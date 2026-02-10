@@ -202,15 +202,9 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									key={stash.selector}
 									stash={stash}
 									index={index}
-									onApply={() => {
-										// TODO: Apply stash
-									}}
-									onPop={() => {
-										// TODO: Pop stash
-									}}
-									onDrop={() => {
-										// TODO: Drop stash
-									}}
+									onApply={() => gitOps.stashApply(stash.selector)}
+									onPop={() => gitOps.stashPop(stash.selector)}
+									onDrop={() => gitOps.stashDrop(stash.selector)}
 								/>
 							))}
 						</Section>

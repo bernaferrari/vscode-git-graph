@@ -88,7 +88,9 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 	};
 
 	const handleStash = async () => {
-		// TODO: Implement stash
+		await gitOps.stashPush(message || undefined);
+		setMessage('');
+		refetchRepoInfo();
 	};
 
 	if (!activeRepo) return null;

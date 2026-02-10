@@ -540,11 +540,25 @@ export function GitGraph() {
 						label="Fetch"
 						onClick={() => gitOps.fetch()}
 					/>
-					<ToolbarButton
-						icon={Upload}
-						label="Push"
-						onClick={() => gitOps.push()}
-					/>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" size="sm" className="h-8 px-2 gap-1.5">
+								<Upload className="h-4 w-4" />
+								<span className="hidden sm:inline">Push</span>
+								<ChevronDown className="h-3 w-3" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start">
+							<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, false)}>
+								<Upload className="h-4 w-4 mr-2" />
+								Push
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, true)}>
+								<Upload className="h-4 w-4 mr-2 text-amber-600" />
+								Force Push
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 					<ToolbarButton
 						icon={GitBranch}
 						label="Pull"

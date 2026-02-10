@@ -103,6 +103,34 @@ export function useGitOperations() {
 		},
 	});
 
+	const stashPush = trpc.git.stash.push.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const stashPop = trpc.git.stash.pop.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const stashApply = trpc.git.stash.apply.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const stashDrop = trpc.git.stash.drop.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
 	const copyToClipboard = trpc.git.copyToClipboard.useMutation();
 
 	// Wrapper functions
@@ -267,6 +295,50 @@ export function useGitOperations() {
 		[activeRepo, revert]
 	);
 
+	const handleStashPush = useCallback(
+		async (message?: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return stashPush.mutateAsync({
+				repo: activeRepo,
+				message,
+			});
+		},
+		[activeRepo, stashPush]
+	);
+
+	const handleStashPop = useCallback(
+		async (selector: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return stashPop.mutateAsync({
+				repo: activeRepo,
+				selector,
+			});
+		},
+		[activeRepo, stashPop]
+	);
+
+	const handleStashApply = useCallback(
+		async (selector: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return stashApply.mutateAsync({
+				repo: activeRepo,
+				selector,
+			});
+		},
+		[activeRepo, stashApply]
+	);
+
+	const handleStashDrop = useCallback(
+		async (selector: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return stashDrop.mutateAsync({
+				repo: activeRepo,
+				selector,
+			});
+		},
+		[activeRepo, stashDrop]
+	);
+
 	const handleCopyToClipboard = useCallback(
 		async (text: string) => {
 			return copyToClipboard.mutateAsync({ text });
@@ -290,7 +362,11 @@ export function useGitOperations() {
 			merge.isPending ||
 			rebase.isPending ||
 			cherryPick.isPending ||
-			revert.isPending,
+			revert.isPending ||
+			stashPush.isPending ||
+			stashPop.isPending ||
+			stashApply.isPending ||
+			stashDrop.isPending,
 
 		// Operations
 		createBranch: handleCreateBranch,
@@ -306,6 +382,10 @@ export function useGitOperations() {
 		rebase: handleRebase,
 		cherryPick: handleCherryPick,
 		revert: handleRevert,
+		stashPush: handleStashPush,
+		stashPop: handleStashPop,
+		stashApply: handleStashApply,
+		stashDrop: handleStashDrop,
 		copyToClipboard: handleCopyToClipboard,
 	};
 }
