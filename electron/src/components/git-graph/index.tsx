@@ -39,6 +39,7 @@ import {
 	GitPullRequest,
 	FolderGit2,
 	Keyboard,
+	Info,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -86,6 +87,8 @@ import { SubmoduleManagement } from './submodule-management';
 import { KeyboardShortcutsHelp } from './keyboard-shortcuts-help';
 import { RecentRepositories } from './recent-repositories';
 import { StashManagement } from './stash-management';
+import { DragDropCherryPick } from './drag-drop-cherry-pick';
+import { CommitGraphLegend } from './commit-graph-legend';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -224,6 +227,9 @@ export function GitGraph() {
 	const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
 	const [recentReposOpen, setRecentReposOpen] = useState(false);
 	const [stashManageOpen, setStashManageOpen] = useState(false);
+	const [graphLegendOpen, setGraphLegendOpen] = useState(false);
+	const [cherryPickDialogOpen, setCherryPickDialogOpen] = useState(false);
+	const [cherryPickCommit, setCherryPickCommit] = useState<{ hash: string; message: string; author: string } | null>(null);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -922,6 +928,10 @@ export function GitGraph() {
 								<Archive className="h-4 w-4 mr-2" />
 								Manage Stashes
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setGraphLegendOpen(true)}>
+								<Info className="h-4 w-4 mr-2" />
+								Graph Legend
+							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
@@ -1252,6 +1262,19 @@ export function GitGraph() {
 				<StashManagement
 					open={stashManageOpen}
 					onOpenChange={setStashManageOpen}
+				/>
+
+				{/* Graph Legend */}
+				<CommitGraphLegend
+					open={graphLegendOpen}
+					onOpenChange={setGraphLegendOpen}
+				/>
+
+				{/* Cherry-Pick Dialog */}
+				<DragDropCherryPick
+					open={cherryPickDialogOpen}
+					onOpenChange={setCherryPickDialogOpen}
+					sourceCommit={cherryPickCommit}
 				/>
 
 				{/* Line Staging */}
