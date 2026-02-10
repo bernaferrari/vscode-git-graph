@@ -20,8 +20,16 @@ import {
 	RotateCcw,
 	Archive,
 	RefreshCw,
+	Edit,
+	ChevronUp,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CommitPanelProps {
 	onCommit?: () => void;
@@ -36,67 +44,57 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 	const [message, setMessage] = useState('');
-	const [stagedFiles, setStagedFiles] = useState<Set<string>>(new Set());
 	const [expandedStaged, setExpandedStaged] = useState(true);
 	const [expandedUnstaged, setExpandedUnstaged] = useState(true);
 
-	// Get uncommitted changes from repoInfo
-	const { data: repoInfo, refetch: refetchRepoInfo } = trpc.git.repoInfo.useQuery(
-		{
-			repo: activeRepo ?? '',
-			showRemoteBranches: true,
-			showStashes: true,
-			hideRemotes: [],
-		},
-		{ enabled: !!activeRepo }
+	// Get working tree status
+	const { data: statusData, refetch: refetchStatus } = trpc.git.workingTreeStatus.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo, refetchInterval: 5000 }
 	);
 
-	// For now, show a placeholder for uncommitted files
-	// TODO: Add proper git status endpoint
-	const hasUncommitted = repoInfo?.hasUncommittedChanges ?? false;
-	const unstaged: FileStatus[] = hasUncommitted ? [{ file: 'Uncommitted changes', status: 'M' }] : [];
-	const staged: FileStatus[] = [];
+	const staged: FileStatus[] = statusData?.staged ?? [];
+	const unstaged: FileStatus[] = statusData?.unstaged ?? [];
 
-	const handleStageFile = (file: string) => {
-		setStagedFiles((prev) => new Set([...prev, file]));
+	const handleStageFile = async (file: string) => {
+		await gitOps.stage([file]);
+		refetchStatus();
 	};
 
-	const handleUnstageFile = (file: string) => {
-		setStagedFiles((prev) => {
-			const next = new Set(prev);
-			next.delete(file);
-			return next;
-		});
+	const handleUnstageFile = async (file: string) => {
+		await gitOps.unstage([file]);
+		refetchStatus();
 	};
 
-	const handleStageAll = () => {
-		const allFiles = [...staged, ...unstaged];
-		setStagedFiles(new Set(allFiles.map((f) => f.file)));
+	const handleStageAll = async () => {
+		await gitOps.stage(unstaged.map((f) => f.file));
+		refetchStatus();
 	};
 
-	const handleUnstageAll = () => {
-		setStagedFiles(new Set());
+	const handleUnstageAll = async () => {
+		await gitOps.unstage(staged.map((f) => f.file));
+		refetchStatus();
 	};
 
-	const handleCommit = async () => {
-		if (!message.trim()) return;
-		// TODO: Implement commit with staged files
+	const handleCommit = async (amend: boolean = false) => {
+		if (!message.trim() && !amend) return;
+		await gitOps.commit(message, amend);
 		setMessage('');
-		setStagedFiles(new Set());
-		refetchRepoInfo();
+		refetchStatus();
 		onCommit?.();
 	};
 
 	const handleStash = async () => {
 		await gitOps.stashPush(message || undefined);
 		setMessage('');
-		refetchRepoInfo();
+		refetchStatus();
 	};
 
 	if (!activeRepo) return null;
 
 	const hasChanges = unstaged.length > 0 || staged.length > 0;
-	const canCommit = stagedFiles.size > 0 && message.trim().length > 0;
+	const canCommit = staged.length > 0 && message.trim().length > 0;
+	const canAmend = staged.length > 0;
 
 	return (
 		<div className="flex flex-col h-full border-t bg-muted/30">
@@ -108,7 +106,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 						variant="ghost"
 						size="sm"
 						className="h-6 w-6 p-0"
-						onClick={() => refetchRepoInfo()}
+						onClick={() => refetchStatus()}
 					>
 						<RefreshCw className="h-3 w-3" />
 					</Button>
@@ -132,6 +130,17 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 								)}
 								<Plus className="h-3 w-3 text-green-600" />
 								<span>Staged ({staged.length})</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-4 px-1 ml-auto text-[10px]"
+									onClick={(e) => {
+										e.stopPropagation();
+										handleUnstageAll();
+									}}
+								>
+									Unstage All
+								</Button>
 							</button>
 							{expandedStaged && (
 								<div className="mt-1 space-y-0.5">
@@ -140,7 +149,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 											key={file.file}
 											file={file.file}
 											status={file.status}
-											staged={stagedFiles.has(file.file)}
+											staged={true}
 											onToggle={() => handleUnstageFile(file.file)}
 										/>
 									))}
@@ -182,7 +191,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 											key={file.file}
 											file={file.file}
 											status={file.status}
-											staged={stagedFiles.has(file.file)}
+											staged={false}
 											onToggle={() => handleStageFile(file.file)}
 										/>
 									))}
@@ -212,15 +221,29 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 				/>
 
 				<div className="flex items-center gap-2">
-					<Button
-						size="sm"
-						className="flex-1"
-						disabled={!canCommit}
-						onClick={handleCommit}
-					>
-						<GitCommit className="h-4 w-4 mr-1" />
-						Commit
-					</Button>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button
+								size="sm"
+								className="flex-1"
+								disabled={!canCommit}
+							>
+								<GitCommit className="h-4 w-4 mr-1" />
+								Commit
+								<ChevronUp className="h-3 w-3 ml-1" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start" className="w-40">
+							<DropdownMenuItem onClick={() => handleCommit(false)} disabled={!canCommit}>
+								<GitCommit className="h-4 w-4 mr-2" />
+								Commit
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => handleCommit(true)} disabled={!canAmend}>
+								<Edit className="h-4 w-4 mr-2" />
+								Amend Commit
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 					<Button
 						variant="outline"
 						size="sm"
@@ -268,7 +291,7 @@ function FileItem({
 		>
 			<Checkbox checked={staged} className="h-3 w-3" />
 			{getStatusIcon()}
-			<span className="text-xs truncate flex-1">{file}</span>
+			<span className="text-xs truncate flex-1" title={file}>{file}</span>
 		</div>
 	);
 }

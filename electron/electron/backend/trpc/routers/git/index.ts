@@ -1059,6 +1059,121 @@ export const gitRouter = router({
 		}),
 
 	/**
+	 * Create a commit.
+	 */
+	commit: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				message: z.string(),
+				amend: z.boolean().optional(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const args = ['commit', '-m', input.message];
+			if (input.amend) {
+				args.push('--amend');
+			}
+
+			const error = await getGitService().runGitCommand(args, input.repo);
+			return { error };
+		}),
+
+	/**
+	 * Get working tree status (changed files).
+	 */
+	workingTreeStatus: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { staged: [], unstaged: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+				const output = await gitService.runGitCommandWithOutput(
+					['status', '--porcelain', '-z'],
+					input.repo
+				);
+
+				const staged: Array<{ file: string; status: string }> = [];
+				const unstaged: Array<{ file: string; status: string }> = [];
+
+				const entries = (output ?? '').split('\0').filter(Boolean);
+				for (const entry of entries) {
+					if (entry.length < 4) continue;
+					const indexStatus = entry[0];
+					const workTreeStatus = entry[1];
+					const file = entry.substring(3);
+
+					// Index status (staged)
+					if (indexStatus && indexStatus !== ' ' && indexStatus !== '?') {
+						staged.push({
+							file,
+							status: indexStatus === 'A' ? 'A' : indexStatus === 'D' ? 'D' : 'M',
+						});
+					}
+
+					// Work tree status (unstaged)
+					if (workTreeStatus && workTreeStatus !== ' ') {
+						unstaged.push({
+							file,
+							status: workTreeStatus === '?' ? 'U' : workTreeStatus === 'D' ? 'D' : 'M',
+						});
+					}
+				}
+
+				return { staged, unstaged, error: null };
+			} catch (error) {
+				return { staged: [], unstaged: [], error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	/**
+	 * Stage files for commit.
+	 */
+	stage: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				files: z.array(z.string()),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['add', ...input.files],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
+	 * Unstage files.
+	 */
+	unstage: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				files: z.array(z.string()),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['reset', 'HEAD', '--', ...input.files],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
 	 * Abort a rebase.
 	 */
 	rebaseAbort: publicProcedure

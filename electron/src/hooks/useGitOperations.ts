@@ -103,6 +103,27 @@ export function useGitOperations() {
 		},
 	});
 
+	const commit = trpc.git.commit.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const stage = trpc.git.stage.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.workingTreeStatus.invalidate();
+		},
+	});
+
+	const unstage = trpc.git.unstage.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.workingTreeStatus.invalidate();
+		},
+	});
+
 	const stashPush = trpc.git.stash.push.useMutation({
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
@@ -295,6 +316,40 @@ export function useGitOperations() {
 		[activeRepo, revert]
 	);
 
+	const handleCommit = useCallback(
+		async (message: string, amend?: boolean) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return commit.mutateAsync({
+				repo: activeRepo,
+				message,
+				amend: amend ?? false,
+			});
+		},
+		[activeRepo, commit]
+	);
+
+	const handleStage = useCallback(
+		async (files: string[]) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return stage.mutateAsync({
+				repo: activeRepo,
+				files,
+			});
+		},
+		[activeRepo, stage]
+	);
+
+	const handleUnstage = useCallback(
+		async (files: string[]) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return unstage.mutateAsync({
+				repo: activeRepo,
+				files,
+			});
+		},
+		[activeRepo, unstage]
+	);
+
 	const handleStashPush = useCallback(
 		async (message?: string) => {
 			if (!activeRepo) return { error: 'No active repository' };
@@ -363,6 +418,9 @@ export function useGitOperations() {
 			rebase.isPending ||
 			cherryPick.isPending ||
 			revert.isPending ||
+			commit.isPending ||
+			stage.isPending ||
+			unstage.isPending ||
 			stashPush.isPending ||
 			stashPop.isPending ||
 			stashApply.isPending ||
@@ -382,6 +440,9 @@ export function useGitOperations() {
 		rebase: handleRebase,
 		cherryPick: handleCherryPick,
 		revert: handleRevert,
+		commit: handleCommit,
+		stage: handleStage,
+		unstage: handleUnstage,
 		stashPush: handleStashPush,
 		stashPop: handleStashPop,
 		stashApply: handleStashApply,
