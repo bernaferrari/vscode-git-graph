@@ -2774,7 +2774,7 @@ export const gitRouter = router({
 					if (!gitDir) return { hooks: [], error: 'Could not find .git directory' };
 
 					// List hooks directory
-					const hooksOutput = await gitService.runGitCommandWithOutput(
+					const _hooksOutput = await gitService.runGitCommandWithOutput(
 						['ls-files', '--error-unmatch', 'hooks'],
 						input.repo
 					);

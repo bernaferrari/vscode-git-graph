@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
@@ -71,7 +70,7 @@ export function BranchCompare({
 
 				{/* Branch selectors */}
 				<div className="flex items-center gap-4 py-2">
-					<Select value={fromBranch} onValueChange={setFromBranch}>
+					<Select value={fromBranch} onValueChange={(v) => v && setFromBranch(v)}>
 						<SelectTrigger className="w-[200px]">
 							<SelectValue placeholder="Select base branch" />
 						</SelectTrigger>
@@ -86,7 +85,7 @@ export function BranchCompare({
 
 					<ArrowRight className="h-4 w-4 text-muted-foreground" />
 
-					<Select value={toBranch} onValueChange={setToBranch}>
+					<Select value={toBranch} onValueChange={(v) => v && setToBranch(v)}>
 						<SelectTrigger className="w-[200px]">
 							<SelectValue placeholder="Select compare branch" />
 						</SelectTrigger>
