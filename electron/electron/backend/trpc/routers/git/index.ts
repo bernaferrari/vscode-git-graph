@@ -2700,6 +2700,61 @@ export const gitRouter = router({
 			}
 		}),
 
+	// ==================== Signing ====================
+	getSigningConfig: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { enabled: false, method: null, key: null, error: initError };
+
+			try {
+				const service = getGitService();
+				const [signingKey, signingFormat] = await Promise.all([
+					service.runGitCommandWithOutput(['config', '--get', 'commit.gpgsign'], input.repo),
+					service.runGitCommandWithOutput(['config', '--get', 'gpg.format'], input.repo),
+				]);
+
+				const enabled = signingKey?.trim() === 'true';
+				const method = signingFormat?.trim() === 'ssh' ? 'ssh' : 'gpg';
+				const key = await service.runGitCommandWithOutput(['config', '--get', 'user.signingkey'], input.repo);
+
+				return { enabled, method, key: key?.trim() || null, error: null };
+			} catch (error) {
+				return { enabled: false, method: null, key: null, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	setSigningConfig: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			enabled: z.boolean(),
+			method: z.enum(['gpg', 'ssh']),
+			key: z.string().optional(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			try {
+				const service = getGitService();
+				await service.runGitCommand(
+					['config', 'commit.gpgsign', input.enabled ? 'true' : 'false'],
+					input.repo
+				);
+
+				if (input.enabled) {
+					await service.runGitCommand(['config', 'gpg.format', input.method], input.repo);
+					if (input.key) {
+						await service.runGitCommand(['config', 'user.signingkey', input.key], input.repo);
+					}
+				}
+
+				return { error: null };
+			} catch (error) {
+				return { error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
 	// ==================== Hooks ====================
 
 	hooks: router({
