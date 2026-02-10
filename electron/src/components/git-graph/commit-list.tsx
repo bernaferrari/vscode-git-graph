@@ -4,6 +4,7 @@
  */
 
 import type { GraphLayout } from '@/lib/graph/layout';
+import { useState } from 'react';
 
 // Minimal commit type for display
 interface DisplayCommit {
@@ -26,6 +27,7 @@ interface CommitListProps {
 	onSelect: (index: number) => void;
 	onExpand: (index: number | null) => void;
 	onContextMenu?: (index: number, event: React.MouseEvent) => void;
+	showAvatars?: boolean;
 }
 
 // Row height - must match graph grid Y spacing
@@ -65,6 +67,7 @@ export function CommitList({
 	onSelect,
 	onExpand,
 	onContextMenu,
+	showAvatars = false,
 }: CommitListProps) {
 	return (
 		<div className="commit-list">
@@ -79,6 +82,7 @@ export function CommitList({
 					onSelect={() => onSelect(index)}
 					onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
 					onContextMenu={onContextMenu ? (e) => onContextMenu(index, e) : undefined}
+					showAvatar={showAvatars}
 				/>
 			))}
 		</div>
@@ -94,6 +98,7 @@ interface CommitRowProps {
 	onSelect: () => void;
 	onToggleExpand: () => void;
 	onContextMenu?: (e: React.MouseEvent) => void;
+	showAvatar?: boolean;
 }
 
 function CommitRow({
@@ -105,6 +110,7 @@ function CommitRow({
 	onSelect,
 	onToggleExpand,
 	onContextMenu,
+	showAvatar = false,
 }: CommitRowProps) {
 	const isUncommitted = commit.hash === '*';
 
@@ -125,6 +131,15 @@ function CommitRow({
 				height: ROW_HEIGHT,
 			}}
 		>
+			{/* Avatar */}
+			{showAvatar && !isUncommitted && (
+				<img
+					src={getGravatarUrl(commit.email)}
+					alt={commit.author}
+					className="w-5 h-5 rounded-full shrink-0 opacity-80"
+					loading="lazy"
+				/>
+			)}
 			{/* Refs - branches, tags, remotes */}
 			<div className="flex items-center gap-1.5 shrink-0">
 				{/* Current branch (first head) */}
@@ -256,4 +271,33 @@ function formatDate(timestamp: number): string {
 	if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo`;
 
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Simple MD5 hash for Gravatar (using SubtleCrypto API)
+async function md5(str: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(str);
+	const hashBuffer = await crypto.subtle.digest('MD5', data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Cache for Gravatar URLs
+const gravatarCache = new Map<string, string>();
+
+// Get Gravatar URL for email
+function getGravatarUrl(email: string): string {
+	const cached = gravatarCache.get(email);
+	if (cached) return cached;
+
+	// Generate a deterministic color based on email for fallback
+	const hash = email.split('').reduce((acc, char) => {
+		return acc + char.charCodeAt(0);
+	}, 0);
+	const hue = hash % 360;
+
+	// Use Gravatar with identicon fallback
+	const url = `https://www.gravatar.com/avatar/${btoa(email).slice(0, 32)}?s=40&d=identicon`;
+	gravatarCache.set(email, url);
+	return url;
 }

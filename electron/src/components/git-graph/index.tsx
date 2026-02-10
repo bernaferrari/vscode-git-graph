@@ -24,6 +24,7 @@ import {
 	User,
 	Calendar,
 	Hash,
+	Globe,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -482,30 +483,46 @@ export function GitGraph() {
 									<ChevronDown className="h-3 w-3" />
 								</Button>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="w-56">
-								<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-									Switch to branch
+							<DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
+								<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground sticky top-0 bg-popover">
+									Local Branches ({repoInfo?.branches?.filter(b => !b.startsWith('remotes/')).length ?? 0})
 								</div>
-								{repoInfo?.branches?.filter(b => !b.startsWith('remotes/')).slice(0, 10).map((branch) => (
+								{repoInfo?.branches?.filter(b => !b.startsWith('remotes/')).map((branch) => (
 									<DropdownMenuItem
 										key={branch}
 										className={branch === currentHead ? 'bg-accent' : ''}
 										onClick={() => {
-											// TODO: Checkout branch
-											console.log('Checkout:', branch);
+											if (branch !== currentHead) {
+												gitOps.checkout(branch);
+											}
 										}}
 									>
-										<GitBranch className="h-4 w-4 mr-2" />
-										{branch}
+										<GitBranch className={`h-4 w-4 mr-2 ${branch === currentHead ? 'text-primary' : 'text-muted-foreground'}`} />
+										<span className="flex-1">{branch}</span>
 										{branch === currentHead && (
-											<span className="ml-auto text-xs text-muted-foreground">current</span>
+											<span className="text-xs text-primary font-medium">✓</span>
 										)}
 									</DropdownMenuItem>
 								))}
-								{(repoInfo?.branches?.length ?? 0) > 10 && (
-									<div className="px-2 py-1 text-xs text-muted-foreground">
-										+{(repoInfo?.branches?.length ?? 0) - 10} more...
-									</div>
+								{/* Remote branches */}
+								{repoInfo?.branches?.filter(b => b.startsWith('remotes/')).length > 0 && (
+									<>
+										<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground sticky top-0 bg-popover mt-2 border-t pt-2">
+											Remote Branches ({repoInfo?.branches?.filter(b => b.startsWith('remotes/')).length ?? 0})
+										</div>
+										{repoInfo?.branches?.filter(b => b.startsWith('remotes/')).map((branch) => (
+											<DropdownMenuItem
+												key={branch}
+												onClick={() => {
+													// Checkout remote branch (creates local tracking branch)
+													gitOps.checkout(branch);
+												}}
+											>
+												<Globe className="h-4 w-4 mr-2 text-muted-foreground" />
+												<span className="flex-1">{branch.replace('remotes/', '')}</span>
+											</DropdownMenuItem>
+										))}
+									</>
 								)}
 							</DropdownMenuContent>
 						</DropdownMenu>
@@ -517,26 +534,17 @@ export function GitGraph() {
 					<ToolbarButton
 						icon={Download}
 						label="Fetch"
-						shortcut="F"
-						onClick={() => {
-							// TODO: Implement fetch
-						}}
+						onClick={() => gitOps.fetch()}
 					/>
 					<ToolbarButton
 						icon={Upload}
 						label="Push"
-						shortcut="P"
-						onClick={() => {
-							// TODO: Implement push
-						}}
+						onClick={() => gitOps.push()}
 					/>
 					<ToolbarButton
 						icon={GitBranch}
 						label="Pull"
-						shortcut="L"
-						onClick={() => {
-							// TODO: Implement pull
-						}}
+						onClick={() => gitOps.pull()}
 					/>
 
 					<div className="h-5 w-px bg-border mx-1" />

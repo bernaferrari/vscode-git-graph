@@ -208,9 +208,9 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 									{/* Change type icon */}
 									<FileChangeIcon type={file.type} />
 									
-									{/* File path */}
-									<span className="truncate flex-1 min-w-0">
-										{file.newFilePath}
+									{/* File path with middle truncation */}
+									<span className="truncate flex-1 min-w-0" title={file.newFilePath}>
+										{middleTruncate(file.newFilePath)}
 									</span>
 
 									{/* Additions/deletions */}
@@ -326,4 +326,29 @@ function formatRelative(timestamp: number): string {
 	if (days < 7) return `${days} days ago`;
 
 	return formatDate(timestamp);
+}
+
+// Middle truncate long file paths: "src/components/very/long/path/to/file.ts" -> "src/.../to/file.ts"
+function middleTruncate(path: string, maxLength: number = 40): string {
+	if (path.length <= maxLength) return path;
+
+	// Keep the filename intact
+	const lastSlash = path.lastIndexOf('/');
+	const filename = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+	const dirPath = lastSlash >= 0 ? path.slice(0, lastSlash) : '';
+
+	if (filename.length >= maxLength - 5) {
+		// Filename is already long, just truncate end
+		return filename.slice(0, maxLength - 3) + '...';
+	}
+
+	// Calculate how much of the directory path we can keep
+	const availableForDir = maxLength - filename.length - 5; // -5 for ".../"
+
+	if (availableForDir < 5) {
+		return '.../' + filename;
+	}
+
+	// Keep start of directory path
+	return dirPath.slice(0, availableForDir) + '.../' + filename;
 }
