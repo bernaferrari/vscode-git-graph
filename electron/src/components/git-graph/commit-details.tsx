@@ -31,9 +31,11 @@ import {
 	RotateCcw,
 	Columns,
 	PanelTop,
+	History,
 } from 'lucide-react';
 import { useState } from 'react';
 import { SideBySideDiff } from './side-by-side-diff';
+import { FileHistory } from './file-history';
 
 interface CommitDetailsPanelProps {
 	commitHash: string | null;
@@ -44,6 +46,8 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [showDiff, setShowDiff] = useState(false);
+	const [showFileHistory, setShowFileHistory] = useState(false);
+	const [historyFile, setHistoryFile] = useState<string | null>(null);
 
 	const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
 		{
@@ -62,6 +66,12 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 	const handleFileClick = (filePath: string) => {
 		setSelectedFile(filePath);
 		setShowDiff(true);
+	};
+
+	// Handle view file history
+	const handleViewHistory = (filePath: string) => {
+		setHistoryFile(filePath);
+		setShowFileHistory(true);
 	};
 
 	if (!commitHash) {
@@ -258,6 +268,10 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 												Copy path
 											</DropdownMenuItem>
 											<DropdownMenuSeparator />
+											<DropdownMenuItem onClick={() => handleViewHistory(file.newFilePath)}>
+												<History className="h-4 w-4 mr-2" />
+												View History
+											</DropdownMenuItem>
 											<DropdownMenuItem>
 												<FileText className="h-4 w-4 mr-2" />
 												View file at this commit
@@ -301,6 +315,36 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 								status: selectedFileInfo.type,
 							}}
 							commitHash={commitHash ?? ''}
+						/>
+					</div>
+				</div>
+			)}
+
+			{/* File History Viewer */}
+			{showFileHistory && historyFile && (
+				<div className="absolute inset-0 z-10 bg-background flex flex-col">
+					<div className="flex items-center justify-between px-3 py-2 border-b">
+						<div className="flex items-center gap-2">
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-6 w-6 p-0"
+								onClick={() => setShowFileHistory(false)}
+							>
+								<X className="h-4 w-4" />
+							</Button>
+							<span className="text-sm font-medium truncate max-w-[200px]">
+								{historyFile}
+							</span>
+						</div>
+					</div>
+					<div className="flex-1 overflow-hidden">
+						<FileHistory
+							filePath={historyFile}
+							onSelectCommit={(hash) => {
+								// Could navigate to the commit in the main view
+								console.log('Selected commit:', hash);
+							}}
 						/>
 					</div>
 				</div>
