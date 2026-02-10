@@ -2984,4 +2984,102 @@ export const gitRouter = router({
 				return { output: null, error: error instanceof Error ? error.message : 'Unknown error' };
 			}
 		}),
+
+	// ==================== Search Commits ====================
+	searchCommits: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			query: z.string(),
+			type: z.enum(['message', 'author', 'file', 'hash']).optional().default('message'),
+			limit: z.number().optional().default(50),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { commits: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+				let args: string[];
+
+				switch (input.type) {
+					case 'author':
+						args = ['log', '--all', '--oneline', `--author=${input.query}`, `-n`, String(input.limit)];
+						break;
+					case 'hash':
+						args = ['log', '--all', '--oneline', `--grep=${input.query}`, `-n`, String(input.limit)];
+						break;
+					case 'file':
+						args = ['log', '--all', '--oneline', `--name-only`, `-n`, String(input.limit)];
+						// For file search, we need to filter results
+						break;
+					default:
+						args = ['log', '--all', '--oneline', `--grep=${input.query}`, `-n`, String(input.limit)];
+				}
+
+				const output = await gitService.runGitCommandWithOutput(args, input.repo);
+				
+				if (!output) {
+					return { commits: [], error: null };
+				}
+
+				// Parse log output
+				const commits = output.split('\n').filter(Boolean).map((line) => {
+					const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+					if (match) {
+						return {
+							hash: match[1],
+							message: match[2],
+							author: '',
+							date: 0,
+						};
+					}
+					return null;
+				}).filter(Boolean) as Array<{ hash: string; message: string; author: string; date: number }>;
+
+				// For file search, we need to get more details
+				if (input.type === 'file') {
+					// Get commits that touched files matching the query
+					const fileArgs = ['log', '--all', '--format=%H|%s|%an|%ct', '--name-only', `-n`, String(input.limit * 2)];
+					const fileOutput = await gitService.runGitCommandWithOutput(fileArgs, input.repo);
+					
+					if (fileOutput) {
+						const matchingCommits: Array<{ hash: string; message: string; author: string; date: number }> = [];
+						const lines = fileOutput.split('\n');
+						let currentCommit: { hash: string; message: string; author: string; date: number } | null = null;
+						
+						for (const line of lines) {
+							if (line.includes('|')) {
+								const [hash, message, author, date] = line.split('|');
+								currentCommit = { hash, message, author, date: parseInt(date, 10) };
+							} else if (line && currentCommit && line.toLowerCase().includes(input.query.toLowerCase())) {
+								if (!matchingCommits.find(c => c.hash === currentCommit?.hash)) {
+									matchingCommits.push(currentCommit);
+								}
+							}
+						}
+						
+						return { commits: matchingCommits.slice(0, input.limit), error: null };
+					}
+				} else {
+					// Get author and date for non-file searches
+					const detailedCommits = await Promise.all(
+						commits.slice(0, input.limit).map(async (commit) => {
+							const detailArgs = ['log', '-1', '--format=%an|%ct', commit.hash];
+							const detailOutput = await gitService.runGitCommandWithOutput(detailArgs, input.repo);
+							if (detailOutput) {
+								const [author, date] = detailOutput.split('|');
+								return { ...commit, author, date: parseInt(date, 10) };
+							}
+							return commit;
+						})
+					);
+					
+					return { commits: detailedCommits, error: null };
+				}
+
+				return { commits: [], error: null };
+			} catch (error) {
+				return { commits: [], error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
 });
