@@ -36,6 +36,13 @@ import {
 import { useState } from 'react';
 import { SideBySideDiff } from './side-by-side-diff';
 import { FileHistory } from './file-history';
+import { ImageDiff } from './image-diff';
+
+// Check if file is an image
+const isImageFile = (path: string): boolean => {
+	const ext = path.split('.').pop()?.toLowerCase() ?? '';
+	return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext);
+};
 
 interface CommitDetailsPanelProps {
 	commitHash: string | null;
@@ -308,14 +315,25 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 						</div>
 					</div>
 					<div className="flex-1 overflow-hidden">
-						<SideBySideDiff
-							file={{
-								path: selectedFile,
-								oldPath: selectedFileInfo.oldFilePath ?? undefined,
-								status: selectedFileInfo.type,
-							}}
-							commitHash={commitHash ?? ''}
-						/>
+						{isImageFile(selectedFile) ? (
+							<ImageDiff
+								file={{
+									path: selectedFile,
+									oldPath: selectedFileInfo.oldFilePath ?? undefined,
+									status: selectedFileInfo.type,
+								}}
+								commitHash={commitHash ?? ''}
+							/>
+						) : (
+							<SideBySideDiff
+								file={{
+									path: selectedFile,
+									oldPath: selectedFileInfo.oldFilePath ?? undefined,
+									status: selectedFileInfo.type,
+								}}
+								commitHash={commitHash ?? ''}
+							/>
+						)}
 					</div>
 				</div>
 			)}
