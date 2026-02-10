@@ -1,0 +1,293 @@
+/**
+ * Stash Management Dialog
+ * View, apply, drop, and pop stashes
+ */
+
+import { useState } from 'react';
+import { trpc } from '@/trpc/client';
+import { useAppStore } from '@/lib/store';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import {
+	Archive,
+	Plus,
+	Trash2,
+	Download,
+	Check,
+	Clock,
+	Loader2,
+	GitBranch,
+	AlertCircle,
+	Eye,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useGitOperations } from '@/hooks/useGitOperations';
+
+interface StashEntry {
+	index: number;
+	message: string;
+	branch: string;
+	hash: string;
+	date: string;
+	files: { path: string; additions: number; deletions: number }[];
+}
+
+interface StashManagementProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}
+
+export function StashManagement({ open, onOpenChange }: StashManagementProps) {
+	const { activeRepo } = useAppStore();
+	const gitOps = useGitOperations();
+	const [newStashMessage, setNewStashMessage] = useState('');
+	const [viewingStash, setViewingStash] = useState<number | null>(null);
+
+	// Fetch stashes
+	const { data: stashData, isLoading, refetch } = trpc.git.stashList.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo && open }
+	);
+
+	const stashes: StashEntry[] = stashData?.stashes ?? [];
+
+	// Create stash mutation
+	const createMutation = trpc.git.stashPush.useMutation({
+		onSuccess: () => {
+			toast.success('Stash created');
+			setNewStashMessage('');
+			refetch();
+		},
+		onError: (error) => {
+			toast.error('Failed to create stash', { description: error.message });
+		},
+	});
+
+	// Apply stash mutation
+	const applyMutation = trpc.git.stashApply.useMutation({
+		onSuccess: () => {
+			toast.success('Stash applied');
+			refetch();
+		},
+		onError: (error) => {
+			toast.error('Failed to apply stash', { description: error.message });
+		},
+	});
+
+	// Drop stash mutation
+	const dropMutation = trpc.git.stashDrop.useMutation({
+		onSuccess: () => {
+			toast.success('Stash dropped');
+			refetch();
+		},
+		onError: (error) => {
+			toast.error('Failed to drop stash', { description: error.message });
+		},
+	});
+
+	// Pop stash mutation
+	const popMutation = trpc.git.stashPop.useMutation({
+		onSuccess: () => {
+			toast.success('Stash popped and applied');
+			refetch();
+		},
+		onError: (error) => {
+			toast.error('Failed to pop stash', { description: error.message });
+		},
+	});
+
+	const handleCreateStash = () => {
+		createMutation.mutate({
+			repo: activeRepo ?? '',
+			message: newStashMessage || undefined,
+		});
+	};
+
+	const handleApplyStash = (index: number, keepInList: boolean) => {
+		if (keepInList) {
+			applyMutation.mutate({ repo: activeRepo ?? '', index });
+		} else {
+			popMutation.mutate({ repo: activeRepo ?? '', index });
+		}
+	};
+
+	const handleDropStash = (index: number) => {
+		if (confirm(`Drop stash@{${index}}?`)) {
+			dropMutation.mutate({ repo: activeRepo ?? '', index });
+		}
+	};
+
+	const formatDate = (dateStr: string) => {
+		try {
+			const date = new Date(dateStr);
+			return date.toLocaleString();
+		} catch {
+			return dateStr;
+		}
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+				<DialogHeader>
+					<DialogTitle className="flex items-center gap-2">
+						<Archive className="h-5 w-5" />
+						Stash Management
+						<span className="text-sm font-normal text-muted-foreground">
+							{stashes.length} stash{stashes.length !== 1 ? 'es' : ''}
+						</span>
+					</DialogTitle>
+				</DialogHeader>
+
+				{/* Create new stash */}
+				<div className="flex items-center gap-2 py-2 border-b">
+					<Input
+						placeholder="Stash message (optional)"
+						value={newStashMessage}
+						onChange={(e) => setNewStashMessage(e.target.value)}
+						className="flex-1"
+					/>
+					<Button
+						size="sm"
+						onClick={handleCreateStash}
+						disabled={createMutation.isPending}
+					>
+						{createMutation.isPending ? (
+							<Loader2 className="h-4 w-4 mr-1 animate-spin" />
+						) : (
+							<Plus className="h-4 w-4 mr-1" />
+						)}
+						Stash
+					</Button>
+				</div>
+
+				<ScrollArea className="flex-1">
+					{isLoading ? (
+						<div className="flex items-center justify-center py-8">
+							<Loader2 className="h-6 w-6 animate-spin" />
+						</div>
+					) : stashes.length === 0 ? (
+						<div className="text-center py-8 text-muted-foreground">
+							<Archive className="h-12 w-12 mx-auto mb-4 opacity-50" />
+							<p>No stashes</p>
+							<p className="text-xs mt-1">
+								Stash your changes to save them temporarily.
+							</p>
+						</div>
+					) : (
+						<div className="space-y-2">
+							{stashes.map((stash, idx) => (
+								<div key={stash.index} className="border rounded-lg overflow-hidden">
+									<div className="p-3 hover:bg-accent/30">
+										<div className="flex items-start gap-3">
+											<div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 shrink-0 text-sm font-medium">
+												{stash.index}
+											</div>
+											<div className="flex-1 min-w-0">
+												<div className="flex items-center gap-2 mb-1">
+													<span className="font-medium text-sm">
+														{stash.message || `stash@{${stash.index}}`}
+													</span>
+													{stash.branch && (
+														<span className="text-xs px-1.5 py-0.5 rounded bg-muted flex items-center gap-1">
+															<GitBranch className="h-3 w-3" />
+															{stash.branch}
+														</span>
+													)}
+												</div>
+												<div className="flex items-center gap-2 text-xs text-muted-foreground">
+													<span className="font-mono">{stash.hash?.slice(0, 7)}</span>
+													<span>•</span>
+													<span>{formatDate(stash.date)}</span>
+												</div>
+											</div>
+											<div className="flex items-center gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => setViewingStash(viewingStash === idx ? null : idx)}
+												>
+													<Eye className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => handleApplyStash(stash.index, true)}
+													disabled={applyMutation.isPending}
+													title="Apply (keep in list)"
+												>
+													<Download className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => handleApplyStash(stash.index, false)}
+													disabled={popMutation.isPending}
+													title="Pop (remove from list)"
+												>
+													<Check className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="text-red-600"
+													onClick={() => handleDropStash(stash.index)}
+													disabled={dropMutation.isPending}
+												>
+													<Trash2 className="h-4 w-4" />
+												</Button>
+											</div>
+										</div>
+
+										{/* Files in stash */}
+										{viewingStash === idx && stash.files?.length > 0 && (
+											<div className="mt-3 pt-3 border-t">
+												<p className="text-xs text-muted-foreground mb-2">
+													{stash.files.length} file{stash.files.length !== 1 ? 's' : ''} changed
+												</p>
+												<div className="space-y-1 max-h-40 overflow-y-auto">
+													{stash.files.map((file, fileIdx) => (
+														<div
+															key={fileIdx}
+															className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/50"
+														>
+															<span className="truncate">{file.path}</span>
+															<div className="flex items-center gap-2 text-muted-foreground">
+																{file.additions > 0 && (
+																	<span className="text-green-600">+{file.additions}</span>
+																)}
+																{file.deletions > 0 && (
+																	<span className="text-red-600">-{file.deletions}</span>
+																)}
+															</div>
+														</div>
+													))}
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+							))}
+						</div>
+					)}
+				</ScrollArea>
+
+				<div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+					<AlertCircle className="h-3 w-3" />
+					<span>
+						Apply keeps the stash in the list. Pop applies and removes it.
+					</span>
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export default StashManagement;

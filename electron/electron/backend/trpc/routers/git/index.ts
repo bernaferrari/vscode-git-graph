@@ -3164,4 +3164,122 @@ export const gitRouter = router({
 		.mutation(async ({ input }) => {
 			return { error: 'Pull request integration requires API token configuration.' };
 		}),
+
+	// ==================== Stash Operations ====================
+	stashList: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { stashes: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+				const output = await gitService.runGitCommandWithOutput(
+					['stash', 'list', '--format=%gd|%gs|%h|%ci'],
+					input.repo
+				);
+
+				const stashes = (output ?? '').split('\n').filter(Boolean).map((line) => {
+					const [ref, message, hash, date] = line.split('|');
+					const indexMatch = ref?.match(/stash@\{(\d+)\}/);
+					const branchMatch = message?.match(/^WIP on ([^:]+):/);
+					
+					return {
+						index: indexMatch ? parseInt(indexMatch[1], 10) : 0,
+						message: message || '',
+						branch: branchMatch ? branchMatch[1] : '',
+						hash: hash || '',
+						date: date || '',
+						files: [] as { path: string; additions: number; deletions: number }[],
+					};
+				});
+
+				return { stashes, error: null };
+			} catch (error) {
+				return { stashes: [], error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	stashPush: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			message: z.string().optional(),
+			includeUntracked: z.boolean().optional().default(true),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const args = ['stash', 'push'];
+			if (input.message) {
+				args.push('-m', input.message);
+			}
+			if (input.includeUntracked) {
+				args.push('--include-untracked');
+			}
+
+			const error = await getGitService().runGitCommand(args, input.repo);
+			return { error };
+		}),
+
+	stashApply: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			index: z.number(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['stash', 'apply', `stash@{${input.index}}`],
+				input.repo
+			);
+			return { error };
+		}),
+
+	stashPop: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			index: z.number(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['stash', 'pop', `stash@{${input.index}}`],
+				input.repo
+			);
+			return { error };
+		}),
+
+	stashDrop: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			index: z.number(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['stash', 'drop', `stash@{${input.index}}`],
+				input.repo
+			);
+			return { error };
+		}),
+
+	stashClear: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['stash', 'clear'],
+				input.repo
+			);
+			return { error };
+		}),
 });

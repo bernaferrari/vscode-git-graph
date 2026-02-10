@@ -85,6 +85,7 @@ import { WorktreeManagement } from './worktree-management';
 import { SubmoduleManagement } from './submodule-management';
 import { KeyboardShortcutsHelp } from './keyboard-shortcuts-help';
 import { RecentRepositories } from './recent-repositories';
+import { StashManagement } from './stash-management';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -222,6 +223,7 @@ export function GitGraph() {
 	const [submoduleOpen, setSubmoduleOpen] = useState(false);
 	const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
 	const [recentReposOpen, setRecentReposOpen] = useState(false);
+	const [stashManageOpen, setStashManageOpen] = useState(false);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -916,6 +918,10 @@ export function GitGraph() {
 								Keyboard Shortcuts
 								<span className="ml-auto text-xs text-muted-foreground">?</span>
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setStashManageOpen(true)}>
+								<Archive className="h-4 w-4 mr-2" />
+								Manage Stashes
+							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
@@ -1240,6 +1246,12 @@ export function GitGraph() {
 				<RecentRepositories
 					open={recentReposOpen}
 					onOpenChange={setRecentReposOpen}
+				/>
+
+				{/* Stash Management */}
+				<StashManagement
+					open={stashManageOpen}
+					onOpenChange={setStashManageOpen}
 				/>
 
 				{/* Line Staging */}
