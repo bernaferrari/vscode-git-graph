@@ -321,10 +321,18 @@ function BranchItem({
 							<MoreHorizontal className="h-3 w-3" />
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-40">
+					<DropdownMenuContent align="end" className="w-48">
 						<DropdownMenuItem onClick={onCheckout}>
 							<Check className="h-4 w-4 mr-2" />
 							Checkout
+						</DropdownMenuItem>
+						<DropdownMenuItem>
+							<Merge className="h-4 w-4 mr-2" />
+							Merge into current
+						</DropdownMenuItem>
+						<DropdownMenuItem>
+							<RefreshCw className="h-4 w-4 mr-2" />
+							Rebase current onto...
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem onClick={onDelete} className="text-destructive">
