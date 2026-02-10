@@ -31,6 +31,32 @@ interface CommitListProps {
 // Row height - must match graph grid Y spacing
 export const ROW_HEIGHT = 32;
 
+// Semantic commit types with colors
+const COMMIT_TYPES: Record<string, { color: string; bg: string }> = {
+	feat: { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
+	fix: { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+	docs: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+	style: { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30' },
+	refactor: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+	perf: { color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+	test: { color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
+	build: { color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+	ci: { color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-900/30' },
+	chore: { color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/30' },
+	revert: { color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-100 dark:bg-pink-900/30' },
+};
+
+// Parse semantic commit message
+function parseCommitMessage(message: string): { type?: string; scope?: string; description: string } {
+	const firstLine = message.split('\n')[0];
+	// Match: type(scope): description or type: description
+	const match = firstLine.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.*)$/);
+	if (match) {
+		return { type: match[1], scope: match[2], description: match[3] };
+	}
+	return { description: firstLine };
+}
+
 export function CommitList({
 	commits,
 	layout,
@@ -139,12 +165,12 @@ function CommitRow({
 				))}
 			</div>
 
-			{/* Commit message */}
+			{/* Commit message with semantic highlighting */}
 			<span className="text-sm truncate flex-1 min-w-0">
 				{isUncommitted ? (
 					<span className="text-muted-foreground italic">Uncommitted Changes</span>
 				) : (
-					commit.message.split('\n')[0]
+					<CommitMessage message={commit.message} />
 				)}
 			</span>
 
@@ -191,6 +217,26 @@ function TagIcon({ className }: { className?: string }) {
 			<path d="M7 7h.01" />
 		</svg>
 	);
+}
+
+// Commit message with semantic type highlighting
+function CommitMessage({ message }: { message: string }) {
+	const parsed = parseCommitMessage(message);
+	const typeInfo = parsed.type ? COMMIT_TYPES[parsed.type] : null;
+
+	if (typeInfo && parsed.type) {
+		return (
+			<>
+				<span className={`${typeInfo.bg} ${typeInfo.color} px-1.5 py-0.5 rounded text-xs font-medium mr-1`}>
+					{parsed.type}
+					{parsed.scope && <span className="opacity-70">({parsed.scope})</span>}
+				</span>
+				<span className="truncate">{parsed.description}</span>
+			</>
+		);
+	}
+
+	return <span className="truncate">{parsed.description}</span>;
 }
 
 function formatDate(timestamp: number): string {

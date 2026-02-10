@@ -474,9 +474,41 @@ export function GitGraph() {
 							<GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
 							<span className="text-sm font-medium">{activeRepo.split('/').pop()}</span>
 						</div>
-						<Badge variant="secondary" className="text-xs font-mono">
-							{currentHead}
-						</Badge>
+						{/* Current branch - clickable to show branches */}
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="secondary" size="sm" className="h-6 px-2 text-xs font-mono gap-1">
+									{currentHead}
+									<ChevronDown className="h-3 w-3" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="start" className="w-56">
+								<div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+									Switch to branch
+								</div>
+								{repoInfo?.branches?.filter(b => !b.startsWith('remotes/')).slice(0, 10).map((branch) => (
+									<DropdownMenuItem
+										key={branch}
+										className={branch === currentHead ? 'bg-accent' : ''}
+										onClick={() => {
+											// TODO: Checkout branch
+											console.log('Checkout:', branch);
+										}}
+									>
+										<GitBranch className="h-4 w-4 mr-2" />
+										{branch}
+										{branch === currentHead && (
+											<span className="ml-auto text-xs text-muted-foreground">current</span>
+										)}
+									</DropdownMenuItem>
+								))}
+								{(repoInfo?.branches?.length ?? 0) > 10 && (
+									<div className="px-2 py-1 text-xs text-muted-foreground">
+										+{(repoInfo?.branches?.length ?? 0) - 10} more...
+									</div>
+								)}
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 
 					<div className="h-5 w-px bg-border mx-1" />
@@ -608,12 +640,12 @@ export function GitGraph() {
 				/>
 
 				{/* Main Content */}
-				<div className="flex-1 flex overflow-hidden">
+				<div className="flex-1 flex overflow-hidden min-w-0">
 					{/* Graph and Commit List */}
-					<ScrollArea className="flex-1">
-						<div className="flex">
-							{/* Graph - sticky so it stays visible while scrolling */}
-							<div className="shrink-0 sticky left-0 bg-background z-10" style={{ width: graphLayout?.width ?? 200 }}>
+					<ScrollArea className="flex-1 w-full h-full">
+						<div className="flex min-w-max">
+							{/* Graph */}
+							<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
 								{graphLayout && (
 									<CommitGraph
 										layout={graphLayout}
@@ -626,7 +658,7 @@ export function GitGraph() {
 							</div>
 
 							{/* Commit list */}
-							<div className="flex-1 min-w-0">
+							<div className="shrink-0" style={{ width: 'max-content' }}>
 								{commitsData?.commits && commitsData.commits.length > 0 && (
 									<CommitList
 										commits={commitsData.commits}

@@ -113,7 +113,7 @@ export default function AppLayout() {
 			>
 				{/* Draggable titlebar with macOS traffic light padding */}
 				<div
-					className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border sidebar-title"
+					className="sidebar-header flex items-center justify-between px-3 border-b border-sidebar-border"
 					style={{ WebkitAppRegion: 'drag' }}
 				>
 					{sidebarOpen && (

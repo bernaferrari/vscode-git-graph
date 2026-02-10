@@ -132,6 +132,7 @@
 }
 
 /* Platform-specific styles */
-.platform-darwin .sidebar-title {
-  padding-top: 2.75rem;
+.platform-darwin .sidebar-header {
+  padding-top: 2.5rem;
+  padding-bottom: 0.5rem;
 }
