@@ -38,6 +38,7 @@ import {
 	Package,
 	GitPullRequest,
 	FolderGit2,
+	Keyboard,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -82,6 +83,8 @@ import { PullRequestIntegration } from './pull-request-integration';
 import { EnhancedCommitPanel } from './enhanced-commit-panel';
 import { WorktreeManagement } from './worktree-management';
 import { SubmoduleManagement } from './submodule-management';
+import { KeyboardShortcutsHelp } from './keyboard-shortcuts-help';
+import { RecentRepositories } from './recent-repositories';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -217,6 +220,8 @@ export function GitGraph() {
 	const [prIntegrationOpen, setPrIntegrationOpen] = useState(false);
 	const [worktreeOpen, setWorktreeOpen] = useState(false);
 	const [submoduleOpen, setSubmoduleOpen] = useState(false);
+	const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
+	const [recentReposOpen, setRecentReposOpen] = useState(false);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -492,7 +497,7 @@ export function GitGraph() {
 			} else if (e.key === '?') {
 				// Show help/keyboard shortcuts
 				e.preventDefault();
-				// Could open a help dialog
+				setKeyboardHelpOpen(true);
 			}
 		};
 
@@ -902,6 +907,16 @@ export function GitGraph() {
 								Submodules
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setRecentReposOpen(true)}>
+								<FolderGit2 className="h-4 w-4 mr-2" />
+								Recent Repositories
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setKeyboardHelpOpen(true)}>
+								<Keyboard className="h-4 w-4 mr-2" />
+								Keyboard Shortcuts
+								<span className="ml-auto text-xs text-muted-foreground">?</span>
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
 								Undo Last Commit
@@ -1213,6 +1228,18 @@ export function GitGraph() {
 				<SubmoduleManagement
 					open={submoduleOpen}
 					onOpenChange={setSubmoduleOpen}
+				/>
+
+				{/* Keyboard Shortcuts Help */}
+				<KeyboardShortcutsHelp
+					open={keyboardHelpOpen}
+					onOpenChange={setKeyboardHelpOpen}
+				/>
+
+				{/* Recent Repositories */}
+				<RecentRepositories
+					open={recentReposOpen}
+					onOpenChange={setRecentReposOpen}
 				/>
 
 				{/* Line Staging */}
