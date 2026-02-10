@@ -26,6 +26,9 @@ import {
 	Hash,
 	Globe,
 	PanelLeft,
+	BarChart3,
+	Settings,
+	Undo,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -45,6 +48,15 @@ import {
 } from './dialogs';
 import { CommitDetailsPanel } from './commit-details';
 import { SidePanel } from './side-panel';
+import { FuzzyFinder } from './fuzzy-finder';
+import { InteractiveRebase } from './interactive-rebase';
+import { Statistics } from './statistics';
+import { GitFlowToolbar } from './gitflow-toolbar';
+import { MergeConflictEditor } from './merge-conflict-editor';
+import { RemoteManageDialog } from './remote-manage-dialog';
+import { BranchCompare } from './branch-compare';
+import { HooksManageDialog } from './hooks-manage-dialog';
+import { TerminalPanel } from './terminal-panel';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -143,6 +155,17 @@ export function GitGraph() {
 	const [selectedBranches, setSelectedBranches] = useState<string[]>(['__all__']);
 	const [showSidePanel, setShowSidePanel] = useState(true);
 	const [layoutMode, setLayoutMode] = useState<'panel' | 'tabs'>('panel');
+
+	// New feature states
+	const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
+	const [interactiveRebaseOpen, setInteractiveRebaseOpen] = useState(false);
+	const [statisticsOpen, setStatisticsOpen] = useState(false);
+	const [terminalOpen, setTerminalOpen] = useState(false);
+	const [remoteManageOpen, setRemoteManageOpen] = useState(false);
+	const [branchCompareOpen, setBranchCompareOpen] = useState(false);
+	const [hooksManageOpen, setHooksManageOpen] = useState(false);
+	const [mergeConflictOpen, setMergeConflictOpen] = useState(false);
+	const [conflictFile, setConflictFile] = useState<{ path: string; ours: string; theirs: string } | null>(null);
 
 	// Refs
 	// Note: ScrollArea handles scrolling internally
@@ -365,12 +388,19 @@ export function GitGraph() {
 			} else if (e.key === 'Escape') {
 				setCommitDetailsOpen(false);
 				setFindWidgetOpen(false);
+				setFuzzyFinderOpen(false);
+			} else if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+				e.preventDefault();
+				setFuzzyFinderOpen(true);
+			} else if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
+				e.preventDefault();
+				setTerminalOpen(!terminalOpen);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen]);
 
 	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
@@ -657,6 +687,39 @@ export function GitGraph() {
 								<FileCode className="h-4 w-4 mr-2" />
 								Open in Finder
 							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setFuzzyFinderOpen(true)}>
+								<Search className="h-4 w-4 mr-2" />
+								Quick Switch...
+								<span className="ml-auto text-xs text-muted-foreground">⌘K</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setTerminalOpen(!terminalOpen)}>
+								<Terminal className="h-4 w-4 mr-2" />
+								Toggle Terminal
+								<span className="ml-auto text-xs text-muted-foreground">⌘P</span>
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setStatisticsOpen(true)}>
+								<BarChart3 className="h-4 w-4 mr-2" />
+								Statistics
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setRemoteManageOpen(true)}>
+								<Globe className="h-4 w-4 mr-2" />
+								Manage Remotes
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setBranchCompareOpen(true)}>
+								<GitBranch className="h-4 w-4 mr-2" />
+								Compare Branches
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setHooksManageOpen(true)}>
+								<Settings className="h-4 w-4 mr-2" />
+								Hooks
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
+								<Undo className="h-4 w-4 mr-2" />
+								Undo Last Commit
+							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
@@ -824,6 +887,57 @@ export function GitGraph() {
 						setRevertOpen(false);
 					}}
 					commitHash={targetCommit}
+				/>
+
+				{/* New Feature Dialogs */}
+				<FuzzyFinder
+					open={fuzzyFinderOpen}
+					onOpenChange={setFuzzyFinderOpen}
+				/>
+
+				<InteractiveRebase
+					open={interactiveRebaseOpen}
+					onOpenChange={setInteractiveRebaseOpen}
+					baseCommit={targetCommit}
+					commits={commitsData?.commits?.slice(0, 20) ?? []}
+				/>
+
+				<Statistics
+					open={statisticsOpen}
+					onClose={() => setStatisticsOpen(false)}
+				/>
+
+				<RemoteManageDialog
+					open={remoteManageOpen}
+					onOpenChange={setRemoteManageOpen}
+				/>
+
+				<BranchCompare
+					open={branchCompareOpen}
+					onOpenChange={setBranchCompareOpen}
+					branches={repoInfo?.branches ?? []}
+					initialFrom={repoInfo?.head ?? ''}
+				/>
+
+				<HooksManageDialog
+					open={hooksManageOpen}
+					onOpenChange={setHooksManageOpen}
+				/>
+
+				<MergeConflictEditor
+					open={mergeConflictOpen}
+					onOpenChange={setMergeConflictOpen}
+					conflict={conflictFile}
+					onResolve={(path, content) => {
+						console.log('Resolved:', path, content);
+						setMergeConflictOpen(false);
+					}}
+				/>
+
+				<TerminalPanel
+					open={terminalOpen}
+					onOpenChange={setTerminalOpen}
+					cwd={activeRepo ?? undefined}
 				/>
 			</div>
 		</TooltipProvider>

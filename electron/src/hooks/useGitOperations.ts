@@ -152,6 +152,102 @@ export function useGitOperations() {
 		},
 	});
 
+	const undoLastCommit = trpc.git.undoLastCommit.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+			utils.git.workingTreeStatus.invalidate();
+		},
+	});
+
+	const submoduleAdd = trpc.git.submodule.add.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const submoduleUpdate = trpc.git.submodule.update.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+		},
+	});
+
+	const submoduleRemove = trpc.git.submodule.remove.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowFeatureStart = trpc.git.gitflow.feature.start.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowFeatureFinish = trpc.git.gitflow.feature.finish.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowReleaseStart = trpc.git.gitflow.release.start.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowReleaseFinish = trpc.git.gitflow.release.finish.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowHotfixStart = trpc.git.gitflow.hotfix.start.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const gitflowHotfixFinish = trpc.git.gitflow.hotfix.finish.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.commits.invalidate();
+		},
+	});
+
+	const remoteAdd = trpc.git.remote.add.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.remotes.invalidate();
+		},
+	});
+
+	const remoteRemove = trpc.git.remote.remove.useMutation({
+		onSuccess: () => {
+			utils.git.repoInfo.invalidate();
+			utils.git.remotes.invalidate();
+		},
+	});
+
+	const worktreeCreate = trpc.git.worktreeManage.create.useMutation({
+		onSuccess: () => {
+			utils.git.worktree.list.invalidate();
+		},
+	});
+
+	const worktreeRemove = trpc.git.worktreeManage.remove.useMutation({
+		onSuccess: () => {
+			utils.git.worktree.list.invalidate();
+		},
+	});
+
 	const copyToClipboard = trpc.git.copyToClipboard.useMutation();
 
 	// Wrapper functions
@@ -394,6 +490,172 @@ export function useGitOperations() {
 		[activeRepo, stashDrop]
 	);
 
+	const handleUndoLastCommit = useCallback(
+		async (soft: boolean = true) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return undoLastCommit.mutateAsync({
+				repo: activeRepo,
+				soft,
+			});
+		},
+		[activeRepo, undoLastCommit]
+	);
+
+	const handleSubmoduleAdd = useCallback(
+		async (url: string, path: string, branch?: string, depth?: number) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return submoduleAdd.mutateAsync({
+				repo: activeRepo,
+				url,
+				path,
+				branch,
+				depth,
+			});
+		},
+		[activeRepo, submoduleAdd]
+	);
+
+	const handleSubmoduleUpdate = useCallback(
+		async (path?: string, options?: { init?: boolean; recursive?: boolean; remote?: boolean }) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return submoduleUpdate.mutateAsync({
+				repo: activeRepo,
+				path,
+				...options,
+			});
+		},
+		[activeRepo, submoduleUpdate]
+	);
+
+	const handleSubmoduleRemove = useCallback(
+		async (path: string, force?: boolean) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return submoduleRemove.mutateAsync({
+				repo: activeRepo,
+				path,
+				force,
+			});
+		},
+		[activeRepo, submoduleRemove]
+	);
+
+	const handleGitFlowFeatureStart = useCallback(
+		async (name: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowFeatureStart.mutateAsync({
+				repo: activeRepo,
+				name,
+			});
+		},
+		[activeRepo, gitflowFeatureStart]
+	);
+
+	const handleGitFlowFeatureFinish = useCallback(
+		async (name: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowFeatureFinish.mutateAsync({
+				repo: activeRepo,
+				name,
+			});
+		},
+		[activeRepo, gitflowFeatureFinish]
+	);
+
+	const handleGitFlowReleaseStart = useCallback(
+		async (name: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowReleaseStart.mutateAsync({
+				repo: activeRepo,
+				name,
+			});
+		},
+		[activeRepo, gitflowReleaseStart]
+	);
+
+	const handleGitFlowReleaseFinish = useCallback(
+		async (name: string, tag?: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowReleaseFinish.mutateAsync({
+				repo: activeRepo,
+				name,
+				tag,
+			});
+		},
+		[activeRepo, gitflowReleaseFinish]
+	);
+
+	const handleGitFlowHotfixStart = useCallback(
+		async (name: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowHotfixStart.mutateAsync({
+				repo: activeRepo,
+				name,
+			});
+		},
+		[activeRepo, gitflowHotfixStart]
+	);
+
+	const handleGitFlowHotfixFinish = useCallback(
+		async (name: string, tag?: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return gitflowHotfixFinish.mutateAsync({
+				repo: activeRepo,
+				name,
+				tag,
+			});
+		},
+		[activeRepo, gitflowHotfixFinish]
+	);
+
+	const handleRemoteAdd = useCallback(
+		async (name: string, url: string, pushUrl?: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return remoteAdd.mutateAsync({
+				repo: activeRepo,
+				name,
+				url,
+				pushUrl,
+			});
+		},
+		[activeRepo, remoteAdd]
+	);
+
+	const handleRemoteRemove = useCallback(
+		async (name: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return remoteRemove.mutateAsync({
+				repo: activeRepo,
+				name,
+			});
+		},
+		[activeRepo, remoteRemove]
+	);
+
+	const handleWorktreeCreate = useCallback(
+		async (path: string, branch?: string, commit?: string) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return worktreeCreate.mutateAsync({
+				repo: activeRepo,
+				path,
+				branch,
+				commit,
+			});
+		},
+		[activeRepo, worktreeCreate]
+	);
+
+	const handleWorktreeRemove = useCallback(
+		async (path: string, force?: boolean) => {
+			if (!activeRepo) return { error: 'No active repository' };
+			return worktreeRemove.mutateAsync({
+				repo: activeRepo,
+				path,
+				force,
+			});
+		},
+		[activeRepo, worktreeRemove]
+	);
+
 	const handleCopyToClipboard = useCallback(
 		async (text: string) => {
 			return copyToClipboard.mutateAsync({ text });
@@ -424,7 +686,21 @@ export function useGitOperations() {
 			stashPush.isPending ||
 			stashPop.isPending ||
 			stashApply.isPending ||
-			stashDrop.isPending,
+			stashDrop.isPending ||
+			undoLastCommit.isPending ||
+			submoduleAdd.isPending ||
+			submoduleUpdate.isPending ||
+			submoduleRemove.isPending ||
+			gitflowFeatureStart.isPending ||
+			gitflowFeatureFinish.isPending ||
+			gitflowReleaseStart.isPending ||
+			gitflowReleaseFinish.isPending ||
+			gitflowHotfixStart.isPending ||
+			gitflowHotfixFinish.isPending ||
+			remoteAdd.isPending ||
+			remoteRemove.isPending ||
+			worktreeCreate.isPending ||
+			worktreeRemove.isPending,
 
 		// Operations
 		createBranch: handleCreateBranch,
@@ -447,6 +723,20 @@ export function useGitOperations() {
 		stashPop: handleStashPop,
 		stashApply: handleStashApply,
 		stashDrop: handleStashDrop,
+		undoLastCommit: handleUndoLastCommit,
+		submoduleAdd: handleSubmoduleAdd,
+		submoduleUpdate: handleSubmoduleUpdate,
+		submoduleRemove: handleSubmoduleRemove,
+		gitFlowFeatureStart: handleGitFlowFeatureStart,
+		gitFlowFeatureFinish: handleGitFlowFeatureFinish,
+		gitFlowReleaseStart: handleGitFlowReleaseStart,
+		gitFlowReleaseFinish: handleGitFlowReleaseFinish,
+		gitFlowHotfixStart: handleGitFlowHotfixStart,
+		gitFlowHotfixFinish: handleGitFlowHotfixFinish,
+		remoteAdd: handleRemoteAdd,
+		remoteRemove: handleRemoteRemove,
+		worktreeCreate: handleWorktreeCreate,
+		worktreeRemove: handleWorktreeRemove,
 		copyToClipboard: handleCopyToClipboard,
 	};
 }

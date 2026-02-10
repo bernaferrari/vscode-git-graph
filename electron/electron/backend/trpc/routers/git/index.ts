@@ -2323,4 +2323,485 @@ export const gitRouter = router({
 				return { error: null };
 			}),
 	}),
+
+	// ==================== Ahead/Behind ====================
+
+	/**
+	 * Get ahead/behind counts for branches compared to their upstream.
+	 */
+	aheadBehind: publicProcedure
+		.input(z.object({ repo: z.string(), branch: z.string().optional() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { ahead: 0, behind: 0, error: initError };
+
+			try {
+				const gitService = getGitService();
+				const branch = input.branch || 'HEAD';
+				const output = await gitService.runGitCommandWithOutput(
+					['rev-list', '--left-right', '--count', `${branch}...@{upstream}`],
+					input.repo
+				);
+
+				const match = output?.match(/^(\d+)\s+(\d+)/);
+				if (match) {
+					return { ahead: parseInt(match[1]!, 10), behind: parseInt(match[2]!, 10), error: null };
+				}
+				return { ahead: 0, behind: 0, error: null };
+			} catch {
+				// No upstream set
+				return { ahead: 0, behind: 0, error: null };
+			}
+		}),
+
+	/**
+	 * Get ahead/behind for all local branches.
+	 */
+	aheadBehindAll: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { branches: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+				const output = await gitService.runGitCommandWithOutput(
+					['for-each-ref', '--format=%(refname:short) %(upstream:short)', 'refs/heads/'],
+					input.repo
+				);
+
+				const branches: Array<{ branch: string; ahead: number; behind: number; upstream: string | null }> = [];
+				const lines = (output ?? '').split('\n').filter(Boolean);
+
+				for (const line of lines) {
+					const [branch, upstream] = line.split(' ');
+					if (!branch) continue;
+
+					if (upstream) {
+						try {
+							const countOutput = await gitService.runGitCommandWithOutput(
+								['rev-list', '--left-right', '--count', `${branch}...${upstream}`],
+								input.repo
+							);
+							const match = countOutput?.match(/^(\d+)\s+(\d+)/);
+							branches.push({
+								branch,
+								ahead: match ? parseInt(match[1]!, 10) : 0,
+								behind: match ? parseInt(match[2]!, 10) : 0,
+								upstream,
+							});
+						} catch {
+							branches.push({ branch, ahead: 0, behind: 0, upstream });
+						}
+					} else {
+						branches.push({ branch, ahead: 0, behind: 0, upstream: null });
+					}
+				}
+
+				return { branches, error: null };
+			} catch (error) {
+				return { branches: [], error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	// ==================== Undo ====================
+
+	/**
+	 * Undo last commit (soft reset to keep changes staged).
+	 */
+	undoLastCommit: publicProcedure
+		.input(z.object({ repo: z.string(), soft: z.boolean().optional() }))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const gitService = getGitService();
+			const mode = input.soft !== false ? '--soft' : '--mixed';
+			const error = await gitService.runGitCommand(['reset', mode, 'HEAD~1'], input.repo);
+			return { error };
+		}),
+
+	// ==================== Git Flow ====================
+
+	gitflow: router({
+		init: publicProcedure
+			.input(z.object({
+				repo: z.string(),
+				master: z.string().optional(),
+				develop: z.string().optional(),
+			}))
+			.mutation(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError) return { error: initError };
+
+				const gitService = getGitService();
+				const args = ['flow', 'init'];
+				if (input.master) args.push('-m', input.master);
+				if (input.develop) args.push('-d', input.develop);
+				else args.push('-d'); // Use defaults
+
+				const error = await gitService.runGitCommand(args, input.repo);
+				return { error };
+			}),
+
+		feature: router({
+			start: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const error = await gitService.runGitCommand(['flow', 'feature', 'start', input.name], input.repo);
+					return { error };
+				}),
+
+			finish: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const error = await gitService.runGitCommand(['flow', 'feature', 'finish', input.name], input.repo);
+					return { error };
+				}),
+		}),
+
+		release: router({
+			start: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const error = await gitService.runGitCommand(['flow', 'release', 'start', input.name], input.repo);
+					return { error };
+				}),
+
+			finish: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string(), tag: z.string().optional() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const args = ['flow', 'release', 'finish', input.name];
+					if (input.tag) args.push('-m', input.tag);
+					const error = await gitService.runGitCommand(args, input.repo);
+					return { error };
+				}),
+		}),
+
+		hotfix: router({
+			start: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const error = await gitService.runGitCommand(['flow', 'hotfix', 'start', input.name], input.repo);
+					return { error };
+				}),
+
+			finish: publicProcedure
+				.input(z.object({ repo: z.string(), name: z.string(), tag: z.string().optional() }))
+				.mutation(async ({ input }) => {
+					const initError = await ensureGitInitialized();
+					if (initError) return { error: initError };
+
+					const gitService = getGitService();
+					const args = ['flow', 'hotfix', 'finish', input.name];
+					if (input.tag) args.push('-m', input.tag);
+					const error = await gitService.runGitCommand(args, input.repo);
+					return { error };
+				}),
+		}),
+	}),
+
+	// ==================== Branch Compare ====================
+
+	compareBranches: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			from: z.string(),
+			to: z.string(),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { commits: [], files: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+
+				// Get commits diff
+				const commitsOutput = await gitService.runGitCommandWithOutput(
+					['log', `${input.from}..${input.to}`, '--oneline', '--no-decorate'],
+					input.repo
+				);
+
+				const commits = (commitsOutput ?? '').split('\n').filter(Boolean).map((line) => {
+					const [hash, ...msgParts] = line.split(' ');
+					return { hash: hash!, message: msgParts.join(' ') };
+				});
+
+				// Get files changed
+				const filesOutput = await gitService.runGitCommandWithOutput(
+					['diff', '--name-status', input.from, input.to],
+					input.repo
+				);
+
+				const files = (filesOutput ?? '').split('\n').filter(Boolean).map((line) => {
+					const [status, ...pathParts] = line.split('\t');
+					return { status: status!, path: pathParts.join('\t') };
+				});
+
+				// Get stats
+				const statsOutput = await gitService.runGitCommandWithOutput(
+					['diff', '--shortstat', input.from, input.to],
+					input.repo
+				);
+
+				let additions = 0;
+				let deletions = 0;
+				const statsMatch = statsOutput?.match(/(\d+) insertion[^,]*(?:,\s*(\d+) deletion)?/);
+				if (statsMatch) {
+					additions = parseInt(statsMatch[1]!, 10);
+					deletions = statsMatch[2] ? parseInt(statsMatch[2], 10) : 0;
+				}
+
+				return { commits, files, additions, deletions, error: null };
+			} catch (error) {
+				return { commits: [], files: [], additions: 0, deletions: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	// ==================== Fuzzy Finder ====================
+
+	searchRefs: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			query: z.string(),
+			includeCommits: z.boolean().optional(),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { branches: [], tags: [], commits: [], error: initError };
+
+			try {
+				const gitService = getGitService();
+				const query = input.query.toLowerCase();
+
+				// Search branches
+				const branchesOutput = await gitService.runGitCommandWithOutput(
+					['branch', '-a', '--list', `*${input.query}*`],
+					input.repo
+				);
+				const branches = (branchesOutput ?? '').split('\n')
+					.map((l) => l.replace(/^\*?\s*/, '').trim())
+					.filter((l) => l && l.toLowerCase().includes(query));
+
+				// Search tags
+				const tagsOutput = await gitService.runGitCommandWithOutput(
+					['tag', '-l', `*${input.query}*`],
+					input.repo
+				);
+				const tags = (tagsOutput ?? '').split('\n')
+					.filter((l) => l && l.toLowerCase().includes(query));
+
+				// Search recent commits
+				let commits: Array<{ hash: string; message: string; date: string }> = [];
+				if (input.includeCommits) {
+					const commitsOutput = await gitService.runGitCommandWithOutput(
+						['log', '--oneline', '-50', '--all', '--grep', input.query],
+						input.repo
+					);
+					commits = (commitsOutput ?? '').split('\n').filter(Boolean).map((line) => {
+						const [hash, ...msgParts] = line.split(' ');
+						return { hash: hash!, message: msgParts.join(' '), date: '' };
+					});
+				}
+
+				return { branches, tags, commits, error: null };
+			} catch (error) {
+				return { branches: [], tags: [], commits: [], error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	// ==================== Statistics ====================
+
+	statistics: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			since: z.string().optional(),
+			until: z.string().optional(),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { authors: [], totalCommits: 0, error: initError };
+
+			try {
+				const gitService = getGitService();
+				const args = ['shortlog', '-sne', '--all'];
+				if (input.since) args.push('--since', input.since);
+				if (input.until) args.push('--until', input.until);
+
+				const output = await gitService.runGitCommandWithOutput(args, input.repo);
+
+				let totalCommits = 0;
+				const authors: Array<{ name: string; email: string; commits: number }> = [];
+
+				(output ?? '').split('\n').filter(Boolean).forEach((line) => {
+					const match = line.match(/^\s*(\d+)\s+(.+)\s+<(.+)>$/);
+					if (match) {
+						const commits = parseInt(match[1]!, 10);
+						totalCommits += commits;
+						authors.push({
+							commits,
+							name: match[2]!.trim(),
+							email: match[3]!,
+						});
+					}
+				});
+
+				// Sort by commits descending
+				authors.sort((a, b) => b.commits - a.commits);
+
+				return { authors, totalCommits, error: null };
+			} catch (error) {
+				return { authors: [], totalCommits: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	// ==================== Hooks ====================
+
+	hooks: router({
+		list: publicProcedure
+			.input(z.object({ repo: z.string() }))
+			.query(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError) return { hooks: [], error: initError };
+
+				try {
+					const gitService = getGitService();
+					const output = await gitService.runGitCommandWithOutput(
+						['rev-parse', '--git-dir'],
+						input.repo
+					);
+					const gitDir = output?.trim();
+					if (!gitDir) return { hooks: [], error: 'Could not find .git directory' };
+
+					// List hooks directory
+					const hooksOutput = await gitService.runGitCommandWithOutput(
+						['ls-files', '--error-unmatch', 'hooks'],
+						input.repo
+					);
+
+					// Common hook names
+					const hookNames = [
+						'pre-commit', 'prepare-commit-msg', 'commit-msg', 'post-commit',
+						'pre-push', 'pre-rebase', 'post-merge', 'pre-receive',
+						'update', 'post-receive', 'post-update', 'push-to-checkout',
+						'pre-auto-gc', 'post-rewrite', 'sendemail-validate',
+					];
+
+					const hooks: Array<{ name: string; enabled: boolean }> = [];
+					for (const name of hookNames) {
+						// Check if hook exists (with or without .sample)
+						const checkOutput = await gitService.runGitCommandWithOutput(
+							['ls-files', '--error-unmatch', `hooks/${name}`],
+							input.repo
+						);
+						const hasHook = !checkOutput?.includes('error');
+						const hasSample = await gitService.runGitCommandWithOutput(
+							['ls-files', '--error-unmatch', `hooks/${name}.sample`],
+							input.repo
+						);
+						const isSample = !hasSample?.includes('error');
+
+						if (hasHook || isSample) {
+							hooks.push({ name, enabled: hasHook });
+						}
+					}
+
+					return { hooks, error: null };
+				} catch (error) {
+					return { hooks: [], error: error instanceof Error ? error.message : 'Unknown error' };
+				}
+			}),
+
+		toggle: publicProcedure
+			.input(z.object({ repo: z.string(), name: z.string(), enabled: z.boolean() }))
+			.mutation(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError) return { error: initError };
+
+				const gitService = getGitService();
+
+				if (input.enabled) {
+					// Enable: rename from .sample or make executable
+					await gitService.runGitCommand(
+						['mv', `hooks/${input.name}.sample`, `hooks/${input.name}`],
+						input.repo
+					);
+				} else {
+					// Disable: rename to .sample
+					await gitService.runGitCommand(
+						['mv', `hooks/${input.name}`, `hooks/${input.name}.sample`],
+						input.repo
+					);
+				}
+
+				return { error: null };
+			}),
+	}),
+
+	// ==================== Worktree Management ====================
+
+	worktreeManage: router({
+		create: publicProcedure
+			.input(z.object({
+				repo: z.string(),
+				path: z.string(),
+				branch: z.string().optional(),
+				commit: z.string().optional(),
+			}))
+			.mutation(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError) return { error: initError };
+
+				const gitService = getGitService();
+				const args = ['worktree', 'add', input.path];
+
+				if (input.branch) {
+					args.push('-b', input.branch);
+				}
+				if (input.commit) {
+					args.push(input.commit);
+				}
+
+				const error = await gitService.runGitCommand(args, input.repo);
+				return { error };
+			}),
+
+		remove: publicProcedure
+			.input(z.object({
+				repo: z.string(),
+				path: z.string(),
+				force: z.boolean().optional(),
+			}))
+			.mutation(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError) return { error: initError };
+
+				const gitService = getGitService();
+				const args = ['worktree', 'remove', input.path];
+				if (input.force) args.push('--force');
+
+				const error = await gitService.runGitCommand(args, input.repo);
+				return { error };
+			}),
+	}),
 });

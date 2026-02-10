@@ -26,6 +26,13 @@ import {
 	MoreHorizontal,
 	GitCommit,
 	FolderTree,
+	GitPullRequest,
+	Play,
+	Flag,
+	Flame,
+	Undo,
+	Box,
+	Settings,
 } from 'lucide-react';
 import {
 	DropdownMenu,
@@ -50,6 +57,7 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 		tags: false,
 		stashes: false,
 		worktrees: false,
+		submodules: false,
 	});
 	const [searchQuery, setSearchQuery] = useState('');
 
@@ -64,6 +72,21 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 	);
 
 	const { data: worktreesData } = trpc.git.worktree.list.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo }
+	);
+
+	const { data: aheadBehindData } = trpc.git.aheadBehindAll.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo, refetchInterval: 10000 }
+	);
+
+	const { data: submodulesData } = trpc.git.submodule.list.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo }
+	);
+
+	const { data: remotesData } = trpc.git.remotes.useQuery(
 		{ repo: activeRepo ?? '' },
 		{ enabled: !!activeRepo }
 	);
@@ -125,15 +148,20 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 							</Button>
 						}
 					>
-						{filteredLocalBranches.map((branch) => (
-							<BranchItem
-								key={branch}
-								branch={branch}
-								isCurrent={branch === currentHead}
-								onCheckout={() => gitOps.checkout(branch)}
-								onDelete={() => gitOps.deleteBranch(branch, false)}
-							/>
-						))}
+						{filteredLocalBranches.map((branch) => {
+							const aheadBehind = aheadBehindData?.branches?.find((b) => b.branch === branch);
+							return (
+								<BranchItem
+									key={branch}
+									branch={branch}
+									isCurrent={branch === currentHead}
+									ahead={aheadBehind?.ahead ?? 0}
+									behind={aheadBehind?.behind ?? 0}
+									onCheckout={() => gitOps.checkout(branch)}
+									onDelete={() => gitOps.deleteBranch(branch, false)}
+								/>
+							);
+						})}
 					</Section>
 
 					{/* Remote Branches */}
@@ -214,6 +242,36 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 						</Section>
 					)}
 
+					{/* Submodules */}
+					{(submodulesData?.submodules?.length ?? 0) > 0 && (
+						<Section
+							title="Submodules"
+							icon={Box}
+							count={submodulesData?.submodules?.length ?? 0}
+							expanded={expandedSections.submodules}
+							onToggle={() => toggleSection('submodules')}
+							actions={
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-5 w-5 p-0"
+									onClick={() => gitOps.submoduleUpdate(undefined, { init: true, recursive: true })}
+								>
+									<RefreshCw className="h-3 w-3" />
+								</Button>
+							}
+						>
+							{submodulesData?.submodules?.map((sm: { path: string; hash: string; status: string; description: string }) => (
+								<SubmoduleItem
+									key={sm.path}
+									submodule={sm}
+									onUpdate={() => gitOps.submoduleUpdate(sm.path, { remote: true })}
+									onRemove={() => gitOps.submoduleRemove(sm.path)}
+								/>
+							))}
+						</Section>
+					)}
+
 					{/* Stashes */}
 					{stashes.length > 0 && (
 						<Section
@@ -289,14 +347,20 @@ function Section({
 function BranchItem({
 	branch,
 	isCurrent,
+	ahead,
+	behind,
 	onCheckout,
 	onDelete,
 }: {
 	branch: string;
 	isCurrent: boolean;
+	ahead?: number;
+	behind?: number;
 	onCheckout: () => void;
 	onDelete: () => void;
 }) {
+	const hasAheadBehind = (ahead ?? 0) > 0 || (behind ?? 0) > 0;
+
 	return (
 		<div
 			className={`group flex items-center gap-2 px-3 py-0.5 text-xs cursor-pointer rounded hover:bg-accent/50 ${
@@ -308,6 +372,23 @@ function BranchItem({
 			<span className={`flex-1 truncate ${isCurrent ? 'font-medium text-primary' : ''}`}>
 				{branch}
 			</span>
+			{/* Ahead/Behind indicators */}
+			{hasAheadBehind && (
+				<span className="flex items-center gap-0.5 shrink-0">
+					{(ahead ?? 0) > 0 && (
+						<span className="flex items-center text-green-600 dark:text-green-400">
+							<ArrowUp className="h-2.5 w-2.5" />
+							<span className="text-[10px]">{ahead}</span>
+						</span>
+					)}
+					{(behind ?? 0) > 0 && (
+						<span className="flex items-center text-amber-600 dark:text-amber-400">
+							<ArrowDown className="h-2.5 w-2.5" />
+							<span className="text-[10px]">{behind}</span>
+						</span>
+					)}
+				</span>
+			)}
 			{isCurrent && <Check className="h-3 w-3 text-primary shrink-0" />}
 			{!isCurrent && (
 				<DropdownMenu>
@@ -472,6 +553,64 @@ function WorktreeItem({
 			{worktree.branch && !worktree.isMain && (
 				<span className="text-[10px] text-muted-foreground">{worktree.branch}</span>
 			)}
+		</div>
+	);
+}
+
+// Submodule item
+function SubmoduleItem({
+	submodule,
+	onUpdate,
+	onRemove,
+}: {
+	submodule: { path: string; hash: string; status: string; description: string };
+	onUpdate: () => void;
+	onRemove: () => void;
+}) {
+	const getStatusIndicator = () => {
+		switch (submodule.status) {
+			case ' ':
+				return null; // Up to date
+			case '+':
+				return <span className="text-green-600 text-[10px]">+</span>;
+			case '-':
+				return <span className="text-red-600 text-[10px]">-</span>;
+			case 'U':
+				return <span className="text-amber-600 text-[10px]">!</span>;
+			default:
+				return null;
+		}
+	};
+
+	return (
+		<div className="group flex items-center gap-2 px-3 py-0.5 text-xs rounded hover:bg-accent/50">
+			<Box className="h-3 w-3 shrink-0 text-muted-foreground" />
+			<span className="flex-1 truncate" title={submodule.path}>
+				{submodule.path}
+			</span>
+			{getStatusIndicator()}
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100"
+					>
+						<MoreHorizontal className="h-3 w-3" />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-40">
+					<DropdownMenuItem onClick={onUpdate}>
+						<RefreshCw className="h-4 w-4 mr-2" />
+						Update
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onClick={onRemove} className="text-destructive">
+						<Trash2 className="h-4 w-4 mr-2" />
+						Remove
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 	);
 }
