@@ -2884,4 +2884,55 @@ export const gitRouter = router({
 				return { error };
 			}),
 	}),
+
+	// ==================== Line Staging ====================
+	stageLines: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			filePath: z.string(),
+			patch: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			try {
+				const gitService = getGitService();
+				const gitPath = gitService.getGitExecutable()?.path;
+				if (!gitPath) {
+					return { error: 'Git executable not available' };
+				}
+				
+				const { spawn } = await import('child_process');
+				
+				// Apply the patch using git apply --cached with stdin
+				return new Promise((resolve) => {
+					const cmd = spawn(gitPath, ['apply', '--cached', '--unidiff-zero', '-'], {
+						cwd: input.repo,
+					});
+					
+					cmd.stdin.write(input.patch);
+					cmd.stdin.end();
+					
+					let stderr = '';
+					cmd.stderr.on('data', (data: Buffer) => {
+						stderr += data.toString();
+					});
+					
+					cmd.on('close', (code) => {
+						if (code === 0) {
+							resolve({ error: null });
+						} else {
+							resolve({ error: stderr || `Git apply failed with code ${code}` });
+						}
+					});
+					
+					cmd.on('error', (err) => {
+						resolve({ error: err.message });
+					});
+				});
+			} catch (error) {
+				return { error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
 });
