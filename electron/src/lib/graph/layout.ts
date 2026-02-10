@@ -525,9 +525,9 @@ export const DEFAULT_GRAPH_CONFIG: GraphConfig = {
 	],
 	grid: {
 		x: 16,
-		y: 24,
+		y: 32,
 		offsetX: 16,
-		offsetY: 12,
+		offsetY: 16,
 		expandY: 250,
 	},
 	style: 'rounded',

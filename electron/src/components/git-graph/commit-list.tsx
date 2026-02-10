@@ -1,6 +1,6 @@
 /**
  * Git Graph Commit List
- * Renders the list of commits with time-based separators
+ * Renders the list of commits aligned with the graph
  */
 
 import type { GraphLayout } from '@/lib/graph/layout';
@@ -28,51 +28,8 @@ interface CommitListProps {
 	onContextMenu?: (index: number, event: React.MouseEvent) => void;
 }
 
-// Row height - matches graph grid
-const ROW_HEIGHT = 24;
-
-// Time groupings
-function getTimeGroup(timestamp: number): string {
-	const now = Date.now();
-	const date = timestamp * 1000;
-	const diffMs = now - date;
-	const diffHours = diffMs / (1000 * 60 * 60);
-	const diffDays = diffHours / 24;
-
-	if (diffHours < 1) return 'Just now';
-	if (diffHours < 24) return 'Today';
-	if (diffDays < 2) return 'Yesterday';
-	if (diffDays < 7) return 'This week';
-	if (diffDays < 30) return 'This month';
-	if (diffDays < 365) return 'This year';
-	return 'Older';
-}
-
-// Group commits by time
-function groupCommitsByTime(commits: DisplayCommit[]): { label: string; commits: { commit: DisplayCommit; index: number }[] }[] {
-	const groups: Map<string, { commit: DisplayCommit; index: number }[]> = new Map();
-
-	commits.forEach((commit, index) => {
-		const group = getTimeGroup(commit.date);
-		if (!groups.has(group)) {
-			groups.set(group, []);
-		}
-		groups.get(group)!.push({ commit, index });
-	});
-
-	// Order groups
-	const order = ['Just now', 'Today', 'Yesterday', 'This week', 'This month', 'This year', 'Older'];
-	const result: { label: string; commits: { commit: DisplayCommit; index: number }[] }[] = [];
-
-	for (const label of order) {
-		const groupCommits = groups.get(label);
-		if (groupCommits && groupCommits.length > 0) {
-			result.push({ label, commits: groupCommits });
-		}
-	}
-
-	return result;
-}
+// Row height - must match graph grid Y spacing
+export const ROW_HEIGHT = 32;
 
 export function CommitList({
 	commits,
@@ -83,31 +40,20 @@ export function CommitList({
 	onExpand,
 	onContextMenu,
 }: CommitListProps) {
-	const groups = groupCommitsByTime(commits);
-
 	return (
 		<div className="commit-list">
-			{groups.map((group) => (
-				<div key={group.label}>
-					{/* Time separator */}
-					<div className="sticky top-0 z-10 px-3 py-1 text-xs font-medium text-muted-foreground bg-muted/50 backdrop-blur-sm border-b">
-						{group.label}
-					</div>
-					{/* Commits in this group */}
-					{group.commits.map(({ commit, index }) => (
-						<CommitRow
-							key={commit.hash}
-							commit={commit}
-							index={index}
-							isSelected={selectedIndex === index}
-							isMuted={layout?.mutedCommits[index] ?? false}
-							width={layout?.widthsAtVertices[index] ?? 0}
-							onSelect={() => onSelect(index)}
-							onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
-							onContextMenu={onContextMenu ? (e) => onContextMenu(index, e) : undefined}
-						/>
-					))}
-				</div>
+			{commits.map((commit, index) => (
+				<CommitRow
+					key={commit.hash}
+					commit={commit}
+					index={index}
+					isSelected={selectedIndex === index}
+					isMuted={layout?.mutedCommits[index] ?? false}
+					graphOffset={layout?.widthsAtVertices[index] ?? 0}
+					onSelect={() => onSelect(index)}
+					onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
+					onContextMenu={onContextMenu ? (e) => onContextMenu(index, e) : undefined}
+				/>
 			))}
 		</div>
 	);
@@ -118,7 +64,7 @@ interface CommitRowProps {
 	index: number;
 	isSelected: boolean;
 	isMuted: boolean;
-	width: number;
+	graphOffset: number;
 	onSelect: () => void;
 	onToggleExpand: () => void;
 	onContextMenu?: (e: React.MouseEvent) => void;
@@ -129,7 +75,7 @@ function CommitRow({
 	index,
 	isSelected,
 	isMuted,
-	width,
+	graphOffset,
 	onSelect,
 	onToggleExpand,
 	onContextMenu,
@@ -139,32 +85,26 @@ function CommitRow({
 	return (
 		<div
 			data-index={index}
-			className={`commit-row group flex items-center border-b border-border/30 cursor-pointer transition-colors ${
+			className={`commit-row group flex items-center gap-3 cursor-pointer transition-colors border-b border-transparent ${
 				isSelected
-					? 'bg-accent/50'
-					: 'hover:bg-accent/30'
+					? 'bg-accent/40'
+					: 'hover:bg-accent/20'
 			} ${isMuted ? 'opacity-50' : ''}`}
 			onClick={onSelect}
 			onDoubleClick={onToggleExpand}
 			onContextMenu={onContextMenu}
 			style={{
-				paddingLeft: width + 12,
-				paddingRight: 12,
+				paddingLeft: graphOffset + 16,
+				paddingRight: 16,
 				height: ROW_HEIGHT,
-				minHeight: ROW_HEIGHT,
 			}}
 		>
 			{/* Refs - branches, tags, remotes */}
-			<div className="flex items-center gap-1 shrink-0 mr-2">
+			<div className="flex items-center gap-1.5 shrink-0">
 				{/* Current branch (first head) */}
 				{commit.heads && commit.heads.length > 0 && (
-					<span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-primary/15 text-primary">
-						<svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-							<line x1="6" y1="3" x2="6" y2="15" />
-							<circle cx="18" cy="18" r="3" />
-							<circle cx="6" cy="18" r="3" />
-							<path d="M18 9a9 9 0 0 0-9-9" />
-						</svg>
+					<span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/15 text-primary border border-primary/20">
+						<GitBranchIcon className="w-3 h-3" />
 						{commit.heads[0]}
 					</span>
 				)}
@@ -172,7 +112,7 @@ function CommitRow({
 				{commit.heads?.slice(1).map((head: string) => (
 					<span
 						key={head}
-						className="px-1.5 py-0.5 text-xs rounded bg-secondary text-secondary-foreground"
+						className="px-2 py-0.5 text-xs rounded-md bg-muted text-muted-foreground"
 					>
 						{head}
 					</span>
@@ -181,13 +121,9 @@ function CommitRow({
 				{commit.remotes?.map((remote: string, i: number) => (
 					<span
 						key={i}
-						className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground"
+						className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border text-muted-foreground"
 					>
-						<svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-							<circle cx="12" cy="12" r="10" />
-							<line x1="2" y1="12" x2="22" y2="12" />
-							<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-						</svg>
+						<GlobeIcon className="w-3 h-3" />
 						{remote}
 					</span>
 				))}
@@ -195,19 +131,16 @@ function CommitRow({
 				{commit.tags?.map((tag: string) => (
 					<span
 						key={tag}
-						className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+						className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50"
 					>
-						<svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-							<path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-							<path d="M7 7h.01" />
-						</svg>
+						<TagIcon className="w-3 h-3" />
 						{tag}
 					</span>
 				))}
 			</div>
 
 			{/* Commit message */}
-			<span className="text-sm truncate flex-1 min-w-0 mr-2">
+			<span className="text-sm truncate flex-1 min-w-0">
 				{isUncommitted ? (
 					<span className="text-muted-foreground italic">Uncommitted Changes</span>
 				) : (
@@ -215,17 +148,48 @@ function CommitRow({
 				)}
 			</span>
 
-			{/* Author, hash, date - shown on hover or when selected */}
+			{/* Author, hash, date */}
 			{!isUncommitted && (
-				<div className={`flex items-center gap-3 text-xs text-muted-foreground shrink-0 transition-opacity ${
-					isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+				<div className={`flex items-center gap-4 text-xs text-muted-foreground shrink-0 transition-opacity ${
+					isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-70'
 				}`}>
-					<span className="max-w-24 truncate">{commit.author}</span>
-					<span className="font-mono text-muted-foreground/70">{commit.hash.slice(0, 7)}</span>
-					<span className="w-20 text-right tabular-nums">{formatDate(commit.date)}</span>
+					<span className="w-24 truncate">{commit.author}</span>
+					<span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{commit.hash.slice(0, 7)}</span>
+					<span className="w-16 text-right tabular-nums">{formatDate(commit.date)}</span>
 				</div>
 			)}
 		</div>
+	);
+}
+
+// Simple icon components
+function GitBranchIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+			<line x1="6" y1="3" x2="6" y2="15" />
+			<circle cx="18" cy="18" r="3" />
+			<circle cx="6" cy="18" r="3" />
+			<path d="M18 9a9 9 0 0 0-9-9" />
+		</svg>
+	);
+}
+
+function GlobeIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+			<circle cx="12" cy="12" r="10" />
+			<line x1="2" y1="12" x2="22" y2="12" />
+			<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+		</svg>
+	);
+}
+
+function TagIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+			<path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+			<path d="M7 7h.01" />
+		</svg>
 	);
 }
 

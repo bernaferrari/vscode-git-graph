@@ -30,13 +30,16 @@ export function CommitGraph({
 			isCommitted: boolean;
 		}[] = [];
 
-		const d = config.grid.y * (config.style === 'angular' ? 0.38 : 0.8);
+		// Offset to center vertices in rows
+		const rowHeight = config.grid.y;
+		const centerY = rowHeight / 2;
+		const curveOffset = rowHeight * 0.4;
 
 		for (const line of layout.lines) {
 			const x1 = line.p1.x * config.grid.x + config.grid.offsetX;
-			const y1 = line.p1.y * config.grid.y; // Removed offsetY
+			const y1 = line.p1.y * config.grid.y + centerY;
 			const x2 = line.p2.x * config.grid.x + config.grid.offsetX;
-			const y2 = line.p2.y * config.grid.y; // Removed offsetY
+			const y2 = line.p2.y * config.grid.y + centerY;
 
 			// Adjust for expanded commit
 			const adjustedY1 = expandedIndex > -1 && line.p1.y > expandedIndex ? y1 + config.grid.expandY : y1;
@@ -50,11 +53,11 @@ export function CommitGraph({
 				pathD += `L${x2},${adjustedY2.toFixed(1)}`;
 			} else if (config.style === 'angular') {
 				const midY = line.lockedFirst
-					? adjustedY2 - d
-					: adjustedY1 + d;
+					? adjustedY2 - curveOffset
+					: adjustedY1 + curveOffset;
 				pathD += `L${x2},${midY.toFixed(1)}L${x2},${adjustedY2.toFixed(1)}`;
 			} else {
-				pathD += `C${x1},${(adjustedY1 + d).toFixed(1)} ${x2},${(adjustedY2 - d).toFixed(1)} ${x2},${adjustedY2.toFixed(1)}`;
+				pathD += `C${x1},${(adjustedY1 + curveOffset).toFixed(1)} ${x2},${(adjustedY2 - curveOffset).toFixed(1)} ${x2},${adjustedY2.toFixed(1)}`;
 			}
 
 			paths.push({
@@ -67,7 +70,7 @@ export function CommitGraph({
 		const vertices = layout.vertices.map((v) => ({
 			id: v.id,
 			cx: v.x * config.grid.x + config.grid.offsetX,
-			cy: v.id * config.grid.y + (expandedIndex > -1 && v.id > expandedIndex ? config.grid.expandY : 0),
+			cy: v.id * config.grid.y + centerY + (expandedIndex > -1 && v.id > expandedIndex ? config.grid.expandY : 0),
 			colour: config.colours[v.colour % config.colours.length] ?? '#808080',
 			isCommitted: v.isCommitted,
 			isCurrent: v.isCurrent,
@@ -96,6 +99,9 @@ export function CommitGraph({
 							d={path.d}
 							className="shadow"
 							fill="none"
+							stroke="var(--background)"
+							strokeWidth={4}
+							strokeOpacity={0.8}
 						/>
 						<path
 							d={path.d}
@@ -117,10 +123,10 @@ export function CommitGraph({
 							<circle
 								cx={v.cx}
 								cy={v.cy}
-								r={5}
-								fill="none"
+								r={6}
+								fill="var(--background)"
 								stroke={v.colour}
-								strokeWidth={2}
+								strokeWidth={2.5}
 								className="cursor-pointer"
 								onClick={() => onVertexClick(v.id)}
 								onMouseEnter={() => onVertexHover(v.id)}
@@ -130,8 +136,10 @@ export function CommitGraph({
 							<circle
 								cx={v.cx}
 								cy={v.cy}
-								r={v.isStash ? 4.5 : 4}
+								r={v.isStash ? 5 : 4.5}
 								fill={v.isCommitted ? v.colour : '#808080'}
+								stroke="var(--background)"
+								strokeWidth={1.5}
 								className="cursor-pointer"
 								onClick={() => onVertexClick(v.id)}
 								onMouseEnter={() => onVertexHover(v.id)}
@@ -143,7 +151,7 @@ export function CommitGraph({
 								cx={v.cx}
 								cy={v.cy}
 								r={2}
-								fill="white"
+								fill="var(--background)"
 								pointerEvents="none"
 							/>
 						)}
