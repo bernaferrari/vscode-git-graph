@@ -36,6 +36,8 @@ import {
 	History,
 	FileText,
 	Package,
+	GitPullRequest,
+	FolderGit2,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -76,6 +78,10 @@ import { CustomCommands } from './custom-commands';
 import { InlineBlame, BlamePill } from './inline-blame';
 import { SearchAllCommits } from './search-commits';
 import { LFSSupport } from './lfs-support';
+import { PullRequestIntegration } from './pull-request-integration';
+import { EnhancedCommitPanel } from './enhanced-commit-panel';
+import { WorktreeManagement } from './worktree-management';
+import { SubmoduleManagement } from './submodule-management';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -208,6 +214,9 @@ export function GitGraph() {
 	const [searchCommitsOpen, setSearchCommitsOpen] = useState(false);
 	const [lfsOpen, setLfsOpen] = useState(false);
 	const [inlineBlameEnabled, setInlineBlameEnabled] = useState(false);
+	const [prIntegrationOpen, setPrIntegrationOpen] = useState(false);
+	const [worktreeOpen, setWorktreeOpen] = useState(false);
+	const [submoduleOpen, setSubmoduleOpen] = useState(false);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -880,6 +889,19 @@ export function GitGraph() {
 								{inlineBlameEnabled ? 'Disable' : 'Enable'} Inline Blame
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setPrIntegrationOpen(true)}>
+								<GitPullRequest className="h-4 w-4 mr-2" />
+								Pull Requests
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setWorktreeOpen(true)}>
+								<FolderGit2 className="h-4 w-4 mr-2" />
+								Worktrees
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setSubmoduleOpen(true)}>
+								<Package className="h-4 w-4 mr-2" />
+								Submodules
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
 								Undo Last Commit
@@ -1173,6 +1195,24 @@ export function GitGraph() {
 				<LFSSupport
 					open={lfsOpen}
 					onOpenChange={setLfsOpen}
+				/>
+
+				{/* Pull Request Integration */}
+				<PullRequestIntegration
+					open={prIntegrationOpen}
+					onOpenChange={setPrIntegrationOpen}
+				/>
+
+				{/* Worktree Management */}
+				<WorktreeManagement
+					open={worktreeOpen}
+					onOpenChange={setWorktreeOpen}
+				/>
+
+				{/* Submodule Management */}
+				<SubmoduleManagement
+					open={submoduleOpen}
+					onOpenChange={setSubmoduleOpen}
 				/>
 
 				{/* Line Staging */}

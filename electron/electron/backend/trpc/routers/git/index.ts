@@ -3082,4 +3082,86 @@ export const gitRouter = router({
 				return { commits: [], error: error instanceof Error ? error.message : 'Unknown error' };
 			}
 		}),
+
+	// ==================== Pull Request Integration ====================
+	listPullRequests: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			provider: z.enum(['github', 'gitlab', 'bitbucket']),
+			state: z.enum(['open', 'closed', 'all']).optional().default('open'),
+		}))
+		.query(async ({ input }) => {
+			// This would integrate with GitHub/GitLab/Bitbucket APIs
+			// For now, return mock data structure
+			// In production, you'd use Octokit for GitHub, etc.
+			return {
+				pullRequests: [] as Array<{
+					id: number;
+					number: number;
+					title: string;
+					body: string;
+					state: 'open' | 'closed' | 'merged';
+					author: string;
+					createdAt: string;
+					updatedAt: string;
+					head: { ref: string; sha: string };
+					base: { ref: string; sha: string };
+					draft: boolean;
+					webUrl: string;
+				}>,
+				error: 'Pull request integration requires API token configuration. Use Settings to configure.',
+			};
+		}),
+
+	createPullRequest: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			provider: z.enum(['github', 'gitlab', 'bitbucket']),
+			title: z.string(),
+			body: z.string().optional(),
+			head: z.string(),
+			base: z.string(),
+			draft: z.boolean().optional().default(false),
+		}))
+		.mutation(async ({ input }) => {
+			// This would create a PR via the provider's API
+			return {
+				pullRequest: null,
+				error: 'Pull request creation requires API token configuration. Use Settings to configure.',
+			};
+		}),
+
+	getPullRequest: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			provider: z.enum(['github', 'gitlab', 'bitbucket']),
+			number: z.number(),
+		}))
+		.query(async ({ input }) => {
+			return {
+				pullRequest: null,
+				error: 'Pull request integration requires API token configuration.',
+			};
+		}),
+
+	mergePullRequest: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			provider: z.enum(['github', 'gitlab', 'bitbucket']),
+			number: z.number(),
+			mergeMethod: z.enum(['merge', 'squash', 'rebase']).optional().default('merge'),
+		}))
+		.mutation(async ({ input }) => {
+			return { error: 'Pull request integration requires API token configuration.' };
+		}),
+
+	closePullRequest: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			provider: z.enum(['github', 'gitlab', 'bitbucket']),
+			number: z.number(),
+		}))
+		.mutation(async ({ input }) => {
+			return { error: 'Pull request integration requires API token configuration.' };
+		}),
 });
