@@ -29,8 +29,11 @@ import {
 	Plus,
 	Minus,
 	RotateCcw,
+	Columns,
+	PanelTop,
 } from 'lucide-react';
 import { useState } from 'react';
+import { SideBySideDiff } from './side-by-side-diff';
 
 interface CommitDetailsPanelProps {
 	commitHash: string | null;
@@ -40,6 +43,7 @@ interface CommitDetailsPanelProps {
 export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelProps) {
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
+	const [showDiff, setShowDiff] = useState(false);
 
 	const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
 		{
@@ -48,6 +52,17 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 		},
 		{ enabled: !!commitHash && !!activeRepo }
 	);
+
+	// Get selected file info
+	const selectedFileInfo = commitDetails?.fileChanges?.find(
+		(f) => f.newFilePath === selectedFile || f.oldFilePath === selectedFile
+	);
+
+	// Handle file click - show diff
+	const handleFileClick = (filePath: string) => {
+		setSelectedFile(filePath);
+		setShowDiff(true);
+	};
 
 	if (!commitHash) {
 		return (
@@ -203,7 +218,7 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 											? 'bg-accent'
 											: 'hover:bg-accent/50'
 									}`}
-									onClick={() => setSelectedFile(file.newFilePath)}
+									onClick={() => handleFileClick(file.newFilePath)}
 								>
 									{/* Change type icon */}
 									<FileChangeIcon type={file.type} />
@@ -259,6 +274,37 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 					</div>
 				</div>
 			</ScrollArea>
+
+			{/* Diff Viewer */}
+			{showDiff && selectedFile && selectedFileInfo && (
+				<div className="absolute inset-0 z-10 bg-background flex flex-col">
+					<div className="flex items-center justify-between px-3 py-2 border-b">
+						<div className="flex items-center gap-2">
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-6 w-6 p-0"
+								onClick={() => setShowDiff(false)}
+							>
+								<X className="h-4 w-4" />
+							</Button>
+							<span className="text-sm font-medium truncate max-w-[200px]">
+								{selectedFile}
+							</span>
+						</div>
+					</div>
+					<div className="flex-1 overflow-hidden">
+						<SideBySideDiff
+							file={{
+								path: selectedFile,
+								oldPath: selectedFileInfo.oldFilePath ?? undefined,
+								status: selectedFileInfo.type,
+							}}
+							commitHash={commitHash ?? ''}
+						/>
+					</div>
+				</div>
+			)}
 
 			{/* Footer actions */}
 			<div className="flex items-center gap-1 p-2 border-t">
