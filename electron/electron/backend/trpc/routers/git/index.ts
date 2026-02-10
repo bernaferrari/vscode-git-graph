@@ -341,6 +341,31 @@ export const gitRouter = router({
 			}
 		}),
 
+	// File-specific diff
+	fileDiff: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				commitHash: z.string(),
+				filePath: z.string(),
+			})
+		)
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { diff: '', error: initError };
+
+			try {
+				const service = getGitService();
+				const diff = await service.runGitCommandWithOutput(
+					['diff', input.commitHash + '^', input.commitHash, '--', input.filePath],
+					input.repo
+				);
+				return { diff, error: null };
+			} catch (error) {
+				return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
 	// ==================== Git Actions ====================
 
 	/**

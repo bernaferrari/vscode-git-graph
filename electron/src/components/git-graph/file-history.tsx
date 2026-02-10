@@ -1,90 +1,190 @@
 /**
  * File History View
+ * Blame view and file history
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { trpc } from '@/trpc/client';
+import { useAppStore } from '@/lib/store';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+	History,
+	User,
+	Calendar,
+	Hash,
+	Search,
+	Loader2,
+} from 'lucide-react';
 
 interface FileHistoryProps {
-	repo: string;
 	filePath: string;
 	onSelectCommit?: (hash: string) => void;
 }
 
-interface HistoryEntry {
-	hash: string;
-	author: string;
-	date: string;
-	message: string;
-	additions: number;
-	deletions: number;
-}
+export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
+	const { activeRepo } = useAppStore();
+	const [view, setView] = useState<'blame' | 'history'>('blame');
 
-export function FileHistory({ repo, filePath, onSelectCommit }: FileHistoryProps) {
-	const { data, isLoading, error } = trpc.git.fileHistory.useQuery(
-		{ repo, path: filePath },
-		{ enabled: !!repo && !!filePath }
+	const { data: blameData, isLoading: blameLoading } = trpc.git.blame.useQuery(
+		{
+			repo: activeRepo ?? '',
+			filePath,
+		},
+		{ enabled: !!activeRepo && !!filePath && view === 'blame' }
 	);
 
-	const [history, setHistory] = useState<HistoryEntry[]>([]);
+	const { data: historyData, isLoading: historyLoading } = trpc.git.log.useQuery(
+		{
+			repo: activeRepo ?? '',
+			filePath,
+			limit: 50,
+		},
+		{ enabled: !!activeRepo && !!filePath && view === 'history' }
+	);
 
-	useEffect(() => {
-		if (data?.history) {
-			setHistory(data.history as HistoryEntry[]);
-		}
-	}, [data]);
-
-	if (isLoading) {
-		return <div className="p-4 text-muted-foreground">Loading history...</div>;
-	}
-
-	if (error) {
-		return <div className="p-4 text-destructive">Error loading history: {error.message}</div>;
-	}
+	const parsedBlame = useMemo(() => {
+		if (!blameData?.blame) return [];
+		
+		const lines: Array<{
+			line: string;
+			commit?: string;
+			author?: string;
+			date?: string;
+			sourceLine?: number;
+		}> = [];
+		const blameText = blameData.blame;
+		const blameLines = blameText.split('\n');
+		
+		let currentCommit: string | undefined;
+		let currentAuthor: string | undefined;
+		let currentDate: string | undefined;
+		
+		blameLines.forEach((line) => {
+			if (line.startsWith('author ')) {
+				currentAuthor = line.slice(7);
+			} else if (line.startsWith('author-time ')) {
+				const timestamp = parseInt(line.slice(12), 10);
+				currentDate = new Date(timestamp * 1000).toLocaleDateString();
+			} else if (/^[a-f0-9]{8} \d+ \d+/.test(line)) {
+				const parts = line.split(' ');
+				currentCommit = parts[0];
+			} else if (line.startsWith('\t')) {
+				lines.push({
+					line: line.slice(1),
+					commit: currentCommit,
+					author: currentAuthor,
+					date: currentDate,
+				});
+			}
+		});
+		
+		return lines;
+	}, [blameData?.blame]);
 
 	return (
-		<Card className="h-full">
-			<CardHeader className="pb-2">
-				<CardTitle className="text-sm flex items-center gap-2">
-					<span>History: {filePath}</span>
-					<Badge variant="secondary">{history.length} commits</Badge>
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<ScrollArea className="h-[400px]">
-					<div className="space-y-1">
-						{history.map((entry) => (
-							<button
-								key={entry.hash}
-								onClick={() => onSelectCommit?.(entry.hash)}
-								className="w-full text-left p-2 rounded hover:bg-accent text-sm"
-							>
-								<div className="flex items-center justify-between">
-									<span className="font-mono text-xs text-muted-foreground">
-										{entry.hash.slice(0, 7)}
-									</span>
-									<div className="flex items-center gap-2 text-xs">
-										<span className="text-green-600">+{entry.additions}</span>
-										<span className="text-red-600">-{entry.deletions}</span>
-									</div>
-								</div>
-								<p className="truncate">{entry.message}</p>
-								<p className="text-xs text-muted-foreground">
-									{entry.author} • {entry.date}
-								</p>
-							</button>
-						))}
-						{history.length === 0 && (
-							<div className="text-center text-muted-foreground py-4">
-								No history found
+		<div className="flex flex-col h-full">
+			<div className="flex items-center justify-between px-4 py-2 border-b">
+				<div className="flex items-center gap-2">
+					<History className="h-4 w-4" />
+					<span className="text-sm font-medium truncate max-w-[200px]">
+						{filePath}
+					</span>
+				</div>
+				<Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+					<TabsList className="h-7">
+						<TabsTrigger value="blame" className="text-xs h-5 px-2">
+							<User className="h-3 w-3 mr-1" />
+							Blame
+						</TabsTrigger>
+						<TabsTrigger value="history" className="text-xs h-5 px-2">
+							<History className="h-3 w-3 mr-1" />
+							History
+						</TabsTrigger>
+					</TabsList>
+				</Tabs>
+			</div>
+
+			<div className="flex-1 overflow-hidden">
+				{view === 'blame' && (
+					<>
+						{blameLoading ? (
+							<div className="flex items-center justify-center h-full">
+								<Loader2 className="h-4 w-4 animate-spin" />
 							</div>
+						) : (
+							<ScrollArea className="h-full">
+								<div className="font-mono text-xs">
+									{parsedBlame.map((item, i) => (
+										<div
+											key={i}
+											className="flex hover:bg-accent/30 cursor-pointer"
+											onClick={() => item.commit && onSelectCommit?.(item.commit)}
+										>
+											<div className="w-10 text-right pr-2 text-muted-foreground select-none border-r bg-muted/30">
+												{i + 1}
+											</div>
+											<div className="w-20 px-1.5 py-0.5 truncate border-r bg-muted/10">
+												<span className="text-[10px] font-normal">{item.commit?.slice(0, 8)}</span>
+											</div>
+											<div className="w-24 px-1.5 py-0.5 truncate border-r bg-muted/10">
+												<span className="text-[10px] font-normal">{item.author}</span>
+											</div>
+											<div className="w-16 px-1.5 py-0.5 truncate border-r bg-muted/10">
+												<span className="text-[10px] font-normal">{item.date}</span>
+											</div>
+											<pre className="px-2 py-0.5 whitespace-pre overflow-hidden flex-1">
+												{item.line}
+											</pre>
+										</div>
+									))}
+								</div>
+							</ScrollArea>
 						)}
-					</div>
-				</ScrollArea>
-			</CardContent>
-		</Card>
+					</>
+				)}
+
+				{view === 'history' && (
+					<>
+						{historyLoading ? (
+							<div className="flex items-center justify-center h-full">
+								<Loader2 className="h-4 w-4 animate-spin" />
+							</div>
+						) : (
+							<ScrollArea className="h-full">
+								<div className="divide-y">
+									{(historyData?.commits ?? []).map((commit) => (
+										<div
+											key={commit.hash}
+											className="p-3 hover:bg-accent/30 cursor-pointer"
+											onClick={() => onSelectCommit?.(commit.hash)}
+										>
+											<div className="flex items-center gap-2 mb-1">
+												<Hash className="h-3 w-3 text-muted-foreground" />
+												<span className="font-mono text-xs">{commit.hash.slice(0, 8)}</span>
+												<span className="text-xs text-muted-foreground flex-1 truncate">
+													{commit.message}
+												</span>
+											</div>
+											<div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+												<span className="flex items-center gap-1">
+													<User className="h-3 w-3" />
+													{commit.author}
+												</span>
+												<span className="flex items-center gap-1">
+													<Calendar className="h-3 w-3" />
+													{new Date(commit.date).toLocaleDateString()}
+												</span>
+											</div>
+										</div>
+									))}
+								</div>
+							</ScrollArea>
+						)}
+					</>
+				)}
+			</div>
+		</div>
 	);
 }
