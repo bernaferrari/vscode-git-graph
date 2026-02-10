@@ -6,6 +6,7 @@
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 
 export function useGitOperations() {
 	const { activeRepo } = useAppStore();
@@ -16,6 +17,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Branch created');
+		},
+		onError: (error) => {
+			toast.error('Failed to create branch', { description: error.message });
 		},
 	});
 
@@ -23,6 +28,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Branch deleted');
+		},
+		onError: (error) => {
+			toast.error('Failed to delete branch', { description: error.message });
 		},
 	});
 
@@ -30,6 +39,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Checked out');
+		},
+		onError: (error) => {
+			toast.error('Checkout failed', { description: error.message });
 		},
 	});
 
@@ -37,6 +50,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Reset successful');
+		},
+		onError: (error) => {
+			toast.error('Reset failed', { description: error.message });
 		},
 	});
 
@@ -44,6 +61,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Fetched from remote');
+		},
+		onError: (error) => {
+			toast.error('Fetch failed', { description: error.message });
 		},
 	});
 
@@ -51,6 +72,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Pulled changes');
+		},
+		onError: (error) => {
+			toast.error('Pull failed', { description: error.message });
 		},
 	});
 
@@ -79,6 +104,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Pushed to remote');
+		},
+		onError: (error) => {
+			toast.error('Push failed', { description: error.message });
 		},
 	});
 
@@ -86,6 +115,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Rebase successful');
+		},
+		onError: (error) => {
+			toast.error('Rebase failed', { description: error.message });
 		},
 	});
 
@@ -93,6 +126,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Cherry-pick successful');
+		},
+		onError: (error) => {
+			toast.error('Cherry-pick failed', { description: error.message });
 		},
 	});
 
@@ -100,6 +137,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Revert successful');
+		},
+		onError: (error) => {
+			toast.error('Revert failed', { description: error.message });
 		},
 	});
 
@@ -107,6 +148,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Committed');
+		},
+		onError: (error) => {
+			toast.error('Commit failed', { description: error.message });
 		},
 	});
 
@@ -128,6 +173,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Stashed changes');
+		},
+		onError: (error) => {
+			toast.error('Stash failed', { description: error.message });
 		},
 	});
 
@@ -135,6 +184,10 @@ export function useGitOperations() {
 		onSuccess: () => {
 			utils.git.repoInfo.invalidate();
 			utils.git.commits.invalidate();
+			toast.success('Stash applied');
+		},
+		onError: (error) => {
+			toast.error('Stash pop failed', { description: error.message });
 		},
 	});
 
