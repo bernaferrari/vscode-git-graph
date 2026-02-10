@@ -1,10 +1,30 @@
 /**
  * Git Graph Main Component
- * Combines all sub-components into a cohesive Git Graph view
+ * GitKraken-style Git visualization
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import {
+	Loader2,
+	GitBranch,
+	Upload,
+	Download,
+	Terminal,
+	Search,
+	Plus,
+	RefreshCw,
+	ChevronDown,
+	Tag,
+	Merge,
+	GitCommit,
+	Archive,
+	MoreHorizontal,
+	X,
+	FileCode,
+	User,
+	Calendar,
+	Hash,
+} from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { CommitGraph } from './commit-graph';
@@ -29,9 +49,21 @@ import {
 } from '@/lib/graph/layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
 
-// Type for commits returned by tRPC (simpler than full GitCommit)
+// Type for commits returned by tRPC
 interface ClientCommit {
 	hash: string;
 	parents: string[];
@@ -50,6 +82,43 @@ const graphCalculator = new GraphLayoutCalculator(GRAPH_CONFIG, {
 	mergeCommits: true,
 	commitsNotAncestorsOfHead: false,
 });
+
+// Toolbar button component
+function ToolbarButton({
+	icon: Icon,
+	label,
+	shortcut,
+	onClick,
+	variant = 'ghost',
+	disabled,
+}: {
+	icon: React.ElementType;
+	label: string;
+	shortcut?: string;
+	onClick: () => void;
+	variant?: 'ghost' | 'default' | 'outline';
+	disabled?: boolean;
+}) {
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					variant={variant}
+					size="sm"
+					className="h-8 px-2 gap-1.5"
+					onClick={onClick}
+					disabled={disabled}
+				>
+					<Icon className="h-4 w-4" />
+					<span className="hidden sm:inline">{label}</span>
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent side="bottom">
+				<p>{label}{shortcut && ` (${shortcut})`}</p>
+			</TooltipContent>
+		</Tooltip>
+	);
+}
 
 export function GitGraph() {
 	// App store
@@ -115,7 +184,6 @@ export function GitGraph() {
 		},
 		{
 			enabled: !!activeRepo,
-			// Auto-refresh commits every 30 seconds
 			refetchInterval: 30000,
 			staleTime: 10000,
 		}
@@ -123,17 +191,6 @@ export function GitGraph() {
 
 	// Git status check
 	const { data: gitStatus } = trpc.git.status.useQuery();
-
-	// File watcher subscription for real-time updates - DISABLED for debugging
-	// const utils = trpc.useUtils();
-	// trpc.watcher.onChange.useSubscription({ repo: activeRepo ?? '' }, {
-	// 	enabled: !!activeRepo,
-	// 	onData: () => {
-	// 		// Invalidate and refetch when repo changes
-	// 		utils.git.commits.invalidate();
-	// 		utils.git.repoInfo.invalidate();
-	// 	},
-	// });
 
 	// Derive commit lookup
 	const commitLookup = useMemo(() => {
@@ -171,8 +228,14 @@ export function GitGraph() {
 	const handleSelectCommit = useCallback((index: number) => {
 		setSelectedCommitIndex(index);
 		const commit = commitsData?.commits[index];
-		setSelectedCommit(commit?.hash ?? null);
-	}, [commitsData, setSelectedCommit]);
+		if (commit) {
+			setSelectedCommit(commit.hash);
+			// Auto-open details panel on click
+			if (!commitDetailsOpen) {
+				setCommitDetailsOpen(true);
+			}
+		}
+	}, [commitsData, setSelectedCommit, commitDetailsOpen, setCommitDetailsOpen]);
 
 	const handleExpandCommit = useCallback((index: number | null) => {
 		setExpandedCommit(index);
@@ -246,14 +309,12 @@ export function GitGraph() {
 	// Keyboard shortcuts
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			// Ignore if typing in an input
 			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
 				return;
 			}
 
 			const totalCommits = commitsData?.commits?.length ?? 0;
 
-			// Navigation
 			if (e.key === 'j' || e.key === 'ArrowDown') {
 				e.preventDefault();
 				if (totalCommits > 0) {
@@ -267,15 +328,12 @@ export function GitGraph() {
 					handleSelectCommit(prevIndex);
 				}
 			} else if (e.key === 'g') {
-				// Go to first commit
 				e.preventDefault();
 				if (totalCommits > 0) handleSelectCommit(0);
 			} else if (e.key === 'G') {
-				// Go to last commit
 				e.preventDefault();
 				if (totalCommits > 0) handleSelectCommit(totalCommits - 1);
 			} else if (e.key === 'Enter') {
-				// Toggle commit details
 				e.preventDefault();
 				if (selectedCommitIndex !== null) {
 					handleExpandCommit(expandedCommit === selectedCommitIndex ? null : selectedCommitIndex);
@@ -287,27 +345,28 @@ export function GitGraph() {
 				e.preventDefault();
 				refetchCommits();
 			} else if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
-				// Create branch on selected commit
 				e.preventDefault();
 				if (selectedCommit) {
 					setTargetCommit(selectedCommit);
 					setCreateBranchOpen(true);
 				}
 			} else if (e.key === 't' && (e.metaKey || e.ctrlKey)) {
-				// Add tag on selected commit
 				e.preventDefault();
 				if (selectedCommit) {
 					setTargetCommit(selectedCommit);
 					setAddTagOpen(true);
 				}
+			} else if (e.key === 'Escape') {
+				setCommitDetailsOpen(false);
+				setFindWidgetOpen(false);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen]);
 
-	// tRPC mutations for opening repo
+	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
 	const { mutate: registerRepo } = trpc.repo.register.useMutation();
 	const { setActiveRepo, addRecentRepo } = useAppStore();
@@ -332,46 +391,17 @@ export function GitGraph() {
 	// No repo selected
 	if (!activeRepo) {
 		return (
-			<div className="flex-1 flex items-center justify-center">
+			<div className="flex-1 flex items-center justify-center bg-background">
 				<div className="text-center max-w-md p-8">
 					<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="40"
-							height="40"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.5"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="text-primary"
-						>
-							<circle cx="12" cy="12" r="4" />
-							<line x1="1.05" y1="12" x2="7" y2="12" />
-							<line x1="17.01" y1="12" x2="22.96" y2="12" />
-						</svg>
+						<GitCommit className="h-10 w-10 text-primary" />
 					</div>
 					<h1 className="text-2xl font-semibold mb-2">Welcome to Git Graph</h1>
 					<p className="text-muted-foreground mb-6">
-						Open a Git repository to visualize your commit history and manage your code.
+						Open a Git repository to visualize your commit history.
 					</p>
 					<Button size="lg" onClick={handleOpenRepo} className="gap-2">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-							<line x1="12" y1="11" x2="12" y2="17" />
-							<line x1="9" y1="14" x2="15" y2="14" />
-						</svg>
+						<Plus className="h-5 w-5" />
 						Open Repository
 					</Button>
 					<p className="text-xs text-muted-foreground mt-4">
@@ -385,32 +415,17 @@ export function GitGraph() {
 	// Git not available
 	if (gitStatus && !gitStatus.available) {
 		return (
-			<div className="flex-1 flex items-center justify-center">
+			<div className="flex-1 flex items-center justify-center bg-background">
 				<div className="text-center max-w-md p-8">
 					<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/5 flex items-center justify-center">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="40"
-							height="40"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.5"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="text-destructive"
-						>
-							<circle cx="12" cy="12" r="10" />
-							<line x1="12" y1="8" x2="12" y2="12" />
-							<line x1="12" y1="16" x2="12.01" y2="16" />
-						</svg>
+						<X className="h-10 w-10 text-destructive" />
 					</div>
 					<h1 className="text-2xl font-semibold mb-2">Git Not Available</h1>
 					<p className="text-muted-foreground mb-2">
-						Git Graph requires Git to be installed on your system.
+						Git Graph requires Git to be installed.
 					</p>
-					<p className="text-sm text-muted-foreground/70">{gitStatus.error}</p>
-					<Button variant="outline" className="mt-6" onClick={() => window.open('https://git-scm.com/downloads', '_blank')}>
+					<p className="text-sm text-muted-foreground/70 mb-4">{gitStatus.error}</p>
+					<Button variant="outline" onClick={() => window.open('https://git-scm.com/downloads', '_blank')}>
 						Download Git
 					</Button>
 				</div>
@@ -421,7 +436,7 @@ export function GitGraph() {
 	// Loading
 	if (repoLoading || commitsLoading) {
 		return (
-			<div className="flex-1 flex items-center justify-center">
+			<div className="flex-1 flex items-center justify-center bg-background">
 				<div className="text-center">
 					<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
 					<p className="text-sm text-muted-foreground">Loading commits...</p>
@@ -433,11 +448,11 @@ export function GitGraph() {
 	// Error state
 	if (commitsData?.error) {
 		return (
-			<div className="flex-1 flex items-center justify-center text-destructive">
+			<div className="flex-1 flex items-center justify-center bg-background">
 				<div className="text-center">
-					<p className="text-lg mb-2">Error Loading Commits</p>
-					<p className="text-sm opacity-70">{commitsData.error}</p>
-					<Button variant="outline" className="mt-4" onClick={() => refetchCommits()}>
+					<p className="text-lg mb-2 text-destructive">Error Loading Commits</p>
+					<p className="text-sm text-muted-foreground mb-4">{commitsData.error}</p>
+					<Button variant="outline" onClick={() => refetchCommits()}>
 						Retry
 					</Button>
 				</div>
@@ -445,189 +460,301 @@ export function GitGraph() {
 		);
 	}
 
+	const currentHead = repoInfo?.head ?? 'main';
+
 	return (
-		<div className="flex-1 flex flex-col h-full overflow-hidden">
-			{/* Top Control Bar */}
-			<div className="flex items-center gap-2 p-2 border-b bg-background">
-				<Badge variant="outline" className="text-sm font-mono">
-					{activeRepo.split('/').pop()}
-				</Badge>
-
-				{repoInfo?.head && (
-					<Badge variant="secondary" className="text-xs">
-						{(repoInfo.head)}
-					</Badge>
-				)}
-
-				<Separator orientation="vertical" className="h-6" />
-
-				<div className="w-48">
-					<BranchDropdown
-						branches={branchOptions}
-						selectedBranches={selectedBranches}
-						multiple
-						onChange={setSelectedBranches}
-					/>
-				</div>
-
-				<Separator orientation="vertical" className="h-6" />
-
-				<Button variant="ghost" size="sm" onClick={() => setFindWidgetOpen(true)}>
-					Find (⌘F)
-				</Button>
-				<Button variant="ghost" size="sm" onClick={() => refetchCommits()}>
-					Refresh (⌘R)
-				</Button>
-
-				{commitsData?.moreCommitsAvailable && (
-					<Badge variant="outline" className="text-xs">
-						More available
-					</Badge>
-				)}
-			</div>
-
-			{/* Find Widget */}
-			<FindWidget
-				open={findWidgetOpen}
-				onClose={() => setFindWidgetOpen(false)}
-				onFind={handleFind}
-				onFindNext={handleFindNext}
-				onFindPrevious={handleFindPrevious}
-				currentIndex={findCurrentIndex}
-				totalMatches={findMatches.length}
-			/>
-
-			{/* Main Content */}
-			<div className="flex-1 flex overflow-hidden">
-				{/* Shared scroll container for graph and list */}
-				<div className="flex-1 overflow-auto" ref={commitListRef}>
-					<div className="flex min-h-full">
-						{/* Graph - positioned absolutely to scroll with list */}
-						<div className="shrink-0" style={{ width: graphLayout?.width ?? 200 }}>
-							{graphLayout && (
-								<CommitGraph
-									layout={graphLayout}
-									config={GRAPH_CONFIG}
-									expandedIndex={expandedCommit ?? -1}
-									onVertexClick={handleSelectCommit}
-									onVertexHover={() => {}}
-								/>
-							)}
+		<TooltipProvider>
+			<div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+				{/* Top Toolbar */}
+				<div className="flex items-center gap-1 px-3 py-1.5 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+					{/* Repo info */}
+					<div className="flex items-center gap-2 mr-2">
+						<div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50">
+							<GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+							<span className="text-sm font-medium">{activeRepo.split('/').pop()}</span>
 						</div>
-
-						{/* Commit list - no internal scrolling */}
-						<div className="flex-1">
-							{commitsData?.commits && commitsData.commits.length > 0 && (
-								<CommitList
-									commits={commitsData.commits}
-									layout={graphLayout}
-									selectedIndex={selectedCommitIndex}
-									expandedIndex={expandedCommit}
-									onSelect={handleSelectCommit}
-									onExpand={handleExpandCommit}
-									onContextMenu={handleContextMenu}
-								/>
-							)}
-							{commitsData?.commits && commitsData.commits.length === 0 && (
-								<div className="flex items-center justify-center h-32 text-muted-foreground">
-									<p>No commits found</p>
-								</div>
-							)}
-						</div>
+						<Badge variant="secondary" className="text-xs font-mono">
+							{currentHead}
+						</Badge>
 					</div>
-				</div>
 
-				{/* Commit Details Panel */}
-				{commitDetailsOpen && selectedCommit && (
-					<div className="w-80 shrink-0">
-						<CommitDetailsPanel
-							commitHash={selectedCommit}
-							onClose={() => setCommitDetailsOpen(false)}
+					<div className="h-5 w-px bg-border mx-1" />
+
+					{/* Main actions */}
+					<ToolbarButton
+						icon={Download}
+						label="Fetch"
+						shortcut="F"
+						onClick={() => {
+							// TODO: Implement fetch
+						}}
+					/>
+					<ToolbarButton
+						icon={Upload}
+						label="Push"
+						shortcut="P"
+						onClick={() => {
+							// TODO: Implement push
+						}}
+					/>
+					<ToolbarButton
+						icon={GitBranch}
+						label="Pull"
+						shortcut="L"
+						onClick={() => {
+							// TODO: Implement pull
+						}}
+					/>
+
+					<div className="h-5 w-px bg-border mx-1" />
+
+					{/* Branch/Tag creation */}
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" size="sm" className="h-8 px-2 gap-1.5">
+								<Plus className="h-4 w-4" />
+								<span className="hidden sm:inline">New</span>
+								<ChevronDown className="h-3 w-3" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="start">
+							<DropdownMenuItem onClick={() => {
+								setTargetCommit(selectedCommit ?? 'HEAD');
+								setCreateBranchOpen(true);
+							}}>
+								<GitBranch className="h-4 w-4 mr-2" />
+								Branch...
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => {
+								setTargetCommit(selectedCommit ?? 'HEAD');
+								setAddTagOpen(true);
+							}}>
+								<Tag className="h-4 w-4 mr-2" />
+								Tag...
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => {
+								// TODO: Stash
+							}}>
+								<Archive className="h-4 w-4 mr-2" />
+								Stash
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+
+					{/* Branch filter */}
+					<div className="ml-2 w-44">
+						<BranchDropdown
+							branches={branchOptions}
+							selectedBranches={selectedBranches}
+							multiple
+							onChange={setSelectedBranches}
 						/>
 					</div>
-				)}
+
+					{/* Right side */}
+					<div className="flex-1" />
+
+					{/* Search */}
+					<ToolbarButton
+						icon={Search}
+						label="Find"
+						shortcut="⌘F"
+						onClick={() => setFindWidgetOpen(true)}
+					/>
+
+					{/* Refresh */}
+					<ToolbarButton
+						icon={RefreshCw}
+						label="Refresh"
+						shortcut="⌘R"
+						onClick={() => refetchCommits()}
+					/>
+
+					{/* More options */}
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+								<MoreHorizontal className="h-4 w-4" />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onClick={() => {
+								// TODO: Open in terminal
+							}}>
+								<Terminal className="h-4 w-4 mr-2" />
+								Open in Terminal
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => {
+								// TODO: Open in Finder
+							}}>
+								<FileCode className="h-4 w-4 mr-2" />
+								Open in Finder
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+
+				{/* Find Widget */}
+				<FindWidget
+					open={findWidgetOpen}
+					onClose={() => setFindWidgetOpen(false)}
+					onFind={handleFind}
+					onFindNext={handleFindNext}
+					onFindPrevious={handleFindPrevious}
+					currentIndex={findCurrentIndex}
+					totalMatches={findMatches.length}
+				/>
+
+				{/* Main Content */}
+				<div className="flex-1 flex overflow-hidden">
+					{/* Graph and Commit List */}
+					<div className="flex-1 overflow-auto" ref={commitListRef}>
+						<div className="flex min-h-full">
+							{/* Graph */}
+							<div className="shrink-0 sticky left-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
+								{graphLayout && (
+									<CommitGraph
+										layout={graphLayout}
+										config={GRAPH_CONFIG}
+										expandedIndex={expandedCommit ?? -1}
+										onVertexClick={handleSelectCommit}
+										onVertexHover={() => {}}
+									/>
+								)}
+							</div>
+
+							{/* Commit list */}
+							<div className="flex-1 min-w-0">
+								{commitsData?.commits && commitsData.commits.length > 0 && (
+									<CommitList
+										commits={commitsData.commits}
+										layout={graphLayout}
+										selectedIndex={selectedCommitIndex}
+										expandedIndex={expandedCommit}
+										onSelect={handleSelectCommit}
+										onExpand={handleExpandCommit}
+										onContextMenu={handleContextMenu}
+									/>
+								)}
+								{commitsData?.commits && commitsData.commits.length === 0 && (
+									<div className="flex items-center justify-center h-32 text-muted-foreground">
+										<p>No commits found</p>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{/* Commit Details Panel */}
+					{commitDetailsOpen && selectedCommit && (
+						<div className="w-80 shrink-0 border-l">
+							<CommitDetailsPanel
+								commitHash={selectedCommit}
+								onClose={() => setCommitDetailsOpen(false)}
+							/>
+						</div>
+					)}
+				</div>
+
+				{/* Status bar */}
+				<div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground border-t bg-background/95">
+					<span>{commitsData?.commits?.length ?? 0} commits</span>
+					{commitsData?.moreCommitsAvailable && (
+						<>
+							<span>•</span>
+							<span className="text-primary cursor-pointer hover:underline">
+								Load more
+							</span>
+						</>
+					)}
+					<div className="flex-1" />
+					<span>{repoInfo?.branches?.length ?? 0} branches</span>
+					<span>•</span>
+					<span>{repoInfo?.tags?.length ?? 0} tags</span>
+				</div>
+
+				{/* Dialogs */}
+				<CreateBranchDialog
+					open={createBranchOpen}
+					onOpenChange={setCreateBranchOpen}
+					onCreate={(name, checkout) => {
+						gitOps.createBranch(targetCommit, name, checkout);
+						setCreateBranchOpen(false);
+					}}
+					targetCommit={targetCommit}
+				/>
+
+				<AddTagDialog
+					open={addTagOpen}
+					onOpenChange={setAddTagOpen}
+					onAdd={(name, type, _push) => {
+						gitOps.createTag(targetCommit, name, type === 'annotated' ? name : undefined);
+						setAddTagOpen(false);
+					}}
+					targetCommit={targetCommit}
+				/>
+
+				<ResetDialog
+					open={resetOpen}
+					onOpenChange={setResetOpen}
+					onReset={(mode) => {
+						gitOps.reset(targetCommit, mode);
+						setResetOpen(false);
+					}}
+					targetCommit={targetCommit}
+				/>
+
+				<DeleteBranchDialog
+					open={deleteBranchOpen}
+					onOpenChange={setDeleteBranchOpen}
+					onDelete={(force) => {
+						gitOps.deleteBranch(targetBranch, force);
+						setDeleteBranchOpen(false);
+					}}
+					branchName={targetBranch}
+				/>
+
+				<MergeDialog
+					open={mergeOpen}
+					onOpenChange={setMergeOpen}
+					onMerge={(options) => {
+						gitOps.merge(targetBranch, options);
+						setMergeOpen(false);
+					}}
+					branchName={targetBranch}
+				/>
+
+				<RebaseDialog
+					open={rebaseOpen}
+					onOpenChange={setRebaseOpen}
+					onRebase={(interactive) => {
+						gitOps.rebase(targetCommit, interactive);
+						setRebaseOpen(false);
+					}}
+					onto={targetCommit}
+				/>
+
+				<CherryPickDialog
+					open={cherryPickOpen}
+					onOpenChange={setCherryPickOpen}
+					onCherryPick={(noCommit) => {
+						gitOps.cherryPick(targetCommit, noCommit);
+						setCherryPickOpen(false);
+					}}
+					commitHash={targetCommit}
+				/>
+
+				<RevertDialog
+					open={revertOpen}
+					onOpenChange={setRevertOpen}
+					onRevert={(noCommit) => {
+						gitOps.revert(targetCommit, noCommit);
+						setRevertOpen(false);
+					}}
+					commitHash={targetCommit}
+				/>
 			</div>
-
-			{/* Dialogs */}
-			<CreateBranchDialog
-				open={createBranchOpen}
-				onOpenChange={setCreateBranchOpen}
-				onCreate={(name, checkout) => {
-					gitOps.createBranch(targetCommit, name, checkout);
-					setCreateBranchOpen(false);
-				}}
-				targetCommit={targetCommit}
-			/>
-
-			<AddTagDialog
-				open={addTagOpen}
-				onOpenChange={setAddTagOpen}
-				onAdd={(name, type, _push) => {
-					gitOps.createTag(targetCommit, name, type === 'annotated' ? name : undefined);
-					setAddTagOpen(false);
-				}}
-				targetCommit={targetCommit}
-			/>
-
-			<ResetDialog
-				open={resetOpen}
-				onOpenChange={setResetOpen}
-				onReset={(mode) => {
-					gitOps.reset(targetCommit, mode);
-					setResetOpen(false);
-				}}
-				targetCommit={targetCommit}
-			/>
-
-			<DeleteBranchDialog
-				open={deleteBranchOpen}
-				onOpenChange={setDeleteBranchOpen}
-				onDelete={(force) => {
-					gitOps.deleteBranch(targetBranch, force);
-					setDeleteBranchOpen(false);
-				}}
-				branchName={targetBranch}
-			/>
-
-			<MergeDialog
-				open={mergeOpen}
-				onOpenChange={setMergeOpen}
-				onMerge={(options) => {
-					gitOps.merge(targetBranch, options);
-					setMergeOpen(false);
-				}}
-				branchName={targetBranch}
-			/>
-
-			<RebaseDialog
-				open={rebaseOpen}
-				onOpenChange={setRebaseOpen}
-				onRebase={(interactive) => {
-					gitOps.rebase(targetCommit, interactive);
-					setRebaseOpen(false);
-				}}
-				onto={targetCommit}
-			/>
-
-			<CherryPickDialog
-				open={cherryPickOpen}
-				onOpenChange={setCherryPickOpen}
-				onCherryPick={(noCommit) => {
-					gitOps.cherryPick(targetCommit, noCommit);
-					setCherryPickOpen(false);
-				}}
-				commitHash={targetCommit}
-			/>
-
-			<RevertDialog
-				open={revertOpen}
-				onOpenChange={setRevertOpen}
-				onRevert={(noCommit) => {
-					gitOps.revert(targetCommit, noCommit);
-					setRevertOpen(false);
-				}}
-				commitHash={targetCommit}
-			/>
-		</div>
+		</TooltipProvider>
 	);
 }

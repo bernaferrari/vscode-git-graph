@@ -8,8 +8,15 @@ import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { useEffect } from 'react';
+import {
+	FolderOpen,
+	FolderGit2,
+	ChevronLeft,
+	ChevronRight,
+	Clock,
+	Plus,
+} from 'lucide-react';
 
 // Extend CSSProperties to include webkit drag properties
 declare module 'react' {
@@ -88,7 +95,6 @@ export default function AppLayout() {
 			});
 			if (!result.canceled && result.filePaths[0]) {
 				const path = result.filePaths[0];
-				// Register the repo
 				registerRepo({ path });
 				setActiveRepo(path);
 			}
@@ -99,41 +105,35 @@ export default function AppLayout() {
 
 	return (
 		<div className="flex h-screen">
-			{/* Sidebar - very translucent with macOS vibrancy */}
-			<div
-				className={`flex flex-col border-r bg-sidebar backdrop-blur-xl transition-all duration-300 ${
-					sidebarOpen ? 'w-64' : 'w-12'
+			{/* Sidebar */}
+			<aside
+				className={`flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
+					sidebarOpen ? 'w-60' : 'w-12'
 				}`}
 			>
-				{/* Draggable titlebar area with macOS traffic light padding */}
-				<div className="flex items-center justify-between p-3 border-b border-sidebar-border sidebar-title" style={{ WebkitAppRegion: 'drag' }}>
+				{/* Draggable titlebar with macOS traffic light padding */}
+				<div
+					className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border sidebar-title"
+					style={{ WebkitAppRegion: 'drag' }}
+				>
 					{sidebarOpen && (
-						<span className="font-semibold text-sm select-none">Git Graph</span>
+						<div className="flex items-center gap-2">
+							<FolderGit2 className="h-4 w-4 text-primary" />
+							<span className="font-semibold text-sm select-none">Git Graph</span>
+						</div>
 					)}
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={() => setSidebarOpen(!sidebarOpen)}
-						className="h-7 w-7 p-0"
+						className="h-7 w-7 p-0 ml-auto"
 						style={{ WebkitAppRegion: 'no-drag' }}
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							{sidebarOpen ? (
-								<polyline points="15 18 9 12 15 6" />
-							) : (
-								<polyline points="9 18 15 12 9 6" />
-							)}
-						</svg>
+						{sidebarOpen ? (
+							<ChevronLeft className="h-4 w-4" />
+						) : (
+							<ChevronRight className="h-4 w-4" />
+						)}
 					</Button>
 				</div>
 
@@ -143,89 +143,84 @@ export default function AppLayout() {
 						<div className="p-2">
 							<Button
 								variant="outline"
-								className="w-full justify-start gap-2"
+								className="w-full justify-start gap-2 h-9"
 								onClick={handleOpenFolder}
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-									<line x1="12" y1="11" x2="12" y2="17" />
-									<line x1="9" y1="14" x2="15" y2="14" />
-								</svg>
-								Open Repository
+								<Plus className="h-4 w-4" />
+								<span>Open Repository</span>
 							</Button>
 						</div>
 
-						<Separator />
-
 						{/* Recent Repositories */}
 						{recentRepos && recentRepos.length > 0 && (
-							<div className="p-2">
-								<div className="text-xs font-medium text-muted-foreground mb-2 px-2">
-									Recent
+							<div className="px-2 pb-2">
+								<div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5 px-2 pt-1">
+									<Clock className="h-3 w-3" />
+									<span>Recent</span>
 								</div>
-								<ScrollArea className="h-auto max-h-40">
+								<div className="space-y-0.5">
 									{recentRepos.slice(0, 5).map((repo) => (
-										<Button
+										<button
 											key={repo}
-											variant={activeRepo === repo ? 'secondary' : 'ghost'}
-											className="w-full justify-start text-left truncate text-xs"
+											className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
+												activeRepo === repo
+													? 'bg-accent text-accent-foreground'
+													: 'hover:bg-accent/50 text-foreground'
+											}`}
 											onClick={() => setActiveRepo(repo)}
 										>
-											{repo.split('/').pop()}
-										</Button>
+											<div className="flex items-center gap-2">
+												<FolderGit2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+												<span className="truncate">{repo.split('/').pop()}</span>
+											</div>
+										</button>
 									))}
-								</ScrollArea>
+								</div>
 							</div>
 						)}
 
-						<Separator />
-
 						{/* Repository List */}
-						<ScrollArea className="flex-1">
-							<div className="p-2">
-								<div className="text-xs font-medium text-muted-foreground mb-2 px-2">
-									Repositories
-								</div>
-								{groupedRepos &&
-									Object.entries(groupedRepos).map(([folder, repos]) => (
+						<ScrollArea className="flex-1 px-2">
+							{groupedRepos && Object.keys(groupedRepos).length > 0 && (
+								<div className="pb-2">
+									<div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5 px-2 pt-1">
+										<FolderOpen className="h-3 w-3" />
+										<span>Repositories</span>
+									</div>
+									{Object.entries(groupedRepos).map(([folder, repos]) => (
 										<div key={folder} className="mb-2">
-											<div className="text-xs text-muted-foreground/70 px-2 py-1">
+											<div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-2 py-1 font-medium">
 												{folder}
 											</div>
-											{repos.map((repo) => (
-												<Button
-													key={repo.path}
-													variant={activeRepo === repo.path ? 'secondary' : 'ghost'}
-													className="w-full justify-start text-left"
-													onClick={() => setActiveRepo(repo.path)}
-												>
-													<div className="flex items-center gap-2 w-full">
-														<span className="truncate flex-1">
-															{repo.name}
-														</span>
-													</div>
-												</Button>
-											))}
+											<div className="space-y-0.5">
+												{repos.map((repo) => (
+													<button
+														key={repo.path}
+														className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
+															activeRepo === repo.path
+																? 'bg-accent text-accent-foreground'
+																: 'hover:bg-accent/50 text-foreground'
+														}`}
+														onClick={() => setActiveRepo(repo.path)}
+													>
+														<div className="flex items-center gap-2">
+															<FolderGit2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+															<span className="truncate">{repo.name}</span>
+														</div>
+													</button>
+												))}
+											</div>
 										</div>
 									))}
-							</div>
+								</div>
+							)}
 						</ScrollArea>
 					</>
 				)}
 
-				{/* Collapsed sidebar icons */}
+				{/* Collapsed sidebar */}
 				{!sidebarOpen && (
-					<div className="flex flex-col items-center p-2 gap-2">
+					<div className="flex flex-col items-center p-2 gap-1">
 						<Button
 							variant="ghost"
 							size="sm"
@@ -233,25 +228,13 @@ export default function AppLayout() {
 							onClick={handleOpenFolder}
 							title="Open Repository"
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-							>
-								<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-								<line x1="12" y1="11" x2="12" y2="17" />
-								<line x1="9" y1="14" x2="15" y2="14" />
-							</svg>
+							<Plus className="h-4 w-4" />
 						</Button>
 					</div>
 				)}
-			</div>
+			</aside>
 
-			{/* Main Content - solid background */}
+			{/* Main Content */}
 			<div className="flex-1 flex flex-col overflow-hidden bg-background">
 				<Outlet />
 			</div>

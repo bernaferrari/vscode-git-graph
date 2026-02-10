@@ -5,10 +5,31 @@
 
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+	X,
+	GitBranch,
+	Tag,
+	Copy,
+	ExternalLink,
+	GitCommit,
+	User,
+	Calendar,
+	MoreHorizontal,
+	ArrowRight,
+	FileText,
+	Plus,
+	Minus,
+	RotateCcw,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface CommitDetailsPanelProps {
@@ -20,7 +41,6 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-	// Get commit details
 	const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
 		{
 			repo: activeRepo ?? '',
@@ -31,15 +51,18 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 
 	if (!commitHash) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground p-4">
-				<p className="text-sm">Select a commit to view details</p>
+			<div className="flex items-center justify-center h-full text-muted-foreground p-4 bg-background">
+				<div className="text-center">
+					<GitCommit className="h-10 w-10 mx-auto mb-3 opacity-30" />
+					<p className="text-sm">Select a commit to view details</p>
+				</div>
 			</div>
 		);
 	}
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center h-full">
+			<div className="flex items-center justify-center h-full bg-background">
 				<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
 			</div>
 		);
@@ -47,7 +70,7 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 
 	if (!commitDetails?.details) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground p-4">
+			<div className="flex items-center justify-center h-full text-muted-foreground p-4 bg-background">
 				<p className="text-sm">Failed to load commit details</p>
 			</div>
 		);
@@ -55,149 +78,236 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 
 	const { details } = commitDetails;
 
+	const copyToClipboard = (text: string) => {
+		navigator.clipboard.writeText(text);
+	};
+
 	return (
-		<div className="flex flex-col h-full border-l bg-background">
+		<div className="flex flex-col h-full bg-background">
 			{/* Header */}
-			<div className="flex items-center justify-between p-3 border-b">
-				<span className="font-medium text-sm">Commit Details</span>
-				{onClose && (
-					<Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
+			<div className="flex items-center justify-between px-3 py-2 border-b">
+				<div className="flex items-center gap-2">
+					<GitCommit className="h-4 w-4 text-muted-foreground" />
+					<span className="font-medium text-sm">Commit</span>
+					<code className="text-xs font-mono text-muted-foreground">
+						{details.hash.slice(0, 7)}
+					</code>
+				</div>
+				<div className="flex items-center gap-1">
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-6 w-6 p-0"
+						onClick={() => copyToClipboard(details.hash)}
+						title="Copy full SHA"
+					>
+						<Copy className="h-3 w-3" />
 					</Button>
-				)}
+					{onClose && (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-6 w-6 p-0"
+							onClick={onClose}
+						>
+							<X className="h-4 w-4" />
+						</Button>
+					)}
+				</div>
 			</div>
 
 			<ScrollArea className="flex-1">
-				<div className="p-3 space-y-3">
-					{/* Commit Hash */}
-					<div>
-						<span className="text-xs text-muted-foreground">SHA</span>
-						<code className="block text-sm font-mono mt-1 p-2 bg-muted rounded">
-							{details.hash}
-						</code>
-					</div>
-
-					{/* Author Info */}
-					<div className="grid grid-cols-2 gap-2">
-						<div>
-							<span className="text-xs text-muted-foreground">Author</span>
-							<p className="text-sm mt-1">{details.author}</p>
-							<p className="text-xs text-muted-foreground">{details.authorEmail}</p>
-						</div>
-						<div>
-							<span className="text-xs text-muted-foreground">Date</span>
-							<p className="text-sm mt-1">{formatDate(details.authorDate)}</p>
-							<p className="text-xs text-muted-foreground">{formatRelative(details.authorDate)}</p>
-						</div>
-					</div>
-
-					{/* Committer (if different) */}
-					{details.committer !== details.author && (
-						<>
-							<Separator />
-							<div className="grid grid-cols-2 gap-2">
-								<div>
-									<span className="text-xs text-muted-foreground">Committer</span>
-									<p className="text-sm mt-1">{details.committer}</p>
-									<p className="text-xs text-muted-foreground">{details.committerEmail}</p>
-								</div>
-								<div>
-									<span className="text-xs text-muted-foreground">Commit Date</span>
-									<p className="text-sm mt-1">{formatDate(details.committerDate)}</p>
-								</div>
+				<div className="p-3 space-y-4">
+					{/* Author & Date */}
+					<div className="space-y-2">
+						<div className="flex items-start gap-2">
+							<div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+								<User className="h-3 w-3 text-primary" />
 							</div>
-						</>
-					)}
-
-					<Separator />
+							<div className="min-w-0 flex-1">
+								<p className="text-sm font-medium">{details.author}</p>
+								<p className="text-xs text-muted-foreground truncate">{details.authorEmail}</p>
+							</div>
+						</div>
+						<div className="flex items-center gap-2 text-xs text-muted-foreground ml-8">
+							<Calendar className="h-3 w-3" />
+							<span>{formatDate(details.authorDate)}</span>
+							<span className="text-muted-foreground/50">•</span>
+							<span>{formatRelative(details.authorDate)}</span>
+						</div>
+					</div>
 
 					{/* Message */}
-					<div>
-						<span className="text-xs text-muted-foreground">Message</span>
-						<p className="text-sm mt-1 whitespace-pre-wrap">{details.body}</p>
+					<div className="space-y-1">
+						<p className="text-sm whitespace-pre-wrap leading-relaxed">
+							{details.body || details.message}
+						</p>
 					</div>
+
+					{/* Parents */}
+					{details.parents && details.parents.length > 0 && (
+						<div className="space-y-1">
+							<span className="text-xs font-medium text-muted-foreground">Parents</span>
+							<div className="flex flex-wrap gap-1">
+								{details.parents.map((parent: string, i: number) => (
+									<button
+										key={parent}
+										className="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted rounded hover:bg-muted/80 transition-colors"
+										onClick={() => {
+											// TODO: Navigate to parent commit
+										}}
+									>
+										{i === 0 ? <ArrowRight className="h-3 w-3" /> : <GitCommit className="h-3 w-3" />}
+										{parent.slice(0, 7)}
+									</button>
+								))}
+							</div>
+						</div>
+					)}
 
 					{/* Signature */}
 					{details.signature && (
-						<>
-							<Separator />
-							<div>
-								<span className="text-xs text-muted-foreground">Signature</span>
-								<div className="flex items-center gap-2 mt-1">
-									<Badge variant={details.signature.status === 'Good' ? 'default' : 'destructive'}>
-										{details.signature.status}
-									</Badge>
-									<span className="text-sm">{details.signature.signer}</span>
-								</div>
-							</div>
-						</>
+						<div className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${
+							details.signature.status === 'Good'
+								? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+								: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+						}`}>
+							<span className="font-medium">{details.signature.status}</span>
+							<span className="opacity-70">•</span>
+							<span>{details.signature.signer}</span>
+						</div>
 					)}
 
-					<Separator />
-
 					{/* File Changes */}
-					<div>
-						<span className="text-xs text-muted-foreground">Changed Files</span>
-						<div className="mt-2 space-y-1">
-							{details.fileChanges.map((file, index) => (
-								<button
+					<div className="space-y-2">
+						<div className="flex items-center justify-between">
+							<span className="text-xs font-medium text-muted-foreground">
+								Changed Files ({details.fileChanges.length})
+							</span>
+							<div className="flex items-center gap-2 text-xs">
+								<span className="text-green-600 dark:text-green-400">
+									+{details.fileChanges.reduce((acc: number, f: { additions: number | null }) => acc + (f.additions ?? 0), 0)}
+								</span>
+								<span className="text-red-600 dark:text-red-400">
+									-{details.fileChanges.reduce((acc: number, f: { deletions: number | null }) => acc + (f.deletions ?? 0), 0)}
+								</span>
+							</div>
+						</div>
+
+						<div className="space-y-0.5">
+							{details.fileChanges.map((file: FileChange, index: number) => (
+								<div
 									key={index}
-									className={`w-full text-left p-2 rounded text-sm hover:bg-accent ${
-										selectedFile === file.newFilePath ? 'bg-accent' : ''
+									className={`group flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
+										selectedFile === file.newFilePath
+											? 'bg-accent'
+											: 'hover:bg-accent/50'
 									}`}
 									onClick={() => setSelectedFile(file.newFilePath)}
 								>
-									<div className="flex items-center gap-2">
-										<Badge
-											variant="outline"
-											className="text-[10px] w-5 h-5 p-0 flex items-center justify-center"
-										>
-											{file.type}
-										</Badge>
-										<span className="truncate flex-1">
-											{file.newFilePath}
-											{file.oldFilePath && file.oldFilePath !== file.newFilePath && (
-												<span className="text-muted-foreground">
-													{' '}
-													← {file.oldFilePath}
-												</span>
+									{/* Change type icon */}
+									<FileChangeIcon type={file.type} />
+									
+									{/* File path */}
+									<span className="truncate flex-1 min-w-0">
+										{file.newFilePath}
+									</span>
+
+									{/* Additions/deletions */}
+									{(file.additions !== null || file.deletions !== null) && (
+										<div className="flex items-center gap-1 text-[10px] font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+											{file.additions !== null && file.additions > 0 && (
+												<span className="text-green-600 dark:text-green-400">+{file.additions}</span>
 											)}
-										</span>
-									</div>
-									{file.additions !== null && file.deletions !== null && (
-										<div className="flex gap-2 mt-1 text-[10px]">
-											<span className="text-green-600">+{file.additions}</span>
-											<span className="text-red-600">-{file.deletions}</span>
+											{file.deletions !== null && file.deletions > 0 && (
+												<span className="text-red-600 dark:text-red-400">-{file.deletions}</span>
+											)}
 										</div>
 									)}
-								</button>
+
+									{/* More actions */}
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button
+												variant="ghost"
+												size="sm"
+												className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+												onClick={(e) => e.stopPropagation()}
+											>
+												<MoreHorizontal className="h-3 w-3" />
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-48">
+											<DropdownMenuItem onClick={() => copyToClipboard(file.newFilePath)}>
+												<Copy className="h-4 w-4 mr-2" />
+												Copy path
+											</DropdownMenuItem>
+											<DropdownMenuSeparator />
+											<DropdownMenuItem>
+												<FileText className="h-4 w-4 mr-2" />
+												View file at this commit
+											</DropdownMenuItem>
+											<DropdownMenuItem>
+												<RotateCcw className="h-4 w-4 mr-2" />
+												Reset file to this revision
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</div>
 							))}
 						</div>
 					</div>
 				</div>
 			</ScrollArea>
+
+			{/* Footer actions */}
+			<div className="flex items-center gap-1 p-2 border-t">
+				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+					<GitBranch className="h-3 w-3" />
+					Branch
+				</Button>
+				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+					<Tag className="h-3 w-3" />
+					Tag
+				</Button>
+				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+					<RotateCcw className="h-3 w-3" />
+					Reset
+				</Button>
+			</div>
 		</div>
 	);
 }
 
+interface FileChange {
+	type: string;
+	newFilePath: string;
+	oldFilePath: string | null;
+	additions: number | null;
+	deletions: number | null;
+}
+
+function FileChangeIcon({ type }: { type: string }) {
+	switch (type) {
+		case 'A':
+			return <Plus className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />;
+		case 'D':
+			return <Minus className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" />;
+		case 'R':
+			return <ArrowRight className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />;
+		default:
+			return <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+	}
+}
+
 function formatDate(timestamp: number): string {
 	return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+		weekday: 'short',
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
 	});
 }
 
