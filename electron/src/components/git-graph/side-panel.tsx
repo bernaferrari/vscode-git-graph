@@ -25,6 +25,7 @@ import {
 	Search,
 	MoreHorizontal,
 	GitCommit,
+	FolderTree,
 } from 'lucide-react';
 import {
 	DropdownMenu,
@@ -48,6 +49,7 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 		remotes: true,
 		tags: false,
 		stashes: false,
+		worktrees: false,
 	});
 	const [searchQuery, setSearchQuery] = useState('');
 
@@ -61,6 +63,11 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 		{ enabled: !!activeRepo }
 	);
 
+	const { data: worktreesData } = trpc.git.worktree.list.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo }
+	);
+
 	const toggleSection = (section: string) => {
 		setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
 	};
@@ -71,6 +78,7 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 	const remoteBranches = repoInfo?.branches?.filter((b) => b.startsWith('remotes/')) ?? [];
 	const tags = repoInfo?.tags ?? [];
 	const stashes = repoInfo?.stashes ?? [];
+	const worktrees = worktreesData?.worktrees ?? [];
 	const currentHead = repoInfo?.head;
 
 	// Filter by search
@@ -185,6 +193,24 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									+{tags.length - 30} more
 								</div>
 							)}
+						</Section>
+					)}
+
+					{/* Worktrees */}
+					{worktrees.length > 0 && (
+						<Section
+							title="Worktrees"
+							icon={FolderTree}
+							count={worktrees.length}
+							expanded={expandedSections.worktrees}
+							onToggle={() => toggleSection('worktrees')}
+						>
+							{worktrees.map((wt: { path: string; branch?: string; isMain?: boolean }) => (
+								<WorktreeItem
+									key={wt.path}
+									worktree={wt}
+								/>
+							))}
 						</Section>
 					)}
 
@@ -413,6 +439,31 @@ function StashItem({
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
+		</div>
+	);
+}
+
+// Worktree item
+function WorktreeItem({
+	worktree,
+}: {
+	worktree: { path: string; branch?: string; isMain?: boolean };
+}) {
+	const pathParts = worktree.path.split('/');
+	const folderName = pathParts[pathParts.length - 1];
+	
+	return (
+		<div className="group flex items-center gap-2 px-3 py-0.5 text-xs rounded hover:bg-accent/50">
+			<FolderTree className={`h-3 w-3 shrink-0 ${worktree.isMain ? 'text-primary' : 'text-muted-foreground'}`} />
+			<span className="flex-1 truncate" title={worktree.path}>
+				{folderName}
+			</span>
+			{worktree.isMain && (
+				<span className="text-[10px] text-primary font-medium">main</span>
+			)}
+			{worktree.branch && !worktree.isMain && (
+				<span className="text-[10px] text-muted-foreground">{worktree.branch}</span>
+			)}
 		</div>
 	);
 }
