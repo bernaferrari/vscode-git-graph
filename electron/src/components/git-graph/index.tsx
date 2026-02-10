@@ -25,6 +25,7 @@ import {
 	Calendar,
 	Hash,
 	Globe,
+	PanelLeft,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -43,6 +44,7 @@ import {
 	RevertDialog,
 } from './dialogs';
 import { CommitDetailsPanel } from './commit-details';
+import { SidePanel } from './side-panel';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -139,6 +141,8 @@ export function GitGraph() {
 	const [findMatches, setFindMatches] = useState<number[]>([]);
 	const [findCurrentIndex, setFindCurrentIndex] = useState(0);
 	const [selectedBranches, setSelectedBranches] = useState<string[]>(['__all__']);
+	const [showSidePanel, setShowSidePanel] = useState(true);
+	const [layoutMode, setLayoutMode] = useState<'panel' | 'tabs'>('panel');
 
 	// Refs
 	// Note: ScrollArea handles scrolling internally
@@ -612,6 +616,13 @@ export function GitGraph() {
 						onClick={() => refetchCommits()}
 					/>
 
+					{/* Toggle Side Panel */}
+					<ToolbarButton
+						icon={PanelLeft}
+						label="Toggle Panel"
+						onClick={() => setShowSidePanel(!showSidePanel)}
+					/>
+
 					{/* More options */}
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -649,6 +660,11 @@ export function GitGraph() {
 
 				{/* Main Content */}
 				<div className="flex-1 flex overflow-hidden min-w-0">
+					{/* Side Panel - Branches/Tags/Stashes */}
+					{showSidePanel && layoutMode === 'panel' && (
+						<SidePanel />
+					)}
+
 					{/* Graph and Commit List */}
 					<ScrollArea className="flex-1 w-full h-full">
 						<div className="flex min-w-max">
