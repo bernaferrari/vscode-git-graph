@@ -35,6 +35,7 @@ import {
 	Pin,
 	History,
 	FileText,
+	Package,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -72,6 +73,9 @@ import { ReflogViewer } from './reflog-viewer';
 import { CommitTemplatesDialog, useCommitTemplates, TemplateQuickInsert } from './commit-templates';
 import { GitignoreManager } from './gitignore-manager';
 import { CustomCommands } from './custom-commands';
+import { InlineBlame, BlamePill } from './inline-blame';
+import { SearchAllCommits } from './search-commits';
+import { LFSSupport } from './lfs-support';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -201,6 +205,9 @@ export function GitGraph() {
 	const [templatesOpen, setTemplatesOpen] = useState(false);
 	const [gitignoreOpen, setGitignoreOpen] = useState(false);
 	const [customCommandsOpen, setCustomCommandsOpen] = useState(false);
+	const [searchCommitsOpen, setSearchCommitsOpen] = useState(false);
+	const [lfsOpen, setLfsOpen] = useState(false);
+	const [inlineBlameEnabled, setInlineBlameEnabled] = useState(false);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -465,6 +472,10 @@ export function GitGraph() {
 			} else if (e.key === 'r' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
 				e.preventDefault();
 				setRemoteManageOpen(true);
+			} else if (e.key === 'F' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				// Cmd+Shift+F for global search
+				e.preventDefault();
+				setSearchCommitsOpen(true);
 			} else if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
 				// Pin current commit with 's' (star)
 				e.preventDefault();
@@ -478,7 +489,7 @@ export function GitGraph() {
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen]);
 
 	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
@@ -855,6 +866,20 @@ export function GitGraph() {
 								Custom Commands
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setSearchCommitsOpen(true)}>
+								<Search className="h-4 w-4 mr-2" />
+								Search Commits
+								<span className="ml-auto text-xs text-muted-foreground">⌘⇧F</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setLfsOpen(true)}>
+								<Package className="h-4 w-4 mr-2" />
+								LFS Management
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setInlineBlameEnabled(!inlineBlameEnabled)}>
+								<User className="h-4 w-4 mr-2" />
+								{inlineBlameEnabled ? 'Disable' : 'Enable'} Inline Blame
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
 								Undo Last Commit
@@ -1129,6 +1154,25 @@ export function GitGraph() {
 				<CustomCommands
 					open={customCommandsOpen}
 					onOpenChange={setCustomCommandsOpen}
+				/>
+
+				{/* Search All Commits */}
+				<SearchAllCommits
+					open={searchCommitsOpen}
+					onOpenChange={setSearchCommitsOpen}
+					onSelectCommit={(hash) => {
+						// Find and select the commit in the list
+						const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+						if (index !== undefined && index >= 0) {
+							handleSelectCommit(index);
+						}
+					}}
+				/>
+
+				{/* LFS Support */}
+				<LFSSupport
+					open={lfsOpen}
+					onOpenChange={setLfsOpen}
 				/>
 
 				{/* Line Staging */}

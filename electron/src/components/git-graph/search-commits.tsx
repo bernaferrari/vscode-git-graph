@@ -3,7 +3,7 @@
  * Full-text search across commit messages, authors, files
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -19,12 +19,21 @@ import {
 	Search,
 	GitCommit,
 	User,
-	Calendar,
-	Hash,
 	Loader2,
 	X,
 } from 'lucide-react';
-import { debounce } from 'lodash-es';
+
+// Simple debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+	const [debouncedValue, setDebouncedValue] = useState(value);
+
+	useEffect(() => {
+		const timer = setTimeout(() => setDebouncedValue(value), delay);
+		return () => clearTimeout(timer);
+	}, [value, delay]);
+
+	return debouncedValue;
+}
 
 interface SearchAllCommitsProps {
 	open: boolean;
@@ -35,19 +44,10 @@ interface SearchAllCommitsProps {
 export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchAllCommitsProps) {
 	const { activeRepo } = useAppStore();
 	const [query, setQuery] = useState('');
-	const [debouncedQuery, setDebouncedQuery] = useState('');
 	const [searchType, setSearchType] = useState<'message' | 'author' | 'file' | 'hash'>('message');
-
-	// Debounce search query
-	const debouncedSetQuery = useMemo(
-		() => debounce((q: string) => setDebouncedQuery(q), 300),
-		[]
-	);
-
-	const handleQueryChange = (value: string) => {
-		setQuery(value);
-		debouncedSetQuery(value);
-	};
+	
+	// Use debounce hook
+	const debouncedQuery = useDebounce(query, 300);
 
 	// Search commits
 	const { data: searchResults, isLoading } = trpc.git.searchCommits.useQuery(
@@ -71,7 +71,6 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 		onSelectCommit?.(hash);
 		onOpenChange(false);
 		setQuery('');
-		setDebouncedQuery('');
 	};
 
 	return (
@@ -91,7 +90,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 						<Input
 							placeholder="Search commits..."
 							value={query}
-							onChange={(e) => handleQueryChange(e.target.value)}
+							onChange={(e) => setQuery(e.target.value)}
 							className="pl-10 pr-10"
 							autoFocus
 						/>
@@ -102,7 +101,6 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 								className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
 								onClick={() => {
 									setQuery('');
-									setDebouncedQuery('');
 								}}
 							>
 								<X className="h-4 w-4" />
