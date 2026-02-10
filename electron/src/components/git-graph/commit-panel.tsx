@@ -3,7 +3,7 @@
  * Shows staging area and allows creating commits
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ import {
 	RefreshCw,
 	Edit,
 	ChevronUp,
+	FolderTree,
+	List,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
@@ -30,6 +32,12 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { FileTreeView } from './file-tree-view';
 
 interface CommitPanelProps {
 	onCommit?: () => void;
@@ -46,6 +54,9 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 	const [message, setMessage] = useState('');
 	const [expandedStaged, setExpandedStaged] = useState(true);
 	const [expandedUnstaged, setExpandedUnstaged] = useState(true);
+	const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
+	const [selectedStagedFiles, setSelectedStagedFiles] = useState<Set<string>>(new Set());
+	const [selectedUnstagedFiles, setSelectedUnstagedFiles] = useState<Set<string>>(new Set());
 
 	// Get working tree status
 	const { data: statusData, refetch: refetchStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -55,6 +66,10 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 
 	const staged: FileStatus[] = statusData?.staged ?? [];
 	const unstaged: FileStatus[] = statusData?.unstaged ?? [];
+
+	// Auto-select all staged files
+	const stagedFileSet = useMemo(() => new Set(staged.map(f => f.file)), [staged]);
+	const unstagedFileSet = useMemo(() => new Set(unstaged.map(f => f.file)), [unstaged]);
 
 	const handleStageFile = async (file: string) => {
 		await gitOps.stage([file]);
@@ -102,6 +117,25 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 			<div className="flex items-center justify-between px-3 py-2 border-b">
 				<span className="text-sm font-medium">Commit</span>
 				<div className="flex items-center gap-1">
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
+								size="sm"
+								className="h-6 w-6 p-0"
+								onClick={() => setViewMode(viewMode === 'tree' ? 'flat' : 'tree')}
+							>
+								{viewMode === 'tree' ? (
+									<FolderTree className="h-3 w-3" />
+								) : (
+									<List className="h-3 w-3" />
+								)}
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>
+							{viewMode === 'tree' ? 'Switch to list view' : 'Switch to tree view'}
+						</TooltipContent>
+					</Tooltip>
 					<Button
 						variant="ghost"
 						size="sm"
