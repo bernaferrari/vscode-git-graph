@@ -440,12 +440,29 @@ export function GitGraph() {
 			} else if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
 				e.preventDefault();
 				setTerminalOpen(!terminalOpen);
+			} else if (e.key === 's' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				e.preventDefault();
+				setStatisticsOpen(true);
+			} else if (e.key === 'p' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				e.preventDefault();
+				setPinnedCommitsOpen(true);
+			} else if (e.key === 'r' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				e.preventDefault();
+				setRemoteManageOpen(true);
+			} else if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
+				// Pin current commit with 's' (star)
+				e.preventDefault();
+				handlePinCommit();
+			} else if (e.key === '?') {
+				// Show help/keyboard shortcuts
+				e.preventDefault();
+				// Could open a help dialog
 			}
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit]);
 
 	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
