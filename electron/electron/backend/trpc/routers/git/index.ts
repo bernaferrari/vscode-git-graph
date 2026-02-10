@@ -2935,4 +2935,74 @@ export const gitRouter = router({
 				return { error: error instanceof Error ? error.message : 'Unknown error' };
 			}
 		}),
+
+	// ==================== File Operations ====================
+	readFile: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			path: z.string(),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { content: null, error: initError };
+
+			try {
+				const fs = await import('fs');
+				const path = await import('path');
+				const filePath = path.join(input.repo, input.path);
+				
+				if (!fs.existsSync(filePath)) {
+					return { content: '', error: null };
+				}
+				
+				const content = fs.readFileSync(filePath, 'utf-8');
+				return { content, error: null };
+			} catch (error) {
+				return { content: null, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	writeFile: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			path: z.string(),
+			content: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			try {
+				const fs = await import('fs');
+				const path = await import('path');
+				const filePath = path.join(input.repo, input.path);
+				
+				fs.writeFileSync(filePath, input.content, 'utf-8');
+				return { error: null };
+			} catch (error) {
+				return { error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	// ==================== Custom Commands ====================
+	runCustomCommand: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			command: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { output: null, error: initError };
+
+			try {
+				const gitService = getGitService();
+				const output = await gitService.runGitCommandWithOutput(
+					input.command.split(' '),
+					input.repo
+				);
+				return { output, error: null };
+			} catch (error) {
+				return { output: null, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
 });
