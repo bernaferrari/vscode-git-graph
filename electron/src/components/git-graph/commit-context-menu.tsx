@@ -3,12 +3,11 @@
  * Right-click menu for commit actions
  */
 
-import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import {
 	ContextMenu,
 	ContextMenuContent,
-	ContextMenuMenuItem,
+	ContextMenuItem,
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from '@/components/ui/context-menu';
@@ -22,7 +21,6 @@ import {
 	ArrowRightLeft,
 	ArrowLeft,
 	Trash2,
-	ExternalLink,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
 
@@ -76,65 +74,65 @@ export function CommitContextMenu({
 				{children}
 			</ContextMenuTrigger>
 			<ContextMenuContent className="w-56">
-				<ContextMenuMenuItem onClick={handleCopyHash}>
+				<ContextMenuItem onClick={handleCopyHash}>
 					<Copy className="h-4 w-4 mr-2" />
 					Copy SHA
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={handleCopyMessage}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={handleCopyMessage}>
 					<Copy className="h-4 w-4 mr-2" />
 					Copy Message
-				</ContextMenuMenuItem>
+				</ContextMenuItem>
 				<ContextMenuSeparator />
 				
-				<ContextMenuMenuItem onClick={onCreateBranch}>
+				<ContextMenuItem onClick={onCreateBranch}>
 					<GitBranch className="h-4 w-4 mr-2" />
 					Create Branch Here
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={onCreateTag}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={onCreateTag}>
 					<Tag className="h-4 w-4 mr-2" />
 					Create Tag Here
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={handleCheckout}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={handleCheckout}>
 					<ArrowLeft className="h-4 w-4 mr-2" />
 					Checkout Commit
-				</ContextMenuMenuItem>
+				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
 				
-				<ContextMenuMenuItem onClick={onMerge}>
+				<ContextMenuItem onClick={onMerge}>
 					<Merge className="h-4 w-4 mr-2" />
 					Merge into Current
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={onRebase}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={onRebase}>
 					<RotateCcw className="h-4 w-4 mr-2" />
 					Rebase Current onto Here
-				</ContextMenuMenuItem>
+				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
 				
-				<ContextMenuMenuItem onClick={onCherryPick}>
+				<ContextMenuItem onClick={onCherryPick}>
 					<GitCommit className="h-4 w-4 mr-2" />
 					Cherry Pick
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={onRevert}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={onRevert}>
 					<ArrowRightLeft className="h-4 w-4 mr-2" />
 					Revert Commit
-				</ContextMenuMenuItem>
+				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
 				
-				<ContextMenuMenuItem onClick={() => handleResetHere('soft')}>
+				<ContextMenuItem onClick={() => handleResetHere('soft')}>
 					<RotateCcw className="h-4 w-4 mr-2 text-amber-600" />
 					Reset Here (Soft)
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={() => handleResetHere('mixed')}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleResetHere('mixed')}>
 					<RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
 					Reset Here (Mixed)
-				</ContextMenuMenuItem>
-				<ContextMenuMenuItem onClick={() => handleResetHere('hard')}>
+				</ContextMenuItem>
+				<ContextMenuItem onClick={() => handleResetHere('hard')}>
 					<Trash2 className="h-4 w-4 mr-2 text-red-600" />
 					Reset Here (Hard)
-				</ContextMenuMenuItem>
+				</ContextMenuItem>
 			</ContextMenuContent>
 		</ContextMenu>
 	);

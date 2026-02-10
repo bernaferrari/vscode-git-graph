@@ -29,6 +29,10 @@ import {
 	BarChart3,
 	Settings,
 	Undo,
+	Star,
+	Key,
+	Filter,
+	Pin,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -57,6 +61,10 @@ import { RemoteManageDialog } from './remote-manage-dialog';
 import { BranchCompare } from './branch-compare';
 import { HooksManageDialog } from './hooks-manage-dialog';
 import { TerminalPanel } from './terminal-panel';
+import { CommitContextMenu } from './commit-context-menu';
+import { CommitHistoryFilters, type CommitFilter } from './commit-history-filters';
+import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
+import { CommitSigningDialog } from './commit-signing-dialog';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -65,6 +73,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -166,6 +180,17 @@ export function GitGraph() {
 	const [hooksManageOpen, setHooksManageOpen] = useState(false);
 	const [mergeConflictOpen, setMergeConflictOpen] = useState(false);
 	const [conflictFile, setConflictFile] = useState<{ path: string; ours: string; theirs: string } | null>(null);
+
+	// Additional feature states
+	const [commitSigningOpen, setCommitSigningOpen] = useState(false);
+	const [pinnedCommitsOpen, setPinnedCommitsOpen] = useState(false);
+	const [commitFilters, setCommitFilters] = useState<CommitFilter>({});
+	const [contextMenuOpen, setContextMenuOpen] = useState(false);
+	const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+	const [showFiltersDialog, setShowFiltersDialog] = useState(false);
+
+	// Pinned commits hook
+	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
 
 	// Refs
 	// Note: ScrollArea handles scrolling internally
@@ -332,8 +357,28 @@ export function GitGraph() {
 			setTargetCommit(commit.hash);
 			setSelectedCommitIndex(index);
 			setSelectedCommit(commit.hash);
+			setContextMenuPosition({ x: event.clientX, y: event.clientY });
+			setContextMenuOpen(true);
 		}
 	}, [commitsData, setSelectedCommit]);
+
+	// Get current commit for context menu
+	const selectedCommitData = useMemo(() => {
+		if (!targetCommit || !commitsData?.commits) return null;
+		return commitsData.commits.find((c: ClientCommit) => c.hash === targetCommit);
+	}, [targetCommit, commitsData?.commits]);
+
+	// Handle pin commit
+	const handlePinCommit = useCallback(() => {
+		if (selectedCommitData) {
+			pinCommit({
+				hash: selectedCommitData.hash,
+				message: selectedCommitData.message,
+				author: selectedCommitData.author,
+				date: new Date(selectedCommitData.date * 1000).toISOString(),
+			});
+		}
+	}, [selectedCommitData, pinCommit]);
 
 	// Keyboard shortcuts
 	useEffect(() => {
@@ -641,6 +686,22 @@ export function GitGraph() {
 						/>
 					</div>
 
+					{/* Commit History Filters */}
+					{(commitFilters.author || commitFilters.search || commitFilters.dateFrom || commitFilters.dateTo || commitFilters.filePath) && (
+						<Badge variant="secondary" className="ml-2 gap-1">
+							<Filter className="h-3 w-3" />
+							<span className="text-xs">Filtered</span>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-4 w-4 p-0 ml-1"
+								onClick={() => setCommitFilters({})}
+							>
+								<X className="h-3 w-3" />
+							</Button>
+						</Badge>
+					)}
+
 					{/* Right side */}
 					<div className="flex-1" />
 
@@ -666,6 +727,26 @@ export function GitGraph() {
 						label="Toggle Panel"
 						onClick={() => setShowSidePanel(!showSidePanel)}
 					/>
+
+					{/* Pinned Commits */}
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-8 w-8 p-0 relative"
+								onClick={() => setPinnedCommitsOpen(true)}
+							>
+								<Pin className="h-4 w-4" />
+								{pinnedCommits.length > 0 && (
+									<span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-primary-foreground">
+										{pinnedCommits.length}
+									</span>
+								)}
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>Pinned Commits</TooltipContent>
+					</Tooltip>
 
 					{/* More options */}
 					<DropdownMenu>
@@ -693,6 +774,10 @@ export function GitGraph() {
 								Quick Switch...
 								<span className="ml-auto text-xs text-muted-foreground">⌘K</span>
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setShowFiltersDialog(true)}>
+								<Filter className="h-4 w-4 mr-2" />
+								Filter Commits...
+							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setTerminalOpen(!terminalOpen)}>
 								<Terminal className="h-4 w-4 mr-2" />
 								Toggle Terminal
@@ -714,6 +799,10 @@ export function GitGraph() {
 							<DropdownMenuItem onClick={() => setHooksManageOpen(true)}>
 								<Settings className="h-4 w-4 mr-2" />
 								Hooks
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setCommitSigningOpen(true)}>
+								<Key className="h-4 w-4 mr-2" />
+								Commit Signing
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
@@ -939,6 +1028,100 @@ export function GitGraph() {
 					onOpenChange={setTerminalOpen}
 					cwd={activeRepo ?? undefined}
 				/>
+
+				{/* Commit Signing Dialog */}
+				<CommitSigningDialog
+					open={commitSigningOpen}
+					onOpenChange={setCommitSigningOpen}
+				/>
+
+				{/* Pinned Commits Dialog */}
+				<PinnedCommitsDialog
+					open={pinnedCommitsOpen}
+					onOpenChange={setPinnedCommitsOpen}
+					pinnedCommits={pinnedCommits}
+					onPin={(commit) => pinCommit(commit as Omit<PinnedCommit, 'pinnedAt'>)}
+					onUnpin={unpinCommit}
+					onUpdateNote={updateNote}
+					onJumpToCommit={(hash) => {
+						const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+						if (index !== undefined && index >= 0) {
+							handleSelectCommit(index);
+							setPinnedCommitsOpen(false);
+						}
+					}}
+				/>
+
+				{/* Context Menu for Commits */}
+				{contextMenuOpen && selectedCommitData && (
+					<div
+						className="fixed inset-0 z-50"
+						onClick={() => setContextMenuOpen(false)}
+						onContextMenu={() => setContextMenuOpen(false)}
+					>
+						<div
+							className="fixed z-50"
+							style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
+						>
+							<CommitContextMenu
+								commit={{
+									hash: selectedCommitData.hash,
+									message: selectedCommitData.message,
+									author: selectedCommitData.author,
+								}}
+								onCreateBranch={() => {
+									setCreateBranchOpen(true);
+									setContextMenuOpen(false);
+								}}
+								onCreateTag={() => {
+									setAddTagOpen(true);
+									setContextMenuOpen(false);
+								}}
+								onMerge={() => {
+									setMergeOpen(true);
+									setContextMenuOpen(false);
+								}}
+								onRebase={() => {
+									setRebaseOpen(true);
+									setContextMenuOpen(false);
+								}}
+								onCherryPick={() => {
+									setCherryPickOpen(true);
+									setContextMenuOpen(false);
+								}}
+								onRevert={() => {
+									setRevertOpen(true);
+									setContextMenuOpen(false);
+								}}
+							>
+								<div />
+							</CommitContextMenu>
+						</div>
+					</div>
+				)}
+
+				{/* Commit Filters Dialog */}
+				<Dialog open={showFiltersDialog} onOpenChange={setShowFiltersDialog}>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
+								<Filter className="h-5 w-5" />
+								Filter Commits
+							</DialogTitle>
+						</DialogHeader>
+						<div className="space-y-4 py-4">
+							<CommitHistoryFilters
+								filters={commitFilters}
+								onChange={(filters) => {
+									setCommitFilters(filters);
+									if (Object.keys(filters).length === 0) {
+										setShowFiltersDialog(false);
+									}
+								}}
+							/>
+						</div>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</TooltipProvider>
 	);
