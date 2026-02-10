@@ -33,6 +33,8 @@ import {
 	Key,
 	Filter,
 	Pin,
+	History,
+	FileText,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -65,6 +67,11 @@ import { CommitContextMenu } from './commit-context-menu';
 import { CommitHistoryFilters, type CommitFilter } from './commit-history-filters';
 import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
 import { CommitSigningDialog } from './commit-signing-dialog';
+import { LineStaging } from './line-staging';
+import { ReflogViewer } from './reflog-viewer';
+import { CommitTemplatesDialog, useCommitTemplates, TemplateQuickInsert } from './commit-templates';
+import { GitignoreManager } from './gitignore-manager';
+import { CustomCommands } from './custom-commands';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -188,9 +195,18 @@ export function GitGraph() {
 	const [contextMenuOpen, setContextMenuOpen] = useState(false);
 	const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 	const [showFiltersDialog, setShowFiltersDialog] = useState(false);
+	const [lineStagingOpen, setLineStagingOpen] = useState(false);
+	const [stagingFile, setStagingFile] = useState<string | null>(null);
+	const [reflogOpen, setReflogOpen] = useState(false);
+	const [templatesOpen, setTemplatesOpen] = useState(false);
+	const [gitignoreOpen, setGitignoreOpen] = useState(false);
+	const [customCommandsOpen, setCustomCommandsOpen] = useState(false);
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
+	
+	// Commit templates hook
+	const { templates, addTemplate, updateTemplate, deleteTemplate } = useCommitTemplates();
 
 	// Refs
 	// Note: ScrollArea handles scrolling internally
@@ -822,6 +838,23 @@ export function GitGraph() {
 								Commit Signing
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setReflogOpen(true)}>
+								<History className="h-4 w-4 mr-2" />
+								Reflog
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setTemplatesOpen(true)}>
+								<FileText className="h-4 w-4 mr-2" />
+								Commit Templates
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setGitignoreOpen(true)}>
+								<FileText className="h-4 w-4 mr-2" />
+								Edit .gitignore
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setCustomCommandsOpen(true)}>
+								<Terminal className="h-4 w-4 mr-2" />
+								Custom Commands
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
 								Undo Last Commit
@@ -1068,6 +1101,44 @@ export function GitGraph() {
 						}
 					}}
 				/>
+
+				{/* Reflog Viewer */}
+				<ReflogViewer
+					open={reflogOpen}
+					onOpenChange={setReflogOpen}
+				/>
+
+				{/* Commit Templates */}
+				<CommitTemplatesDialog
+					open={templatesOpen}
+					onOpenChange={setTemplatesOpen}
+					templates={templates}
+					onTemplatesChange={(t) => {
+						// Update templates - for now just close
+						setTemplatesOpen(false);
+					}}
+				/>
+
+				{/* Gitignore Manager */}
+				<GitignoreManager
+					open={gitignoreOpen}
+					onOpenChange={setGitignoreOpen}
+				/>
+
+				{/* Custom Commands */}
+				<CustomCommands
+					open={customCommandsOpen}
+					onOpenChange={setCustomCommandsOpen}
+				/>
+
+				{/* Line Staging */}
+				{lineStagingOpen && stagingFile && (
+					<LineStaging
+						open={lineStagingOpen}
+						onOpenChange={setLineStagingOpen}
+						filePath={stagingFile}
+					/>
+				)}
 
 				{/* Context Menu for Commits */}
 				{contextMenuOpen && selectedCommitData && (
