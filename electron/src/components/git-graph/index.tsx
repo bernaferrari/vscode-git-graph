@@ -3,7 +3,7 @@
  * GitKraken-style Git visualization
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
 	Loader2,
 	GitBranch,
@@ -49,6 +49,7 @@ import {
 } from '@/lib/graph/layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -139,7 +140,7 @@ export function GitGraph() {
 	const [selectedBranches, setSelectedBranches] = useState<string[]>(['__all__']);
 
 	// Refs
-	const commitListRef = useRef<HTMLDivElement>(null);
+	// Note: ScrollArea handles scrolling internally
 
 	// Dialog state
 	const [createBranchOpen, setCreateBranchOpen] = useState(false);
@@ -609,10 +610,10 @@ export function GitGraph() {
 				{/* Main Content */}
 				<div className="flex-1 flex overflow-hidden">
 					{/* Graph and Commit List */}
-					<div className="flex-1 overflow-auto" ref={commitListRef}>
-						<div className="flex min-h-full">
-							{/* Graph */}
-							<div className="shrink-0 sticky left-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
+					<ScrollArea className="flex-1">
+						<div className="flex">
+							{/* Graph - sticky so it stays visible while scrolling */}
+							<div className="shrink-0 sticky left-0 bg-background z-10" style={{ width: graphLayout?.width ?? 200 }}>
 								{graphLayout && (
 									<CommitGraph
 										layout={graphLayout}
@@ -644,7 +645,7 @@ export function GitGraph() {
 								)}
 							</div>
 						</div>
-					</div>
+					</ScrollArea>
 
 					{/* Commit Details Panel */}
 					{commitDetailsOpen && selectedCommit && (
