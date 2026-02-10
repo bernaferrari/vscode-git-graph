@@ -13,6 +13,7 @@ import { BufferedQueue } from '../../../src/lib/utils/bufferedQueue';
 import { GitService } from './gitService';
 import { RepoFileWatcher } from './fileWatcher';
 import { instanceStore } from '../store';
+import { notifyRepoChanged } from '../trpc/routers/watcher';
 import {
 	BooleanOverride,
 	FileViewType,
@@ -85,6 +86,10 @@ export class RepoManager extends Disposable {
 
 		// File watcher for the active repository
 		this.fileWatcher = new RepoFileWatcher(() => {
+			const activeRepo = this.fileWatcher.getRepo();
+			if (activeRepo) {
+				notifyRepoChanged(activeRepo);
+			}
 			this.emitRepoChange();
 		});
 

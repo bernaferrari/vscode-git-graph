@@ -5,9 +5,14 @@
  * Calculates the layout of branches and commits in the Git graph.
  */
 
-import type { GitCommit } from '../types/git';
-
 // ==================== Types ====================
+
+// Minimal commit interface needed for layout calculation
+interface LayoutCommit {
+	hash: string;
+	parents: string[];
+	stash?: unknown | null;
+}
 
 export interface Point {
 	x: number;
@@ -95,8 +100,12 @@ class Vertex {
 		return this.children;
 	}
 
+	hasParents(): boolean {
+		return this.parents.length > 0;
+	}
+
 	getNextParent(): Vertex | null {
-		return this.nextParent < this.parents.length ? this.parents[this.nextParent] : null;
+		return this.nextParent < this.parents.length ? (this.parents[this.nextParent] ?? null) : null;
 	}
 
 	registerParentProcessed(): void {
@@ -114,12 +123,32 @@ class Vertex {
 		}
 	}
 
+	isNotOnBranch(): boolean {
+		return this.branch === null;
+	}
+
 	getPoint(): Point {
 		return { x: this.x, y: this.id };
 	}
 
 	getNextPoint(): Point {
 		return { x: this.nextX, y: this.id };
+	}
+
+	getPointConnectingTo(vertex: Vertex | null, onBranch: Branch): Point | null {
+		for (let i = 0; i < this.connections.length; i++) {
+			if (this.connections[i]?.connectsTo === vertex && this.connections[i]?.onBranch === onBranch) {
+				return { x: i, y: this.id };
+			}
+		}
+		return null;
+	}
+
+	registerUnavailablePoint(x: number, connectsToVertex: Vertex | null, onBranch: Branch): void {
+		if (x === this.nextX) {
+			this.nextX = x + 1;
+			this.connections[x] = { connectsTo: connectsToVertex, onBranch: onBranch };
+		}
 	}
 
 	getColour(): number {
@@ -174,7 +203,7 @@ export class GraphLayoutCalculator {
 	private branches: Branch[] = [];
 	private availableColours: number[] = [];
 
-	private commits: ReadonlyArray<GitCommit> = [];
+	private commits: ReadonlyArray<LayoutCommit> = [];
 	private commitHead: string | null = null;
 	private commitLookup: Record<string, number> = {};
 	private onlyFollowFirstParent: boolean = false;
@@ -185,7 +214,7 @@ export class GraphLayoutCalculator {
 	) {}
 
 	calculate(
-		commits: ReadonlyArray<GitCommit>,
+		commits: ReadonlyArray<LayoutCommit>,
 		commitHead: string | null,
 		commitLookup: Record<string, number>,
 		onlyFollowFirstParent: boolean
@@ -225,45 +254,62 @@ export class GraphLayoutCalculator {
 
 		// Create vertices
 		for (let i = 0; i < this.commits.length; i++) {
-			this.vertices.push(new Vertex(i, this.commits[i].stash !== null));
+			const commit = this.commits[i];
+			this.vertices.push(new Vertex(i, commit?.stash !== null));
 		}
 
 		// Link parents and children
 		for (let i = 0; i < this.commits.length; i++) {
 			const commit = this.commits[i];
+			if (!commit) continue;
+
 			for (let j = 0; j < commit.parents.length; j++) {
 				const parentHash = commit.parents[j];
-				if (typeof this.commitLookup[parentHash] === 'number') {
-					this.vertices[i].addParent(this.vertices[this.commitLookup[parentHash]]);
-					this.vertices[this.commitLookup[parentHash]].addChild(this.vertices[i]);
+				if (!parentHash) continue;
+
+				const parentIndex = this.commitLookup[parentHash];
+				if (typeof parentIndex === 'number' && parentIndex >= 0) {
+					const parentVertex = this.vertices[parentIndex];
+					const currentVertex = this.vertices[i];
+					if (parentVertex && currentVertex) {
+						currentVertex.addParent(parentVertex);
+						parentVertex.addChild(currentVertex);
+					}
 				} else if (!this.onlyFollowFirstParent || j === 0) {
-					this.vertices[i].addParent(nullVertex);
+					this.vertices[i]?.addParent(nullVertex);
 				}
 			}
 		}
 
 		// Mark uncommitted changes
-		if (this.commits[0]?.hash === '*') {
-			this.vertices[0].setNotCommitted();
+		const firstCommit = this.commits[0];
+		const firstVertex = this.vertices[0];
+		if (firstCommit?.hash === '*' && firstVertex) {
+			firstVertex.setNotCommitted();
 		}
 
 		// Mark current HEAD
 		if (
-			this.commits[0]?.hash === '*' &&
-			this.config.uncommittedChanges === 'openCircleAtTheUncommittedChanges'
+			firstCommit?.hash === '*' &&
+			this.config.uncommittedChanges === 'openCircleAtUncommittedChanges'
 		) {
-			this.vertices[0].setCurrent();
-		} else if (this.commitHead !== null && typeof this.commitLookup[this.commitHead] === 'number') {
-			this.vertices[this.commitLookup[this.commitHead]].setCurrent();
+			firstVertex?.setCurrent();
+		} else if (this.commitHead !== null) {
+			const headIndex = this.commitLookup[this.commitHead];
+			if (typeof headIndex === 'number') {
+				const headVertex = this.vertices[headIndex];
+				headVertex?.setCurrent();
+			}
 		}
 	}
 
 	private buildBranches(): void {
 		let i = 0;
 		while (i < this.vertices.length) {
+			const vertex = this.vertices[i];
 			if (
-				this.vertices[i].getNextParent() !== null ||
-				this.vertices[i].branch === null
+				(vertex && vertex.getNextParent() !== null) ||
+				(vertex && vertex.isNotOnBranch())
 			) {
 				this.determinePath(i);
 			} else {
@@ -274,48 +320,96 @@ export class GraphLayoutCalculator {
 
 	private determinePath(startAt: number): void {
 		let i = startAt;
-		const vertex = this.vertices[i];
-		const parentVertex = vertex.getNextParent();
+		let vertex = this.vertices[i];
+		if (!vertex) return;
+
+		let parentVertex = vertex.getNextParent();
 
 		if (parentVertex === null) {
 			vertex.registerParentProcessed();
 			return;
 		}
 
-		const lastPoint = vertex.branch === null ? vertex.getNextPoint() : vertex.getPoint();
+		let lastPoint = vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint();
+		let curPoint: Point;
+		let curVertex: Vertex;
 
-		// Normal branch
-		const branch = new Branch(this.getAvailableColour(startAt));
-		vertex.addToBranch(branch, lastPoint.x);
+		// Check for merge between two vertices already on branches
+		if (
+			parentVertex !== null &&
+			parentVertex.id !== NULL_VERTEX_ID &&
+			vertex.isMerge() &&
+			!vertex.isNotOnBranch() &&
+			!parentVertex.isNotOnBranch()
+		) {
+			// Branch is a merge between two vertices already on branches
+			let foundPointToParent = false;
+			const parentBranch = parentVertex.branch!;
+			for (i = startAt + 1; i < this.vertices.length; i++) {
+				curVertex = this.vertices[i];
+				if (!curVertex) continue;
 
-		for (i = startAt + 1; i < this.vertices.length; i++) {
-			const curVertex = this.vertices[i];
-			const curPoint =
-				parentVertex === curVertex && curVertex.branch !== null
-					? curVertex.getPoint()
-					: curVertex.getNextPoint();
+				curPoint = curVertex.getPointConnectingTo(parentVertex, parentBranch);
+				if (curPoint !== null) {
+					foundPointToParent = true;
+				} else {
+					curPoint = curVertex.getNextPoint();
+				}
+				parentBranch.addLine(lastPoint, curPoint, vertex.isCommitted, !foundPointToParent && curVertex !== parentVertex ? lastPoint.x < curPoint.x : true);
+				curVertex.registerUnavailablePoint(curPoint.x, parentVertex, parentBranch);
+				lastPoint = curPoint;
 
-			branch.addLine(lastPoint, curPoint, vertex.isCommitted, lastPoint.x < curPoint.x);
-
-			if (parentVertex === curVertex) {
-				vertex.registerParentProcessed();
-				const parentVertexOnBranch = curVertex.branch !== null;
-				curVertex.addToBranch(branch, curPoint.x);
-
-				if (parentVertexOnBranch || vertex.getNextParent() === null) {
+				if (foundPointToParent) {
+					vertex.registerParentProcessed();
 					break;
 				}
 			}
-		}
+		} else {
+			// Branch is normal
+			const branch = new Branch(this.getAvailableColour(startAt));
+			vertex.addToBranch(branch, lastPoint.x);
+			vertex.registerUnavailablePoint(lastPoint.x, vertex, branch);
 
-		branch.setEnd(i);
-		this.branches.push(branch);
-		this.availableColours[branch.getColour()] = i;
+			for (i = startAt + 1; i < this.vertices.length; i++) {
+				curVertex = this.vertices[i];
+				if (!curVertex) continue;
+
+				curPoint = parentVertex === curVertex && !curVertex.isNotOnBranch()
+					? curVertex.getPoint()
+					: curVertex.getNextPoint();
+
+				branch.addLine(lastPoint, curPoint, vertex.isCommitted, lastPoint.x < curPoint.x);
+				curVertex.registerUnavailablePoint(curPoint.x, parentVertex, branch);
+				lastPoint = curPoint;
+
+				if (parentVertex === curVertex) {
+					// The parent of <vertex> has been reached, progress to continue building the branch
+					vertex.registerParentProcessed();
+					const parentVertexOnBranch = !curVertex.isNotOnBranch();
+					curVertex.addToBranch(branch, curPoint.x);
+					vertex = parentVertex;
+					parentVertex = vertex.getNextParent();
+					if (parentVertex === null || parentVertexOnBranch) {
+						break;
+					}
+				}
+			}
+
+			if (i === this.vertices.length && parentVertex !== null && parentVertex.id === NULL_VERTEX_ID) {
+				// Vertex is the last in the graph, so no more branch can be formed to the parent
+				vertex.registerParentProcessed();
+			}
+
+			branch.setEnd(i);
+			this.branches.push(branch);
+			this.availableColours[branch.getColour()] = i;
+		}
 	}
 
 	private getAvailableColour(startAt: number): number {
 		for (let i = 0; i < this.availableColours.length; i++) {
-			if (startAt > this.availableColours[i]) {
+			const colourValue = this.availableColours[i];
+			if (colourValue !== undefined && startAt > colourValue) {
 				return i;
 			}
 		}
@@ -370,7 +464,9 @@ export class GraphLayoutCalculator {
 		// Mute merge commits
 		if (this.muteConfig.mergeCommits) {
 			for (let i = 0; i < this.commits.length; i++) {
-				if (this.vertices[i].isMerge() && this.commits[i].stash === null) {
+				const vertex = this.vertices[i];
+				const commit = this.commits[i];
+				if (vertex && commit && vertex.isMerge() && commit.stash === null) {
 					muted[i] = true;
 				}
 			}
@@ -379,15 +475,17 @@ export class GraphLayoutCalculator {
 		// Mute commits not ancestors of HEAD
 		if (
 			this.muteConfig.commitsNotAncestorsOfHead &&
-			this.commitHead !== null &&
-			typeof this.commitLookup[this.commitHead] === 'number'
+			this.commitHead !== null
 		) {
-			const ancestor: boolean[] = new Array(this.commits.length).fill(false);
-			this.markAncestors(this.commitLookup[this.commitHead], ancestor);
+			const headIndex = this.commitLookup[this.commitHead];
+			if (typeof headIndex === 'number') {
+				const ancestor: boolean[] = new Array(this.commits.length).fill(false);
+				this.markAncestors(headIndex, ancestor);
 
-			for (let i = 0; i < this.commits.length; i++) {
-				if (!ancestor[i]) {
-					muted[i] = true;
+				for (let i = 0; i < this.commits.length; i++) {
+					if (!ancestor[i]) {
+						muted[i] = true;
+					}
 				}
 			}
 		}
@@ -399,7 +497,10 @@ export class GraphLayoutCalculator {
 		if (vertexId < 0 || ancestor[vertexId]) return;
 		ancestor[vertexId] = true;
 
-		for (const parent of this.vertices[vertexId].getParents()) {
+		const vertex = this.vertices[vertexId];
+		if (!vertex) return;
+
+		for (const parent of vertex.getParents()) {
 			this.markAncestors(parent.id, ancestor);
 		}
 	}

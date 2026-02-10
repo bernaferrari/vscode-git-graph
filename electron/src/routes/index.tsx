@@ -1,9 +1,9 @@
 /*
-Why: Root file-based route mapping to the Home page.
-*/
+ * Home route - redirects to Git Graph
+ */
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 
-import Home from '@/web/pages/index';
-
-export const Route = createFileRoute('/')({ component: Home });
+export const Route = createFileRoute('/')({
+	component: () => <Navigate to="/git-graph" />,
+});

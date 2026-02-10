@@ -252,6 +252,42 @@ export class GitService {
 		});
 	}
 
+	/**
+	 * Run a git command and return the stdout output.
+	 */
+	async runGitCommandWithOutput(args: string[], cwd: string): Promise<string | null> {
+		if (!this.gitExecutable) {
+			return null;
+		}
+
+		return new Promise((resolve) => {
+			const cmd = cp.spawn(this.gitExecutable!.path, args, { cwd });
+
+			let stdout = '';
+			let stderr = '';
+
+			cmd.stdout.on('data', (data: string) => {
+				stdout += data;
+			});
+
+			cmd.stderr.on('data', (data: string) => {
+				stderr += data;
+			});
+
+			cmd.on('error', () => {
+				resolve(null);
+			});
+
+			cmd.on('close', (code) => {
+				if (code === 0) {
+					resolve(stdout);
+				} else {
+					resolve(null);
+				}
+			});
+		});
+	}
+
 	// ==================== Repository Information ====================
 
 	/**

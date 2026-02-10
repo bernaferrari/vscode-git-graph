@@ -123,6 +123,7 @@ interface CreateBranchDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onCreate: (name: string, checkout: boolean) => void;
+	targetCommit?: string;
 	defaultCheckout?: boolean;
 }
 
@@ -130,6 +131,7 @@ export function CreateBranchDialog({
 	open,
 	onOpenChange,
 	onCreate,
+	targetCommit: _targetCommit,
 	defaultCheckout = false,
 }: CreateBranchDialogProps) {
 	const [name, setName] = useState('');
@@ -194,6 +196,7 @@ interface AddTagDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onAdd: (name: string, type: 'annotated' | 'lightweight', push: boolean) => void;
+	targetCommit?: string;
 	defaultType?: 'annotated' | 'lightweight';
 	defaultPush?: boolean;
 }
@@ -202,6 +205,7 @@ export function AddTagDialog({
 	open,
 	onOpenChange,
 	onAdd,
+	targetCommit: _targetCommit,
 	defaultType = 'annotated',
 	defaultPush = false,
 }: AddTagDialogProps) {
@@ -495,6 +499,190 @@ export function MergeDialog({
 							No commit (stage changes only)
 						</Label>
 					</div>
+				</div>
+			</div>
+		</Dialog>
+	);
+}
+
+// ==================== Rebase Dialog ====================
+
+interface RebaseDialogProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onRebase: (interactive: boolean) => void;
+	onto: string;
+}
+
+export function RebaseDialog({
+	open,
+	onOpenChange,
+	onRebase,
+	onto,
+}: RebaseDialogProps) {
+	const [interactive, setInteractive] = useState(false);
+
+	const handleRebase = () => {
+		onRebase(interactive);
+		setInteractive(false);
+		onOpenChange(false);
+	};
+
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={onOpenChange}
+			title="Rebase"
+			footer={
+				<>
+					<Button variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button onClick={handleRebase}>Rebase</Button>
+				</>
+			}
+		>
+			<div className="space-y-4">
+				<p className="text-sm text-muted-foreground">
+					Rebase current branch onto <Badge variant="secondary">{onto.slice(0, 7)}</Badge>
+				</p>
+				<div className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						id="interactive"
+						checked={interactive}
+						onChange={(e) => setInteractive(e.target.checked)}
+						className="h-4 w-4"
+					/>
+					<Label htmlFor="interactive" className="cursor-pointer">
+						Interactive rebase
+					</Label>
+				</div>
+			</div>
+		</Dialog>
+	);
+}
+
+// ==================== Cherry Pick Dialog ====================
+
+interface CherryPickDialogProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onCherryPick: (noCommit: boolean) => void;
+	commitHash: string;
+	commitMessage?: string;
+}
+
+export function CherryPickDialog({
+	open,
+	onOpenChange,
+	onCherryPick,
+	commitHash,
+	commitMessage,
+}: CherryPickDialogProps) {
+	const [noCommit, setNoCommit] = useState(false);
+
+	const handleCherryPick = () => {
+		onCherryPick(noCommit);
+		setNoCommit(false);
+		onOpenChange(false);
+	};
+
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={onOpenChange}
+			title="Cherry Pick"
+			footer={
+				<>
+					<Button variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button onClick={handleCherryPick}>Cherry Pick</Button>
+				</>
+			}
+		>
+			<div className="space-y-4">
+				<p className="text-sm text-muted-foreground">
+					Cherry pick commit <Badge variant="secondary">{commitHash.slice(0, 7)}</Badge>
+				</p>
+				{commitMessage && (
+					<p className="text-sm bg-muted p-2 rounded">{commitMessage}</p>
+				)}
+				<div className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						id="no-commit-cp"
+						checked={noCommit}
+						onChange={(e) => setNoCommit(e.target.checked)}
+						className="h-4 w-4"
+					/>
+					<Label htmlFor="no-commit-cp" className="cursor-pointer">
+						No commit (stage changes only)
+					</Label>
+				</div>
+			</div>
+		</Dialog>
+	);
+}
+
+// ==================== Revert Dialog ====================
+
+interface RevertDialogProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onRevert: (noCommit: boolean) => void;
+	commitHash: string;
+	commitMessage?: string;
+}
+
+export function RevertDialog({
+	open,
+	onOpenChange,
+	onRevert,
+	commitHash,
+	commitMessage,
+}: RevertDialogProps) {
+	const [noCommit, setNoCommit] = useState(false);
+
+	const handleRevert = () => {
+		onRevert(noCommit);
+		setNoCommit(false);
+		onOpenChange(false);
+	};
+
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={onOpenChange}
+			title="Revert Commit"
+			footer={
+				<>
+					<Button variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button onClick={handleRevert}>Revert</Button>
+				</>
+			}
+		>
+			<div className="space-y-4">
+				<p className="text-sm text-muted-foreground">
+					Revert commit <Badge variant="secondary">{commitHash.slice(0, 7)}</Badge>
+				</p>
+				{commitMessage && (
+					<p className="text-sm bg-muted p-2 rounded">{commitMessage}</p>
+				)}
+				<div className="flex items-center gap-2">
+					<input
+						type="checkbox"
+						id="no-commit-rv"
+						checked={noCommit}
+						onChange={(e) => setNoCommit(e.target.checked)}
+						className="h-4 w-4"
+					/>
+					<Label htmlFor="no-commit-rv" className="cursor-pointer">
+						No commit (stage changes only)
+					</Label>
 				</div>
 			</div>
 		</Dialog>

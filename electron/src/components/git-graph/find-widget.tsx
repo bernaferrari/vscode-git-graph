@@ -82,41 +82,45 @@ export function FindWidget({
 
 				{/* Case Sensitive Toggle */}
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant={caseSensitive ? 'default' : 'ghost'}
-							size="sm"
-							onClick={() => {
-								setCaseSensitive(!caseSensitive);
-								if (query) {
-									onFind(query, { caseSensitive: !caseSensitive, regex });
-								}
-							}}
-							className="h-8 w-8 p-0"
-						>
-							Aa
-						</Button>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<Button
+								variant={caseSensitive ? 'default' : 'ghost'}
+								size="sm"
+								onClick={() => {
+									setCaseSensitive(!caseSensitive);
+									if (query) {
+										onFind(query, { caseSensitive: !caseSensitive, regex });
+									}
+								}}
+								className="h-8 w-8 p-0"
+							>
+								Aa
+							</Button>
+						}
+					/>
 					<TooltipContent>Match Case</TooltipContent>
 				</Tooltip>
 
 				{/* Regex Toggle */}
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant={regex ? 'default' : 'ghost'}
-							size="sm"
-							onClick={() => {
-								setRegex(!regex);
-								if (query) {
-									onFind(query, { caseSensitive, regex: !regex });
-								}
-							}}
-							className="h-8 w-8 p-0 font-mono"
-						>
-							.*
-						</Button>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<Button
+								variant={regex ? 'default' : 'ghost'}
+								size="sm"
+								onClick={() => {
+									setRegex(!regex);
+									if (query) {
+										onFind(query, { caseSensitive, regex: !regex });
+									}
+								}}
+								className="h-8 w-8 p-0 font-mono"
+							>
+								.*
+							</Button>
+						}
+					/>
 					<TooltipContent>Use Regular Expression</TooltipContent>
 				</Tooltip>
 
@@ -124,57 +128,61 @@ export function FindWidget({
 
 				{/* Previous Match */}
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={onFindPrevious}
-							disabled={totalMatches === 0}
-							className="h-8 w-8 p-0"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={onFindPrevious}
+								disabled={totalMatches === 0}
+								className="h-8 w-8 p-0"
 							>
-								<polyline points="18 15 12 9 6 15" />
-							</svg>
-						</Button>
-					</TooltipTrigger>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								>
+									<polyline points="18 15 12 9 6 15" />
+								</svg>
+							</Button>
+						}
+					/>
 					<TooltipContent>Previous Match (Shift+Enter)</TooltipContent>
 				</Tooltip>
 
 				{/* Next Match */}
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={onFindNext}
-							disabled={totalMatches === 0}
-							className="h-8 w-8 p-0"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={onFindNext}
+								disabled={totalMatches === 0}
+								className="h-8 w-8 p-0"
 							>
-								<polyline points="6 9 12 15 18 9" />
-							</svg>
-						</Button>
-					</TooltipTrigger>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								>
+									<polyline points="6 9 12 15 18 9" />
+								</svg>
+							</Button>
+						}
+					/>
 					<TooltipContent>Next Match (Enter)</TooltipContent>
 				</Tooltip>
 

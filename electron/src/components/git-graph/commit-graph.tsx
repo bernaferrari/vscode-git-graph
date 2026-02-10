@@ -34,9 +34,9 @@ export function CommitGraph({
 
 		for (const line of layout.lines) {
 			const x1 = line.p1.x * config.grid.x + config.grid.offsetX;
-			const y1 = line.p1.y * config.grid.y + config.grid.offsetY;
+			const y1 = line.p1.y * config.grid.y; // Removed offsetY
 			const x2 = line.p2.x * config.grid.x + config.grid.offsetX;
-			const y2 = line.p2.y * config.grid.y + config.grid.offsetY;
+			const y2 = line.p2.y * config.grid.y; // Removed offsetY
 
 			// Adjust for expanded commit
 			const adjustedY1 = expandedIndex > -1 && line.p1.y > expandedIndex ? y1 + config.grid.expandY : y1;
@@ -67,7 +67,7 @@ export function CommitGraph({
 		const vertices = layout.vertices.map((v) => ({
 			id: v.id,
 			cx: v.x * config.grid.x + config.grid.offsetX,
-			cy: v.id * config.grid.y + config.grid.offsetY + (expandedIndex > -1 && v.id > expandedIndex ? config.grid.expandY : 0),
+			cy: v.id * config.grid.y + (expandedIndex > -1 && v.id > expandedIndex ? config.grid.expandY : 0),
 			colour: config.colours[v.colour % config.colours.length] ?? '#808080',
 			isCommitted: v.isCommitted,
 			isCurrent: v.isCurrent,
@@ -79,7 +79,8 @@ export function CommitGraph({
 
 	if (!layout) return null;
 
-	const height = layout.height + (expandedIndex > -1 ? config.grid.expandY : 0);
+	// Height matches commit list (vertices.length * ROW_HEIGHT)
+	const height = layout.vertices.length * config.grid.y + (expandedIndex > -1 ? config.grid.expandY : 0);
 
 	return (
 		<svg

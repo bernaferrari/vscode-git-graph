@@ -55,12 +55,18 @@ export function GitGraphContextMenu({
 
 	return (
 		<DropdownMenu open={open} onOpenChange={handleOpenChange}>
-			<DropdownMenuTrigger asChild onContextMenu={(e) => {
-				e.preventDefault();
-				setOpen(true);
-			}}>
-				{children}
-			</DropdownMenuTrigger>
+			<DropdownMenuTrigger
+				render={
+					<div
+						onContextMenu={(e) => {
+							e.preventDefault();
+							setOpen(true);
+						}}
+					>
+						{children}
+					</div>
+				}
+			/>
 			<DropdownMenuContent align="start" className="min-w-48">
 				{visibleGroups.map((group, groupIndex) => (
 					<div key={groupIndex}>
