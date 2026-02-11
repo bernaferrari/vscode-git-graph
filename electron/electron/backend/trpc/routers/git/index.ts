@@ -715,6 +715,121 @@ export const gitRouter = router({
 		}),
 
 	/**
+	 * Preview a merge before executing.
+	 */
+	mergePreview: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				source: z.string(),
+				target: z.string(),
+			})
+		)
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			try {
+				// Check if merge is possible (dry run)
+				const mergeCheck = await getGitService().runGitCommandWithOutput(
+					['merge', '--no-commit', '--no-ff', input.source],
+					input.repo
+				);
+
+				// Get conflicts if any
+				const statusResult = await getGitService().getStatus(input.repo);
+				const conflicts = statusResult.conflicted || [];
+
+				// Abort the dry-run merge
+				await getGitService().runGitCommand(['merge', '--abort'], input.repo);
+
+				// Get commits that would be merged
+				const logResult = await getGitService().runGitCommandWithOutput(
+					['log', `${input.target}..${input.source}`, '--oneline'],
+					input.repo
+				);
+				const aheadCommits = logResult.split('\n').filter(Boolean).map(line => {
+					const [hash, ...msgParts] = line.split(' ');
+					return { hash, message: msgParts.join(' ') };
+				});
+
+				// Get files that would change
+				const diffResult = await getGitService().runGitCommandWithOutput(
+					['diff', '--stat', `${input.target}...${input.source}`],
+					input.repo
+				);
+				const files = diffResult.split('\n').filter(Boolean).map(line => {
+					const match = line.match(/^(.+?)\s*\|\s*(\d+)/);
+					if (match) {
+						return { path: match[1].trim(), changes: parseInt(match[2]) || 0 };
+					}
+					return { path: line.trim(), changes: 0 };
+				});
+
+				return {
+					canMerge: conflicts.length === 0,
+					conflicts,
+					aheadCommits,
+					files,
+					warnings: [],
+				};
+			} catch (error) {
+				// Merge would have conflicts
+				const statusResult = await getGitService().getStatus(input.repo);
+				await getGitService().runGitCommand(['merge', '--abort'], input.repo);
+				
+				return {
+					canMerge: false,
+					conflicts: statusResult.conflicted || [],
+					aheadCommits: [],
+					files: [],
+					warnings: ['Merge conflicts detected'],
+				};
+			}
+		}),
+
+	/**
+	 * Continue an interactive rebase.
+	 */
+	continueRebase: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				todos: z.string().optional(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['rebase', '--continue'],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
+	 * Abort an interactive rebase.
+	 */
+	abortRebase: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['rebase', '--abort'],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
 	 * Cherry-pick a commit.
 	 */
 	cherryPick: publicProcedure
