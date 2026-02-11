@@ -1,6 +1,7 @@
 /**
  * Commit Panel
  * Shows staging area and allows creating commits
+ * Now with inline staging diff support
  */
 
 import { useState, useMemo, useCallback } from 'react';
@@ -24,6 +25,7 @@ import {
 	ChevronUp,
 	FolderTree,
 	List,
+	X,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
@@ -38,6 +40,7 @@ import {
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { FileTreeView } from './file-tree-view';
+import { InlineStagingDiff } from './inline-staging-diff';
 
 interface CommitPanelProps {
 	onCommit?: () => void;
@@ -57,6 +60,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 	const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
 	const [selectedStagedFiles, setSelectedStagedFiles] = useState<Set<string>>(new Set());
 	const [selectedUnstagedFiles, setSelectedUnstagedFiles] = useState<Set<string>>(new Set());
+	const [selectedFile, setSelectedFile] = useState<{ path: string; status: string; staged: boolean } | null>(null);
 
 	// Get working tree status
 	const { data: statusData, refetch: refetchStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -184,7 +188,9 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 											file={file.file}
 											status={file.status}
 											staged={true}
+											selected={selectedFile?.path === file.file}
 											onToggle={() => handleUnstageFile(file.file)}
+											onClick={() => setSelectedFile({ path: file.file, status: file.status, staged: true })}
 										/>
 									))}
 								</div>
@@ -226,7 +232,9 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 											file={file.file}
 											status={file.status}
 											staged={false}
+											selected={selectedFile?.path === file.file}
 											onToggle={() => handleStageFile(file.file)}
+											onClick={() => setSelectedFile({ path: file.file, status: file.status, staged: false })}
 										/>
 									))}
 								</div>
@@ -243,6 +251,30 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
 					)}
 				</div>
 			</ScrollArea>
+
+			{/* Inline Diff View */}
+			{selectedFile && (
+				<div className="border-t h-64 flex flex-col">
+					<div className="flex items-center justify-between px-2 py-1 bg-muted/50 border-b">
+						<span className="text-xs font-medium truncate">{selectedFile.path}</span>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-5 w-5 p-0"
+							onClick={() => setSelectedFile(null)}
+						>
+							<X className="h-3 w-3" />
+						</Button>
+					</div>
+					<div className="flex-1 overflow-hidden">
+						<InlineStagingDiff
+							filePath={selectedFile.path}
+							fileStatus={selectedFile.status}
+							onStaged={() => refetchStatus()}
+						/>
+					</div>
+				</div>
+			)}
 
 			{/* Commit message and actions */}
 			<div className="border-t p-2 space-y-2">
@@ -298,12 +330,16 @@ function FileItem({
 	file,
 	status,
 	staged,
+	selected,
 	onToggle,
+	onClick,
 }: {
 	file: string;
 	status: string;
 	staged: boolean;
+	selected?: boolean;
 	onToggle: () => void;
+	onClick: () => void;
 }) {
 	const getStatusIcon = () => {
 		switch (status) {
@@ -320,10 +356,20 @@ function FileItem({
 
 	return (
 		<div
-			className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-accent/50 cursor-pointer"
-			onClick={onToggle}
+			className={`flex items-center gap-2 px-2 py-0.5 rounded cursor-pointer ${
+				selected ? 'bg-accent' : 'hover:bg-accent/50'
+			}`}
+			onClick={onClick}
+			onDoubleClick={onToggle}
 		>
-			<Checkbox checked={staged} className="h-3 w-3" />
+			<Checkbox 
+				checked={staged} 
+				className="h-3 w-3" 
+				onClick={(e) => {
+					e.stopPropagation();
+					onToggle();
+				}}
+			/>
 			{getStatusIcon()}
 			<span className="text-xs truncate flex-1" title={file}>{file}</span>
 		</div>

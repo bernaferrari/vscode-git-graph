@@ -97,6 +97,9 @@ import { RepoHealthCheck } from './repo-health-check';
 import { Avatar, AvatarWithTooltip } from './avatar';
 import { CommandPalette } from './command-palette';
 import { GitFlowAutomation } from './gitflow-automation';
+import { VirtualizedCommitList } from './virtualized-commit-list';
+import { LaneBasedGraph, LaneBasedGraphSVG } from './lane-based-graph';
+import { InlineStagingDiff } from './inline-staging-diff';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -242,6 +245,12 @@ export function GitGraph() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [gitFlowOpen, setGitFlowOpen] = useState(false);
 	const [healthCheckOpen, setHealthCheckOpen] = useState(false);
+	
+	// Graph and virtualization state
+	const [useLaneGraph, setUseLaneGraph] = useState(false);
+	const [useVirtualization, setUseVirtualization] = useState(true);
+	const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+	const [scrollTop, setScrollTop] = useState(0);
 
 	// Settings hook
 	const { settings } = useSettings();
@@ -1006,11 +1015,42 @@ export function GitGraph() {
 					)}
 
 					{/* Graph and Commit List */}
-					<ScrollArea className="flex-1 w-full h-full">
-						<div className="flex min-w-max">
+					<div className="flex-1 flex flex-col overflow-hidden">
+						{/* Graph type toggle */}
+						<div className="flex items-center gap-2 px-3 py-1 border-b bg-muted/30 text-xs">
+							<span className="text-muted-foreground">Graph:</span>
+							<Button
+								variant={!useLaneGraph ? 'default' : 'ghost'}
+								size="sm"
+								className="h-5 px-2 text-xs"
+								onClick={() => setUseLaneGraph(false)}
+							>
+								Classic
+							</Button>
+							<Button
+								variant={useLaneGraph ? 'default' : 'ghost'}
+								size="sm"
+								className="h-5 px-2 text-xs"
+								onClick={() => setUseLaneGraph(true)}
+							>
+								Lanes
+							</Button>
+							<div className="flex-1" />
+							<span className="text-muted-foreground">Virtualization:</span>
+							<Button
+								variant={useVirtualization ? 'default' : 'ghost'}
+								size="sm"
+								className="h-5 px-2 text-xs"
+								onClick={() => setUseVirtualization(!useVirtualization)}
+							>
+								{useVirtualization ? 'On' : 'Off'}
+							</Button>
+						</div>
+
+						<div className="flex-1 flex overflow-hidden">
 							{/* Graph */}
-							<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
-								{graphLayout && (
+							<div className="shrink-0 bg-background overflow-hidden" style={{ width: graphLayout?.width ?? 200 }}>
+								{graphLayout && !useLaneGraph && (
 									<CommitGraph
 										layout={graphLayout}
 										config={GRAPH_CONFIG}
@@ -1019,12 +1059,23 @@ export function GitGraph() {
 										onVertexHover={() => {}}
 									/>
 								)}
+								{graphLayout && useLaneGraph && commitsData?.commits && (
+									<LaneBasedGraphSVG
+										commits={commitsData.commits}
+										layout={graphLayout}
+										selectedIndex={selectedCommitIndex}
+										scrollTop={scrollTop}
+										visibleStartIndex={visibleRange.start}
+										visibleEndIndex={visibleRange.end}
+										onSelectCommit={handleSelectCommit}
+									/>
+								)}
 							</div>
 
-							{/* Commit list */}
-							<div className="shrink-0" style={{ width: 'max-content' }}>
-								{commitsData?.commits && commitsData.commits.length > 0 && (
-									<CommitList
+							{/* Commit list - Virtualized or Standard */}
+							<div className="flex-1 overflow-hidden">
+								{commitsData?.commits && commitsData.commits.length > 0 && useVirtualization ? (
+									<VirtualizedCommitList
 										commits={commitsData.commits}
 										layout={graphLayout}
 										selectedIndex={selectedCommitIndex}
@@ -1032,16 +1083,30 @@ export function GitGraph() {
 										onSelect={handleSelectCommit}
 										onExpand={handleExpandCommit}
 										onContextMenu={handleContextMenu}
+										onVisibleRangeChange={(start, end) => {
+											setVisibleRange({ start, end });
+										}}
 									/>
-								)}
-								{commitsData?.commits && commitsData.commits.length === 0 && (
-									<div className="flex items-center justify-center h-32 text-muted-foreground">
+								) : commitsData?.commits && commitsData.commits.length > 0 ? (
+									<ScrollArea className="h-full">
+										<CommitList
+											commits={commitsData.commits}
+											layout={graphLayout}
+											selectedIndex={selectedCommitIndex}
+											expandedIndex={expandedCommit}
+											onSelect={handleSelectCommit}
+											onExpand={handleExpandCommit}
+											onContextMenu={handleContextMenu}
+										/>
+									</ScrollArea>
+								) : (
+									<div className="flex items-center justify-center h-full text-muted-foreground">
 										<p>No commits found</p>
 									</div>
 								)}
 							</div>
 						</div>
-					</ScrollArea>
+					</div>
 
 					{/* Commit Details Panel */}
 					{commitDetailsOpen && selectedCommit && (
