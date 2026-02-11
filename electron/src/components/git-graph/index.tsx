@@ -89,6 +89,9 @@ import { RecentRepositories } from './recent-repositories';
 import { StashManagement } from './stash-management';
 import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitGraphLegend } from './commit-graph-legend';
+import { SettingsDialog, useSettings } from './settings-dialog';
+import { StatusBar } from './status-bar';
+import { QuickActionsToolbar } from './quick-actions-toolbar';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -230,6 +233,10 @@ export function GitGraph() {
 	const [graphLegendOpen, setGraphLegendOpen] = useState(false);
 	const [cherryPickDialogOpen, setCherryPickDialogOpen] = useState(false);
 	const [cherryPickCommit, setCherryPickCommit] = useState<{ hash: string; message: string; author: string } | null>(null);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+
+	// Settings hook
+	const { settings } = useSettings();
 
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
@@ -506,12 +513,16 @@ export function GitGraph() {
 				// Show help/keyboard shortcuts
 				e.preventDefault();
 				setKeyboardHelpOpen(true);
+			} else if (e.key === ',' && (e.metaKey || e.ctrlKey)) {
+				// Cmd+, for settings
+				e.preventDefault();
+				setSettingsOpen(true);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen, setKeyboardHelpOpen, setSettingsOpen]);
 
 	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
@@ -933,6 +944,12 @@ export function GitGraph() {
 								Graph Legend
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+								<Settings className="h-4 w-4 mr-2" />
+								Settings
+								<span className="ml-auto text-xs text-muted-foreground">⌘,</span>
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
 								<Undo className="h-4 w-4 mr-2" />
 								Undo Last Commit
@@ -1277,6 +1294,12 @@ export function GitGraph() {
 					sourceCommit={cherryPickCommit}
 				/>
 
+				{/* Settings Dialog */}
+				<SettingsDialog
+					open={settingsOpen}
+					onOpenChange={setSettingsOpen}
+				/>
+
 				{/* Line Staging */}
 				{lineStagingOpen && stagingFile && (
 					<LineStaging
@@ -1356,6 +1379,13 @@ export function GitGraph() {
 						</div>
 					</DialogContent>
 				</Dialog>
+
+				{/* Status Bar */}
+				<StatusBar
+					onFetch={() => gitOps.fetch()}
+					onPush={() => gitOps.push()}
+					onPull={() => gitOps.pull()}
+				/>
 			</div>
 		</TooltipProvider>
 	);
