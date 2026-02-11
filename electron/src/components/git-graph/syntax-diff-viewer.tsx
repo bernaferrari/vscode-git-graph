@@ -1,22 +1,23 @@
 /**
  * Syntax Highlighting Diff Viewer
- * Display diffs with syntax highlighting
+ * Display diffs with syntax highlighting and word-level diff
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-
-interface DiffLine {
-	type: 'add' | 'delete' | 'context' | 'header';
-	content: string;
-	oldLineNumber?: number;
-	newLineNumber?: number;
-}
+import { Toggle } from '@/components/ui/toggle';
+import { Eye, EyeOff } from 'lucide-react';
+import {
+	parseDiffWithInlineDiffs,
+	DiffCharRenderer,
+	type LineDiff,
+} from '@/lib/diff-utils';
 
 interface SyntaxDiffViewerProps {
 	diff: string;
 	filename?: string;
 	className?: string;
+	showWordDiff?: boolean;
 }
 
 // Simple syntax highlighting for common languages
@@ -53,101 +54,154 @@ function highlightSyntax(content: string, filename?: string): string {
 	return result;
 }
 
-function parseDiff(diff: string): DiffLine[] {
-	const lines = diff.split('\n');
-	const result: DiffLine[] = [];
-	let oldLineNumber = 0;
-	let newLineNumber = 0;
+export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = true }: SyntaxDiffViewerProps) {
+	const [wordDiff, setWordDiff] = useState(showWordDiff);
+	const lines = useMemo(() => parseDiffWithInlineDiffs(diff), [diff]);
 
-	for (const line of lines) {
-		if (line.startsWith('@@')) {
-			// Parse hunk header
-			const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-			if (match) {
-				oldLineNumber = parseInt(match[1], 10);
-				newLineNumber = parseInt(match[2], 10);
-			}
-			result.push({ type: 'header', content: line });
-		} else if (line.startsWith('+++') || line.startsWith('---')) {
-			result.push({ type: 'header', content: line });
-		} else if (line.startsWith('+')) {
-			result.push({
-				type: 'add',
-				content: line.slice(1),
-				newLineNumber: newLineNumber++,
-			});
-		} else if (line.startsWith('-')) {
-			result.push({
-				type: 'delete',
-				content: line.slice(1),
-				oldLineNumber: oldLineNumber++,
-			});
-		} else if (line.startsWith(' ')) {
-			result.push({
-				type: 'context',
-				content: line.slice(1),
-				oldLineNumber: oldLineNumber++,
-				newLineNumber: newLineNumber++,
-			});
-		} else if (line.trim()) {
-			result.push({ type: 'context', content: line });
-		}
-	}
-
-	return result;
-}
-
-export function SyntaxDiffViewer({ diff, filename, className }: SyntaxDiffViewerProps) {
-	const lines = useMemo(() => parseDiff(diff), [diff]);
+	// Stats
+	const stats = useMemo(() => {
+		const added = lines.filter(l => l.type === 'added').length;
+		const removed = lines.filter(l => l.type === 'removed').length;
+		const modified = lines.filter(l => l.type === 'modified').length;
+		return { added, removed, modified };
+	}, [lines]);
 
 	return (
-		<div className={cn("font-mono text-sm overflow-x-auto", className)}>
-			<table className="w-full border-collapse">
-				<colgroup>
-					<col className="w-12" />
-					<col className="w-12" />
-					<col className="w-8" />
-					<col />
-				</colgroup>
-				<tbody>
-					{lines.map((line, index) => (
-						<tr
-							key={index}
-							className={cn(
-								line.type === 'add' && 'bg-green-50 dark:bg-green-950/30',
-								line.type === 'delete' && 'bg-red-50 dark:bg-red-950/30',
-								line.type === 'header' && 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300'
-							)}
-						>
-							{/* Old line number */}
-							<td className="px-2 py-0.5 text-right text-xs text-gray-400 select-none border-r border-gray-200 dark:border-gray-700">
-								{line.oldLineNumber ?? ''}
-							</td>
-							{/* New line number */}
-							<td className="px-2 py-0.5 text-right text-xs text-gray-400 select-none border-r border-gray-200 dark:border-gray-700">
-								{line.newLineNumber ?? ''}
-							</td>
-							{/* Diff indicator */}
-							<td className="px-1 py-0.5 text-center text-xs select-none">
-								{line.type === 'add' && <span className="text-green-600">+</span>}
-								{line.type === 'delete' && <span className="text-red-600">-</span>}
-							</td>
-							{/* Content */}
-							<td className="px-2 py-0.5 whitespace-pre">
-								{line.type === 'header' ? (
-									<span>{line.content}</span>
-								) : (
-									<span 
-										dangerouslySetInnerHTML={{ 
-											__html: highlightSyntax(line.content, filename) 
-										}} 
-									/>
-								)}
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
+		<div className={cn("flex flex-col", className)}>
+			{/* Toolbar */}
+			<div className="flex items-center justify-end gap-2 px-2 py-1 border-b bg-muted/30">
+				<Toggle
+					pressed={wordDiff}
+					onPressedChange={setWordDiff}
+					size="sm"
+					className="h-6 px-2 text-xs gap-1"
+				>
+					{wordDiff ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+					Word Diff
+				</Toggle>
+			</div>
+			
+			{/* Diff content */}
+			<div className="flex-1 overflow-auto font-mono text-sm">
+				<table className="w-full border-collapse">
+					<colgroup>
+						<col className="w-12" />
+						<col className="w-12" />
+						<col className="w-8" />
+						<col />
+					</colgroup>
+					<tbody>
+						{lines.map((line, index) => {
+							const isHeader = line.type === 'context' && 
+								(!line.left?.chars?.length || line.left?.chars?.length === 0);
+							
+							return (
+								<tr
+									key={index}
+									className={cn(
+										line.type === 'added' && 'bg-green-50 dark:bg-green-950/30',
+										line.type === 'removed' && 'bg-red-50 dark:bg-red-950/30',
+										line.type === 'modified' && 'bg-amber-50 dark:bg-amber-950/30',
+									)}
+								>
+									{/* Old line number */}
+									<td className="px-2 py-0.5 text-right text-xs text-muted-foreground select-none border-r">
+										{line.leftLineNum || ''}
+									</td>
+									{/* New line number */}
+									<td className="px-2 py-0.5 text-right text-xs text-muted-foreground select-none border-r">
+										{line.rightLineNum || ''}
+									</td>
+									{/* Diff indicator */}
+									<td className="px-1 py-0.5 text-center text-xs select-none">
+										{line.type === 'added' && <span className="text-green-600">+</span>}
+										{line.type === 'removed' && <span className="text-red-600">-</span>}
+										{line.type === 'modified' && <span className="text-amber-600">~</span>}
+									</td>
+									{/* Content */}
+									<td className="px-2 py-0.5 whitespace-pre">
+										{line.type === 'context' ? (
+											<span 
+												dangerouslySetInnerHTML={{ 
+													__html: highlightSyntax(
+														line.left?.chars?.map(c => c.char).join('') || '',
+														filename
+													) 
+												}} 
+											/>
+										) : line.type === 'removed' ? (
+											wordDiff && line.left?.chars ? (
+												<span className="text-red-700 dark:text-red-300">
+													<DiffCharRenderer chars={line.left.chars} baseClass="removed" />
+												</span>
+											) : (
+												<span 
+													dangerouslySetInnerHTML={{ 
+														__html: highlightSyntax(
+															line.left?.chars?.map(c => c.char).join('') || '',
+															filename
+														) 
+													}} 
+												/>
+											)
+										) : line.type === 'added' ? (
+											wordDiff && line.right?.chars ? (
+												<span className="text-green-700 dark:text-green-300">
+													<DiffCharRenderer chars={line.right.chars} baseClass="added" />
+												</span>
+											) : (
+												<span 
+													dangerouslySetInnerHTML={{ 
+														__html: highlightSyntax(
+															line.right?.chars?.map(c => c.char).join('') || '',
+															filename
+														) 
+													}} 
+												/>
+											)
+										) : (
+											/* Modified line */
+											<>
+												{line.left && (
+													<div className={wordDiff ? '' : 'hidden'}>
+														<span className="text-red-700 dark:text-red-300">
+															{wordDiff && line.left.chars ? (
+																<DiffCharRenderer chars={line.left.chars} baseClass="removed" />
+															) : (
+																line.left.chars?.map(c => c.char).join('')
+															)}
+														</span>
+													</div>
+												)}
+												{line.right && (
+													<div className={wordDiff ? '' : ''}>
+														<span className="text-green-700 dark:text-green-300">
+															{wordDiff && line.right.chars ? (
+																<DiffCharRenderer chars={line.right.chars} baseClass="added" />
+															) : (
+																line.right.chars?.map(c => c.char).join('')
+															)}
+														</span>
+													</div>
+												)}
+											</>
+										)}
+									</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+			
+			{/* Status bar */}
+			<div className="flex items-center justify-between px-2 py-1 border-t bg-muted/30 text-xs text-muted-foreground">
+				<span>{lines.length} lines</span>
+				<div className="flex items-center gap-3">
+					<span className="text-red-600">-{stats.removed}</span>
+					<span className="text-green-600">+{stats.added + stats.modified}</span>
+				</div>
+			</div>
 		</div>
 	);
 }

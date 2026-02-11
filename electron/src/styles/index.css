@@ -136,3 +136,63 @@
   padding-top: 2.5rem;
   padding-bottom: 0.5rem;
 }
+
+/* Word-level diff highlighting */
+.diff-char-removed {
+  background-color: oklch(0.75 0.15 25 / 0.5);
+  border-radius: 2px;
+}
+
+.diff-char-added {
+  background-color: oklch(0.75 0.15 145 / 0.5);
+  border-radius: 2px;
+}
+
+.dark .diff-char-removed {
+  background-color: oklch(0.45 0.12 25 / 0.6);
+}
+
+.dark .diff-char-added {
+  background-color: oklch(0.45 0.12 145 / 0.6);
+}
+
+/* Diff line hover effects */
+.diff-line-removed:hover {
+  background-color: oklch(0.92 0.05 25);
+}
+
+.diff-line-added:hover {
+  background-color: oklch(0.92 0.05 145);
+}
+
+.dark .diff-line-removed:hover {
+  background-color: oklch(0.28 0.04 25);
+}
+
+.dark .diff-line-added:hover {
+  background-color: oklch(0.28 0.04 145);
+}
+
+/* Selection in diff */
+.diff-selected-line {
+  background-color: oklch(0.90 0.05 240 / 0.5) !important;
+}
+
+/* Gutter styling */
+.diff-gutter {
+  user-select: none;
+  min-width: 3rem;
+}
+
+/* Diff line number alignment */
+.diff-line-num {
+  text-align: right;
+  padding-right: 0.5rem;
+  color: oklch(0.556 0 0);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inline diff indicator */
+.diff-modified-indicator {
+  color: oklch(0.70 0.15 75);
+}
