@@ -40,6 +40,7 @@ import {
 	FolderGit2,
 	Keyboard,
 	Info,
+	Activity,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -92,6 +93,10 @@ import { CommitGraphLegend } from './commit-graph-legend';
 import { SettingsDialog, useSettings } from './settings-dialog';
 import { StatusBar } from './status-bar';
 import { QuickActionsToolbar } from './quick-actions-toolbar';
+import { RepoHealthCheck } from './repo-health-check';
+import { Avatar, AvatarWithTooltip } from './avatar';
+import { CommandPalette } from './command-palette';
+import { GitFlowAutomation } from './gitflow-automation';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -234,6 +239,9 @@ export function GitGraph() {
 	const [cherryPickDialogOpen, setCherryPickDialogOpen] = useState(false);
 	const [cherryPickCommit, setCherryPickCommit] = useState<{ hash: string; message: string; author: string } | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+	const [gitFlowOpen, setGitFlowOpen] = useState(false);
+	const [healthCheckOpen, setHealthCheckOpen] = useState(false);
 
 	// Settings hook
 	const { settings } = useSettings();
@@ -517,12 +525,20 @@ export function GitGraph() {
 				// Cmd+, for settings
 				e.preventDefault();
 				setSettingsOpen(true);
+			} else if (e.key === 'P' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				// Cmd+Shift+P for command palette
+				e.preventDefault();
+				setCommandPaletteOpen(true);
+			} else if (e.key === 'G' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				// Cmd+Shift+G for Git Flow
+				e.preventDefault();
+				setGitFlowOpen(true);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen, setKeyboardHelpOpen, setSettingsOpen]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen, setKeyboardHelpOpen, setSettingsOpen, setCommandPaletteOpen, setGitFlowOpen]);
 
 	// tRPC mutations
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
@@ -943,11 +959,24 @@ export function GitGraph() {
 								<Info className="h-4 w-4 mr-2" />
 								Graph Legend
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setGitFlowOpen(true)}>
+								<GitBranch className="h-4 w-4 mr-2" />
+								Git Flow
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setHealthCheckOpen(true)}>
+								<Activity className="h-4 w-4 mr-2" />
+								Health Check
+							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => setSettingsOpen(true)}>
 								<Settings className="h-4 w-4 mr-2" />
 								Settings
 								<span className="ml-auto text-xs text-muted-foreground">⌘,</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setCommandPaletteOpen(true)}>
+								<Search className="h-4 w-4 mr-2" />
+								Command Palette
+								<span className="ml-auto text-xs text-muted-foreground">⌘⇧P</span>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
@@ -1379,6 +1408,52 @@ export function GitGraph() {
 						</div>
 					</DialogContent>
 				</Dialog>
+
+				{/* Command Palette */}
+				<CommandPalette
+					open={commandPaletteOpen}
+					onOpenChange={setCommandPaletteOpen}
+					actions={{
+						onCreateBranch: () => setCreateBranchOpen(true),
+						onCreateTag: () => setAddTagOpen(true),
+						onFetch: () => gitOps.fetch(),
+						onPull: () => gitOps.pull(),
+						onPush: () => gitOps.push(),
+						onRefresh: () => refetchCommits(),
+						onSettings: () => setSettingsOpen(true),
+						onSearch: () => setSearchCommitsOpen(true),
+						onTerminal: () => setTerminalOpen(!terminalOpen),
+						onStash: () => setStashManageOpen(true),
+						onCommitSigning: () => setCommitSigningOpen(true),
+						onReflog: () => setReflogOpen(true),
+						onTemplates: () => setTemplatesOpen(true),
+						onGitignore: () => setGitignoreOpen(true),
+						onCustomCommands: () => setCustomCommandsOpen(true),
+						onLFS: () => setLfsOpen(true),
+						onPRIntegration: () => setPrIntegrationOpen(true),
+						onWorktrees: () => setWorktreeOpen(true),
+						onSubmodules: () => setSubmoduleOpen(true),
+						onStatistics: () => setStatisticsOpen(true),
+						onRemotes: () => setRemoteManageOpen(true),
+						onFilters: () => setShowFiltersDialog(true),
+						onPinned: () => setPinnedCommitsOpen(true),
+						onKeyboardHelp: () => setKeyboardHelpOpen(true),
+						onHealthCheck: () => setHealthCheckOpen(true),
+						onFuzzyFinder: () => setFuzzyFinderOpen(true),
+					}}
+				/>
+
+				{/* Git Flow Automation */}
+				<GitFlowAutomation
+					open={gitFlowOpen}
+					onOpenChange={setGitFlowOpen}
+				/>
+
+				{/* Repository Health Check */}
+				<RepoHealthCheck
+					open={healthCheckOpen}
+					onOpenChange={setHealthCheckOpen}
+				/>
 
 				{/* Status Bar */}
 				<StatusBar

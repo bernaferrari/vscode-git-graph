@@ -1,379 +1,399 @@
 /**
- * Command Palette (Cmd+K)
- * Quick access to all actions, like VSCode
+ * Command Palette
+ * Quick access to all commands and actions (Cmd+Shift+P)
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useAppStore } from '@/lib/store';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
+	DialogHeader,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import {
+	GitBranch,
+	Upload,
+	Download,
+	Plus,
+	RefreshCw,
+	Settings,
+	Search,
+	Terminal,
+	Archive,
+	Key,
+	History,
+	FileText,
+	Package,
+	GitPullRequest,
+	FolderGit2,
+	Trash2,
+	RotateCcw,
+	Keyboard,
+	HelpCircle,
+	BarChart3,
+	Globe,
+	Filter,
+	Pin,
+	User,
+	Activity,
+	Command,
+} from 'lucide-react';
 
 interface Command {
 	id: string;
 	label: string;
+	description?: string;
+	icon: React.ReactNode;
 	category: string;
 	shortcut?: string;
-	icon?: string;
 	action: () => void;
 	keywords?: string[];
 }
 
 interface CommandPaletteProps {
-	repo: string;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onCreateBranch: () => void;
-	onFetch: () => void;
-	onPush: () => void;
-	onPull: () => void;
-	onStash: () => void;
-	onCommit: () => void;
-	onRebase: () => void;
-	onMerge: () => void;
-	onSettings: () => void;
+	actions: {
+		onCreateBranch: () => void;
+		onCreateTag: () => void;
+		onFetch: () => void;
+		onPull: () => void;
+		onPush: () => void;
+		onRefresh: () => void;
+		onSettings: () => void;
+		onSearch: () => void;
+		onTerminal: () => void;
+		onStash: () => void;
+		onCommitSigning: () => void;
+		onReflog: () => void;
+		onTemplates: () => void;
+		onGitignore: () => void;
+		onCustomCommands: () => void;
+		onLFS: () => void;
+		onPRIntegration: () => void;
+		onWorktrees: () => void;
+		onSubmodules: () => void;
+		onStatistics: () => void;
+		onRemotes: () => void;
+		onFilters: () => void;
+		onPinned: () => void;
+		onKeyboardHelp: () => void;
+		onHealthCheck: () => void;
+		onFuzzyFinder: () => void;
+	};
 }
 
-export function CommandPalette({
-	repo,
-	open,
-	onOpenChange,
-	onCreateBranch,
-	onFetch,
-	onPush,
-	onPull,
-	onStash,
-	onCommit,
-	onRebase,
-	onMerge,
-	onSettings,
-}: CommandPaletteProps) {
-	const [search, setSearch] = useState('');
+export function CommandPalette({ open, onOpenChange, actions }: CommandPaletteProps) {
+	const [query, setQuery] = useState('');
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	const utils = trpc.useUtils();
-	const { data: branches } = trpc.git.repoInfo.useQuery(
-		{ repo, showRemoteBranches: true, showStashes: false, hideRemotes: [] },
-		{ enabled: open && !!repo }
-	);
-
-	const checkoutMutation = trpc.git.checkout.useMutation({
-		onSuccess: () => {
-			utils.git.repoInfo.invalidate();
-			utils.git.commits.invalidate();
-			onOpenChange(false);
+	const commands: Command[] = useMemo(() => [
+		// Git Operations
+		{
+			id: 'pull',
+			label: 'Pull from Remote',
+			icon: <Download className="h-4 w-4" />,
+			category: 'Git',
+			shortcut: '',
+			action: actions.onPull,
 		},
-	});
+		{
+			id: 'push',
+			label: 'Push to Remote',
+			icon: <Upload className="h-4 w-4" />,
+			category: 'Git',
+			action: actions.onPush,
+		},
+		{
+			id: 'fetch',
+			label: 'Fetch from All Remotes',
+			icon: <RefreshCw className="h-4 w-4" />,
+			category: 'Git',
+			action: actions.onFetch,
+		},
+		{
+			id: 'create-branch',
+			label: 'Create Branch',
+			icon: <GitBranch className="h-4 w-4" />,
+			category: 'Git',
+			shortcut: '⌘B',
+			action: actions.onCreateBranch,
+		},
+		{
+			id: 'create-tag',
+			label: 'Create Tag',
+			icon: <Plus className="h-4 w-4" />,
+			category: 'Git',
+			shortcut: '⌘T',
+			action: actions.onCreateTag,
+		},
+		{
+			id: 'stash',
+			label: 'Manage Stashes',
+			icon: <Archive className="h-4 w-4" />,
+			category: 'Git',
+			action: actions.onStash,
+		},
+		{
+			id: 'reflog',
+			label: 'View Reflog',
+			icon: <History className="h-4 w-4" />,
+			category: 'Git',
+			action: actions.onReflog,
+		},
+		// Tools
+		{
+			id: 'search',
+			label: 'Search All Commits',
+			icon: <Search className="h-4 w-4" />,
+			category: 'Tools',
+			shortcut: '⌘⇧F',
+			action: actions.onSearch,
+		},
+		{
+			id: 'fuzzy-finder',
+			label: 'Fuzzy Finder',
+			icon: <Command className="h-4 w-4" />,
+			category: 'Tools',
+			shortcut: '⌘K',
+			action: actions.onFuzzyFinder,
+		},
+		{
+			id: 'terminal',
+			label: 'Toggle Terminal',
+			icon: <Terminal className="h-4 w-4" />,
+			category: 'Tools',
+			shortcut: '⌘P',
+			action: actions.onTerminal,
+		},
+		{
+			id: 'statistics',
+			label: 'Repository Statistics',
+			icon: <BarChart3 className="h-4 w-4" />,
+			category: 'Tools',
+			shortcut: '⌘⇧S',
+			action: actions.onStatistics,
+		},
+		{
+			id: 'filters',
+			label: 'Commit Filters',
+			icon: <Filter className="h-4 w-4" />,
+			category: 'Tools',
+			action: actions.onFilters,
+		},
+		{
+			id: 'pinned',
+			label: 'Pinned Commits',
+			icon: <Pin className="h-4 w-4" />,
+			category: 'Tools',
+			shortcut: '⌘⇧P',
+			action: actions.onPinned,
+		},
+		// Settings
+		{
+			id: 'commit-signing',
+			label: 'Commit Signing',
+			icon: <Key className="h-4 w-4" />,
+			category: 'Settings',
+			action: actions.onCommitSigning,
+		},
+		{
+			id: 'templates',
+			label: 'Commit Templates',
+			icon: <FileText className="h-4 w-4" />,
+			category: 'Settings',
+			action: actions.onTemplates,
+		},
+		{
+			id: 'gitignore',
+			label: 'Edit .gitignore',
+			icon: <FileText className="h-4 w-4" />,
+			category: 'Settings',
+			action: actions.onGitignore,
+		},
+		{
+			id: 'custom-commands',
+			label: 'Custom Commands',
+			icon: <Terminal className="h-4 w-4" />,
+			category: 'Settings',
+			action: actions.onCustomCommands,
+		},
+		{
+			id: 'remotes',
+			label: 'Manage Remotes',
+			icon: <Globe className="h-4 w-4" />,
+			category: 'Settings',
+			shortcut: '⌘⇧R',
+			action: actions.onRemotes,
+		},
+		{
+			id: 'settings',
+			label: 'Open Settings',
+			icon: <Settings className="h-4 w-4" />,
+			category: 'Settings',
+			shortcut: '⌘,',
+			action: actions.onSettings,
+		},
+		// Integrations
+		{
+			id: 'pr-integration',
+			label: 'Pull Requests',
+			icon: <GitPullRequest className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onPRIntegration,
+		},
+		{
+			id: 'lfs',
+			label: 'LFS Management',
+			icon: <Package className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onLFS,
+		},
+		{
+			id: 'worktrees',
+			label: 'Worktrees',
+			icon: <FolderGit2 className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onWorktrees,
+		},
+		{
+			id: 'submodules',
+			label: 'Submodules',
+			icon: <Package className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onSubmodules,
+		},
+		// Help
+		{
+			id: 'keyboard-shortcuts',
+			label: 'Keyboard Shortcuts',
+			icon: <Keyboard className="h-4 w-4" />,
+			category: 'Help',
+			shortcut: '?',
+			action: actions.onKeyboardHelp,
+		},
+		{
+			id: 'health-check',
+			label: 'Repository Health Check',
+			icon: <Activity className="h-4 w-4" />,
+			category: 'Help',
+			action: actions.onHealthCheck,
+		},
+		{
+			id: 'refresh',
+			label: 'Refresh Repository',
+			icon: <RefreshCw className="h-4 w-4" />,
+			category: 'Help',
+			shortcut: '⌘R',
+			action: actions.onRefresh,
+		},
+	], [actions]);
 
-	// Build commands list
-	const commands = useMemo<Command[]>(() => {
-		const cmds: Command[] = [
-			// Branch commands
-			{
-				id: 'branch.create',
-				label: 'Create Branch',
-				category: 'Branch',
-				shortcut: 'B',
-				action: () => { onOpenChange(false); onCreateBranch(); },
-				keywords: ['new', 'branch'],
-			},
-			{
-				id: 'branch.checkout',
-				label: 'Checkout Branch...',
-				category: 'Branch',
-				shortcut: '⇧B',
-				action: () => {},
-				keywords: ['switch', 'branch'],
-			},
-
-			// Remote commands
-			{
-				id: 'remote.fetch',
-				label: 'Fetch All',
-				category: 'Remote',
-				shortcut: 'F',
-				action: () => { onOpenChange(false); onFetch(); },
-				keywords: ['download', 'remote'],
-			},
-			{
-				id: 'remote.push',
-				label: 'Push',
-				category: 'Remote',
-				shortcut: 'P',
-				action: () => { onOpenChange(false); onPush(); },
-				keywords: ['upload', 'push'],
-			},
-			{
-				id: 'remote.pull',
-				label: 'Pull',
-				category: 'Remote',
-				shortcut: '⇧P',
-				action: () => { onOpenChange(false); onPull(); },
-				keywords: ['download', 'merge'],
-			},
-
-			// Commit commands
-			{
-				id: 'commit.create',
-				label: 'Commit',
-				category: 'Commit',
-				shortcut: 'C',
-				action: () => { onOpenChange(false); onCommit(); },
-				keywords: ['save', 'commit'],
-			},
-			{
-				id: 'commit.amend',
-				label: 'Amend Commit',
-				category: 'Commit',
-				action: () => { onOpenChange(false); },
-				keywords: ['edit', 'fix'],
-			},
-
-			// Stash commands
-			{
-				id: 'stash.push',
-				label: 'Stash Changes',
-				category: 'Stash',
-				shortcut: 'S',
-				action: () => { onOpenChange(false); onStash(); },
-				keywords: ['save', 'temporary'],
-			},
-			{
-				id: 'stash.pop',
-				label: 'Pop Stash',
-				category: 'Stash',
-				action: () => { onOpenChange(false); },
-				keywords: ['apply', 'restore'],
-			},
-
-			// Merge/Rebase
-			{
-				id: 'merge.start',
-				label: 'Merge Branch...',
-				category: 'Merge',
-				shortcut: 'M',
-				action: () => { onOpenChange(false); onMerge(); },
-				keywords: ['combine', 'branch'],
-			},
-			{
-				id: 'rebase.start',
-				label: 'Rebase...',
-				category: 'Rebase',
-				shortcut: 'R',
-				action: () => { onOpenChange(false); onRebase(); },
-				keywords: ['replay', 'commits'],
-			},
-			{
-				id: 'rebase.interactive',
-				label: 'Interactive Rebase',
-				category: 'Rebase',
-				action: () => { onOpenChange(false); onRebase(); },
-				keywords: ['edit', 'squash', 'reorder'],
-			},
-
-			// Tag commands
-			{
-				id: 'tag.create',
-				label: 'Create Tag',
-				category: 'Tag',
-				action: () => { onOpenChange(false); },
-				keywords: ['version', 'release'],
-			},
-
-			// View commands
-			{
-				id: 'view.blame',
-				label: 'Show Blame',
-				category: 'View',
-				action: () => { onOpenChange(false); },
-				keywords: ['annotate', 'author'],
-			},
-			{
-				id: 'view.history',
-				label: 'File History',
-				category: 'View',
-				action: () => { onOpenChange(false); },
-				keywords: ['log', 'changes'],
-			},
-			{
-				id: 'view.reflog',
-				label: 'Show Reflog',
-				category: 'View',
-				action: () => { onOpenChange(false); },
-				keywords: ['undo', 'history'],
-			},
-
-			// Git Flow
-			{
-				id: 'gitflow.feature',
-				label: 'Start Feature',
-				category: 'Git Flow',
-				action: () => { onOpenChange(false); },
-			},
-			{
-				id: 'gitflow.release',
-				label: 'Start Release',
-				category: 'Git Flow',
-				action: () => { onOpenChange(false); },
-			},
-
-			// Settings
-			{
-				id: 'settings.open',
-				label: 'Open Settings',
-				category: 'Settings',
-				shortcut: ',',
-				action: () => { onOpenChange(false); onSettings(); },
-				keywords: ['preferences', 'config'],
-			},
-
-			// Help
-			{
-				id: 'help.shortcuts',
-				label: 'Keyboard Shortcuts',
-				category: 'Help',
-				shortcut: '?',
-				action: () => { onOpenChange(false); },
-			},
-		];
-
-		// Add branch checkout commands
-		if (branches?.branches) {
-			for (const branch of branches.branches.slice(0, 10)) {
-				const branchName = branch.toString();
-				const isCurrent = branchName === branches.head;
-				if (!isCurrent) {
-					cmds.push({
-						id: `checkout.${branchName}`,
-						label: `Checkout ${branchName}`,
-						category: 'Branches',
-						action: () => {
-							checkoutMutation.mutate({ repo, ref: branchName });
-						},
-					});
-				}
-			}
-		}
-
-		return cmds;
-	}, [branches, checkoutMutation, onCreateBranch, onFetch, onMerge, onOpenChange, onPull, onPush, onRebase, onSettings, onStash, onCommit, repo]);
-
-	// Filter commands by search
 	const filteredCommands = useMemo(() => {
-		if (!search.trim()) return commands;
+		if (!query) return commands;
+		
+		const lowerQuery = query.toLowerCase();
+		return commands.filter(cmd => 
+			cmd.label.toLowerCase().includes(lowerQuery) ||
+			cmd.category.toLowerCase().includes(lowerQuery) ||
+			cmd.keywords?.some(k => k.toLowerCase().includes(lowerQuery))
+		);
+	}, [commands, query]);
 
-		const searchLower = search.toLowerCase();
-		return commands.filter((cmd) => {
-			const matchLabel = cmd.label.toLowerCase().includes(searchLower);
-			const matchCategory = cmd.category.toLowerCase().includes(searchLower);
-			const matchKeywords = cmd.keywords?.some(k => k.includes(searchLower));
-			return matchLabel || matchCategory || matchKeywords;
-		});
-	}, [commands, search]);
+	// Reset selection when query changes
+	useEffect(() => {
+		setSelectedIndex(0);
+	}, [query]);
 
-	// Keyboard navigation
+	// Handle keyboard navigation
 	const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
 		switch (e.key) {
 			case 'ArrowDown':
 				e.preventDefault();
-				setSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
+				setSelectedIndex(prev => Math.min(prev + 1, filteredCommands.length - 1));
 				break;
 			case 'ArrowUp':
 				e.preventDefault();
-				setSelectedIndex((i) => Math.max(i - 1, 0));
+				setSelectedIndex(prev => Math.max(prev - 1, 0));
 				break;
 			case 'Enter':
 				e.preventDefault();
 				if (filteredCommands[selectedIndex]) {
 					filteredCommands[selectedIndex].action();
+					onOpenChange(false);
+					setQuery('');
 				}
 				break;
 			case 'Escape':
 				onOpenChange(false);
+				setQuery('');
 				break;
 		}
 	}, [filteredCommands, selectedIndex, onOpenChange]);
 
-	// Reset on open
-	useEffect(() => {
-		if (open) {
-			setSearch('');
-			setSelectedIndex(0);
-		}
-	}, [open]);
-
-	// Reset selection when filter changes
-	useEffect(() => {
-		setSelectedIndex(0);
-	}, [filteredCommands.length]);
-
-	// Group by category
-	const groupedCommands = useMemo(() => {
-		const groups: Record<string, Command[]> = {};
-		for (const cmd of filteredCommands) {
-			if (!groups[cmd.category]) {
-				groups[cmd.category] = [];
-			}
-			groups[cmd.category]!.push(cmd);
-		}
-		return groups;
-	}, [filteredCommands]);
-
-	let flatIndex = -1;
-
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="p-0 gap-0 max-w-lg">
-				{/* Search input */}
-				<div className="border-b p-3">
+		<Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setQuery(''); }}>
+			<DialogContent className="p-0 max-w-xl gap-0">
+				<div className="flex items-center border-b px-3">
+					<Search className="h-4 w-4 text-muted-foreground mr-2" />
 					<Input
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						onKeyDown={handleKeyDown}
 						placeholder="Type a command or search..."
-						className="border-0 shadow-none focus-visible:ring-0 text-sm"
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+						onKeyDown={handleKeyDown}
+						className="border-0 focus-visible:ring-0 px-0"
 						autoFocus
 					/>
 				</div>
 
-				{/* Commands list */}
 				<ScrollArea className="max-h-80">
 					{filteredCommands.length === 0 ? (
-						<div className="p-4 text-center text-muted-foreground text-sm">
+						<div className="py-6 text-center text-muted-foreground text-sm">
 							No commands found
 						</div>
 					) : (
 						<div className="py-2">
-							{Object.entries(groupedCommands).map(([category, cmds]) => (
+							{Object.entries(
+								filteredCommands.reduce((acc, cmd) => {
+									if (!acc[cmd.category]) acc[cmd.category] = [];
+									acc[cmd.category].push(cmd);
+									return acc;
+								}, {} as Record<string, Command[]>)
+							).map(([category, cmds]) => (
 								<div key={category}>
 									<div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
 										{category}
 									</div>
-									{cmds.map((cmd) => {
-										flatIndex++;
-										const idx = flatIndex;
+									{cmds.map((cmd, index) => {
+										const globalIndex = filteredCommands.indexOf(cmd);
 										return (
-											<button
+											<div
 												key={cmd.id}
-												onClick={() => cmd.action()}
-												onMouseEnter={() => setSelectedIndex(idx)}
-												className={cn(
-													'w-full flex items-center justify-between px-3 py-2 text-sm',
-													selectedIndex === idx && 'bg-accent'
-												)}
+												className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
+													globalIndex === selectedIndex 
+														? 'bg-accent' 
+														: 'hover:bg-accent/50'
+												}`}
+												onClick={() => {
+													cmd.action();
+													onOpenChange(false);
+													setQuery('');
+												}}
+												onMouseEnter={() => setSelectedIndex(globalIndex)}
 											>
-												<span>{cmd.label}</span>
+												<div className="text-muted-foreground">
+													{cmd.icon}
+												</div>
+												<span className="flex-1 text-sm">{cmd.label}</span>
 												{cmd.shortcut && (
-													<kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">
+													<kbd className="text-xs px-1.5 py-0.5 rounded bg-muted">
 														{cmd.shortcut}
 													</kbd>
 												)}
-											</button>
+											</div>
 										);
 									})}
 								</div>
@@ -382,40 +402,14 @@ export function CommandPalette({
 					)}
 				</ScrollArea>
 
-				{/* Footer hints */}
-				<div className="border-t p-2 flex items-center justify-between text-xs text-muted-foreground">
-					<span>
-						<kbd className="px-1 bg-muted rounded mx-0.5">↑↓</kbd> navigate
-						<kbd className="px-1 bg-muted rounded mx-0.5 ml-2">↵</kbd> select
-						<kbd className="px-1 bg-muted rounded mx-0.5 ml-2">esc</kbd> close
-					</span>
-					<span className="flex items-center gap-1">
-						<Badge variant="outline" className="text-xs">⌘K</Badge>
-						to open
-					</span>
+				<div className="border-t px-3 py-2 text-xs text-muted-foreground flex items-center gap-4">
+					<span>↑↓ to navigate</span>
+					<span>↵ to select</span>
+					<span>esc to close</span>
 				</div>
 			</DialogContent>
 		</Dialog>
 	);
 }
 
-/**
- * Hook to manage command palette keyboard shortcut
- */
-export function useCommandPalette() {
-	const [open, setOpen] = useState(false);
-
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-				e.preventDefault();
-				setOpen(true);
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, []);
-
-	return { open, setOpen };
-}
+export default CommandPalette;
