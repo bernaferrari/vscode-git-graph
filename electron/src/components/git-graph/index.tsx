@@ -104,6 +104,15 @@ import { InlineStagingDiff } from './inline-staging-diff';
 import { GitBisectUI } from './git-bisect-ui';
 import { CIStatusBadge, CIStatusMini } from './ci-status';
 import { BlameOnHover } from './blame-on-hover';
+import { UndoStackProvider, UndoStackDialog, UndoRedoButtons } from './undo-stack';
+import { ExternalDiffConfig, OpenInExternalDiffButton } from './external-diff-tool';
+import { GitConfigEditor } from './git-config-editor';
+import { IssueTrackerSettings, IssueTrackerPanel } from './issue-tracker';
+import { BulkCommitOperations } from './bulk-commit-operations';
+import { FileAnnotationsPanel } from './file-annotations-panel';
+import { ActivityHeatmap } from './activity-heatmap';
+import { QuickLookPanel, QuickLookButton, useQuickLook, useQuickLookKeyboard } from './quick-look';
+import { DragCommitHandler, DraggableCommit, BranchDropZone, useDragCommit } from './drag-commit-to-branch';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -250,6 +259,24 @@ export function GitGraph() {
 	const [gitFlowOpen, setGitFlowOpen] = useState(false);
 	const [healthCheckOpen, setHealthCheckOpen] = useState(false);
 	const [bisectOpen, setBisectOpen] = useState(false);
+	
+	// New advanced features
+	const [undoStackOpen, setUndoStackOpen] = useState(false);
+	const [configEditorOpen, setConfigEditorOpen] = useState(false);
+	const [externalDiffOpen, setExternalDiffOpen] = useState(false);
+	const [issueTrackerOpen, setIssueTrackerOpen] = useState(false);
+	const [bulkOpsOpen, setBulkOpsOpen] = useState(false);
+	
+	// Additional advanced features
+	const [fileAnnotationsOpen, setFileAnnotationsOpen] = useState(false);
+	const [annotationsFile, setAnnotationsFile] = useState<string>('');
+	const [activityHeatmapOpen, setActivityHeatmapOpen] = useState(false);
+	const [dragCherryPickOpen, setDragCherryPickOpen] = useState(false);
+	const [dragCommit, setDragCommit] = useState<{ hash: string; message: string } | null>(null);
+	const [dragTargetBranch, setDragTargetBranch] = useState('');
+	
+	// Quick Look hook
+	useQuickLookKeyboard();
 	
 	// Graph and virtualization state
 	const [useLaneGraph, setUseLaneGraph] = useState(false);
@@ -986,6 +1013,36 @@ export function GitGraph() {
 								Git Bisect
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
+							<DropdownMenuItem onClick={() => setUndoStackOpen(true)}>
+								<History className="h-4 w-4 mr-2" />
+								Undo History
+								<span className="ml-auto text-xs text-muted-foreground">⌘Z</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setConfigEditorOpen(true)}>
+								<Settings className="h-4 w-4 mr-2" />
+								Git Configuration
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setExternalDiffOpen(true)}>
+								<FileCode className="h-4 w-4 mr-2" />
+								External Diff Settings
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setIssueTrackerOpen(true)}>
+								<GitPullRequest className="h-4 w-4 mr-2" />
+								Issue Tracker Settings
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setBulkOpsOpen(true)}>
+								<GitCommit className="h-4 w-4 mr-2" />
+								Bulk Operations
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setFileAnnotationsOpen(true)}>
+								<FileCode className="h-4 w-4 mr-2" />
+								File Annotations
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setActivityHeatmapOpen(true)}>
+								<BarChart3 className="h-4 w-4 mr-2" />
+								Activity Heatmap
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => setSettingsOpen(true)}>
 								<Settings className="h-4 w-4 mr-2" />
 								Settings
@@ -1514,6 +1571,16 @@ export function GitGraph() {
 						onKeyboardHelp: () => setKeyboardHelpOpen(true),
 						onHealthCheck: () => setHealthCheckOpen(true),
 						onFuzzyFinder: () => setFuzzyFinderOpen(true),
+						onUndoStack: () => setUndoStackOpen(true),
+						onConfigEditor: () => setConfigEditorOpen(true),
+						onExternalDiff: () => setExternalDiffOpen(true),
+						onIssueTracker: () => setIssueTrackerOpen(true),
+						onBulkOps: () => setBulkOpsOpen(true),
+						onFileAnnotations: () => {
+							setAnnotationsFile('README.md'); // Default file
+							setFileAnnotationsOpen(true);
+						},
+						onActivityHeatmap: () => setActivityHeatmapOpen(true),
 					}}
 				/>
 
@@ -1535,6 +1602,73 @@ export function GitGraph() {
 					onOpenChange={setBisectOpen}
 					currentCommitHash={selectedCommit ?? undefined}
 				/>
+
+				{/* Undo Stack Dialog */}
+				<UndoStackDialog
+					open={undoStackOpen}
+					onOpenChange={setUndoStackOpen}
+				/>
+
+				{/* Git Config Editor */}
+				<GitConfigEditor
+					open={configEditorOpen}
+					onOpenChange={setConfigEditorOpen}
+				/>
+
+				{/* External Diff Settings */}
+				<ExternalDiffConfig
+					open={externalDiffOpen}
+					onOpenChange={setExternalDiffOpen}
+				/>
+
+				{/* Issue Tracker Settings */}
+				<IssueTrackerSettings
+					open={issueTrackerOpen}
+					onOpenChange={setIssueTrackerOpen}
+				/>
+
+				{/* Bulk Commit Operations */}
+				<BulkCommitOperations
+					open={bulkOpsOpen}
+					onOpenChange={setBulkOpsOpen}
+					commits={(commitsData?.commits ?? []).map((c: ClientCommit) => ({
+						hash: c.hash,
+						message: c.message,
+						author: c.author,
+						date: c.date,
+						parents: c.parents,
+					}))}
+					onComplete={() => refetchCommits()}
+				/>
+
+				{/* File Annotations Panel */}
+				<FileAnnotationsPanel
+					open={fileAnnotationsOpen}
+					onOpenChange={setFileAnnotationsOpen}
+					filePath={annotationsFile}
+					commitHash={selectedCommit ?? 'HEAD'}
+				/>
+
+				{/* Activity Heatmap */}
+				<ActivityHeatmap
+					open={activityHeatmapOpen}
+					onOpenChange={setActivityHeatmapOpen}
+				/>
+
+				{/* Drag Cherry-Pick Handler */}
+				{dragCommit && (
+					<DragCommitHandler
+						open={dragCherryPickOpen}
+						onOpenChange={setDragCherryPickOpen}
+						commitHash={dragCommit.hash}
+						commitMessage={dragCommit.message}
+						targetBranch={dragTargetBranch}
+						onComplete={() => refetchCommits()}
+					/>
+				)}
+
+				{/* Quick Look Panel */}
+				<QuickLookPanel />
 
 				{/* Status Bar */}
 				<StatusBar

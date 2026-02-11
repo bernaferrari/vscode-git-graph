@@ -40,6 +40,8 @@ import {
 	User,
 	Activity,
 	Command,
+	FileCode,
+	GitCommit,
 } from 'lucide-react';
 
 interface Command {
@@ -83,6 +85,13 @@ interface CommandPaletteProps {
 		onKeyboardHelp: () => void;
 		onHealthCheck: () => void;
 		onFuzzyFinder: () => void;
+		onUndoStack?: () => void;
+		onConfigEditor?: () => void;
+		onExternalDiff?: () => void;
+		onIssueTracker?: () => void;
+		onBulkOps?: () => void;
+		onFileAnnotations?: () => void;
+		onActivityHeatmap?: () => void;
 	};
 }
 
@@ -266,6 +275,56 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Integrations',
 			action: actions.onSubmodules,
 		},
+		// Advanced
+		...(actions.onUndoStack ? [{
+			id: 'undo-stack',
+			label: 'Undo History',
+			icon: <History className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onUndoStack,
+		}] : []),
+		...(actions.onConfigEditor ? [{
+			id: 'config-editor',
+			label: 'Git Configuration',
+			icon: <Settings className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onConfigEditor,
+		}] : []),
+		...(actions.onExternalDiff ? [{
+			id: 'external-diff',
+			label: 'External Diff Settings',
+			icon: <FileCode className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onExternalDiff,
+		}] : []),
+		...(actions.onIssueTracker ? [{
+			id: 'issue-tracker',
+			label: 'Issue Tracker Settings',
+			icon: <GitPullRequest className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onIssueTracker,
+		}] : []),
+		...(actions.onBulkOps ? [{
+			id: 'bulk-ops',
+			label: 'Bulk Commit Operations',
+			icon: <GitCommit className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onBulkOps,
+		}] : []),
+		...(actions.onFileAnnotations ? [{
+			id: 'file-annotations',
+			label: 'File Annotations',
+			icon: <FileCode className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onFileAnnotations,
+		}] : []),
+		...(actions.onActivityHeatmap ? [{
+			id: 'activity-heatmap',
+			label: 'Activity Heatmap',
+			icon: <BarChart3 className="h-4 w-4" />,
+			category: 'Advanced',
+			action: actions.onActivityHeatmap,
+		}] : []),
 		// Help
 		{
 			id: 'keyboard-shortcuts',

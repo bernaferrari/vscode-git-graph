@@ -26,13 +26,14 @@ import {
 	Check,
 	X,
 	Loader2,
-	GitHub,
-	Trello,
-	Box,
+	GitPullRequest,
+	LayoutGrid,
+	Package,
 	ListTodo,
 	CheckCircle2,
 	AlertCircle,
 	Clock,
+	Globe,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -73,13 +74,13 @@ interface IssueTrackerConfig {
 }
 
 const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNode; color: string }> = {
-	github: { name: 'GitHub', icon: <GitHub className="h-4 w-4" />, color: 'text-gray-700 dark:text-gray-300' },
+	github: { name: 'GitHub', icon: <GitPullRequest className="h-4 w-4" />, color: 'text-gray-700 dark:text-gray-300' },
 	jira: { name: 'Jira', icon: <ListTodo className="h-4 w-4" />, color: 'text-blue-600' },
-	linear: { name: 'Linear', icon: <Box className="h-4 w-4" />, color: 'text-indigo-600' },
+	linear: { name: 'Linear', icon: <Package className="h-4 w-4" />, color: 'text-indigo-600' },
 	asana: { name: 'Asana', icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-orange-600' },
-	trello: { name: 'Trello', icon: <Trello className="h-4 w-4" />, color: 'text-blue-500' },
+	trello: { name: 'Trello', icon: <LayoutGrid className="h-4 w-4" />, color: 'text-blue-500' },
 	clickup: { name: 'ClickUp', icon: <ListTodo className="h-4 w-4" />, color: 'text-pink-600' },
-	notion: { name: 'Notion', icon: <Box className="h-4 w-4" />, color: 'text-gray-800' },
+	notion: { name: 'Notion', icon: <Globe className="h-4 w-4" />, color: 'text-gray-800' },
 };
 
 const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React.ReactNode }> = {
