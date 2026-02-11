@@ -73,7 +73,7 @@ interface IssueTrackerConfig {
 	patterns: string[];
 }
 
-const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNode; color: string }> = {
+export const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNode; color: string }> = {
 	github: { name: 'GitHub', icon: <GitPullRequest className="h-4 w-4" />, color: 'text-gray-700 dark:text-gray-300' },
 	jira: { name: 'Jira', icon: <ListTodo className="h-4 w-4" />, color: 'text-blue-600' },
 	linear: { name: 'Linear', icon: <Package className="h-4 w-4" />, color: 'text-indigo-600' },
@@ -83,7 +83,7 @@ const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNo
 	notion: { name: 'Notion', icon: <Globe className="h-4 w-4" />, color: 'text-gray-800' },
 };
 
-const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React.ReactNode }> = {
+export const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React.ReactNode }> = {
 	open: { color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30', icon: <AlertCircle className="h-3 w-3" /> },
 	in_progress: { color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30', icon: <Clock className="h-3 w-3" /> },
 	closed: { color: 'text-green-600 bg-green-100 dark:bg-green-900/30', icon: <CheckCircle2 className="h-3 w-3" /> },
@@ -123,7 +123,7 @@ function fetchIssues(provider: IssueProvider, query: string): Promise<Issue[]> {
 }
 
 // Detect issue keys in commit message
-function detectIssueKeys(message: string, patterns: string[]): string[] {
+export function detectIssueKeys(message: string, patterns: string[]): string[] {
 	const keys: string[] = [];
 	
 	for (const pattern of patterns) {
