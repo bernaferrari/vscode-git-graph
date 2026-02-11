@@ -3586,4 +3586,226 @@ export const gitRouter = router({
 			);
 			return { error };
 		}),
+
+	/**
+	 * Get git configuration as key-value object.
+	 */
+	configList: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return {};
+
+			try {
+				const result = await getGitService().runGitCommandWithOutput(
+					['config', '--list', '--global'],
+					input.repo
+				);
+
+				const config: Record<string, string> = {};
+				result?.split('\n').forEach(line => {
+					const [key, ...valueParts] = line.split('=');
+					if (key && valueParts.length > 0) {
+						config[key] = valueParts.join('=');
+					}
+				});
+
+				return config;
+			} catch {
+				return {};
+			}
+		}),
+
+	/**
+	 * Set a git configuration value.
+	 */
+	configSet: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			key: z.string(),
+			value: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['config', '--global', input.key, input.value],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
+	 * Unset a git configuration value.
+	 */
+	configUnset: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			key: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['config', '--global', '--unset', input.key],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
+	 * Get raw git configuration file content.
+	 */
+	configRaw: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return '';
+
+			try {
+				const result = await getGitService().runGitCommandWithOutput(
+					['config', '--global', '--list', '--show-origin'],
+					input.repo
+				);
+				return result || '';
+			} catch {
+				return '';
+			}
+		}),
+
+	/**
+	 * Set raw git configuration.
+	 */
+	configSetRaw: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			content: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			// This would need to write to the .gitconfig file directly
+			// For now, return an error indicating this is not implemented
+			return { error: 'Direct config file editing not implemented' };
+		}),
+
+	/**
+	 * Test if a diff tool is available.
+	 */
+	testDiffTool: publicProcedure
+		.input(z.object({
+			command: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			try {
+				const { spawn } = await import('child_process');
+				return new Promise<{ available: boolean }>((resolve) => {
+					const proc = spawn(input.command, ['--version'], { shell: true });
+					proc.on('close', (code) => {
+						resolve({ available: code === 0 });
+					});
+					proc.on('error', () => {
+						resolve({ available: false });
+					});
+				});
+			} catch {
+				return { available: false };
+			}
+		}),
+
+	/**
+	 * Open external diff tool.
+	 */
+	openExternalDiff: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			filePath: z.string(),
+			commitHash: z.string().optional(),
+			onCommit: z.string().optional(),
+			command: z.string(),
+			args: z.string(),
+		}))
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			try {
+				// Get file contents
+				const oldContent = input.onCommit
+					? await getGitService().runGitCommandWithOutput(
+						['show', `${input.onCommit}:${input.filePath}`],
+						input.repo
+					)
+					: '';
+
+				const newContent = input.commitHash
+					? await getGitService().runGitCommandWithOutput(
+						['show', `${input.commitHash}:${input.filePath}`],
+						input.repo
+					)
+					: '';
+
+				// Write temp files
+				const fs = await import('fs');
+				const os = await import('os');
+				const path = await import('path');
+				
+				const tmpDir = os.tmpdir();
+				const oldFile = path.join(tmpDir, 'git-diff-old');
+				const newFile = path.join(tmpDir, 'git-diff-new');
+
+				fs.writeFileSync(oldFile, oldContent || '');
+				fs.writeFileSync(newFile, newContent || '');
+
+				// Replace variables in args
+				const args = input.args
+					.replace(/\$LOCAL/g, oldFile)
+					.replace(/\$REMOTE/g, newFile)
+					.replace(/\$BASE/g, oldFile)
+					.replace(/\$MERGED/g, newFile);
+
+				// Spawn diff tool
+				const { spawn } = await import('child_process');
+				spawn(input.command, args.split(' '), { shell: true, detached: true });
+
+				return { error: null };
+			} catch (error) {
+				return { error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	/**
+	 * Get commit info for a specific hash.
+	 */
+	commitInfo: publicProcedure
+		.input(z.object({
+			repo: z.string(),
+			hash: z.string(),
+		}))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return null;
+
+			try {
+				const result = await getGitService().runGitCommandWithOutput(
+					['show', '-s', '--format=%H%n%an%n%ae%n%at%n%s%n%b', input.hash],
+					input.repo
+				);
+
+				if (!result) return null;
+
+				const [hash, author, email, timestamp, subject, ...body] = result.split('\n');
+
+				return {
+					hash,
+					author,
+					email,
+					date: new Date(parseInt(timestamp) * 1000).toISOString(),
+					message: subject,
+					body: body.join('\n').trim(),
+				};
+			} catch {
+				return null;
+			}
+		}),
 });
