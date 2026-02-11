@@ -41,6 +41,7 @@ import {
 	Keyboard,
 	Info,
 	Activity,
+	Bug,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
@@ -100,6 +101,9 @@ import { GitFlowAutomation } from './gitflow-automation';
 import { VirtualizedCommitList } from './virtualized-commit-list';
 import { LaneBasedGraph, LaneBasedGraphSVG } from './lane-based-graph';
 import { InlineStagingDiff } from './inline-staging-diff';
+import { GitBisectUI } from './git-bisect-ui';
+import { CIStatusBadge, CIStatusMini } from './ci-status';
+import { BlameOnHover } from './blame-on-hover';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import {
 	GraphLayoutCalculator,
@@ -245,6 +249,7 @@ export function GitGraph() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [gitFlowOpen, setGitFlowOpen] = useState(false);
 	const [healthCheckOpen, setHealthCheckOpen] = useState(false);
+	const [bisectOpen, setBisectOpen] = useState(false);
 	
 	// Graph and virtualization state
 	const [useLaneGraph, setUseLaneGraph] = useState(false);
@@ -976,6 +981,10 @@ export function GitGraph() {
 								<Activity className="h-4 w-4 mr-2" />
 								Health Check
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setBisectOpen(true)}>
+								<Bug className="h-4 w-4 mr-2" />
+								Git Bisect
+							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => setSettingsOpen(true)}>
 								<Settings className="h-4 w-4 mr-2" />
@@ -1518,6 +1527,13 @@ export function GitGraph() {
 				<RepoHealthCheck
 					open={healthCheckOpen}
 					onOpenChange={setHealthCheckOpen}
+				/>
+
+				{/* Git Bisect UI */}
+				<GitBisectUI
+					open={bisectOpen}
+					onOpenChange={setBisectOpen}
+					currentCommitHash={selectedCommit ?? undefined}
 				/>
 
 				{/* Status Bar */}

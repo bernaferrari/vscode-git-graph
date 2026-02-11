@@ -830,6 +830,195 @@ export const gitRouter = router({
 		}),
 
 	/**
+	 * Start a git bisect.
+	 */
+	bisectStart: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['bisect', 'start'],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
+	 * Get bisect status.
+	 */
+	bisectStatus: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+			})
+		)
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { isActive: false };
+
+			try {
+				const result = await getGitService().runGitCommandWithOutput(
+					['bisect', 'log'],
+					input.repo
+				);
+				
+				// Parse bisect log to determine state
+				const isActive = result && !result.includes('We are not bisecting');
+				const badMatch = result?.match(/bisect-bad=([a-f0-9]+)/);
+				const goodMatch = result?.match(/bisect-good=([a-f0-9]+)/g);
+				
+				return {
+					isActive,
+					badCommit: badMatch ? badMatch[1] : null,
+					goodCommits: goodMatch?.map(m => m.split('=')[1]) || [],
+					currentCommit: null, // Would need git bisect visualize
+					remaining: 0,
+					culprit: null,
+				};
+			} catch {
+				return { isActive: false };
+			}
+		}),
+
+	/**
+	 * Mark commit as bad in bisect.
+	 */
+	bisectBad: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				commit: z.string().optional(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const args = ['bisect', 'bad'];
+			if (input.commit) args.push(input.commit);
+
+			const result = await getGitService().runGitCommandWithOutput(args, input.repo);
+			
+			// Check if culprit found
+			if (result?.includes('is the first bad commit')) {
+				const match = result.match(/([a-f0-9]{40}) is the first bad commit/);
+				return {
+					culprit: match ? match[1] : null,
+					nextCommit: null,
+					remaining: 0,
+					steps: 0,
+				};
+			}
+
+			// Parse remaining steps
+			const stepsMatch = result?.match(/roughly (\d+) steps/);
+			const remainingMatch = result?.match(/\((\d+) commits/);
+			
+			return {
+				culprit: null,
+				nextCommit: null,
+				remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
+				steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+			};
+		}),
+
+	/**
+	 * Mark commit as good in bisect.
+	 */
+	bisectGood: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				commit: z.string().optional(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const args = ['bisect', 'good'];
+			if (input.commit) args.push(input.commit);
+
+			const result = await getGitService().runGitCommandWithOutput(args, input.repo);
+			
+			// Check if culprit found
+			if (result?.includes('is the first bad commit')) {
+				const match = result.match(/([a-f0-9]{40}) is the first bad commit/);
+				return {
+					culprit: match ? match[1] : null,
+					nextCommit: null,
+					remaining: 0,
+					steps: 0,
+				};
+			}
+
+			// Parse remaining steps
+			const stepsMatch = result?.match(/roughly (\d+) steps/);
+			const remainingMatch = result?.match(/\((\d+) commits/);
+			
+			return {
+				culprit: null,
+				nextCommit: null,
+				remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
+				steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+			};
+		}),
+
+	/**
+	 * Skip current commit in bisect.
+	 */
+	bisectSkip: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const result = await getGitService().runGitCommandWithOutput(
+				['bisect', 'skip'],
+				input.repo
+			);
+
+			const stepsMatch = result?.match(/roughly (\d+) steps/);
+			const remainingMatch = result?.match(/\((\d+) commits/);
+			
+			return {
+				nextCommit: null,
+				remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
+				steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+			};
+		}),
+
+	/**
+	 * Reset bisect.
+	 */
+	bisectReset: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { error: initError };
+
+			const error = await getGitService().runGitCommand(
+				['bisect', 'reset'],
+				input.repo
+			);
+			return { error };
+		}),
+
+	/**
 	 * Cherry-pick a commit.
 	 */
 	cherryPick: publicProcedure
