@@ -1,10 +1,16 @@
 /**
  * Git Graph SVG Renderer
- * Renders the commit graph using SVG
+ * Renders the commit graph using SVG with optional avatars on nodes
  */
 
 import { useMemo } from 'react';
 import type { GraphLayout, GraphConfig } from '@/lib/graph/layout';
+
+interface CommitInfo {
+	hash: string;
+	author: string;
+	email: string;
+}
 
 interface CommitGraphProps {
 	layout: GraphLayout | null;
@@ -12,6 +18,8 @@ interface CommitGraphProps {
 	expandedIndex: number;
 	onVertexClick: (index: number) => void;
 	onVertexHover: (index: number | null) => void;
+	commits?: CommitInfo[];
+	showAvatars?: boolean;
 }
 
 export function CommitGraph({
@@ -20,6 +28,8 @@ export function CommitGraph({
 	expandedIndex,
 	onVertexClick,
 	onVertexHover,
+	commits = [],
+	showAvatars = false,
 }: CommitGraphProps) {
 	const { paths, vertices } = useMemo(() => {
 		if (!layout) return { paths: [], vertices: [] };
@@ -117,47 +127,114 @@ export function CommitGraph({
 
 			{/* Commit vertices */}
 			<g className="commit-vertices">
-				{vertices.map((v) => (
-					<g key={v.id}>
-						{v.isCurrent ? (
-							<circle
-								cx={v.cx}
-								cy={v.cy}
-								r={6}
-								fill="var(--background)"
-								stroke={v.colour}
-								strokeWidth={2.5}
-								className="cursor-pointer"
-								onClick={() => onVertexClick(v.id)}
-								onMouseEnter={() => onVertexHover(v.id)}
-								onMouseLeave={() => onVertexHover(null)}
-							/>
-						) : (
-							<circle
-								cx={v.cx}
-								cy={v.cy}
-								r={v.isStash ? 5 : 4.5}
-								fill={v.isCommitted ? v.colour : '#808080'}
-								stroke="var(--background)"
-								strokeWidth={1.5}
-								className="cursor-pointer"
-								onClick={() => onVertexClick(v.id)}
-								onMouseEnter={() => onVertexHover(v.id)}
-								onMouseLeave={() => onVertexHover(null)}
-							/>
-						)}
-						{v.isStash && !v.isCurrent && (
-							<circle
-								cx={v.cx}
-								cy={v.cy}
-								r={2}
-								fill="var(--background)"
-								pointerEvents="none"
-							/>
-						)}
-					</g>
-				))}
+				{vertices.map((v) => {
+					const commit = commits[v.id];
+					const showAvatar = showAvatars && commit?.email;
+					const nodeRadius = v.isCurrent ? 6 : (v.isStash ? 5 : 4.5);
+					const avatarSize = 16; // Avatar circle radius
+
+					return (
+						<g key={v.id}>
+							{showAvatar ? (
+								// Avatar on top of node
+								<g
+									className="cursor-pointer"
+									onClick={() => onVertexClick(v.id)}
+									onMouseEnter={() => onVertexHover(v.id)}
+									onMouseLeave={() => onVertexHover(null)}
+								>
+									{/* White background circle for avatar */}
+									<circle
+										cx={v.cx}
+										cy={v.cy}
+										r={avatarSize}
+										fill="var(--background)"
+										stroke={v.colour}
+										strokeWidth={2}
+									/>
+									{/* Avatar image */}
+									<image
+										href={getGravatarUrl(commit.email)}
+										x={v.cx - avatarSize + 2}
+										y={v.cy - avatarSize + 2}
+										width={(avatarSize - 2) * 2}
+										height={(avatarSize - 2) * 2}
+										clipPath={`circle(${avatarSize - 2}px at ${avatarSize - 2}px ${avatarSize - 2}px)`}
+										className="pointer-events-none"
+									/>
+									{/* Current commit ring */}
+									{v.isCurrent && (
+										<circle
+											cx={v.cx}
+											cy={v.cy}
+											r={avatarSize + 2}
+											fill="none"
+											stroke={v.colour}
+											strokeWidth={2}
+											className="animate-pulse"
+										/>
+									)}
+								</g>
+							) : (
+								// Normal circle node
+								<>
+									{v.isCurrent ? (
+										<circle
+											cx={v.cx}
+											cy={v.cy}
+											r={nodeRadius}
+											fill="var(--background)"
+											stroke={v.colour}
+											strokeWidth={2.5}
+											className="cursor-pointer"
+											onClick={() => onVertexClick(v.id)}
+											onMouseEnter={() => onVertexHover(v.id)}
+											onMouseLeave={() => onVertexHover(null)}
+										/>
+									) : (
+										<circle
+											cx={v.cx}
+											cy={v.cy}
+											r={nodeRadius}
+											fill={v.isCommitted ? v.colour : '#808080'}
+											stroke="var(--background)"
+											strokeWidth={1.5}
+											className="cursor-pointer"
+											onClick={() => onVertexClick(v.id)}
+											onMouseEnter={() => onVertexHover(v.id)}
+											onMouseLeave={() => onVertexHover(null)}
+										/>
+									)}
+									{v.isStash && !v.isCurrent && (
+										<circle
+											cx={v.cx}
+											cy={v.cy}
+											r={2}
+											fill="var(--background)"
+											pointerEvents="none"
+										/>
+									)}
+								</>
+							)}
+						</g>
+					);
+				})}
 			</g>
 		</svg>
 	);
+}
+
+// Cache for Gravatar URLs
+const gravatarCache = new Map<string, string>();
+
+// Get Gravatar URL for email
+function getGravatarUrl(email: string): string {
+	const cached = gravatarCache.get(email);
+	if (cached) return cached;
+
+	// Use d=identicon for default avatar
+	const hash = btoa(email).slice(0, 32).toLowerCase();
+	const url = `https://www.gravatar.com/avatar/${hash}?s=64&d=identicon`;
+	gravatarCache.set(email, url);
+	return url;
 }

@@ -1120,7 +1120,7 @@ export function GitGraph() {
 									</div>
 
 									{/* Graph */}
-									<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
+									<div className="shrink-0 bg-background" style={{ width: (graphLayout?.width ?? 200) + 20 }}>
 										{graphLayout && (
 											<CommitGraph
 												layout={graphLayout}
@@ -1128,6 +1128,12 @@ export function GitGraph() {
 												expandedIndex={expandedCommit ?? -1}
 												onVertexClick={handleSelectCommit}
 												onVertexHover={() => {}}
+												commits={commitsData?.commits?.map(c => ({
+													hash: c.hash,
+													author: c.author,
+													email: c.email,
+												})) ?? []}
+												showAvatars={true}
 											/>
 										)}
 									</div>
@@ -1144,7 +1150,7 @@ export function GitGraph() {
 												onExpand={handleExpandCommit}
 												onContextMenu={handleContextMenu}
 												hideRefs={true}
-												showAvatars={true}
+												showAvatars={false}
 											/>
 										) : (
 											<div className="flex items-center justify-center h-64 text-muted-foreground">
