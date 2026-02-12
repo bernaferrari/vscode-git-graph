@@ -98,6 +98,7 @@ import { RepoHealthCheck } from './repo-health-check';
 import { Avatar, AvatarWithTooltip } from './avatar';
 import { CommandPalette } from './command-palette';
 import { GitFlowAutomation } from './gitflow-automation';
+import { NoRepoSelected, CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
 import { VirtualizedCommitList } from './virtualized-commit-list';
 import { InlineStagingDiff } from './inline-staging-diff';
 import { GitBisectUI } from './git-bisect-ui';
@@ -1093,7 +1094,32 @@ export function GitGraph() {
 					{/* Graph and Commit List */}
 					<div className="flex-1 flex flex-col overflow-hidden">
 						<div className="flex-1 flex overflow-hidden">
-							<ScrollArea className="h-full w-full">
+							{commitsLoading ? (
+								// Loading skeleton
+								<div className="flex w-full">
+									<div className="shrink-0 w-28 border-r bg-muted/5">
+										{Array.from({ length: 15 }).map((_, i) => (
+											<div key={i} className="h-8 px-2 animate-pulse">
+												<div className="h-4 w-16 bg-muted rounded" />
+											</div>
+										))}
+									</div>
+									<div className="shrink-0" style={{ width: 210 }}>
+										<GraphSkeleton />
+									</div>
+									<div className="flex-1">
+										<CommitListSkeleton count={15} />
+									</div>
+								</div>
+							) : commitsData?.error ? (
+								// Error state
+								<ErrorState
+									title="Failed to load commits"
+									message={commitsData.error}
+									onRetry={() => refetchCommits()}
+								/>
+							) : (
+								<ScrollArea className="h-full w-full">
 								<div className="flex min-w-max">
 									{/* Refs column - branches and tags */}
 									<div className="shrink-0 w-28 border-r bg-muted/5">
@@ -1160,6 +1186,7 @@ export function GitGraph() {
 									</div>
 								</div>
 							</ScrollArea>
+							)}
 						</div>
 					</div>
 
