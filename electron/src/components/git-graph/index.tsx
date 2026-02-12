@@ -678,7 +678,8 @@ export function GitGraph() {
 	const currentHead = repoInfo?.head ?? 'main';
 
 	return (
-		<TooltipProvider>
+		<UndoStackProvider repoPath={activeRepo}>
+			<TooltipProvider>
 			<div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
 				{/* Top Toolbar */}
 				<div className="flex items-center gap-1 px-3 py-1.5 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -1677,6 +1678,7 @@ export function GitGraph() {
 					onPull={() => gitOps.pull()}
 				/>
 			</div>
-		</TooltipProvider>
+			</TooltipProvider>
+		</UndoStackProvider>
 	);
 }
