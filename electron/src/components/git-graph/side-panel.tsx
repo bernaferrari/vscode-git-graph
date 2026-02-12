@@ -10,6 +10,11 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/components/ui/popover';
+import {
 	ChevronRight,
 	ChevronDown,
 	GitBranch,
@@ -182,9 +187,17 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 								/>
 							))}
 							{remoteBranches.length > 20 && (
-								<div className="px-4 py-1 text-xs text-muted-foreground">
-									+{remoteBranches.length - 20} more
-								</div>
+								<MoreItems
+									label={`+${remoteBranches.length - 20} more`}
+									items={remoteBranches.slice(20)}
+									renderItem={(branch) => (
+										<RemoteBranchItem
+											key={branch}
+											branch={branch}
+											onCheckout={() => gitOps.checkout(branch)}
+										/>
+									)}
+								/>
 							)}
 						</Section>
 					)}
@@ -217,10 +230,18 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									onDelete={() => gitOps.deleteTag(tag)}
 								/>
 							))}
-							{tags.length > 30 && (
-								<div className="px-4 py-1 text-xs text-muted-foreground">
-									+{tags.length - 30} more
-								</div>
+							{filteredTags.length > 30 && (
+								<MoreItems
+									label={`+${filteredTags.length - 30} more`}
+									items={filteredTags.slice(30)}
+									renderItem={(tag) => (
+										<TagItem
+											key={tag}
+											tag={tag}
+											onDelete={() => gitOps.deleteTag(tag)}
+										/>
+									)}
+								/>
 							)}
 						</Section>
 					)}
@@ -613,5 +634,46 @@ function SubmoduleItem({
 				</DropdownMenuContent>
 			</DropdownMenu>
 		</div>
+	);
+}
+
+// More items popover - shows "+X more" as clickable popover
+function MoreItems<T>({
+	label,
+	items,
+	renderItem,
+}: {
+	label: string;
+	items: T[];
+	renderItem: (item: T, index: number) => React.ReactNode;
+}) {
+	return (
+		<Popover>
+			<PopoverTrigger asChild>
+				<button className="px-3 py-0.5 text-xs text-primary hover:underline cursor-pointer w-full text-left">
+					{label}
+				</button>
+			</PopoverTrigger>
+			<PopoverContent 
+				className="w-72 p-0" 
+				align="start"
+				side="right"
+				sideOffset={5}
+			>
+				<div className="flex items-center justify-between px-3 py-2 border-b">
+					<span className="text-sm font-medium">{items.length} items</span>
+					<Input
+						placeholder="Filter..."
+						className="h-7 w-32 text-xs"
+						onClick={(e) => e.stopPropagation()}
+					/>
+				</div>
+				<ScrollArea className="h-[300px]">
+					<div className="py-1">
+						{items.map((item, index) => renderItem(item, index))}
+					</div>
+				</ScrollArea>
+			</PopoverContent>
+		</Popover>
 	);
 }

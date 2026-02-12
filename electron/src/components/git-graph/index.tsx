@@ -99,7 +99,6 @@ import { Avatar, AvatarWithTooltip } from './avatar';
 import { CommandPalette } from './command-palette';
 import { GitFlowAutomation } from './gitflow-automation';
 import { VirtualizedCommitList } from './virtualized-commit-list';
-import { LaneBasedGraph, LaneBasedGraphSVG } from './lane-based-graph';
 import { InlineStagingDiff } from './inline-staging-diff';
 import { GitBisectUI } from './git-bisect-ui';
 import { CIStatusBadge, CIStatusMini } from './ci-status';
@@ -279,10 +278,8 @@ export function GitGraph() {
 	useQuickLookKeyboard();
 	
 	// Graph and virtualization state
-	const [useLaneGraph, setUseLaneGraph] = useState(false);
 	const [useVirtualization, setUseVirtualization] = useState(true);
 	const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
-	const [scrollTop, setScrollTop] = useState(0);
 
 	// Settings hook
 	const { settings } = useSettings();
@@ -311,6 +308,9 @@ export function GitGraph() {
 	// Git operations hook
 	const gitOps = useGitOperations();
 
+	// Commit limit state
+	const [maxCommits, setMaxCommits] = useState(500);
+
 	// tRPC queries
 	const { data: repoInfo, isLoading: repoLoading } = trpc.git.repoInfo.useQuery(
 		{
@@ -330,7 +330,7 @@ export function GitGraph() {
 		{
 			repo: activeRepo ?? '',
 			branches: selectedBranches.includes('__all__') ? null : selectedBranches,
-			maxCommits: 500,
+			maxCommits,
 			order: 'date',
 			onlyFollowFirstParent: false,
 			showTags: true,
@@ -343,6 +343,11 @@ export function GitGraph() {
 			staleTime: 10000,
 		}
 	);
+
+	// Load more commits handler
+	const handleLoadMore = useCallback(() => {
+		setMaxCommits(prev => prev + 500);
+	}, []);
 
 	// Git status check
 	const { data: gitStatus } = trpc.git.status.useQuery();
@@ -1083,26 +1088,8 @@ export function GitGraph() {
 
 					{/* Graph and Commit List */}
 					<div className="flex-1 flex flex-col overflow-hidden">
-						{/* Graph type toggle */}
+						{/* Graph options */}
 						<div className="flex items-center gap-2 px-3 py-1 border-b bg-muted/30 text-xs">
-							<span className="text-muted-foreground">Graph:</span>
-							<Button
-								variant={!useLaneGraph ? 'default' : 'ghost'}
-								size="sm"
-								className="h-5 px-2 text-xs"
-								onClick={() => setUseLaneGraph(false)}
-							>
-								Classic
-							</Button>
-							<Button
-								variant={useLaneGraph ? 'default' : 'ghost'}
-								size="sm"
-								className="h-5 px-2 text-xs"
-								onClick={() => setUseLaneGraph(true)}
-							>
-								Lanes
-							</Button>
-							<div className="flex-1" />
 							<span className="text-muted-foreground">Virtualization:</span>
 							<Button
 								variant={useVirtualization ? 'default' : 'ghost'}
@@ -1117,24 +1104,13 @@ export function GitGraph() {
 						<div className="flex-1 flex overflow-hidden">
 							{/* Graph */}
 							<div className="shrink-0 bg-background overflow-hidden" style={{ width: graphLayout?.width ?? 200 }}>
-								{graphLayout && !useLaneGraph && (
+								{graphLayout && (
 									<CommitGraph
 										layout={graphLayout}
 										config={GRAPH_CONFIG}
 										expandedIndex={expandedCommit ?? -1}
 										onVertexClick={handleSelectCommit}
 										onVertexHover={() => {}}
-									/>
-								)}
-								{graphLayout && useLaneGraph && commitsData?.commits && (
-									<LaneBasedGraphSVG
-										commits={commitsData.commits}
-										layout={graphLayout}
-										selectedIndex={selectedCommitIndex}
-										scrollTop={scrollTop}
-										visibleStartIndex={visibleRange.start}
-										visibleEndIndex={visibleRange.end}
-										onSelectCommit={handleSelectCommit}
 									/>
 								)}
 							</div>
@@ -1192,7 +1168,10 @@ export function GitGraph() {
 					{commitsData?.moreCommitsAvailable && (
 						<>
 							<span>•</span>
-							<span className="text-primary cursor-pointer hover:underline">
+							<span
+								className="text-primary cursor-pointer hover:underline"
+								onClick={handleLoadMore}
+							>
 								Load more
 							</span>
 						</>
