@@ -28,6 +28,7 @@ interface CommitListProps {
 	onExpand: (index: number | null) => void;
 	onContextMenu?: (index: number, event: React.MouseEvent) => void;
 	showAvatars?: boolean;
+	hideRefs?: boolean;
 }
 
 // Row height - must match graph grid Y spacing
@@ -68,6 +69,7 @@ export function CommitList({
 	onExpand,
 	onContextMenu,
 	showAvatars = false,
+	hideRefs = false,
 }: CommitListProps) {
 	return (
 		<div className="commit-list">
@@ -83,6 +85,7 @@ export function CommitList({
 					onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
 					onContextMenu={onContextMenu ? (e) => onContextMenu(index, e) : undefined}
 					showAvatar={showAvatars}
+					hideRefs={hideRefs}
 				/>
 			))}
 		</div>
@@ -99,6 +102,7 @@ interface CommitRowProps {
 	onToggleExpand: () => void;
 	onContextMenu?: (e: React.MouseEvent) => void;
 	showAvatar?: boolean;
+	hideRefs?: boolean;
 }
 
 function CommitRow({
@@ -111,6 +115,7 @@ function CommitRow({
 	onToggleExpand,
 	onContextMenu,
 	showAvatar = false,
+	hideRefs = false,
 }: CommitRowProps) {
 	const isUncommitted = commit.hash === '*';
 
@@ -140,33 +145,34 @@ function CommitRow({
 					loading="lazy"
 				/>
 			)}
-			{/* Refs - branches, tags, remotes */}
-			<div className="flex items-center gap-1.5 shrink-0">
-				{/* Current branch (first head) */}
-				{commit.heads && commit.heads.length > 0 && (
-					<span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/15 text-primary border border-primary/20">
-						<GitBranchIcon className="w-3 h-3" />
-						{commit.heads[0]}
-					</span>
-				)}
-				{/* Other heads */}
-				{commit.heads?.slice(1).map((head: string) => (
-					<span
-						key={head}
-						className="px-2 py-0.5 text-xs rounded-md bg-muted text-muted-foreground"
-					>
-						{head}
-					</span>
-				))}
-				{/* Remotes */}
-				{commit.remotes?.map((remote: string, i: number) => (
-					<span
-						key={i}
-						className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border text-muted-foreground"
-					>
-						<GlobeIcon className="w-3 h-3" />
-						{remote}
-					</span>
+			{/* Refs - branches, tags, remotes (only if not hidden) */}
+			{!hideRefs && (
+				<div className="flex items-center gap-1.5 shrink-0">
+					{/* Current branch (first head) */}
+					{commit.heads && commit.heads.length > 0 && (
+						<span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/15 text-primary border border-primary/20">
+							<GitBranchIcon className="w-3 h-3" />
+							{commit.heads[0]}
+						</span>
+					)}
+					{/* Other heads */}
+					{commit.heads?.slice(1).map((head: string) => (
+						<span
+							key={head}
+							className="px-2 py-0.5 text-xs rounded-md bg-muted text-muted-foreground"
+						>
+							{head}
+						</span>
+					))}
+					{/* Remotes */}
+					{commit.remotes?.map((remote: string, i: number) => (
+						<span
+							key={i}
+							className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border text-muted-foreground"
+						>
+							<GlobeIcon className="w-3 h-3" />
+							{remote}
+						</span>
 				))}
 				{/* Tags */}
 				{commit.tags?.map((tag: string) => (
@@ -178,7 +184,8 @@ function CommitRow({
 						{tag}
 					</span>
 				))}
-			</div>
+				</div>
+			)}
 
 			{/* Commit message with semantic highlighting */}
 			<span className="text-sm truncate flex-1 min-w-0">

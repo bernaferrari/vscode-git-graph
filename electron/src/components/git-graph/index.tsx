@@ -1112,6 +1112,28 @@ export function GitGraph() {
 						<div className="flex-1 flex overflow-hidden">
 							<ScrollArea className="h-full w-full">
 								<div className="flex min-w-max">
+									{/* Refs column - branches and tags */}
+									<div className="shrink-0 w-32 border-r bg-muted/10">
+										{commitsData?.commits?.map((commit, index) => (
+											<div
+												key={commit.hash}
+												className="flex items-center gap-1 px-2 h-8 text-xs"
+												onClick={() => handleSelectCommit(index)}
+											>
+												{commit.heads && commit.heads.length > 0 && (
+													<span className="px-1.5 py-0.5 bg-primary/15 text-primary rounded text-[10px] font-medium truncate">
+														{commit.heads[0]}
+													</span>
+												)}
+												{commit.tags && commit.tags.length > 0 && (
+													<span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-[10px] font-medium truncate">
+														{commit.tags[0]}
+													</span>
+												)}
+											</div>
+										))}
+									</div>
+
 									{/* Graph */}
 									<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
 										{graphMode === 'classic' && graphLayout && (
@@ -1143,6 +1165,7 @@ export function GitGraph() {
 												onSelect={handleSelectCommit}
 												onExpand={handleExpandCommit}
 												onContextMenu={handleContextMenu}
+												hideRefs={true}
 											/>
 										) : (
 											<div className="flex items-center justify-center h-64 text-muted-foreground">

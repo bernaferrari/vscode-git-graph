@@ -1,21 +1,31 @@
 /**
  * Git Graph Branch Dropdown
- * Uses Shadcn select component for branch selection
+ * Clean popover-based branch selector
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+	Check,
+	ChevronDown,
+	GitBranch,
+	Globe,
+	Search,
+	X,
+} from 'lucide-react';
 
 interface BranchOption {
 	name: string;
 	value: string;
 	isRemote?: boolean;
 	isCurrent?: boolean;
-	remote?: string;
 }
 
 interface BranchDropdownProps {
@@ -33,9 +43,20 @@ export function BranchDropdown({
 	placeholder = 'Select branch...',
 	onChange,
 }: BranchDropdownProps) {
+	const [open, setOpen] = useState(false);
 	const [filter, setFilter] = useState('');
-	const [isOpen, setIsOpen] = useState(false);
+	const inputRef = useRef<HTMLInputElement>(null);
 
+	// Focus input when opened
+	useEffect(() => {
+		if (open) {
+			setTimeout(() => inputRef.current?.focus(), 0);
+		} else {
+			setFilter('');
+		}
+	}, [open]);
+
+	// Filter branches
 	const filteredBranches = useMemo(() => {
 		if (!filter) return branches;
 		const lowerFilter = filter.toLowerCase();
@@ -44,12 +65,13 @@ export function BranchDropdown({
 		);
 	}, [branches, filter]);
 
+	// Separate local and remote
 	const localBranches = filteredBranches.filter((b) => !b.isRemote);
 	const remoteBranches = filteredBranches.filter((b) => b.isRemote);
 
+	// Handle selection - DON'T reorder, just toggle
 	const handleSelect = (value: string) => {
 		if (multiple) {
-			// For multiple selection
 			if (value === '__all__') {
 				onChange(['__all__']);
 			} else {
@@ -62,171 +84,161 @@ export function BranchDropdown({
 			}
 		} else {
 			onChange([value]);
-			setIsOpen(false);
+			setOpen(false);
 		}
 	};
 
+	// Check if selected
+	const isSelected = (value: string) => {
+		return selectedBranches.includes(value) || (multiple && selectedBranches.includes('__all__'));
+	};
+
+	// Display value
 	const displayValue = useMemo(() => {
 		if (selectedBranches.length === 0) return placeholder;
-		if (multiple && selectedBranches.includes('__all__')) return 'Show All';
+		if (multiple && selectedBranches.includes('__all__')) return 'All branches';
 		if (selectedBranches.length === 1) {
 			const branch = branches.find((b) => b.value === selectedBranches[0]);
 			return branch?.name ?? selectedBranches[0];
 		}
-		return `${selectedBranches.length} branches selected`;
+		return `${selectedBranches.length} branches`;
 	}, [selectedBranches, branches, placeholder, multiple]);
 
 	return (
-		<div className="relative">
-			<Button
-				variant="outline"
-				onClick={() => setIsOpen(!isOpen)}
-				className="w-full justify-between"
-			>
-				<span className="truncate">{displayValue}</span>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					className={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					variant="outline"
+					size="sm"
+					className="h-7 min-w-[140px] justify-between text-xs font-normal"
 				>
-					<polyline points="6 9 12 15 18 9" />
-				</svg>
-			</Button>
-
-			{isOpen && (
-				<div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border bg-popover shadow-lg">
-					{/* Filter Input */}
-					<div className="p-2 border-b">
+					<span className="truncate">{displayValue}</span>
+					<ChevronDown className="h-3.5 w-3.5 opacity-50 ml-2" />
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent 
+				className="w-72 p-0" 
+				align="start"
+				sideOffset={4}
+			>
+				{/* Search */}
+				<div className="p-2 border-b">
+					<div className="relative">
+						<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
 						<Input
+							ref={inputRef}
 							value={filter}
 							onChange={(e) => setFilter(e.target.value)}
 							placeholder="Filter branches..."
-							className="h-8"
-							autoFocus
+							className="h-8 pl-8 text-sm"
 						/>
+						{filter && (
+							<Button
+								variant="ghost"
+								size="sm"
+								className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+								onClick={() => setFilter('')}
+							>
+								<X className="h-3 w-3" />
+							</Button>
+						)}
 					</div>
-
-					<ScrollArea className="max-h-64">
-						<div className="p-1">
-							{/* Show All option for multiple selection */}
-							{multiple && (
-								<>
-									<BranchDropdownItem
-										name="Show All"
-										value="__all__"
-										selected={selectedBranches.includes('__all__')}
-										onClick={() => handleSelect('__all__')}
-									/>
-									<Separator className="my-1" />
-								</>
-							)}
-
-							{/* Local Branches */}
-							{localBranches.length > 0 && (
-								<>
-									<div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-										Local
-									</div>
-									{localBranches.map((branch) => (
-										<BranchDropdownItem
-											key={branch.value}
-											{...branch}
-											selected={
-												selectedBranches.includes(branch.value) ||
-												(multiple && selectedBranches.includes('__all__'))
-											}
-											onClick={() => handleSelect(branch.value)}
-										/>
-									))}
-								</>
-							)}
-
-							{/* Remote Branches */}
-							{remoteBranches.length > 0 && (
-								<>
-									{localBranches.length > 0 && <Separator className="my-1" />}
-									<div className="px-2 py-1 text-xs text-muted-foreground font-medium">
-										Remote
-									</div>
-									{remoteBranches.map((branch) => (
-										<BranchDropdownItem
-											key={branch.value}
-											{...branch}
-											selected={
-												selectedBranches.includes(branch.value) ||
-												(multiple && selectedBranches.includes('__all__'))
-											}
-											onClick={() => handleSelect(branch.value)}
-										/>
-									))}
-								</>
-							)}
-
-							{filteredBranches.length === 0 && (
-								<div className="px-2 py-3 text-center text-sm text-muted-foreground">
-									No branches found
-								</div>
-							)}
-						</div>
-					</ScrollArea>
 				</div>
-			)}
-		</div>
+
+				<ScrollArea className="h-[300px]">
+					<div className="py-1">
+						{/* Show All option for multiple */}
+						{multiple && (
+							<>
+								<BranchItem
+									name="All branches"
+									icon={<GitBranch className="h-4 w-4" />}
+									selected={selectedBranches.includes('__all__')}
+									onClick={() => handleSelect('__all__')}
+								/>
+								<div className="h-px bg-border mx-2 my-1" />
+							</>
+						)}
+
+						{/* Local Branches */}
+						{localBranches.length > 0 && (
+							<>
+								<div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+									Local
+								</div>
+								{localBranches.map((branch) => (
+									<BranchItem
+										key={branch.value}
+										name={branch.name}
+										icon={<GitBranch className="h-4 w-4" />}
+										selected={isSelected(branch.value)}
+										isCurrent={branch.isCurrent}
+										onClick={() => handleSelect(branch.value)}
+									/>
+								))}
+							</>
+						)}
+
+						{/* Remote Branches */}
+						{remoteBranches.length > 0 && (
+							<>
+								{localBranches.length > 0 && <div className="h-px bg-border mx-2 my-1" />}
+								<div className="px-3 py-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+									Remote
+								</div>
+								{remoteBranches.map((branch) => (
+									<BranchItem
+										key={branch.value}
+										name={branch.name}
+										icon={<Globe className="h-4 w-4" />}
+										selected={isSelected(branch.value)}
+										onClick={() => handleSelect(branch.value)}
+									/>
+								))}
+							</>
+						)}
+
+						{filteredBranches.length === 0 && (
+							<div className="px-3 py-6 text-center text-sm text-muted-foreground">
+								No branches found
+							</div>
+						)}
+					</div>
+				</ScrollArea>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
-interface BranchDropdownItemProps {
+interface BranchItemProps {
 	name: string;
-	value: string;
+	icon: React.ReactNode;
 	selected: boolean;
 	isCurrent?: boolean;
 	onClick: () => void;
 }
 
-function BranchDropdownItem({
-	name,
-	selected,
-	isCurrent,
-	onClick,
-}: BranchDropdownItemProps) {
+function BranchItem({ name, icon, selected, isCurrent, onClick }: BranchItemProps) {
 	return (
 		<button
 			onClick={onClick}
-			className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent ${
-				selected ? 'bg-accent/50' : ''
+			className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ${
+				selected
+					? 'bg-accent text-accent-foreground'
+					: 'hover:bg-accent/50'
 			}`}
 		>
-			{selected && (
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					className="shrink-0"
-				>
-					<polyline points="20 6 9 17 4 12" />
-				</svg>
-			)}
-			<span className={`truncate ${!selected ? 'pl-5' : ''}`}>
-				{name}
-				{isCurrent && (
-					<Badge variant="secondary" className="ml-2 text-xs">
-						current
-					</Badge>
-				)}
+			<span className={selected ? 'text-primary' : 'text-muted-foreground'}>
+				{icon}
 			</span>
+			<span className={`flex-1 text-left truncate ${isCurrent ? 'font-medium' : ''}`}>
+				{name}
+			</span>
+			{selected && (
+				<Check className="h-4 w-4 text-primary" />
+			)}
 		</button>
 	);
 }
+
+export default BranchDropdown;
