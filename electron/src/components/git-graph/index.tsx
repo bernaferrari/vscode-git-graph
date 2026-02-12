@@ -99,6 +99,7 @@ import { Avatar, AvatarWithTooltip } from './avatar';
 import { CommandPalette } from './command-palette';
 import { GitFlowAutomation } from './gitflow-automation';
 import { VirtualizedCommitList } from './virtualized-commit-list';
+import { LaneGraph } from './lane-graph';
 import { InlineStagingDiff } from './inline-staging-diff';
 import { GitBisectUI } from './git-bisect-ui';
 import { CIStatusBadge, CIStatusMini } from './ci-status';
@@ -276,6 +277,9 @@ export function GitGraph() {
 	
 	// Quick Look hook
 	useQuickLookKeyboard();
+
+	// Graph mode: 'classic' or 'lanes'
+	const [graphMode, setGraphMode] = useState<'classic' | 'lanes'>('classic');
 
 	// Settings hook
 	const { settings } = useSettings();
@@ -1084,18 +1088,46 @@ export function GitGraph() {
 
 					{/* Graph and Commit List */}
 					<div className="flex-1 flex flex-col overflow-hidden">
+						{/* Graph mode toggle */}
+						<div className="flex items-center gap-2 px-3 py-1 border-b bg-muted/30 text-xs">
+							<span className="text-muted-foreground">Graph:</span>
+							<Button
+								variant={graphMode === 'classic' ? 'default' : 'ghost'}
+								size="sm"
+								className="h-5 px-2 text-xs"
+								onClick={() => setGraphMode('classic')}
+							>
+								Classic
+							</Button>
+							<Button
+								variant={graphMode === 'lanes' ? 'default' : 'ghost'}
+								size="sm"
+								className="h-5 px-2 text-xs"
+								onClick={() => setGraphMode('lanes')}
+							>
+								Lanes
+							</Button>
+						</div>
+
 						<div className="flex-1 flex overflow-hidden">
 							<ScrollArea className="h-full w-full">
 								<div className="flex min-w-max">
 									{/* Graph */}
 									<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
-										{graphLayout && (
+										{graphMode === 'classic' && graphLayout && (
 											<CommitGraph
 												layout={graphLayout}
 												config={GRAPH_CONFIG}
 												expandedIndex={expandedCommit ?? -1}
 												onVertexClick={handleSelectCommit}
 												onVertexHover={() => {}}
+											/>
+										)}
+										{graphMode === 'lanes' && commitsData?.commits && (
+											<LaneGraph
+												commits={commitsData.commits}
+												selectedIndex={selectedCommitIndex}
+												onSelectCommit={handleSelectCommit}
 											/>
 										)}
 									</div>
