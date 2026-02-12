@@ -1,19 +1,19 @@
 /**
  * Git Graph Find Widget
- * Uses Shadcn input components
+ * Clean, minimal search for commits
  */
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from '@/components/ui/tooltip';
+	Search,
+	X,
+	ArrowUp,
+	ArrowDown,
+	CaseSensitive,
+	Regex,
+} from 'lucide-react';
 
 interface FindWidgetProps {
 	open: boolean;
@@ -56,161 +56,108 @@ export function FindWidget({
 		}
 	};
 
+	const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const newQuery = e.target.value;
+		setQuery(newQuery);
+		if (newQuery) {
+			onFind(newQuery, { caseSensitive, regex });
+		}
+	};
+
 	if (!open) return null;
 
 	return (
-		<div className="fixed top-2 right-2 z-50 flex items-center gap-2 rounded-lg border bg-background p-2 shadow-lg">
-			<TooltipProvider>
-				{/* Search Input */}
-				<Input
-					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-					onKeyDown={handleKeyDown}
-					placeholder="Find in commits..."
-					className="w-64"
-					autoFocus
-				/>
+		<div className="fixed top-3 right-3 z-50 flex items-center gap-1 rounded-lg border bg-background/95 backdrop-blur shadow-lg p-1">
+			{/* Search icon */}
+			<Search className="h-4 w-4 text-muted-foreground ml-2 mr-1" />
 
-				{/* Match Count */}
-				{totalMatches > 0 && (
-					<Badge variant="secondary" className="shrink-0">
-						{currentIndex + 1} / {totalMatches}
-					</Badge>
-				)}
+			{/* Search Input */}
+			<Input
+				value={query}
+				onChange={handleQueryChange}
+				onKeyDown={handleKeyDown}
+				placeholder="Find in commits..."
+				className="w-56 h-8 border-0 shadow-none focus-visible:ring-0 text-sm"
+				autoFocus
+			/>
 
-				<Separator orientation="vertical" className="h-6" />
+			{/* Match Count */}
+			{query && (
+				<span className="text-xs text-muted-foreground px-2 min-w-[50px] text-center">
+					{totalMatches > 0 ? `${currentIndex + 1}/${totalMatches}` : 'No matches'}
+				</span>
+			)}
 
-				{/* Case Sensitive Toggle */}
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant={caseSensitive ? 'default' : 'ghost'}
-								size="sm"
-								onClick={() => {
-									setCaseSensitive(!caseSensitive);
-									if (query) {
-										onFind(query, { caseSensitive: !caseSensitive, regex });
-									}
-								}}
-								className="h-8 w-8 p-0"
-							>
-								Aa
-							</Button>
-						}
-					/>
-					<TooltipContent>Match Case</TooltipContent>
-				</Tooltip>
+			{/* Case Sensitive Toggle */}
+			<Button
+				variant={caseSensitive ? 'secondary' : 'ghost'}
+				size="sm"
+				onClick={() => {
+					setCaseSensitive(!caseSensitive);
+					if (query) {
+						onFind(query, { caseSensitive: !caseSensitive, regex });
+					}
+				}}
+				className="h-7 w-7 p-0"
+				title="Case sensitive"
+			>
+				<CaseSensitive className="h-4 w-4" />
+			</Button>
 
-				{/* Regex Toggle */}
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant={regex ? 'default' : 'ghost'}
-								size="sm"
-								onClick={() => {
-									setRegex(!regex);
-									if (query) {
-										onFind(query, { caseSensitive, regex: !regex });
-									}
-								}}
-								className="h-8 w-8 p-0 font-mono"
-							>
-								.*
-							</Button>
-						}
-					/>
-					<TooltipContent>Use Regular Expression</TooltipContent>
-				</Tooltip>
+			{/* Regex Toggle */}
+			<Button
+				variant={regex ? 'secondary' : 'ghost'}
+				size="sm"
+				onClick={() => {
+					setRegex(!regex);
+					if (query) {
+						onFind(query, { caseSensitive, regex: !regex });
+					}
+				}}
+				className="h-7 w-7 p-0"
+				title="Regular expression"
+			>
+				<Regex className="h-4 w-4" />
+			</Button>
 
-				<Separator orientation="vertical" className="h-6" />
+			<div className="w-px h-5 bg-border mx-1" />
 
-				{/* Previous Match */}
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={onFindPrevious}
-								disabled={totalMatches === 0}
-								className="h-8 w-8 p-0"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<polyline points="18 15 12 9 6 15" />
-								</svg>
-							</Button>
-						}
-					/>
-					<TooltipContent>Previous Match (Shift+Enter)</TooltipContent>
-				</Tooltip>
+			{/* Previous */}
+			<Button
+				variant="ghost"
+				size="sm"
+				onClick={onFindPrevious}
+				disabled={totalMatches === 0}
+				className="h-7 w-7 p-0"
+				title="Previous match (Shift+Enter)"
+			>
+				<ArrowUp className="h-4 w-4" />
+			</Button>
 
-				{/* Next Match */}
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={onFindNext}
-								disabled={totalMatches === 0}
-								className="h-8 w-8 p-0"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<polyline points="6 9 12 15 18 9" />
-								</svg>
-							</Button>
-						}
-					/>
-					<TooltipContent>Next Match (Enter)</TooltipContent>
-				</Tooltip>
+			{/* Next */}
+			<Button
+				variant="ghost"
+				size="sm"
+				onClick={onFindNext}
+				disabled={totalMatches === 0}
+				className="h-7 w-7 p-0"
+				title="Next match (Enter)"
+			>
+				<ArrowDown className="h-4 w-4" />
+			</Button>
 
-				<Separator orientation="vertical" className="h-6" />
+			<div className="w-px h-5 bg-border mx-1" />
 
-				{/* Close */}
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={onClose}
-					className="h-8 w-8 p-0"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<line x1="18" y1="6" x2="6" y2="18" />
-						<line x1="6" y1="6" x2="18" y2="18" />
-					</svg>
-				</Button>
-			</TooltipProvider>
+			{/* Close */}
+			<Button
+				variant="ghost"
+				size="sm"
+				onClick={onClose}
+				className="h-7 w-7 p-0"
+				title="Close (Esc)"
+			>
+				<X className="h-4 w-4" />
+			</Button>
 		</div>
 	);
 }

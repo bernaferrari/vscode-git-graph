@@ -1176,23 +1176,59 @@ export function GitGraph() {
 				</div>
 
 				{/* Status bar */}
-				<div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground border-t bg-background/95">
-					<span>{commitsData?.commits?.length ?? 0} commits</span>
-					{commitsData?.moreCommitsAvailable && (
-						<>
-							<span>•</span>
-							<span
-								className="text-primary cursor-pointer hover:underline"
+				<div className="flex items-center gap-3 px-4 py-1.5 text-xs border-t bg-muted/30">
+					{/* Left side - commit info */}
+					<div className="flex items-center gap-3">
+						<span className="text-muted-foreground">
+							<span className="font-medium text-foreground">{commitsData?.commits?.length ?? 0}</span> commits
+						</span>
+						{commitsData?.moreCommitsAvailable && (
+							<button
+								className="text-primary hover:underline font-medium"
 								onClick={handleLoadMore}
 							>
-								Load more
-							</span>
-						</>
-					)}
+								Load more...
+							</button>
+						)}
+					</div>
+
 					<div className="flex-1" />
-					<span>{repoInfo?.branches?.length ?? 0} branches</span>
-					<span>•</span>
-					<span>{repoInfo?.tags?.length ?? 0} tags</span>
+
+					{/* Center - repo status */}
+					<div className="flex items-center gap-3 text-muted-foreground">
+						{(repoInfo?.ahead ?? 0) > 0 && (
+							<span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+								<ArrowUp className="h-3 w-3" />
+								{repoInfo?.ahead} ahead
+							</span>
+						)}
+						{(repoInfo?.behind ?? 0) > 0 && (
+							<span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+								<ArrowDown className="h-3 w-3" />
+								{repoInfo?.behind} behind
+							</span>
+						)}
+						{(repoInfo?.unstaged ?? 0) > 0 && (
+							<span className="flex items-center gap-1">
+								<GitCommit className="h-3 w-3" />
+								{repoInfo?.unstaged} changes
+							</span>
+						)}
+					</div>
+
+					<div className="flex-1" />
+
+					{/* Right side - counts */}
+					<div className="flex items-center gap-3 text-muted-foreground">
+						<span className="flex items-center gap-1">
+							<GitBranch className="h-3 w-3" />
+							{repoInfo?.branches?.length ?? 0}
+						</span>
+						<span className="flex items-center gap-1">
+							<Tag className="h-3 w-3" />
+							{repoInfo?.tags?.length ?? 0}
+						</span>
+					</div>
 				</div>
 
 				{/* Dialogs */}

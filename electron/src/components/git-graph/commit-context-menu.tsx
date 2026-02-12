@@ -9,7 +9,9 @@ import {
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuSeparator,
-	ContextMenuTrigger,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
 } from '@/components/ui/context-menu';
 import {
 	GitBranch,
@@ -21,6 +23,9 @@ import {
 	ArrowRightLeft,
 	ArrowLeft,
 	Trash2,
+	Scissors,
+	History,
+	ExternalLink,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
 
@@ -74,64 +79,78 @@ export function CommitContextMenu({
 				{children}
 			</ContextMenuTrigger>
 			<ContextMenuContent className="w-56">
-				<ContextMenuItem onClick={handleCopyHash}>
-					<Copy className="h-4 w-4 mr-2" />
-					Copy SHA
-				</ContextMenuItem>
-				<ContextMenuItem onClick={handleCopyMessage}>
-					<Copy className="h-4 w-4 mr-2" />
-					Copy Message
-				</ContextMenuItem>
-				<ContextMenuSeparator />
-				
-				<ContextMenuItem onClick={onCreateBranch}>
-					<GitBranch className="h-4 w-4 mr-2" />
-					Create Branch Here
-				</ContextMenuItem>
-				<ContextMenuItem onClick={onCreateTag}>
-					<Tag className="h-4 w-4 mr-2" />
-					Create Tag Here
-				</ContextMenuItem>
+				{/* Navigation */}
 				<ContextMenuItem onClick={handleCheckout}>
-					<ArrowLeft className="h-4 w-4 mr-2" />
+					<ArrowLeft className="h-4 w-4 mr-2 text-muted-foreground" />
 					Checkout Commit
 				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
-				
-				<ContextMenuItem onClick={onMerge}>
-					<GitMerge className="h-4 w-4 mr-2" />
-					Merge into Current
+
+				{/* Create */}
+				<ContextMenuItem onClick={onCreateBranch}>
+					<GitBranch className="h-4 w-4 mr-2 text-muted-foreground" />
+					Create Branch...
 				</ContextMenuItem>
-				<ContextMenuItem onClick={onRebase}>
-					<RotateCcw className="h-4 w-4 mr-2" />
-					Rebase Current onto Here
+				<ContextMenuItem onClick={onCreateTag}>
+					<Tag className="h-4 w-4 mr-2 text-muted-foreground" />
+					Create Tag...
 				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
-				
+
+				{/* Integrate */}
+				<ContextMenuItem onClick={onMerge}>
+					<GitMerge className="h-4 w-4 mr-2 text-muted-foreground" />
+					Merge into Current
+				</ContextMenuItem>
+				<ContextMenuItem onClick={onRebase}>
+					<History className="h-4 w-4 mr-2 text-muted-foreground" />
+					Rebase Onto Here
+				</ContextMenuItem>
 				<ContextMenuItem onClick={onCherryPick}>
-					<GitCommit className="h-4 w-4 mr-2" />
+					<Scissors className="h-4 w-4 mr-2 text-muted-foreground" />
 					Cherry Pick
 				</ContextMenuItem>
 				<ContextMenuItem onClick={onRevert}>
-					<ArrowRightLeft className="h-4 w-4 mr-2" />
+					<ArrowRightLeft className="h-4 w-4 mr-2 text-muted-foreground" />
 					Revert Commit
 				</ContextMenuItem>
 				
 				<ContextMenuSeparator />
+
+				{/* Reset submenu */}
+				<ContextMenuSub>
+					<ContextMenuSubTrigger>
+						<RotateCcw className="h-4 w-4 mr-2 text-muted-foreground" />
+						Reset to Here
+					</ContextMenuSubTrigger>
+					<ContextMenuSubContent>
+						<ContextMenuItem onClick={() => handleResetHere('soft')}>
+							<span className="text-amber-600">Soft</span>
+							<span className="ml-2 text-xs text-muted-foreground">Keep changes staged</span>
+						</ContextMenuItem>
+						<ContextMenuItem onClick={() => handleResetHere('mixed')}>
+							<span className="text-blue-600">Mixed</span>
+							<span className="ml-2 text-xs text-muted-foreground">Keep changes unstaged</span>
+						</ContextMenuItem>
+						<ContextMenuItem onClick={() => handleResetHere('hard')} className="text-red-600">
+							Hard
+							<span className="ml-2 text-xs opacity-70">Discard all changes</span>
+						</ContextMenuItem>
+					</ContextMenuSubContent>
+				</ContextMenuSub>
 				
-				<ContextMenuItem onClick={() => handleResetHere('soft')}>
-					<RotateCcw className="h-4 w-4 mr-2 text-amber-600" />
-					Reset Here (Soft)
+				<ContextMenuSeparator />
+
+				{/* Copy */}
+				<ContextMenuItem onClick={handleCopyHash}>
+					<Copy className="h-4 w-4 mr-2 text-muted-foreground" />
+					Copy SHA
 				</ContextMenuItem>
-				<ContextMenuItem onClick={() => handleResetHere('mixed')}>
-					<RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
-					Reset Here (Mixed)
-				</ContextMenuItem>
-				<ContextMenuItem onClick={() => handleResetHere('hard')}>
-					<Trash2 className="h-4 w-4 mr-2 text-red-600" />
-					Reset Here (Hard)
+				<ContextMenuItem onClick={handleCopyMessage}>
+					<Copy className="h-4 w-4 mr-2 text-muted-foreground" />
+					Copy Message
 				</ContextMenuItem>
 			</ContextMenuContent>
 		</ContextMenu>
