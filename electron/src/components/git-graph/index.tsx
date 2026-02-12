@@ -3,7 +3,7 @@
  * GitKraken-style Git visualization
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
 	Loader2,
 	GitBranch,
@@ -276,10 +276,6 @@ export function GitGraph() {
 	
 	// Quick Look hook
 	useQuickLookKeyboard();
-	
-	// Graph and virtualization state
-	const [useVirtualization, setUseVirtualization] = useState(true);
-	const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
 
 	// Settings hook
 	const { settings } = useSettings();
@@ -1088,66 +1084,42 @@ export function GitGraph() {
 
 					{/* Graph and Commit List */}
 					<div className="flex-1 flex flex-col overflow-hidden">
-						{/* Graph options */}
-						<div className="flex items-center gap-2 px-3 py-1 border-b bg-muted/30 text-xs">
-							<span className="text-muted-foreground">Virtualization:</span>
-							<Button
-								variant={useVirtualization ? 'default' : 'ghost'}
-								size="sm"
-								className="h-5 px-2 text-xs"
-								onClick={() => setUseVirtualization(!useVirtualization)}
-							>
-								{useVirtualization ? 'On' : 'Off'}
-							</Button>
-						</div>
-
 						<div className="flex-1 flex overflow-hidden">
-							{/* Graph */}
-							<div className="shrink-0 bg-background overflow-hidden" style={{ width: graphLayout?.width ?? 200 }}>
-								{graphLayout && (
-									<CommitGraph
-										layout={graphLayout}
-										config={GRAPH_CONFIG}
-										expandedIndex={expandedCommit ?? -1}
-										onVertexClick={handleSelectCommit}
-										onVertexHover={() => {}}
-									/>
-								)}
-							</div>
-
-							{/* Commit list - Virtualized or Standard */}
-							<div className="flex-1 overflow-hidden">
-								{commitsData?.commits && commitsData.commits.length > 0 && useVirtualization ? (
-									<VirtualizedCommitList
-										commits={commitsData.commits}
-										layout={graphLayout}
-										selectedIndex={selectedCommitIndex}
-										expandedIndex={expandedCommit}
-										onSelect={handleSelectCommit}
-										onExpand={handleExpandCommit}
-										onContextMenu={handleContextMenu}
-										onVisibleRangeChange={(start, end) => {
-											setVisibleRange({ start, end });
-										}}
-									/>
-								) : commitsData?.commits && commitsData.commits.length > 0 ? (
-									<ScrollArea className="h-full">
-										<CommitList
-											commits={commitsData.commits}
-											layout={graphLayout}
-											selectedIndex={selectedCommitIndex}
-											expandedIndex={expandedCommit}
-											onSelect={handleSelectCommit}
-											onExpand={handleExpandCommit}
-											onContextMenu={handleContextMenu}
-										/>
-									</ScrollArea>
-								) : (
-									<div className="flex items-center justify-center h-full text-muted-foreground">
-										<p>No commits found</p>
+							<ScrollArea className="h-full w-full">
+								<div className="flex min-w-max">
+									{/* Graph */}
+									<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
+										{graphLayout && (
+											<CommitGraph
+												layout={graphLayout}
+												config={GRAPH_CONFIG}
+												expandedIndex={expandedCommit ?? -1}
+												onVertexClick={handleSelectCommit}
+												onVertexHover={() => {}}
+											/>
+										)}
 									</div>
-								)}
-							</div>
+
+									{/* Commit list */}
+									<div className="flex-1 min-w-[400px]">
+										{commitsData?.commits && commitsData.commits.length > 0 ? (
+											<CommitList
+												commits={commitsData.commits}
+												layout={graphLayout}
+												selectedIndex={selectedCommitIndex}
+												expandedIndex={expandedCommit}
+												onSelect={handleSelectCommit}
+												onExpand={handleExpandCommit}
+												onContextMenu={handleContextMenu}
+											/>
+										) : (
+											<div className="flex items-center justify-center h-64 text-muted-foreground">
+												<p>No commits found</p>
+											</div>
+										)}
+									</div>
+								</div>
+							</ScrollArea>
 						</div>
 					</div>
 

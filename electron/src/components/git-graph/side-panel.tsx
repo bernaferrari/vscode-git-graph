@@ -655,20 +655,15 @@ function MoreItems<T>({
 				</button>
 			</PopoverTrigger>
 			<PopoverContent 
-				className="w-72 p-0" 
+				className="w-80 p-0" 
 				align="start"
 				side="right"
 				sideOffset={5}
 			>
-				<div className="flex items-center justify-between px-3 py-2 border-b">
+				<div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
 					<span className="text-sm font-medium">{items.length} items</span>
-					<Input
-						placeholder="Filter..."
-						className="h-7 w-32 text-xs"
-						onClick={(e) => e.stopPropagation()}
-					/>
 				</div>
-				<ScrollArea className="h-[300px]">
+				<ScrollArea className="h-[500px] max-h-[60vh]">
 					<div className="py-1">
 						{items.map((item, index) => renderItem(item, index))}
 					</div>
