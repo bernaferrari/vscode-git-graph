@@ -7,14 +7,12 @@ import { useState, useMemo } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
 	History,
 	User,
 	Calendar,
 	Hash,
-	Search,
 	Loader2,
 } from 'lucide-react';
 
@@ -30,37 +28,36 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 	const { data: blameData, isLoading: blameLoading } = trpc.git.blame.useQuery(
 		{
 			repo: activeRepo ?? '',
-			filePath,
+			path: filePath,
 		},
 		{ enabled: !!activeRepo && !!filePath && view === 'blame' }
 	);
 
-	const { data: historyData, isLoading: historyLoading } = trpc.git.log.useQuery(
+	const { data: historyData, isLoading: historyLoading } = trpc.git.fileHistory.useQuery(
 		{
 			repo: activeRepo ?? '',
-			filePath,
-			limit: 50,
+			path: filePath,
 		},
 		{ enabled: !!activeRepo && !!filePath && view === 'history' }
 	);
 
 	const parsedBlame = useMemo(() => {
 		if (!blameData?.blame) return [];
-		
+
 		const lines: Array<{
 			line: string;
-			commit?: string;
-			author?: string;
-			date?: string;
+			commit?: string | undefined;
+			author?: string | undefined;
+			date?: string | undefined;
 			sourceLine?: number;
 		}> = [];
 		const blameText = blameData.blame;
 		const blameLines = blameText.split('\n');
-		
+
 		let currentCommit: string | undefined;
 		let currentAuthor: string | undefined;
 		let currentDate: string | undefined;
-		
+
 		blameLines.forEach((line) => {
 			if (line.startsWith('author ')) {
 				currentAuthor = line.slice(7);
@@ -79,7 +76,7 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 				});
 			}
 		});
-		
+
 		return lines;
 	}, [blameData?.blame]);
 
@@ -154,7 +151,7 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 						) : (
 							<ScrollArea className="h-full">
 								<div className="divide-y">
-									{(historyData?.commits ?? []).map((commit) => (
+									{(historyData?.history ?? []).map((commit) => (
 										<div
 											key={commit.hash}
 											className="p-3 hover:bg-accent/30 cursor-pointer"

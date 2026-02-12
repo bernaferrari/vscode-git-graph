@@ -3,7 +3,7 @@
  * Tooltip with commit info when hovering over lines in diff
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,8 @@ import {
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Avatar } from './avatar';
-import { GitCommit, User, Calendar, Copy, Check } from 'lucide-react';
+import { GitCommit, Calendar, Copy, Check } from 'lucide-react';
+import { parseGitBlame } from '@/lib/git-blame-utils';
 
 interface BlameInfo {
 	hash: string;
@@ -47,6 +48,7 @@ export function BlameOnHover({
 	const [blameInfo, setBlameInfo] = useState<BlameInfo | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const utils = trpc.useUtils();
 
 	// Cache key
 	const cacheKey = `${activeRepo}-${filePath}`;
@@ -64,30 +66,34 @@ export function BlameOnHover({
 
 		// Fetch blame data
 		setIsLoading(true);
-		trpc.git.blame.query({
+		utils.client.git.blame.query({
 			repo: activeRepo,
 			path: filePath,
 			commitHash,
 		})
 			.then((result) => {
-				if (result?.lines) {
+				const blameText = result.blame;
+				if (blameText) {
+					// Parse using shared utility
+					const parsedLines = parseGitBlame(blameText);
+
 					// Build cache for this file
 					const newFileCache = new Map<number, BlameInfo>();
-					
-					result.lines.forEach((line: any, index: number) => {
+
+					parsedLines.forEach((line, index) => {
 						newFileCache.set(index + 1, {
-							hash: line.hash || '',
-							author: line.author || 'Unknown',
-							authorEmail: line.authorEmail || '',
-							date: line.date || '',
+							hash: line.hash,
+							author: line.author,
+							authorEmail: line.authorEmail,
+							date: line.date,
 							relativeDate: formatRelativeDate(line.date),
-							message: line.summary || '',
+							message: line.summary,
 							lineNumber: index + 1,
 						});
 					});
-					
+
 					blameCache.set(cacheKey, newFileCache);
-					
+
 					const info = newFileCache.get(lineNumber);
 					if (info) {
 						setBlameInfo(info);
@@ -100,7 +106,7 @@ export function BlameOnHover({
 			.finally(() => {
 				setIsLoading(false);
 			});
-	}, [activeRepo, filePath, lineNumber, commitHash, cacheKey]);
+	}, [activeRepo, filePath, lineNumber, commitHash, cacheKey, utils]);
 
 	const handleCopyHash = useCallback(() => {
 		if (blameInfo?.hash) {
@@ -112,7 +118,7 @@ export function BlameOnHover({
 
 	const formatRelativeDate = (dateStr: string): string => {
 		if (!dateStr) return '';
-		
+
 		try {
 			const date = new Date(dateStr);
 			const now = new Date();
@@ -141,8 +147,8 @@ export function BlameOnHover({
 	};
 
 	return (
-		<Tooltip delayDuration={300}>
-			<TooltipTrigger asChild>
+		<Tooltip>
+			<TooltipTrigger>
 				<span className="cursor-default">{children}</span>
 			</TooltipTrigger>
 			<TooltipContent side={side} className="max-w-sm p-0" sideOffset={4}>
@@ -172,7 +178,7 @@ export function BlameOnHover({
 
 						{/* Commit */}
 						<div className="flex items-start gap-2">
-							<div 
+							<div
 								className="flex items-center gap-1 cursor-pointer hover:bg-muted rounded px-1"
 								onClick={handleCopyHash}
 							>
@@ -216,7 +222,7 @@ interface InlineBlameAnnotationProps {
 export function InlineBlameAnnotation({
 	filePath,
 	lineNumber,
-	commitHash,
+	commitHash: _commitHash,
 	className,
 }: InlineBlameAnnotationProps) {
 	const { activeRepo } = useAppStore();
@@ -256,44 +262,49 @@ export function InlineBlameAnnotation({
 export function usePrefetchBlame(filePath: string, commitHash?: string) {
 	const { activeRepo } = useAppStore();
 	const cacheKey = `${activeRepo}-${filePath}`;
+	const utils = trpc.useUtils();
 
 	useEffect(() => {
 		if (!activeRepo || !filePath) return;
 		if (blameCache.has(cacheKey)) return;
 
-		trpc.git.blame.query({
+		utils.client.git.blame.query({
 			repo: activeRepo,
 			path: filePath,
 			commitHash,
 		})
 			.then((result) => {
-				if (result?.lines) {
+				const blameText = result.blame;
+				if (blameText) {
+					// Parse using shared utility
+					const parsedLines = parseGitBlame(blameText);
+
 					const fileCache = new Map<number, BlameInfo>();
-					
-					result.lines.forEach((line: any, index: number) => {
+
+					parsedLines.forEach((line, index) => {
 						fileCache.set(index + 1, {
-							hash: line.hash || '',
-							author: line.author || 'Unknown',
-							authorEmail: line.authorEmail || '',
-							date: line.date || '',
-							relativeDate: formatRelativeDate(line.date),
-							message: line.summary || '',
+							hash: line.hash,
+							author: line.author,
+							authorEmail: line.authorEmail,
+							date: line.date,
+							relativeDate: formatRelativeDate(line.date), // Using duplicated helper for now
+							message: line.summary,
 							lineNumber: index + 1,
 						});
 					});
-					
+
 					blameCache.set(cacheKey, fileCache);
 				}
 			})
 			.catch(() => {
 				// Silently fail
 			});
-	}, [activeRepo, filePath, commitHash, cacheKey]);
+	}, [activeRepo, filePath, commitHash, cacheKey, utils]);
 }
 
 function formatRelativeDate(dateStr: string): string {
 	if (!dateStr) return '';
-	
+
 	try {
 		const date = new Date(dateStr);
 		const now = new Date();

@@ -1120,7 +1120,7 @@ export function GitGraph() {
 									</div>
 
 									{/* Graph */}
-									<div className="shrink-0 bg-background" style={{ width: (graphLayout?.width ?? 200) + 20 }}>
+									<div className="shrink-0 bg-background" style={{ width: (graphLayout?.width ?? 200) + 10 }}>
 										{graphLayout && (
 											<CommitGraph
 												layout={graphLayout}

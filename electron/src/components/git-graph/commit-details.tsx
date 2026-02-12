@@ -8,12 +8,10 @@ import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/components/ui/popover';
 import {
 	X,
 	GitBranch,
@@ -32,6 +30,7 @@ import {
 	Columns,
 	PanelTop,
 	History,
+	Ellipsis,
 } from 'lucide-react';
 import { useState } from 'react';
 import { SideBySideDiff } from './side-by-side-diff';
@@ -48,9 +47,10 @@ interface CommitDetailsPanelProps {
 	commitHash: string | null;
 	onClose?: () => void;
 	onNavigateToCommit?: (hash: string) => void;
+	onFilterByAuthor?: (email: string) => void;
 }
 
-export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, onFilterByAuthor }: CommitDetailsPanelProps) {
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [showDiff, setShowDiff] = useState(false);
@@ -153,19 +153,27 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit }: 
 				<div className="p-3 space-y-4">
 					{/* Author & Date */}
 					<div className="space-y-2">
-						<div className="flex items-start gap-2">
-							<div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-								<User className="h-3 w-3 text-primary" />
-							</div>
+						<div 
+							className={`flex items-start gap-2.5 ${onFilterByAuthor ? 'cursor-pointer group' : ''}`}
+							onClick={() => onFilterByAuthor?.(details.authorEmail)}
+							title={onFilterByAuthor ? 'Click to filter by author' : undefined}
+						>
+							<img
+								src={getGravatarUrl(details.authorEmail)}
+								alt={details.author}
+								className="w-8 h-8 rounded-full shrink-0"
+							/>
 							<div className="min-w-0 flex-1">
-								<p className="text-sm font-medium">{details.author}</p>
+								<p className={`text-sm font-medium ${onFilterByAuthor ? 'group-hover:text-primary' : ''}`}>
+									{details.author}
+								</p>
 								<p className="text-xs text-muted-foreground truncate">{details.authorEmail}</p>
 							</div>
 						</div>
-						<div className="flex items-center gap-2 text-xs text-muted-foreground ml-8">
+						<div className="flex items-center gap-2 text-xs text-muted-foreground ml-10">
 							<Calendar className="h-3 w-3" />
 							<span>{formatDate(details.authorDate)}</span>
-							<span className="text-muted-foreground/50">•</span>
+							<span className="text-border">•</span>
 							<span>{formatRelative(details.authorDate)}</span>
 						</div>
 					</div>
@@ -463,4 +471,19 @@ function middleTruncate(path: string, maxLength: number = 40): string {
 
 	// Keep start of directory path
 	return dirPath.slice(0, availableForDir) + '.../' + filename;
+}
+
+// Cache for Gravatar URLs
+const gravatarCache = new Map<string, string>();
+
+// Get Gravatar URL for email
+function getGravatarUrl(email: string): string {
+	const cached = gravatarCache.get(email);
+	if (cached) return cached;
+
+	// Use d=identicon for default avatar
+	const hash = btoa(email).slice(0, 32).toLowerCase();
+	const url = `https://www.gravatar.com/avatar/${hash}?s=64&d=identicon`;
+	gravatarCache.set(email, url);
+	return url;
 }

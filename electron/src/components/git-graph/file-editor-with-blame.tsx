@@ -3,12 +3,10 @@
  * Edit files with inline git blame annotations
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import {
 	Dialog,
 	DialogContent,
@@ -16,19 +14,11 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
 	Edit3,
 	Save,
-	X,
 	Loader2,
 	GitCommit,
-	User,
 	Calendar,
-	RefreshCw,
 	Undo,
 	History,
 } from 'lucide-react';
@@ -67,6 +57,7 @@ export function FileEditorWithBlame({
 	const [showBlame, setShowBlame] = useState(true);
 	const [isLoading, setIsLoading] = useState(false);
 	const editorRef = useRef<HTMLTextAreaElement>(null);
+	const utils = trpc.useUtils();
 
 	// Load file content and blame data
 	useEffect(() => {
@@ -76,7 +67,7 @@ export function FileEditorWithBlame({
 			setIsLoading(true);
 			try {
 				// Fetch file content
-				const fileResult = await trpc.git.readFile.query({
+				const fileResult = await utils.client.git.readFile.query({
 					repo: activeRepo,
 					path: filePath,
 				});
@@ -84,16 +75,60 @@ export function FileEditorWithBlame({
 				setOriginalContent(fileResult.content || '');
 
 				// Fetch blame data
-				const blameResult = await trpc.git.blame.query({
+				const blameResult = await utils.client.git.blame.query({
 					repo: activeRepo,
 					path: filePath,
-					commitHash: commitHash,
+					commitHash: commitHash, // undefined is fine here if unexpected by trpc, but trpc usually handles it
 				});
 
 				// Parse blame data into line-by-line format
 				const lines = (fileResult.content || '').split('\n');
-				const parsedBlame: BlameLine[] = lines.map((line, index) => {
-					const blameInfo = blameResult.lines?.[index] || {};
+
+				// Parse raw blame output if available
+				const blameLines: Partial<BlameLine>[] = [];
+				if (blameResult.blame) {
+					const rawBlame = blameResult.blame;
+
+					const rawLines = rawBlame.split('\n');
+					let currentHash = '';
+					let currentAuthor = '';
+					let currentEmail = '';
+					let currentDate = '';
+					let currentSummary = '';
+
+					for (const line of rawLines) {
+						if (!line) continue;
+
+						if (line.startsWith('\t')) {
+							// Content line, ends the block for this line
+							blameLines.push({
+								hash: currentHash,
+								author: currentAuthor,
+								authorEmail: currentEmail,
+								date: currentDate,
+								summary: currentSummary,
+							});
+							currentHash = ''; // Reset
+						} else if (/^[0-9a-f]{40}/.test(line)) {
+							// New block start
+							currentHash = line.split(' ')[0] ?? '';
+						} else if (line.startsWith('author ')) {
+							currentAuthor = line.substring(7);
+						} else if (line.startsWith('author-mail ')) {
+							currentEmail = line.substring(12).replace(/[<,>]/g, '');
+						} else if (line.startsWith('author-time ')) {
+							const ts = parseInt(line.substring(12), 10);
+							if (!isNaN(ts)) {
+								currentDate = new Date(ts * 1000).toISOString();
+							}
+						} else if (line.startsWith('summary ')) {
+							currentSummary = line.substring(8);
+						}
+					}
+				}
+
+				const parsedBlame: BlameLine[] = lines.map((line: string, index: number) => {
+					const blameInfo = blameLines[index] || {};
 					return {
 						lineNumber: index + 1,
 						content: line,
@@ -106,6 +141,7 @@ export function FileEditorWithBlame({
 				});
 				setBlameData(parsedBlame);
 			} catch (error) {
+				console.error(error);
 				toast.error('Failed to load file');
 			} finally {
 				setIsLoading(false);
@@ -113,7 +149,7 @@ export function FileEditorWithBlame({
 		};
 
 		loadData();
-	}, [open, filePath, activeRepo, commitHash]);
+	}, [open, filePath, activeRepo, commitHash, utils]);
 
 	const hasChanges = content !== originalContent;
 
@@ -122,7 +158,7 @@ export function FileEditorWithBlame({
 
 		setIsSaving(true);
 		try {
-			await trpc.git.writeFile.mutate({
+			await utils.client.git.writeFile.mutate({
 				repo: activeRepo ?? '',
 				path: filePath,
 				content,
@@ -243,7 +279,7 @@ export function FileEditorWithBlame({
 								</div>
 							) : (
 								<div className="divide-y divide-border/50">
-									{blameGroups.map((group, index) => (
+									{blameGroups.map((group) => (
 										<div
 											key={`${group.hash}-${group.startLine}`}
 											className="px-2 py-1 hover:bg-accent/50"
@@ -254,7 +290,7 @@ export function FileEditorWithBlame({
 													{getShortHash(group.hash)}
 												</code>
 												<Avatar
-													email={blameData[group.startLine]?.authorEmail}
+													email={blameData[group.startLine]?.authorEmail || ''}
 													name={group.author}
 													size="sm"
 													className="h-4 w-4"
@@ -312,13 +348,12 @@ export function FileEditorWithBlame({
 										{content.split('\n').map((line, index) => {
 											const blame = blameData[index];
 											const isNewGroup = index === 0 || blameData[index - 1]?.hash !== blame?.hash;
-											
+
 											return (
 												<div
 													key={index}
-													className={`group h-5 leading-5 hover:bg-accent/30 ${
-														isNewGroup && showBlame ? 'border-t border-border/30' : ''
-													}`}
+													className={`group h-5 leading-5 hover:bg-accent/30 ${isNewGroup && showBlame ? 'border-t border-border/30' : ''
+														}`}
 												>
 													{line || ' '}
 												</div>

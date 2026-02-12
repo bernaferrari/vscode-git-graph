@@ -129,37 +129,42 @@ export function CommitGraph({
 			<g className="commit-vertices">
 				{vertices.map((v) => {
 					const commit = commits[v.id];
-					const showAvatar = showAvatars && commit?.email;
-					const nodeRadius = v.isCurrent ? 6 : (v.isStash ? 5 : 4.5);
-					const avatarSize = 16; // Avatar circle radius
+					const hasAvatar = showAvatars && commit?.email;
+					const normalRadius = v.isCurrent ? 6 : (v.isStash ? 5 : 4.5);
+					const avatarRadius = 10; // Smaller avatar size
 
 					return (
 						<g key={v.id}>
-							{showAvatar ? (
-								// Avatar on top of node
+							{hasAvatar ? (
+								// Avatar on top of smaller node
 								<g
 									className="cursor-pointer"
 									onClick={() => onVertexClick(v.id)}
 									onMouseEnter={() => onVertexHover(v.id)}
 									onMouseLeave={() => onVertexHover(null)}
 								>
-									{/* White background circle for avatar */}
+									{/* Small colored circle underneath */}
 									<circle
 										cx={v.cx}
 										cy={v.cy}
-										r={avatarSize}
+										r={avatarRadius + 1}
+										fill={v.colour}
+									/>
+									{/* White background for avatar */}
+									<circle
+										cx={v.cx}
+										cy={v.cy}
+										r={avatarRadius - 1}
 										fill="var(--background)"
-										stroke={v.colour}
-										strokeWidth={2}
 									/>
 									{/* Avatar image */}
 									<image
 										href={getGravatarUrl(commit.email)}
-										x={v.cx - avatarSize + 2}
-										y={v.cy - avatarSize + 2}
-										width={(avatarSize - 2) * 2}
-										height={(avatarSize - 2) * 2}
-										clipPath={`circle(${avatarSize - 2}px at ${avatarSize - 2}px ${avatarSize - 2}px)`}
+										x={v.cx - avatarRadius + 2}
+										y={v.cy - avatarRadius + 2}
+										width={(avatarRadius - 2) * 2}
+										height={(avatarRadius - 2) * 2}
+										style={{ clipPath: `circle(${avatarRadius - 2}px)` }}
 										className="pointer-events-none"
 									/>
 									{/* Current commit ring */}
@@ -167,22 +172,22 @@ export function CommitGraph({
 										<circle
 											cx={v.cx}
 											cy={v.cy}
-											r={avatarSize + 2}
+											r={avatarRadius + 3}
 											fill="none"
 											stroke={v.colour}
 											strokeWidth={2}
-											className="animate-pulse"
+											opacity={0.6}
 										/>
 									)}
 								</g>
 							) : (
-								// Normal circle node
+								// Normal circle node (no avatar)
 								<>
 									{v.isCurrent ? (
 										<circle
 											cx={v.cx}
 											cy={v.cy}
-											r={nodeRadius}
+											r={normalRadius}
 											fill="var(--background)"
 											stroke={v.colour}
 											strokeWidth={2.5}
@@ -195,7 +200,7 @@ export function CommitGraph({
 										<circle
 											cx={v.cx}
 											cy={v.cy}
-											r={nodeRadius}
+											r={normalRadius}
 											fill={v.isCommitted ? v.colour : '#808080'}
 											stroke="var(--background)"
 											strokeWidth={1.5}
