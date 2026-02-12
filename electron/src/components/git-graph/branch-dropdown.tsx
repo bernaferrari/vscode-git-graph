@@ -88,10 +88,17 @@ export function BranchDropdown({
 		}
 	};
 
-	// Check if selected
+	// Check if a specific branch is selected (not when "all" is selected)
 	const isSelected = (value: string) => {
-		return selectedBranches.includes(value) || (multiple && selectedBranches.includes('__all__'));
+		// When "all" is selected, don't show individual items as selected
+		if (multiple && selectedBranches.includes('__all__')) {
+			return false;
+		}
+		return selectedBranches.includes(value);
 	};
+
+	// Check if "all" is selected
+	const isAllSelected = multiple && selectedBranches.includes('__all__');
 
 	// Display value
 	const displayValue = useMemo(() => {
@@ -153,7 +160,7 @@ export function BranchDropdown({
 								<BranchItem
 									name="All branches"
 									icon={<GitBranch className="h-4 w-4" />}
-									selected={selectedBranches.includes('__all__')}
+									selected={isAllSelected}
 									onClick={() => handleSelect('__all__')}
 								/>
 								<div className="h-px bg-border mx-2 my-1" />
@@ -222,20 +229,20 @@ function BranchItem({ name, icon, selected, isCurrent, onClick }: BranchItemProp
 	return (
 		<button
 			onClick={onClick}
-			className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ${
+			className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-sm ${
 				selected
-					? 'bg-accent text-accent-foreground'
-					: 'hover:bg-accent/50'
+					? 'bg-primary text-primary-foreground'
+					: 'hover:bg-accent'
 			}`}
 		>
-			<span className={selected ? 'text-primary' : 'text-muted-foreground'}>
+			<span className={selected ? 'text-primary-foreground' : 'text-muted-foreground'}>
 				{icon}
 			</span>
-			<span className={`flex-1 text-left truncate ${isCurrent ? 'font-medium' : ''}`}>
+			<span className={`flex-1 text-left truncate ${isCurrent ? 'font-semibold' : ''}`}>
 				{name}
 			</span>
 			{selected && (
-				<Check className="h-4 w-4 text-primary" />
+				<Check className="h-4 w-4" />
 			)}
 		</button>
 	);

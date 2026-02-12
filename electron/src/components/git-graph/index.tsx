@@ -99,7 +99,6 @@ import { Avatar, AvatarWithTooltip } from './avatar';
 import { CommandPalette } from './command-palette';
 import { GitFlowAutomation } from './gitflow-automation';
 import { VirtualizedCommitList } from './virtualized-commit-list';
-import { LaneGraph } from './lane-graph';
 import { InlineStagingDiff } from './inline-staging-diff';
 import { GitBisectUI } from './git-bisect-ui';
 import { CIStatusBadge, CIStatusMini } from './ci-status';
@@ -278,9 +277,6 @@ export function GitGraph() {
 	// Quick Look hook
 	useQuickLookKeyboard();
 
-	// Graph mode: 'classic' or 'lanes'
-	const [graphMode, setGraphMode] = useState<'classic' | 'lanes'>('classic');
-
 	// Settings hook
 	const { settings } = useSettings();
 
@@ -396,6 +392,14 @@ export function GitGraph() {
 			}
 		}
 	}, [commitsData, setSelectedCommit, commitDetailsOpen, setCommitDetailsOpen]);
+
+	// Navigate to a commit by hash
+	const handleNavigateToCommit = useCallback((hash: string) => {
+		const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+		if (index !== undefined && index >= 0) {
+			handleSelectCommit(index);
+		}
+	}, [commitsData, handleSelectCommit]);
 
 	const handleExpandCommit = useCallback((index: number | null) => {
 		setExpandedCommit(index);
@@ -1088,45 +1092,26 @@ export function GitGraph() {
 
 					{/* Graph and Commit List */}
 					<div className="flex-1 flex flex-col overflow-hidden">
-						{/* Graph mode toggle */}
-						<div className="flex items-center gap-2 px-3 py-1 border-b bg-muted/30 text-xs">
-							<span className="text-muted-foreground">Graph:</span>
-							<Button
-								variant={graphMode === 'classic' ? 'default' : 'ghost'}
-								size="sm"
-								className="h-5 px-2 text-xs"
-								onClick={() => setGraphMode('classic')}
-							>
-								Classic
-							</Button>
-							<Button
-								variant={graphMode === 'lanes' ? 'default' : 'ghost'}
-								size="sm"
-								className="h-5 px-2 text-xs"
-								onClick={() => setGraphMode('lanes')}
-							>
-								Lanes
-							</Button>
-						</div>
-
 						<div className="flex-1 flex overflow-hidden">
 							<ScrollArea className="h-full w-full">
 								<div className="flex min-w-max">
 									{/* Refs column - branches and tags */}
-									<div className="shrink-0 w-32 border-r bg-muted/10">
+									<div className="shrink-0 w-28 border-r bg-muted/5">
 										{commitsData?.commits?.map((commit, index) => (
 											<div
 												key={commit.hash}
-												className="flex items-center gap-1 px-2 h-8 text-xs"
+												className={`flex items-center gap-1 px-2 h-8 text-xs cursor-pointer transition-colors ${
+													selectedCommitIndex === index ? 'bg-accent/30' : 'hover:bg-accent/10'
+												}`}
 												onClick={() => handleSelectCommit(index)}
 											>
 												{commit.heads && commit.heads.length > 0 && (
-													<span className="px-1.5 py-0.5 bg-primary/15 text-primary rounded text-[10px] font-medium truncate">
+													<span className="px-1.5 py-0.5 bg-primary text-primary-foreground rounded text-[10px] font-medium truncate">
 														{commit.heads[0]}
 													</span>
 												)}
-												{commit.tags && commit.tags.length > 0 && (
-													<span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded text-[10px] font-medium truncate">
+												{!commit.heads?.length && commit.tags && commit.tags.length > 0 && (
+													<span className="px-1.5 py-0.5 bg-amber-500 text-white rounded text-[10px] font-medium truncate">
 														{commit.tags[0]}
 													</span>
 												)}
@@ -1136,20 +1121,13 @@ export function GitGraph() {
 
 									{/* Graph */}
 									<div className="shrink-0 bg-background" style={{ width: graphLayout?.width ?? 200 }}>
-										{graphMode === 'classic' && graphLayout && (
+										{graphLayout && (
 											<CommitGraph
 												layout={graphLayout}
 												config={GRAPH_CONFIG}
 												expandedIndex={expandedCommit ?? -1}
 												onVertexClick={handleSelectCommit}
 												onVertexHover={() => {}}
-											/>
-										)}
-										{graphMode === 'lanes' && commitsData?.commits && (
-											<LaneGraph
-												commits={commitsData.commits}
-												selectedIndex={selectedCommitIndex}
-												onSelectCommit={handleSelectCommit}
 											/>
 										)}
 									</div>
@@ -1166,6 +1144,7 @@ export function GitGraph() {
 												onExpand={handleExpandCommit}
 												onContextMenu={handleContextMenu}
 												hideRefs={true}
+												showAvatars={true}
 											/>
 										) : (
 											<div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -1184,6 +1163,7 @@ export function GitGraph() {
 							<CommitDetailsPanel
 								commitHash={selectedCommit}
 								onClose={() => setCommitDetailsOpen(false)}
+								onNavigateToCommit={handleNavigateToCommit}
 							/>
 						</div>
 					)}

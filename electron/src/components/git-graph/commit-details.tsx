@@ -47,9 +47,10 @@ const isImageFile = (path: string): boolean => {
 interface CommitDetailsPanelProps {
 	commitHash: string | null;
 	onClose?: () => void;
+	onNavigateToCommit?: (hash: string) => void;
 }
 
-export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit }: CommitDetailsPanelProps) {
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [showDiff, setShowDiff] = useState(false);
@@ -180,16 +181,19 @@ export function CommitDetailsPanel({ commitHash, onClose }: CommitDetailsPanelPr
 					{details.parents && details.parents.length > 0 && (
 						<div className="space-y-1">
 							<span className="text-xs font-medium text-muted-foreground">Parents</span>
-							<div className="flex flex-wrap gap-1">
+							<div className="flex flex-wrap gap-1.5">
 								{details.parents.map((parent: string, i: number) => (
 									<button
 										key={parent}
-										className="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted rounded hover:bg-muted/80 transition-colors"
-										onClick={() => {
-											// TODO: Navigate to parent commit
-										}}
+										className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-mono bg-muted hover:bg-primary hover:text-primary-foreground rounded transition-colors cursor-pointer"
+										onClick={() => onNavigateToCommit?.(parent)}
+										title={`Go to ${parent}`}
 									>
-										{i === 0 ? <ArrowRight className="h-3 w-3" /> : <GitCommit className="h-3 w-3" />}
+										{i === 0 ? (
+											<ArrowRight className="h-3.5 w-3.5" />
+										) : (
+											<GitCommit className="h-3.5 w-3.5" />
+										)}
 										{parent.slice(0, 7)}
 									</button>
 								))}
