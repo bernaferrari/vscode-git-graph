@@ -16,7 +16,7 @@ import {
 	Tag,
 	Copy,
 	RotateCcw,
-	Merge,
+	GitMerge,
 	GitCommit,
 	ArrowRightLeft,
 	ArrowLeft,
@@ -100,7 +100,7 @@ export function CommitContextMenu({
 				<ContextMenuSeparator />
 				
 				<ContextMenuItem onClick={onMerge}>
-					<Merge className="h-4 w-4 mr-2" />
+					<GitMerge className="h-4 w-4 mr-2" />
 					Merge into Current
 				</ContextMenuItem>
 				<ContextMenuItem onClick={onRebase}>

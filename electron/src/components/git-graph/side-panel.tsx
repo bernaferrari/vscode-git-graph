@@ -27,6 +27,7 @@ import {
 	GitCommit,
 	FolderTree,
 	GitPullRequest,
+	GitMerge,
 	Play,
 	Flag,
 	Flame,
@@ -408,7 +409,7 @@ function BranchItem({
 							Checkout
 						</DropdownMenuItem>
 						<DropdownMenuItem>
-							<Merge className="h-4 w-4 mr-2" />
+							<GitMerge className="h-4 w-4 mr-2" />
 							Merge into current
 						</DropdownMenuItem>
 						<DropdownMenuItem>
