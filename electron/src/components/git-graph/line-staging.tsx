@@ -21,7 +21,7 @@ import {
 	X,
 	ChevronDown,
 	ChevronRight,
-	StageAll,
+	ListPlus,
 } from 'lucide-react';
 
 interface LineStagingProps {

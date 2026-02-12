@@ -17,8 +17,8 @@ import {
 	MinusCircle,
 	Check,
 	Loader2,
-	StageAll,
-	UnstageAll,
+	ListPlus,
+	ListX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
