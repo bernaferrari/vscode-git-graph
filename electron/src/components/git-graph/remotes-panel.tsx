@@ -193,7 +193,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
 
 			{/* Add Remote Dialog */}
 			<Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-				<DialogContent>
+				<DialogContent className="ui-surface">
 					<DialogHeader>
 						<DialogTitle>Add Remote</DialogTitle>
 					</DialogHeader>
@@ -223,7 +223,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
 							/>
 						</div>
 					</div>
-					<DialogFooter>
+					<DialogFooter className="ui-toolbar">
 						<Button variant="outline" onClick={() => setShowAddDialog(false)}>
 							Cancel
 						</Button>
@@ -239,7 +239,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
 
 			{/* Edit Remote Dialog */}
 			<Dialog open={!!editingRemote} onOpenChange={() => setEditingRemote(null)}>
-				<DialogContent>
+				<DialogContent className="ui-surface">
 					<DialogHeader>
 						<DialogTitle>Edit Remote: {editingRemote?.name}</DialogTitle>
 					</DialogHeader>
@@ -260,7 +260,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
 							/>
 						</div>
 					</div>
-					<DialogFooter>
+					<DialogFooter className="ui-toolbar">
 						<Button variant="outline" onClick={() => setEditingRemote(null)}>
 							Cancel
 						</Button>

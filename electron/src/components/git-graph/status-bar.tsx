@@ -56,14 +56,14 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
 
 	if (!activeRepo) {
 		return (
-			<div className={cn("h-6 bg-muted border-t flex items-center px-3 text-xs text-muted-foreground", className)}>
+			<div className={cn("ui-status-bar h-6 flex items-center px-3 text-xs text-muted-foreground", className)}>
 				<span>No repository open</span>
 			</div>
 		);
 	}
 
 	return (
-		<div className={cn("h-6 bg-muted border-t flex items-center justify-between px-3 text-xs", className)}>
+		<div className={cn("ui-status-bar h-6 flex items-center justify-between px-3 text-xs", className)}>
 			{/* Left side - Branch and status */}
 			<div className="flex items-center gap-3">
 				{/* Branch */}

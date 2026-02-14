@@ -84,7 +84,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-md">
+			<DialogContent className="max-w-md ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Copy className="h-5 w-5" />
@@ -151,7 +151,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 					)}
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						Cancel
 					</Button>

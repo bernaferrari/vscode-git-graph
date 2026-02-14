@@ -426,7 +426,7 @@ export function IssueTrackerSettings({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-md">
+			<DialogContent className="max-w-md ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Link className="h-5 w-5" />

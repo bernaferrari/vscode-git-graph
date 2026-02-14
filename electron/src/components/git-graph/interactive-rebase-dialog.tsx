@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { trpc } from '@/trpc/client';
+import { toast } from 'sonner';
 
 interface RebaseCommit {
 	hash: string;
@@ -54,13 +55,15 @@ export function InteractiveRebaseDialog({
 	const [commits, setCommits] = useState<RebaseCommit[]>([]);
 	const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 	const utils = trpc.useUtils();
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const sanitizeTodoMessage = useCallback((message: string) => {
+		return message.trim().replace(/[\r\n]+/g, ' ');
+	}, []);
 
 	const rebaseMutation = trpc.git.rebase.useMutation({
 		onSuccess: () => {
 			utils.git.commits.invalidate();
 			utils.git.repoInfo.invalidate();
-			onComplete();
-			onOpenChange(false);
 		},
 	});
 
@@ -103,18 +106,46 @@ export function InteractiveRebaseDialog({
 		setDraggedIndex(null);
 	}, []);
 
-	const handleRebase = useCallback(() => {
-		// For now, just run rebase with the onto ref
-		// Full interactive rebase would require writing the todo file
-		rebaseMutation.mutate({ repo, onto, interactive: true });
-	}, [repo, onto, rebaseMutation]);
+	const handleRebase = useCallback(async () => {
+		const activeCommits = commits.filter((commit) => commit.action !== 'drop');
+		if (activeCommits.length === 0) {
+			toast.error('No commits selected for rebase.');
+			return;
+		}
+
+		const todoContent = activeCommits
+			.map((commit) => `${commit.action} ${commit.hash} ${sanitizeTodoMessage(commit.message)}`)
+			.join('\n');
+
+		setIsSubmitting(true);
+		try {
+			const result = await rebaseMutation.mutateAsync({
+				repo,
+				onto,
+				interactive: true,
+				todos: todoContent,
+			});
+
+			if (result?.error) {
+				toast.error(result.error);
+				return;
+			}
+
+			onComplete();
+			onOpenChange(false);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : 'Failed to start rebase');
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [commits, onto, repo, onComplete, onOpenChange, rebaseMutation, sanitizeTodoMessage]);
 
 	if (!open) return null;
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
-			<Card className="relative z-50 w-full max-w-2xl mx-4 max-h-[80vh]">
+			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<Card className="relative z-50 w-full ui-surface max-w-2xl mx-4 max-h-[80vh]">
 				<CardHeader>
 					<CardTitle className="flex items-center justify-between">
 						<span>Interactive Rebase onto {onto.slice(0, 7)}</span>
@@ -187,8 +218,11 @@ export function InteractiveRebaseDialog({
 						<Button variant="outline" onClick={() => onOpenChange(false)}>
 							Cancel
 						</Button>
-						<Button onClick={handleRebase} disabled={rebaseMutation.isPending}>
-							{rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}
+						<Button
+							onClick={handleRebase}
+							disabled={isSubmitting || rebaseMutation.isPending}
+						>
+							{isSubmitting || rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}
 						</Button>
 					</div>
 				</CardContent>

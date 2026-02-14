@@ -72,7 +72,7 @@ export function CommitSigningDialog({ open, onOpenChange }: CommitSigningProps) 
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className="sm:max-w-md ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Key className="h-5 w-5" />
@@ -175,7 +175,7 @@ export function CommitSigningDialog({ open, onOpenChange }: CommitSigningProps) 
 					)}
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						Cancel
 					</Button>

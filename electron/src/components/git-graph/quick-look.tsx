@@ -232,15 +232,15 @@ export function QuickLookPanel() {
 
 	return (
 		<div
-			className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
+			className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center"
 			onClick={closeQuickLook}
 		>
 			<div
-				className="bg-background rounded-lg shadow-2xl max-w-5xl max-h-[90vh] w-full mx-4 overflow-hidden flex flex-col"
+				className="ui-surface max-w-5xl max-h-[90vh] w-full mx-4 overflow-hidden flex flex-col"
 				onClick={(e) => e.stopPropagation()}
 			>
 				{/* Header */}
-				<div className="flex items-center justify-between px-4 py-3 border-b">
+				<div className="ui-toolbar flex items-center justify-between px-4 py-3">
 					<div className="flex items-center gap-3">
 						<FileIcon className="h-5 w-5 text-muted-foreground" />
 						<span className="font-medium truncate">{filePath.split('/').pop()}</span>
@@ -303,7 +303,7 @@ export function QuickLookPanel() {
 				</div>
 
 				{/* Footer */}
-				<div className="px-4 py-2 border-t text-xs text-muted-foreground flex items-center justify-between">
+				<div className="ui-toolbar px-4 py-2 text-xs text-muted-foreground flex items-center justify-between">
 					<span>{filePath}</span>
 					<div className="flex items-center gap-4">
 						<span>Press ESC or click outside to close</span>

@@ -216,7 +216,7 @@ export function BulkCommitOperations({
 
 	return (
 		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<CheckSquare className="h-5 w-5" />

@@ -198,7 +198,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 
 			{/* Dialog */}
 			<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-				<DialogContent className="sm:max-w-md">
+				<DialogContent className="sm:max-w-md ui-surface">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
 							{FLOW_CONFIG[flowType].icon && (
@@ -236,7 +236,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 								: `This will merge ${flowType}/${name} back and clean up the branch.`}
 						</p>
 					</div>
-					<DialogFooter>
+					<DialogFooter className="ui-toolbar">
 						<Button variant="outline" onClick={() => setDialogOpen(false)}>
 							Cancel
 						</Button>

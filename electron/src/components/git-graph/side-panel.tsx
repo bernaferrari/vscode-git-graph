@@ -42,9 +42,11 @@ import { CommitPanel } from './commit-panel';
 
 interface SidePanelProps {
 	onBranchSelect?: (branch: string) => void;
+	onCreateBranch?: () => void;
+	onCreateTag?: () => void;
 }
 
-export function SidePanel({ onBranchSelect }: SidePanelProps) {
+export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag }: SidePanelProps) {
 	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 	
@@ -103,22 +105,22 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 	const filteredTags = filterBySearch(tags);
 
 	return (
-		<div className="flex flex-col h-full border-r bg-muted/20 w-60 shrink-0">
+		<div className="ui-surface flex flex-col h-full w-60 shrink-0 rounded-none border-r-0">
 			{/* Header */}
-			<div className="p-2 border-b bg-background/50">
+			<div className="p-2 border-b border-border/70 ui-toolbar">
 				<div className="relative">
 					<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
 					<Input
 						placeholder="Filter..."
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						className="h-8 pl-8 text-sm bg-background"
+						className="h-8 pl-8 text-sm"
 					/>
 				</div>
 			</div>
 
 			<ScrollArea className="flex-1">
-				<div className="p-2 space-y-1">
+				<div className="p-2 space-y-1 ui-reveal">
 					{/* Local Branches */}
 					<Section
 						title="Branches"
@@ -127,16 +129,19 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 						expanded={expandedSections.branches}
 						onToggle={() => toggleSection('branches')}
 						action={
-							<Button
-								variant="ghost"
-								size="sm"
-								className="h-5 w-5 p-0 hover:bg-accent"
-								onClick={() => {/* TODO: create branch */}}
-							>
-								<Plus className="h-3 w-3" />
-							</Button>
-						}
-					>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-5 w-5 p-0 hover:bg-accent"
+									onClick={(e) => {
+										e.stopPropagation();
+										onCreateBranch?.();
+									}}
+								>
+									<Plus className="h-3 w-3" />
+								</Button>
+							}
+						>
 						{filteredLocalBranches.map((branch) => {
 							const aheadBehind = aheadBehindData?.[branch];
 							return (
@@ -146,6 +151,7 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									isCurrent={branch === currentHead}
 									ahead={aheadBehind?.ahead}
 									behind={aheadBehind?.behind}
+									onSelect={onBranchSelect}
 									onCheckout={() => gitOps.checkout(branch)}
 									onDelete={() => gitOps.deleteBranch(branch, false)}
 								/>
@@ -166,6 +172,7 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 								<RemoteBranchItem
 									key={branch}
 									branch={branch}
+									onSelect={onBranchSelect}
 									onCheckout={() => gitOps.checkout(branch)}
 								/>
 							))}
@@ -175,11 +182,12 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									count={remoteBranches.length - 20}
 								>
 									{remoteBranches.slice(20).map((branch) => (
-										<RemoteBranchItem
-											key={branch}
-											branch={branch}
-											onCheckout={() => gitOps.checkout(branch)}
-										/>
+									<RemoteBranchItem
+										key={branch}
+										branch={branch}
+										onSelect={onBranchSelect}
+										onCheckout={() => gitOps.checkout(branch)}
+									/>
 									))}
 								</MoreItems>
 							)}
@@ -199,7 +207,10 @@ export function SidePanel({ onBranchSelect }: SidePanelProps) {
 									variant="ghost"
 									size="sm"
 									className="h-5 w-5 p-0 hover:bg-accent"
-									onClick={() => {/* TODO: create tag */}}
+									onClick={(e) => {
+										e.stopPropagation();
+										onCreateTag?.();
+									}}
 								>
 									<Plus className="h-3 w-3" />
 								</Button>
@@ -333,6 +344,7 @@ function BranchItem({
 	isCurrent,
 	ahead,
 	behind,
+	onSelect,
 	onCheckout,
 	onDelete,
 }: {
@@ -340,6 +352,7 @@ function BranchItem({
 	isCurrent: boolean;
 	ahead?: number;
 	behind?: number;
+	onSelect?: (branch: string) => void;
 	onCheckout: () => void;
 	onDelete: () => void;
 }) {
@@ -347,8 +360,20 @@ function BranchItem({
 
 	return (
 		<div
-			className="group flex items-center gap-2 px-2 py-1 text-xs cursor-pointer rounded hover:bg-accent/40 transition-colors"
-			onClick={onCheckout}
+			className="group flex items-center gap-2 px-2 py-1 text-xs cursor-pointer rounded hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+			onClick={() => {
+				onSelect?.(branch);
+				onCheckout();
+			}}
+			role="button"
+			tabIndex={0}
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onSelect?.(branch);
+					onCheckout();
+				}
+			}}
 		>
 			<GitBranch className={`h-3.5 w-3.5 shrink-0 ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`} />
 			<span className={`flex-1 truncate ${isCurrent ? 'font-medium text-primary' : ''}`}>
@@ -375,7 +400,7 @@ function BranchItem({
 				<ActionMenu>
 					<button
 						className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-accent"
-						onClick={(e) => { e.stopPropagation(); onCheckout(); }}
+						onClick={(e) => { e.stopPropagation(); onSelect?.(branch); onCheckout(); }}
 					>
 						<Check className="h-3.5 w-3.5" /> Checkout
 					</button>
@@ -401,23 +426,40 @@ function BranchItem({
 // Remote branch item
 function RemoteBranchItem({
 	branch,
+	branchName,
+	onSelect,
 	onCheckout,
 }: {
 	branch: string;
+	branchName?: string;
+	onSelect?: (branch: string) => void;
 	onCheckout: () => void;
 }) {
 	const displayBranch = branch.replace('remotes/', '');
 	const [remote, ...rest] = displayBranch.split('/');
-	const branchName = rest.join('/');
+	const shortBranchName = rest.join('/');
+	const resolvedBranch = branchName ?? shortBranchName;
 
 	return (
 		<div
-			className="group flex items-center gap-2 px-2 py-1 text-xs cursor-pointer rounded hover:bg-accent/40 transition-colors"
-			onClick={onCheckout}
+			className="group flex items-center gap-2 px-2 py-1 text-xs cursor-pointer rounded hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+			onClick={() => {
+				onSelect?.(branch);
+				onCheckout();
+			}}
+			role="button"
+			tabIndex={0}
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onSelect?.(branch);
+					onCheckout();
+				}
+			}}
 		>
 			<Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 			<span className="text-muted-foreground shrink-0">{remote}/</span>
-			<span className="flex-1 truncate">{branchName}</span>
+			<span className="flex-1 truncate">{resolvedBranch}</span>
 		</div>
 	);
 }

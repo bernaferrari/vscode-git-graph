@@ -64,6 +64,18 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 		],
 	},
 	{
+		title: 'Merge Conflict Editor',
+		shortcuts: [
+			{ keys: ['⌘', '↑'], description: 'Go to previous unresolved conflict' },
+			{ keys: ['⌘', '↓'], description: 'Go to next unresolved conflict' },
+			{ keys: ['⌘', 'O'], description: 'Use Ours for active conflict, advance to next' },
+			{ keys: ['⌘', 'T'], description: 'Use Theirs for active conflict, advance to next' },
+			{ keys: ['⌘', 'B'], description: 'Keep both for active conflict, advance to next' },
+			{ keys: ['Alt', 'N'], description: 'Use Base for active conflict, advance to next' },
+			{ keys: ['⌘', 'R'], description: 'Close conflict editor' },
+		],
+	},
+	{
 		title: 'Refresh',
 		shortcuts: [
 			{ keys: ['⌘', 'R'], description: 'Refresh commit list' },
@@ -75,7 +87,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsHelpProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Keyboard className="h-5 w-5" />

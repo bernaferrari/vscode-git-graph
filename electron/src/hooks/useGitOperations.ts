@@ -430,12 +430,13 @@ export function useGitOperations() {
 	);
 
 	const handleRebase = useCallback(
-		async (onto: string, interactive?: boolean) => {
+		async (onto: string, interactive?: boolean, todos?: string) => {
 			if (!activeRepo) return { error: 'No active repository' };
 			return rebase.mutateAsync({
 				repo: activeRepo,
 				onto,
 				interactive: interactive ?? false,
+				todos: todos,
 			});
 		},
 		[activeRepo, rebase]

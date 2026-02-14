@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { router, publicProcedure } from '../../init';
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 // Singleton Git service instance
 let gitService: GitService | null = null;
@@ -41,6 +43,230 @@ async function ensureGitInitialized(): Promise<string | null> {
 	} catch (error) {
 		return error instanceof Error ? error.message : 'Failed to find Git executable';
 	}
+}
+
+async function runRebaseCommandWithOptionalTodos(
+	args: string[],
+	repo: string,
+	todos?: string
+): Promise<string | null> {
+	const trimmedTodos = todos?.trim();
+	const gitService = getGitService();
+
+	if (trimmedTodos) {
+		const validationError = validateRebaseTodoText(trimmedTodos);
+		if (validationError) {
+			return validationError;
+		}
+		return gitService.runGitCommandWithInteractiveTodo(args, repo, trimmedTodos);
+	}
+
+	return gitService.runGitCommand(args, repo);
+}
+
+async function getGitDir(repo: string): Promise<string | null> {
+	const output = await getGitService().runGitCommandWithOutput(['rev-parse', '--git-dir'], repo);
+	const gitDir = output?.trim();
+	if (!gitDir) {
+		return null;
+	}
+
+	return path.isAbsolute(gitDir) ? gitDir : path.resolve(repo, gitDir);
+}
+
+function resolveRepoPath(repo: string, targetPath: string): string {
+	const repositoryRoot = path.resolve(repo);
+	const normalizedPath = targetPath.replace(/\\/g, '/');
+	const fullPath = path.resolve(repositoryRoot, normalizedPath);
+
+	if (fullPath !== repositoryRoot && !fullPath.startsWith(`${repositoryRoot}${path.sep}`)) {
+		throw new Error('Invalid file path');
+	}
+
+	return fullPath;
+}
+
+function validateGitPath(inputPath: string): string {
+	const normalized = inputPath.replace(/\\/g, '/');
+	const segments = normalized.split('/').filter(Boolean);
+	if (!normalized || normalized === '.' || path.isAbsolute(normalized) || segments.includes('..')) {
+		throw new Error('Invalid file path');
+	}
+	return normalized;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+	try {
+		await fs.access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+type RebaseTodoAction =
+	'pick' |
+	'reword' |
+	'edit' |
+	'squash' |
+	'fixup' |
+	'drop' |
+	'exec' |
+	'break' |
+	'label' |
+	'reset' |
+	'merge' |
+	'noop';
+
+const REBASE_TODO_ACTIONS_WITH_HASH: ReadonlySet<string> = new Set([
+	'pick',
+	'reword',
+	'edit',
+	'squash',
+	'fixup',
+	'drop',
+]);
+
+const REBASE_TODO_ACTIONS_WITHOUT_HASH: ReadonlySet<string> = new Set([
+	'exec',
+	'break',
+	'label',
+	'reset',
+	'merge',
+	'noop',
+]);
+
+const HASH_LIKE = /^[0-9a-f]{7,40}$/i;
+
+interface RebaseTodoItem {
+	action: RebaseTodoAction;
+	hash: string;
+	message: string;
+}
+
+function validateRebaseTodoText(todos: string): string | null {
+	const trimmed = todos.trim();
+	if (!trimmed) return null;
+
+	for (const [index, rawLine] of trimmed.split('\n').entries()) {
+		const trimmedLine = rawLine.trim();
+		if (!trimmedLine || trimmedLine.startsWith('#')) {
+			continue;
+		}
+
+		const [rawAction, ...restParts] = trimmedLine.split(/\s+/);
+		if (!rawAction) {
+			return `Invalid rebase todo at line ${index + 1}: empty command`;
+		}
+
+		const action = rawAction.toLowerCase();
+		const hash = restParts[0];
+
+		if (REBASE_TODO_ACTIONS_WITH_HASH.has(action)) {
+			if (!hash || !HASH_LIKE.test(hash)) {
+				return `Invalid rebase todo at line ${index + 1}: "${action}" requires a valid commit hash`;
+			}
+			continue;
+		}
+
+		if (REBASE_TODO_ACTIONS_WITHOUT_HASH.has(action)) {
+			continue;
+		}
+
+		return `Invalid rebase todo at line ${index + 1}: unknown action "${rawAction}"`;
+	}
+
+	return null;
+}
+
+function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
+	const trimmedLine = line.trim();
+	if (!trimmedLine || trimmedLine.startsWith('#')) {
+		return null;
+	}
+
+	const actionWithCommitMatch = trimmedLine.match(
+		/^(pick|reword|edit|squash|fixup|drop)\s+([0-9a-f]{7,40})(?:\s+(.*))?$/i
+	);
+	if (actionWithCommitMatch) {
+		return {
+			action: actionWithCommitMatch[1]!.toLowerCase() as RebaseTodoAction,
+			hash: actionWithCommitMatch[2]!.toLowerCase(),
+			message: actionWithCommitMatch[3]?.trim() ?? '',
+		};
+	}
+
+	const actionNoCommitMatch = trimmedLine.match(/^(exec|break)\s*(.*)$/i);
+	if (actionNoCommitMatch) {
+		return {
+			action: actionNoCommitMatch[1]!.toLowerCase() as RebaseTodoAction,
+			hash: '',
+			message: actionNoCommitMatch[2]?.trim() ?? '',
+		};
+	}
+
+	const actionWithOptionalHashMatch = trimmedLine.match(/^(label|reset|merge|noop)\s+(.*)$/i);
+	if (actionWithOptionalHashMatch) {
+		const [, action, body] = actionWithOptionalHashMatch;
+		if (!body) {
+			return {
+				action: action.toLowerCase() as RebaseTodoAction,
+				hash: '',
+				message: '',
+			};
+		}
+
+		const hashMatch = body.match(/^([0-9a-f]{7,40})(?:\s+(.*))?$/i);
+		if (hashMatch) {
+			return {
+				action: action.toLowerCase() as RebaseTodoAction,
+				hash: hashMatch[1]!.toLowerCase(),
+				message: hashMatch[2]?.trim() ?? '',
+			};
+		}
+
+		return {
+			action: action.toLowerCase() as RebaseTodoAction,
+			hash: '',
+			message: body.trim(),
+		};
+	}
+
+	const actionOnlyMatch = trimmedLine.match(/^(label|reset|merge|noop)\s*$/i);
+	if (actionOnlyMatch) {
+		return {
+			action: actionOnlyMatch[1]!.toLowerCase() as RebaseTodoAction,
+			hash: '',
+			message: '',
+		};
+	}
+
+	return null;
+}
+
+async function readRebaseTodo(gitDir: string): Promise<{ source: 'rebase-merge' | 'rebase-apply'; rawTodo: string; todos: RebaseTodoItem[] } | null> {
+	const rebaseTodoCandidates: Array<{ source: 'rebase-merge' | 'rebase-apply'; path: string }> = [
+		{ source: 'rebase-merge', path: path.join(gitDir, 'rebase-merge', 'git-rebase-todo') },
+		{ source: 'rebase-apply', path: path.join(gitDir, 'rebase-apply', 'git-rebase-todo') },
+	];
+
+	for (const candidate of rebaseTodoCandidates) {
+		if (!(await fileExists(candidate.path))) continue;
+
+		const rawTodo = await fs.readFile(candidate.path, 'utf8');
+		const todos = rawTodo
+			.split('\n')
+			.map((line) => parseRebaseTodoLine(line))
+			.filter((entry): entry is RebaseTodoItem => Boolean(entry));
+
+		return {
+			source: candidate.source,
+			rawTodo,
+			todos,
+		};
+	}
+
+	return null;
 }
 
 export const gitRouter = router({
@@ -140,6 +366,11 @@ export const gitRouter = router({
 				showTags: z.boolean(),
 				showRemoteBranches: z.boolean(),
 				hideRemotes: z.array(z.string()),
+				author: z.string().optional(),
+				search: z.string().optional(),
+				filePath: z.string().optional(),
+				dateFrom: z.string().optional(),
+				dateTo: z.string().optional(),
 			})
 		)
 		.query(async ({ input }) => {
@@ -156,7 +387,14 @@ export const gitRouter = router({
 						input.branches,
 						input.maxCommits + 1,
 						input.order,
-						input.onlyFollowFirstParent
+						input.onlyFollowFirstParent,
+						{
+							author: input.author,
+							search: input.search,
+							filePath: input.filePath,
+							dateFrom: input.dateFrom,
+							dateTo: input.dateTo,
+						}
 					),
 					service.getRefs(input.repo, input.showRemoteBranches, input.hideRemotes),
 				]);
@@ -262,6 +500,36 @@ export const gitRouter = router({
 			} catch (error) {
 				return {
 					details: null,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				};
+			}
+		}),
+
+	/**
+	 * Get commits from a starting commit through HEAD.
+	 */
+	log: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				startHash: z.string(),
+				maxCommits: z.number().min(1).max(500).default(50),
+			})
+		)
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { commits: [], error: initError };
+
+			try {
+				const commits = await getGitService().getCommitsFrom(
+					input.startHash,
+					input.repo,
+					input.maxCommits
+				);
+				return { commits, error: null };
+			} catch (error) {
+				return {
+					commits: [],
 					error: error instanceof Error ? error.message : 'Unknown error',
 				};
 			}
@@ -700,6 +968,7 @@ export const gitRouter = router({
 				repo: z.string(),
 				onto: z.string(),
 				interactive: z.boolean().optional(),
+				todos: z.string().optional(),
 			})
 		)
 		.mutation(async ({ input }) => {
@@ -708,9 +977,20 @@ export const gitRouter = router({
 
 			const args = ['rebase'];
 			if (input.interactive) args.push('-i');
-			args.push('--onto', input.onto);
+			args.push(input.onto);
 
-			const error = await getGitService().runGitCommand(args, input.repo);
+			let error = null;
+
+			if (input.interactive) {
+				if (!input.todos?.trim()) {
+					error = 'Interactive rebase requires a todo list.';
+				} else {
+					error = await runRebaseCommandWithOptionalTodos(args, input.repo, input.todos);
+				}
+			} else {
+				error = await getGitService().runGitCommand(args, input.repo);
+			}
+
 			return { error };
 		}),
 
@@ -790,6 +1070,8 @@ export const gitRouter = router({
 
 	/**
 	 * Continue an interactive rebase.
+	 *
+	 * @deprecated Use rebaseContinue for active operations. Kept for compatibility.
 	 */
 	continueRebase: publicProcedure
 		.input(
@@ -802,15 +1084,18 @@ export const gitRouter = router({
 			const initError = await ensureGitInitialized();
 			if (initError) return { error: initError };
 
-			const error = await getGitService().runGitCommand(
+			const error = await runRebaseCommandWithOptionalTodos(
 				['rebase', '--continue'],
-				input.repo
+				input.repo,
+				input.todos
 			);
 			return { error };
 		}),
 
 	/**
 	 * Abort an interactive rebase.
+	 *
+	 * @deprecated Use rebaseAbort for active operations. Kept for compatibility.
 	 */
 	abortRebase: publicProcedure
 		.input(
@@ -1474,8 +1759,12 @@ export const gitRouter = router({
 			const initError = await ensureGitInitialized();
 			if (initError) return { error: initError };
 
+			const safeFiles = input.files.map(validateGitPath);
+			if (safeFiles.length === 0) {
+				return { error: 'No files provided' };
+			}
 			const error = await getGitService().runGitCommand(
-				['add', ...input.files],
+				['add', '--', ...safeFiles],
 				input.repo
 			);
 			return { error };
@@ -1495,8 +1784,12 @@ export const gitRouter = router({
 			const initError = await ensureGitInitialized();
 			if (initError) return { error: initError };
 
+			const safeFiles = input.files.map(validateGitPath);
+			if (safeFiles.length === 0) {
+				return { error: 'No files provided' };
+			}
 			const error = await getGitService().runGitCommand(
-				['reset', 'HEAD', '--', ...input.files],
+				['reset', 'HEAD', '--', ...safeFiles],
 				input.repo
 			);
 			return { error };
@@ -1519,12 +1812,21 @@ export const gitRouter = router({
 	 * Continue a rebase after resolving conflicts.
 	 */
 	rebaseContinue: publicProcedure
-		.input(z.object({ repo: z.string() }))
+		.input(
+			z.object({
+				repo: z.string(),
+				todos: z.string().optional(),
+			})
+		)
 		.mutation(async ({ input }) => {
 			const initError = await ensureGitInitialized();
 			if (initError) return { error: initError };
 
-			const error = await getGitService().runGitCommand(['rebase', '--continue'], input.repo);
+			const error = await runRebaseCommandWithOptionalTodos(
+				['rebase', '--continue'],
+				input.repo,
+				input.todos
+			);
 			return { error };
 		}),
 
@@ -1630,10 +1932,10 @@ export const gitRouter = router({
 
 			try {
 				const gitService = getGitService();
-				const fs = await import('fs');
-				const path = await import('path');
-
-				const gitDir = path.join(input.repo, '.git');
+				const gitDir = await getGitDir(input.repo);
+				if (!gitDir) {
+					return { state: null, error: 'Could not determine .git directory' };
+				}
 
 				// Check for various operation states
 				const state = {
@@ -1646,39 +1948,39 @@ export const gitRouter = router({
 				};
 
 				// Check merge state
-				try {
-					await fs.promises.access(path.join(gitDir, 'MERGE_HEAD'));
-					state.merging = true;
-				} catch {}
-
-				// Check rebase state
-				try {
-					await fs.promises.access(path.join(gitDir, 'rebase-merge'));
-					state.rebasing = true;
-				} catch {
 					try {
-						await fs.promises.access(path.join(gitDir, 'rebase-apply'));
-						state.rebasing = true;
+						await fs.access(path.join(gitDir, 'MERGE_HEAD'));
+						state.merging = true;
 					} catch {}
-				}
 
-				// Check cherry-pick state
-				try {
-					await fs.promises.access(path.join(gitDir, 'CHERRY_PICK_HEAD'));
-					state.cherryPicking = true;
-				} catch {}
+					// Check rebase state
+					try {
+						await fs.access(path.join(gitDir, 'rebase-merge'));
+						state.rebasing = true;
+					} catch {
+						try {
+							await fs.access(path.join(gitDir, 'rebase-apply'));
+							state.rebasing = true;
+						} catch {}
+					}
 
-				// Check revert state
-				try {
-					await fs.promises.access(path.join(gitDir, 'REVERT_HEAD'));
-					state.reverting = true;
-				} catch {}
+					// Check cherry-pick state
+					try {
+						await fs.access(path.join(gitDir, 'CHERRY_PICK_HEAD'));
+						state.cherryPicking = true;
+					} catch {}
 
-				// Check bisect state
-				try {
-					await fs.promises.access(path.join(gitDir, 'BISECT_LOG'));
-					state.bisecting = true;
-				} catch {}
+					// Check revert state
+					try {
+						await fs.access(path.join(gitDir, 'REVERT_HEAD'));
+						state.reverting = true;
+					} catch {}
+
+					// Check bisect state
+					try {
+						await fs.access(path.join(gitDir, 'BISECT_LOG'));
+						state.bisecting = true;
+					} catch {}
 
 				// Get conflict list
 				const statusOutput = await gitService.runGitCommandWithOutput(
@@ -1698,9 +2000,55 @@ export const gitRouter = router({
 					}
 				}
 
-				return { state, error: null };
+			return { state, error: null };
 			} catch (error) {
 				return { state: null, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	/**
+	 * Get active rebase todo list for an in-progress rebase.
+	 */
+	rebaseTodo: publicProcedure
+		.input(z.object({ repo: z.string() }))
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { source: null, rawTodo: '', todos: [], error: initError };
+
+			try {
+				const gitDir = await getGitDir(input.repo);
+				if (!gitDir) {
+					return {
+						source: null,
+						rawTodo: '',
+						todos: [],
+						error: 'Could not determine .git directory',
+					};
+				}
+
+				const rebaseTodo = await readRebaseTodo(gitDir);
+				if (!rebaseTodo) {
+					return {
+						source: null,
+						rawTodo: '',
+						todos: [],
+						error: 'No active rebase todo file found',
+					};
+				}
+
+				return {
+					source: rebaseTodo.source,
+					rawTodo: rebaseTodo.rawTodo,
+					todos: rebaseTodo.todos,
+					error: null,
+				};
+			} catch (error) {
+				return {
+					source: null,
+					rawTodo: '',
+					todos: [],
+					error: error instanceof Error ? error.message : 'Unknown error',
+				};
 			}
 		}),
 
@@ -1723,18 +2071,19 @@ export const gitRouter = router({
 			
 			// Use git checkout to resolve
 			const args = ['checkout'];
+			const safePath = validateGitPath(input.path);
 			if (input.resolution === 'ours') {
 				args.push('--ours');
 			} else if (input.resolution === 'theirs') {
 				args.push('--theirs');
 			}
-			args.push('--', input.path);
+			args.push('--', safePath);
 
 			const error = await gitService.runGitCommand(args, input.repo);
 			
 			if (!error) {
 				// Stage the resolved file
-				await gitService.runGitCommand(['add', input.path], input.repo);
+				await gitService.runGitCommand(['add', '--', safePath], input.repo);
 			}
 			
 			return { error };
@@ -2313,18 +2662,85 @@ export const gitRouter = router({
 		)
 		.query(async ({ input }) => {
 			try {
+				const safePath = resolveRepoPath(input.repo, validateGitPath(input.path));
 				const fs = await import('fs');
-				const path = await import('path');
-				const fullPath = path.join(input.repo, input.path);
-				
-				if (!fs.existsSync(fullPath)) {
+				if (!await fileExists(safePath)) {
 					return { content: '', error: null };
 				}
-				
-				const content = await fs.promises.readFile(fullPath, 'utf-8');
+
+				const content = await fs.promises.readFile(safePath, 'utf-8');
 				return { content, error: null };
 			} catch (error) {
 				return { content: null, error: error instanceof Error ? error.message : 'Unknown error' };
+			}
+		}),
+
+	/**
+	 * Read conflict-side versions for a conflicted file from git index stages.
+	 */
+	readConflictFile: publicProcedure
+		.input(
+			z.object({
+				repo: z.string(),
+				path: z.string(),
+			})
+		)
+		.query(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError) return { ours: null, base: null, theirs: null, error: initError };
+
+			try {
+				const gitService = getGitService();
+				const safePath = validateGitPath(input.path);
+				const fetchConflictVersion = (stage: number) =>
+					gitService.runGitCommandWithOutput(['show', `:${stage}:${safePath}`], input.repo);
+				const stageResults = await Promise.allSettled([
+					fetchConflictVersion(2),
+					fetchConflictVersion(1),
+					fetchConflictVersion(3),
+				]);
+
+				const values = {
+					ours: null as string | null,
+					base: null as string | null,
+					theirs: null as string | null,
+				};
+				const warnings: string[] = [];
+
+				if (stageResults[0].status === 'fulfilled') {
+					values.ours = stageResults[0].value;
+				} else {
+					warnings.push('Unable to read our conflict version from index.');
+				}
+
+				if (stageResults[1].status === 'fulfilled') {
+					values.base = stageResults[1].value;
+				} else {
+					warnings.push('Unable to read base conflict version from index.');
+				}
+
+				if (stageResults[2].status === 'fulfilled') {
+					values.theirs = stageResults[2].value;
+				} else {
+					warnings.push('Unable to read theirs conflict version from index.');
+				}
+
+				const criticalError = !values.ours && !values.theirs
+					? 'Unable to read conflict versions for this file.'
+					: null;
+
+				return {
+					...values,
+					warnings: warnings.length ? warnings : null,
+					error: criticalError,
+				};
+			} catch (error) {
+				return {
+					ours: null,
+					base: null,
+					theirs: null,
+					error: error instanceof Error ? error.message : 'Unknown error',
+				};
 			}
 		}),
 
@@ -2341,10 +2757,10 @@ export const gitRouter = router({
 		)
 		.mutation(async ({ input }) => {
 			try {
+				const safePath = resolveRepoPath(input.repo, validateGitPath(input.path));
 				const fs = await import('fs');
-				const path = await import('path');
-				const fullPath = path.join(input.repo, input.path);
-				await fs.promises.writeFile(fullPath, input.content, 'utf-8');
+				await fs.promises.mkdir(path.dirname(safePath), { recursive: true });
+				await fs.promises.writeFile(safePath, input.content, 'utf-8');
 				return { error: null };
 			} catch (error) {
 				return { error: error instanceof Error ? error.message : 'Unknown error' };

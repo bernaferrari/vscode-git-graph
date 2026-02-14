@@ -128,7 +128,7 @@ export function EmptyState({ icon, title, description, action, variant = 'card' 
 	}
 
 	return (
-		<Card className="border-dashed bg-muted/20">
+		<Card className="ui-surface border-dashed border-border/70">
 			<CardContent className="flex flex-col items-center justify-center py-12 text-center">
 				{icon && (
 					<div className="mb-4 text-muted-foreground opacity-50">{icon}</div>
@@ -222,7 +222,7 @@ export function ErrorState({
 
 export function NoRepoSelected({ onSelectRepo }: { onSelectRepo: () => void }) {
 	return (
-		<div className="flex flex-col items-center justify-center h-full text-center p-8">
+		<div className="flex flex-col items-center justify-center h-full text-center p-8 ui-surface">
 			<div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
 				<FolderGit2 className="h-10 w-10 text-primary" />
 			</div>

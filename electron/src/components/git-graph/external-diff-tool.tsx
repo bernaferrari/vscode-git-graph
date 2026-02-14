@@ -257,7 +257,7 @@ export function ExternalDiffConfig({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<ExternalLink className="h-5 w-5" />
@@ -420,7 +420,7 @@ export function ExternalDiffConfig({
 					</div>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<Button variant="ghost" onClick={() => onOpenChange(false)}>
 						Close
 					</Button>

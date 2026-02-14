@@ -29,7 +29,7 @@ interface CommitGraphLegendProps {
 export function CommitGraphLegend({ open, onOpenChange }: CommitGraphLegendProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-lg">
+			<DialogContent className="max-w-lg ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Info className="h-5 w-5" />

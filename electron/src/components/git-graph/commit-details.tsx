@@ -48,9 +48,22 @@ interface CommitDetailsPanelProps {
 	onClose?: () => void;
 	onNavigateToCommit?: (hash: string) => void;
 	onFilterByAuthor?: (email: string) => void;
+	onCreateBranch?: (hash: string) => void;
+	onCreateTag?: (hash: string) => void;
+	onReset?: (hash: string, mode: 'soft' | 'mixed' | 'hard') => void;
+	onFileHistoryNavigate?: (hash: string) => void;
 }
 
-export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, onFilterByAuthor }: CommitDetailsPanelProps) {
+export function CommitDetailsPanel({
+	commitHash,
+	onClose,
+	onNavigateToCommit,
+	onFilterByAuthor,
+	onCreateBranch,
+	onCreateTag,
+	onReset,
+	onFileHistoryNavigate,
+}: CommitDetailsPanelProps) {
 	const { activeRepo } = useAppStore();
 	const [selectedFile, setSelectedFile] = useState<string | null>(null);
 	const [showDiff, setShowDiff] = useState(false);
@@ -82,9 +95,27 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 		setShowFileHistory(true);
 	};
 
+	const handleCreateBranch = () => {
+		if (commitHash) {
+			onCreateBranch?.(commitHash);
+		}
+	};
+
+	const handleCreateTag = () => {
+		if (commitHash) {
+			onCreateTag?.(commitHash);
+		}
+	};
+
+	const handleResetCommit = () => {
+		if (commitHash) {
+			onReset?.(commitHash, 'mixed');
+		}
+	};
+
 	if (!commitHash) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground p-4 bg-background">
+			<div className="flex items-center justify-center h-full text-muted-foreground p-4 ui-surface">
 				<div className="text-center">
 					<GitCommit className="h-10 w-10 mx-auto mb-3 opacity-30" />
 					<p className="text-sm">Select a commit to view details</p>
@@ -95,7 +126,7 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center h-full bg-background">
+			<div className="flex items-center justify-center h-full ui-surface">
 				<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
 			</div>
 		);
@@ -103,7 +134,7 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 
 	if (!commitDetails?.details) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground p-4 bg-background">
+			<div className="flex items-center justify-center h-full text-muted-foreground p-4 ui-surface">
 				<p className="text-sm">Failed to load commit details</p>
 			</div>
 		);
@@ -116,9 +147,9 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 	};
 
 	return (
-		<div className="flex flex-col h-full bg-background">
+		<div className="flex flex-col h-full ui-surface">
 			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-2 border-b">
+			<div className="flex items-center justify-between px-3 py-2 ui-toolbar">
 				<div className="flex items-center gap-2">
 					<GitCommit className="h-4 w-4 text-muted-foreground" />
 					<span className="font-medium text-sm">Commit</span>
@@ -310,8 +341,8 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 
 			{/* Diff Viewer */}
 			{showDiff && selectedFile && selectedFileInfo && (
-				<div className="absolute inset-0 z-10 bg-background flex flex-col">
-					<div className="flex items-center justify-between px-3 py-2 border-b">
+				<div className="absolute inset-0 z-10 ui-surface flex flex-col">
+					<div className="flex items-center justify-between px-3 py-2 ui-toolbar">
 						<div className="flex items-center gap-2">
 							<Button
 								variant="ghost"
@@ -351,9 +382,9 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 			)}
 
 			{/* File History Viewer */}
-			{showFileHistory && historyFile && (
-				<div className="absolute inset-0 z-10 bg-background flex flex-col">
-					<div className="flex items-center justify-between px-3 py-2 border-b">
+							{showFileHistory && historyFile && (
+				<div className="absolute inset-0 z-10 ui-surface flex flex-col">
+					<div className="flex items-center justify-between px-3 py-2 ui-toolbar">
 						<div className="flex items-center gap-2">
 							<Button
 								variant="ghost"
@@ -372,8 +403,8 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 						<FileHistory
 							filePath={historyFile}
 							onSelectCommit={(hash) => {
-								// Could navigate to the commit in the main view
-								console.log('Selected commit:', hash);
+								onFileHistoryNavigate?.(hash);
+								setShowFileHistory(false);
 							}}
 						/>
 					</div>
@@ -382,15 +413,30 @@ export function CommitDetailsPanel({ commitHash, onClose, onNavigateToCommit, on
 
 			{/* Footer actions */}
 			<div className="flex items-center gap-1 p-2 border-t">
-				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 text-xs gap-1"
+					onClick={handleCreateBranch}
+				>
 					<GitBranch className="h-3 w-3" />
 					Branch
 				</Button>
-				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 text-xs gap-1"
+					onClick={handleCreateTag}
+				>
 					<Tag className="h-3 w-3" />
 					Tag
 				</Button>
-				<Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 text-xs gap-1"
+					onClick={handleResetCommit}
+				>
 					<RotateCcw className="h-3 w-3" />
 					Reset
 				</Button>

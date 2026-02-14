@@ -12,7 +12,7 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
       aria-label="pagination"
       data-slot="pagination"
       className={cn(
-        "mx-auto flex w-full justify-center",
+        "mx-auto flex w-full justify-center text-foreground",
         className
       )}
       {...props}
@@ -49,10 +49,13 @@ function PaginationLink({
   ...props
 }: PaginationLinkProps) {
   return (
-    <Button
+      <Button
       variant={isActive ? "outline" : "ghost"}
       size={size}
-      className={cn(className)}
+      className={cn(
+        "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset)]",
+        className
+      )}
       nativeButton={false}
       render={
         <a

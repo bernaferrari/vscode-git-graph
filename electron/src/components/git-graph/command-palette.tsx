@@ -39,6 +39,7 @@ import {
 	Pin,
 	User,
 	Activity,
+	FolderOpen,
 	Command,
 	FileCode,
 	GitCommit,
@@ -60,17 +61,18 @@ interface CommandPaletteProps {
 	onOpenChange: (open: boolean) => void;
 	actions: {
 		onCreateBranch: () => void;
-		onCreateTag: () => void;
-		onFetch: () => void;
-		onPull: () => void;
-		onPush: () => void;
-		onRefresh: () => void;
-		onSettings: () => void;
-		onSearch: () => void;
-		onTerminal: () => void;
-		onStash: () => void;
-		onCommitSigning: () => void;
-		onReflog: () => void;
+	onCreateTag: () => void;
+	onFetch: () => void;
+	onPull: () => void;
+	onPush: () => void;
+	onRefresh: () => void;
+	onSettings: () => void;
+	onSearch: () => void;
+	onTerminal: () => void;
+	onOpenInFinder?: () => void;
+	onStash: () => void;
+	onCommitSigning: () => void;
+	onReflog: () => void;
 		onTemplates: () => void;
 		onGitignore: () => void;
 		onCustomCommands: () => void;
@@ -177,6 +179,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Tools',
 			shortcut: '⌘P',
 			action: actions.onTerminal,
+		},
+		{
+			id: 'finder',
+			label: 'Reveal in Finder',
+			icon: <FolderOpen className="h-4 w-4" />,
+			category: 'Tools',
+			action: actions.onOpenInFinder ?? (() => {}),
 		},
 		{
 			id: 'statistics',
@@ -395,8 +404,8 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 
 	return (
 		<Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setQuery(''); }}>
-			<DialogContent className="p-0 max-w-xl gap-0">
-				<div className="flex items-center border-b px-3">
+			<DialogContent className="p-0 max-w-xl gap-0 ui-surface">
+				<div className="ui-toolbar flex items-center px-3 py-2">
 					<Search className="h-4 w-4 text-muted-foreground mr-2" />
 					<Input
 						placeholder="Type a command or search..."
@@ -448,7 +457,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 												</div>
 												<span className="flex-1 text-sm">{cmd.label}</span>
 												{cmd.shortcut && (
-													<kbd className="text-xs px-1.5 py-0.5 rounded bg-muted">
+													<kbd className="ui-kbd">
 														{cmd.shortcut}
 													</kbd>
 												)}
@@ -461,7 +470,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 					)}
 				</ScrollArea>
 
-				<div className="border-t px-3 py-2 text-xs text-muted-foreground flex items-center gap-4">
+				<div className="ui-toolbar px-3 py-2 text-xs text-muted-foreground flex items-center gap-4">
 					<span>↑↓ to navigate</span>
 					<span>↵ to select</span>
 					<span>esc to close</span>

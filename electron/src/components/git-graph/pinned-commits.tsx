@@ -77,7 +77,7 @@ export function PinnedCommitsDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+			<DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Pin className="h-5 w-5" />

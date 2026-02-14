@@ -80,8 +80,8 @@ export function MergeConflictDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
-			<Card className="relative z-50 w-full max-w-4xl mx-4 max-h-[80vh]">
+			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<Card className="relative z-50 w-full ui-surface max-w-4xl mx-4 max-h-[80vh]">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<span>Merge Conflicts</span>

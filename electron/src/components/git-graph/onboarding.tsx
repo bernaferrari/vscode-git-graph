@@ -158,27 +158,27 @@ export function OnboardingDialog({
 					<div className="grid grid-cols-2 gap-2 text-sm">
 						<div className="flex justify-between">
 							<span>Command Palette</span>
-							<kbd className="bg-muted px-2 rounded">⌘⇧P</kbd>
+							<kbd className="ui-kbd">⌘⇧P</kbd>
 						</div>
 						<div className="flex justify-between">
 							<span>Find</span>
-							<kbd className="bg-muted px-2 rounded">⌘F</kbd>
+							<kbd className="ui-kbd">⌘F</kbd>
 						</div>
 						<div className="flex justify-between">
 							<span>Create Branch</span>
-							<kbd className="bg-muted px-2 rounded">⌘B</kbd>
+							<kbd className="ui-kbd">⌘B</kbd>
 						</div>
 						<div className="flex justify-between">
 							<span>Commit</span>
-							<kbd className="bg-muted px-2 rounded">⌘⏎</kbd>
+							<kbd className="ui-kbd">⌘⏎</kbd>
 						</div>
 						<div className="flex justify-between">
 							<span>Push</span>
-							<kbd className="bg-muted px-2 rounded">⌘P</kbd>
+							<kbd className="ui-kbd">⌘P</kbd>
 						</div>
 						<div className="flex justify-between">
 							<span>Pull</span>
-							<kbd className="bg-muted px-2 rounded">⌘⇧P</kbd>
+							<kbd className="ui-kbd">⌘⇧P</kbd>
 						</div>
 					</div>
 				</div>
@@ -244,7 +244,7 @@ export function OnboardingDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-lg">
+			<DialogContent className="max-w-lg ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center justify-between">
 						<div className="flex items-center gap-2">

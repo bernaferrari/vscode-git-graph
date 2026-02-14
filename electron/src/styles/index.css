@@ -8,6 +8,7 @@
 :root {
     --background: oklch(0.98 0 0);
     --foreground: oklch(0.145 0 0);
+    --surface: oklch(0.982 0.004 262);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
@@ -30,6 +31,10 @@
     --chart-4: oklch(0.65 0.18 132);
     --chart-5: oklch(0.53 0.14 132);
     --radius: 0.625rem;
+    --ring-offset: oklch(0.98 0 0);
+    --surface-elevated: oklch(0.99 0.005 260);
+    --surface-gradient-1: oklch(0.99 0.01 160);
+    --surface-gradient-2: oklch(0.97 0.02 132);
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
     --sidebar-primary: oklch(0.65 0.18 132);
@@ -43,6 +48,7 @@
 .dark {
     --background: oklch(0.12 0 0);
     --foreground: oklch(0.985 0 0);
+    --surface: oklch(0.15 0.01 262);
     --card: oklch(0.205 0 0);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
@@ -72,6 +78,10 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    --ring-offset: oklch(0.12 0 0);
+    --surface-elevated: oklch(0.205 0 0);
+    --surface-gradient-1: oklch(0.23 0.03 230);
+    --surface-gradient-2: oklch(0.205 0.01 132);
 }
 
 @theme inline {
@@ -120,14 +130,105 @@
   * {
     @apply border-border outline-ring/50;
   }
+  *:focus-visible {
+    @apply ring-2 ring-ring ring-offset-2 ring-offset-[var(--ring-offset)] outline-none;
+  }
   html {
     height: 100%;
   }
   body {
-    @apply h-full bg-background text-foreground font-sans antialiased;
+    @apply h-full text-foreground font-sans antialiased;
+    background:
+      radial-gradient(circle at 10% 0%, var(--surface-gradient-1), transparent 44%),
+      radial-gradient(circle at 90% 0%, var(--surface-gradient-2), transparent 46%),
+      var(--surface);
+    color: var(--foreground);
   }
   #root {
     @apply h-full;
+    isolation: isolate;
+  }
+}
+
+.app-shell {
+  @apply min-h-full flex bg-background text-foreground;
+}
+
+.app-shell-main {
+  @apply flex-1 min-h-0 overflow-hidden relative;
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--surface-elevated) 65%, transparent), transparent),
+    var(--surface-elevated);
+}
+
+.app-shell-sidebar {
+  @apply border-r border-sidebar-border/80 bg-sidebar shadow-[0_0_30px_-18px_rgba(0,0,0,0.5)];
+  backdrop-filter: blur(4px);
+}
+
+.glossy-panel {
+  @apply bg-card/85 border border-border/80 rounded-2xl shadow-[0_20px_60px_-30px_rgba(0,0,0,0.4)];
+  backdrop-filter: blur(8px);
+}
+
+.glass-panel {
+  @apply border border-white/20 rounded-xl bg-white/20;
+  backdrop-filter: blur(8px);
+}
+
+.empty-state {
+  @apply px-4 py-10 text-sm text-muted-foreground flex flex-col items-center justify-center gap-2 text-center;
+}
+
+.skip-link {
+  @apply sr-only focus:not-sr-only focus:fixed focus:z-[100] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-background focus:py-2 focus:px-3 focus:text-sm focus:border focus:border-border;
+}
+
+.ui-reveal {
+  animation: ui-reveal 240ms cubic-bezier(0.2, 0.8, 0.4, 1) both;
+}
+
+.ui-surface {
+  @apply rounded-2xl border border-border/65 bg-card/92 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.45)];
+  backdrop-filter: blur(12px);
+}
+
+.ui-toolbar {
+  @apply border-b border-border/70 bg-background/90 backdrop-blur-md;
+}
+
+.ui-commit-col {
+  @apply border-r border-border/60 bg-muted/20;
+}
+
+.ui-commit-row {
+  @apply border-b border-border/40 transition-[background,transform];
+}
+
+.ui-status-bar {
+  @apply h-6 border-t border-border/70 bg-background/90 backdrop-blur-md;
+}
+
+.ui-empty-state-shell {
+  @apply p-8 flex flex-col items-center justify-center gap-2 text-center;
+}
+
+.ui-inline-menu {
+  @apply rounded-lg border border-border/70 bg-popover/95 backdrop-blur-sm shadow-[0_18px_90px_-40px_rgba(0,0,0,0.55)] ring-1 ring-foreground/20;
+}
+
+.ui-kbd {
+  @apply inline-flex items-center rounded-md border border-border/55 bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono;
+}
+
+@keyframes ui-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -195,4 +296,15 @@
 /* Inline diff indicator */
 .diff-modified-indicator {
   color: oklch(0.70 0.15 75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

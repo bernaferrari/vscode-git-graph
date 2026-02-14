@@ -41,6 +41,9 @@ interface AppSettings {
 	autoFetchInterval: number;
 	checkForUpdates: boolean;
 	launchAtStartup: boolean;
+
+	// Lens Mode (new - three lenses approach)
+	lensMode: 'guided' | 'craft' | 'control';
 	
 	// Appearance
 	theme: 'light' | 'dark' | 'system';
@@ -77,6 +80,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 	autoFetchInterval: 5,
 	checkForUpdates: true,
 	launchAtStartup: false,
+	lensMode: 'craft', // Default to Craft mode (balanced)
 	theme: 'system',
 	graphTheme: 'default',
 	commitMessageLength: 72,
@@ -141,7 +145,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+			<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Settings className="h-5 w-5" />
@@ -201,6 +205,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 										checked={settings.launchAtStartup}
 										onCheckedChange={(v) => updateSetting('launchAtStartup', v)}
 									/>
+								</SettingRow>
+								<SettingRow
+									label="Lens Mode"
+									description="Choose your interface experience level"
+								>
+									<select
+										className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
+										value={settings.lensMode}
+										onChange={(e) => updateSetting('lensMode', e.target.value as 'guided' | 'craft' | 'control')}
+									>
+										<option value="guided">Guided - Simple and safe</option>
+										<option value="craft">Craft - Balanced with shortcuts</option>
+										<option value="control">Control - Full power</option>
+									</select>
 								</SettingRow>
 							</SettingsSection>
 						</TabsContent>
@@ -429,7 +447,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 					</ScrollArea>
 				</Tabs>
 
-				<div className="flex items-center justify-between pt-4 border-t">
+				<div className="ui-toolbar px-4 py-3 -mx-4 -mb-4">
 					<Button variant="outline" onClick={resetSettings}>
 						<RotateCcw className="h-4 w-4 mr-2" />
 						Reset to Defaults

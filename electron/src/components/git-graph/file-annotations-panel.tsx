@@ -165,7 +165,7 @@ export function FileAnnotationsPanel({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0">
+			<DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0 ui-surface">
 				<DialogHeader className="px-6 py-4 border-b">
 					<div className="flex items-center justify-between">
 						<DialogTitle className="flex items-center gap-2">

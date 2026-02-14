@@ -129,11 +129,11 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
 	return (
 		<>
 			{/* Backdrop */}
-			<div className="fixed inset-0 z-50 bg-black/50" onClick={handleSkip} />
+			<div className="fixed inset-0 z-50 bg-black/55" onClick={handleSkip} />
 
 			{/* Tour card */}
 			<div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
-				<Card className="shadow-2xl">
+				<Card className="shadow-2xl ui-surface">
 					<CardHeader className="pb-2">
 						<div className="flex items-center justify-between">
 							<span className="text-xs text-muted-foreground">

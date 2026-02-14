@@ -6,6 +6,9 @@
  */
 
 import * as cp from 'child_process';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { decode, encodingExists } from 'iconv-lite';
 import type { GitExecutable } from './gitExecutable';
 import { doesVersionMeetRequirement, GitVersionRequirement } from './gitExecutable';
@@ -224,13 +227,20 @@ export class GitService {
 	/**
 	 * Run a Git command and return error info (null = success).
 	 */
-	async runGitCommand(args: string[], cwd: string): Promise<string | null> {
+	async runGitCommand(
+		args: string[],
+		cwd: string,
+		options?: { env?: NodeJS.ProcessEnv }
+	): Promise<string | null> {
 		if (!this.gitExecutable) {
 			return 'Git executable not available';
 		}
 
 		return new Promise((resolve) => {
-			const cmd = cp.spawn(this.gitExecutable!.path, args, { cwd });
+			const cmd = cp.spawn(this.gitExecutable!.path, args, {
+				cwd,
+				env: options?.env ? { ...process.env, ...options.env } : process.env,
+			});
 
 			let stderr = '';
 
@@ -250,6 +260,47 @@ export class GitService {
 				}
 			});
 		});
+	}
+
+	/**
+	 * Run a Git command with custom interactive rebase todo content.
+	 */
+	async runGitCommandWithInteractiveTodo(
+		args: string[],
+		cwd: string,
+		todos: string
+	): Promise<string | null> {
+		const trimmedTodos = todos.trim();
+		const tmpTodoPath = path.join(os.tmpdir(), `git-graph-rebase-todo-${Date.now()}.txt`);
+		const tmpEditorPath = path.join(
+			os.tmpdir(),
+			`git-graph-rebase-sequence-editor-${Date.now()}${process.platform === 'win32' ? '.cmd' : '.sh'}`
+		);
+		const normalizedTodos = (trimmedTodos === '' ? '# no changes\\n' : `${trimmedTodos}\\n`);
+		const isWindows = process.platform === 'win32';
+
+		const editorScript = isWindows
+			? `@echo off\\r\\nif "%GIT_GRAPH_REBASE_TODO%"=="" exit /B 0\\nif "%~1"=="" exit /B 0\\ncopy /Y "%GIT_GRAPH_REBASE_TODO%" "%~1" >nul\\nexit /B 0\\n`
+			: `#!/bin/sh\\nset -eu\\nif [ -n "$GIT_GRAPH_REBASE_TODO" ] && [ -n "$1" ]; then\\n  cp "$GIT_GRAPH_REBASE_TODO" "$1"\\nfi\\nexit 0\\n`;
+
+		await fs.writeFile(tmpTodoPath, normalizedTodos, { encoding: 'utf8' });
+		await fs.writeFile(tmpEditorPath, editorScript, { encoding: 'utf8' });
+		if (!isWindows) {
+			await fs.chmod(tmpEditorPath, 0o755);
+		}
+
+		try {
+			const error = await this.runGitCommand(args, cwd, {
+				env: {
+					GIT_GRAPH_REBASE_TODO: tmpTodoPath,
+					GIT_SEQUENCE_EDITOR: tmpEditorPath,
+				},
+			});
+			return error;
+		} finally {
+			await fs.unlink(tmpTodoPath).catch(() => {});
+			await fs.unlink(tmpEditorPath).catch(() => {});
+		}
 	}
 
 	/**
@@ -474,7 +525,14 @@ export class GitService {
 		branches: string[] | null,
 		maxCommits: number,
 		order: 'date' | 'author-date' | 'topo',
-		onlyFollowFirstParent: boolean
+		onlyFollowFirstParent: boolean,
+		filters?: {
+			author?: string;
+			search?: string;
+			filePath?: string;
+			dateFrom?: string;
+			dateTo?: string;
+		}
 	): Promise<
 		Array<{
 			hash: string;
@@ -498,11 +556,91 @@ export class GitService {
 			args.push('--first-parent');
 		}
 
+		const filteredAuthor = filters?.author?.trim();
+		if (filteredAuthor) {
+			args.push(`--author=${filteredAuthor}`);
+		}
+
+		const filteredSearch = filters?.search?.trim();
+		if (filteredSearch) {
+			args.push(`--grep=${filteredSearch}`);
+		}
+
+		const filteredDateFrom = filters?.dateFrom?.trim();
+		if (filteredDateFrom) {
+			args.push(`--since=${filteredDateFrom}`);
+		}
+
+		const filteredDateTo = filters?.dateTo?.trim();
+		if (filteredDateTo) {
+			args.push(`--until=${filteredDateTo}`);
+		}
+
 		if (branches !== null && branches.length > 0) {
 			args.push(...branches);
 		} else {
 			args.push('--branches', '--tags');
 		}
+
+		const filteredFilePath = filters?.filePath?.trim();
+		if (filteredFilePath) {
+			args.push('--', filteredFilePath);
+		}
+
+		return this.spawnGit(args, repo, (stdout) => {
+			const commits: Array<{
+				hash: string;
+				parents: string[];
+				author: string;
+				email: string;
+				date: number;
+				message: string;
+			}> = [];
+
+			const lines = stdout.split(EOL_REGEX);
+			for (const line of lines) {
+				if (!line) continue;
+
+				const parts = line.split(GIT_LOG_SEPARATOR);
+				if (parts.length < 6) continue;
+
+				commits.push({
+					hash: parts[0]!,
+					parents: parts[1] ? parts[1].split(' ') : [],
+					author: parts[2]!,
+					email: parts[3]!,
+					date: parseInt(parts[4]!, 10),
+					message: parts[5]!,
+				});
+			}
+
+			return commits;
+		});
+	}
+
+	/**
+	 * Get commits in range from a starting commit up to HEAD.
+	 */
+	async getCommitsFrom(startHash: string, repo: string, maxCommits: number): Promise<
+		Array<{
+			hash: string;
+			parents: string[];
+			author: string;
+			email: string;
+			date: number;
+			message: string;
+		}>
+	> {
+		if (!startHash?.trim() || maxCommits <= 0) {
+			return [];
+		}
+
+		const args = [
+			'log',
+			`--max-count=${maxCommits}`,
+			`--format=${this.gitFormatLog}`,
+			`${startHash}..HEAD`,
+		];
 
 		return this.spawnGit(args, repo, (stdout) => {
 			const commits: Array<{

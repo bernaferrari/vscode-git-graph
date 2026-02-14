@@ -155,7 +155,7 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-lg max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<FolderGit2 className="h-5 w-5" />

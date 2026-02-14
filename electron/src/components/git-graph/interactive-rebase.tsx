@@ -3,9 +3,7 @@
  * Drag-drop to reorder, squash, edit, drop commits
  */
 
-import { useState, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -17,21 +15,20 @@ import {
 } from '@/components/ui/dialog';
 import {
 	GripVertical,
-	MessageSquare,
-	Edit2,
-	Square,
 	ChevronDown,
 	ChevronUp,
 	Trash2,
 	RotateCcw,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { toast } from 'sonner';
 
 interface InteractiveRebaseProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	baseCommit: string;
 	commits: Array<{ hash: string; message: string; author: string; date: number }>;
+	onComplete?: () => void;
 }
 
 type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
@@ -59,15 +56,23 @@ export function InteractiveRebase({
 	onOpenChange,
 	baseCommit,
 	commits,
+	onComplete,
 }: InteractiveRebaseProps) {
-	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 	const [rebaseCommits, setRebaseCommits] = useState<RebaseCommit[]>([]);
 	const [dragIndex, setDragIndex] = useState<number | null>(null);
 	const [dropIndex, setDropIndex] = useState<number | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const sanitizeTodoMessage = useCallback((message: string) => {
+		return message
+			.trim()
+			.replace(/[\r\n]+/g, ' ')
+			.replace(/^\s*#/, '#');
+	}, []);
 
 	// Initialize commits when dialog opens
-	useState(() => {
+	useEffect(() => {
 		if (open && commits.length > 0) {
 			setRebaseCommits(
 				commits.map((c, i) => ({
@@ -76,8 +81,10 @@ export function InteractiveRebase({
 					originalIndex: i,
 				}))
 			);
+		} else if (!open) {
+			setRebaseCommits([]);
 		}
-	});
+	}, [open, commits]);
 
 	// Handle drag and drop
 	const handleDragStart = (index: number) => {
@@ -140,18 +147,30 @@ export function InteractiveRebase({
 
 	// Execute rebase
 	const executeRebase = async () => {
-		// Build todo file content
+		if (rebaseCommits.filter((c) => c.action !== 'drop').length === 0) {
+			toast.error('No commits selected for rebase. Mark at least one commit to apply.');
+			return;
+		}
+
+		setIsSubmitting(true);
 		const todoContent = rebaseCommits
 			.filter((c) => c.action !== 'drop')
-			.map((c) => `${c.action} ${c.hash.slice(0, 7)} ${c.message.split('\n')[0]}`)
+			.map((c) => `${c.action} ${c.hash} ${sanitizeTodoMessage(c.message)}`)
 			.join('\n');
 
-		// TODO: Call backend to execute interactive rebase
-		// For now, we'll just show a message
-		console.log('Rebase todo:', todoContent);
-		console.log('Base commit:', baseCommit);
+		try {
+			const result = await gitOps.rebase(baseCommit, true, todoContent);
+			if (result && typeof result === 'object' && 'error' in result && result.error) {
+				toast.error(result.error);
+				return;
+			}
+		} finally {
+			setIsSubmitting(false);
+		}
 
-		// Close dialog
+		if (onComplete) {
+			onComplete();
+		}
 		onOpenChange(false);
 	};
 
@@ -159,7 +178,7 @@ export function InteractiveRebase({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+			<DialogContent className="max-w-2xl max-h-[80vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle>Interactive Rebase onto {baseCommit.slice(0, 7)}</DialogTitle>
 				</DialogHeader>
@@ -250,15 +269,15 @@ export function InteractiveRebase({
 					</div>
 				</ScrollArea>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<div className="flex items-center gap-2 text-xs text-muted-foreground mr-auto">
 						{validCommits.length} commits will be applied
 					</div>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						Cancel
 					</Button>
-					<Button onClick={executeRebase}>
-						Start Rebase
+					<Button onClick={executeRebase} disabled={isSubmitting || validCommits.length === 0}>
+						{isSubmitting ? 'Starting Rebase...' : 'Start Rebase'}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

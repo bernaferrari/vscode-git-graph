@@ -113,7 +113,7 @@ interface KeyboardShortcutsDialogProps {
 export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcutsDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-lg">
+			<DialogContent className="max-w-lg ui-surface">
 				<DialogHeader>
 					<DialogTitle>Keyboard Shortcuts</DialogTitle>
 				</DialogHeader>

@@ -105,7 +105,7 @@ export function WelcomeScreen({ onOpenRepo }: WelcomeScreenProps) {
 	];
 
 	return (
-		<div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 p-8 overflow-auto">
+		<div className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto ui-reveal">
 			<div className="max-w-4xl w-full space-y-8">
 				{/* Hero */}
 				<div className="text-center space-y-4">
@@ -127,7 +127,7 @@ export function WelcomeScreen({ onOpenRepo }: WelcomeScreenProps) {
 					{quickStarts.map((item, index) => (
 						<Card
 							key={index}
-							className={`cursor-pointer transition-all hover:shadow-lg ${
+							className={`cursor-pointer ui-surface transition-all hover:shadow-lg ${
 								item.primary
 									? 'border-primary/50 hover:border-primary'
 									: 'hover:border-muted-foreground/30'
@@ -168,7 +168,7 @@ export function WelcomeScreen({ onOpenRepo }: WelcomeScreenProps) {
 						{features.map((feature, index) => (
 							<div
 								key={index}
-								className="flex items-start gap-3 p-4 rounded-lg border bg-card"
+								className="flex items-start gap-3 p-4 rounded-lg border ui-surface"
 							>
 								<div className="p-2 rounded-lg bg-muted shrink-0">
 									{feature.icon}
@@ -187,8 +187,8 @@ export function WelcomeScreen({ onOpenRepo }: WelcomeScreenProps) {
 				{/* Keyboard shortcut hint */}
 				<div className="text-center text-sm text-muted-foreground">
 					<p>
-						Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">?</kbd> for keyboard shortcuts or{' '}
-						<kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">⌘K</kbd> to open the fuzzy finder
+						Press <kbd className="ui-kbd">?</kbd> for keyboard shortcuts or{' '}
+						<kbd className="ui-kbd">⌘K</kbd> to open the fuzzy finder
 					</p>
 				</div>
 			</div>

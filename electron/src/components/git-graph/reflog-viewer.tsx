@@ -39,9 +39,10 @@ interface ReflogEntry {
 interface ReflogViewerProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	onCreateBranchFromHash?: (hash: string) => void;
 }
 
-export function ReflogViewer({ open, onOpenChange }: ReflogViewerProps) {
+export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: ReflogViewerProps) {
 	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 	const [copiedHash, setCopiedHash] = useState<string | null>(null);
@@ -65,8 +66,7 @@ export function ReflogViewer({ open, onOpenChange }: ReflogViewerProps) {
 	};
 
 	const handleCreateBranch = (hash: string) => {
-		// This would open the create branch dialog with the hash as target
-		console.log('Create branch at:', hash);
+		onCreateBranchFromHash?.(hash);
 	};
 
 	const getOperationIcon = (operation: string) => {
@@ -110,7 +110,7 @@ export function ReflogViewer({ open, onOpenChange }: ReflogViewerProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<History className="h-5 w-5" />

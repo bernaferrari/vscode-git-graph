@@ -44,7 +44,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-			<DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+			<DialogContent className="max-w-2xl max-h-[80vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<BarChart3 className="h-5 w-5" />

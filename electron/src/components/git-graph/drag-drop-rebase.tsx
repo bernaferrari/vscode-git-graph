@@ -3,7 +3,7 @@
  * Improved UX with drag-to-reorder commits
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { trpc } from '@/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { GripVertical } from 'lucide-react';
+import { toast } from 'sonner';
 
 type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
 
@@ -56,12 +57,20 @@ export function DragDropRebase({
 	const [commits, setCommits] = useState<RebaseCommit[]>(initialCommits);
 	const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 	const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const sanitizeTodoMessage = useCallback((message: string) => {
+		return message.trim().replace(/[\r\n]+/g, ' ');
+	}, []);
+
+	useEffect(() => {
+		setCommits(initialCommits);
+	}, [initialCommits]);
 
 	const utils = trpc.useUtils();
-	const rebaseMutation = trpc.git.rebase.useMutation({
+const rebaseMutation = trpc.git.rebase.useMutation({
 		onSuccess: () => {
 			utils.git.commits.invalidate();
-			onComplete();
 		},
 	});
 
@@ -115,14 +124,38 @@ export function DragDropRebase({
 	};
 
 	// Execute rebase
-	const handleRebase = () => {
-		// In a real implementation, we'd write the commands to a file
-		// and run git rebase with GIT_SEQUENCE_EDITOR
-		rebaseMutation.mutate({
-			repo,
-			onto,
-			interactive: true,
-		});
+	const handleRebase = async () => {
+		if (commits.filter((c) => c.action !== 'drop').length === 0) {
+			toast.error('No commits selected for rebase.');
+			return;
+		}
+
+		const todoContent = commits
+			.filter((commit) => commit.action !== 'drop')
+			.map((commit) => `${commit.action} ${commit.hash} ${sanitizeTodoMessage(commit.message)}`)
+			.join('\n');
+
+		setIsSubmitting(true);
+		try {
+			const result = await rebaseMutation.mutateAsync({
+				repo,
+				onto,
+				interactive: true,
+				todos: todoContent,
+			});
+
+			if (result?.error) {
+				toast.error(result.error);
+				return;
+			}
+
+			onComplete();
+			onCancel();
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : 'Failed to start rebase');
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	// Stats
@@ -232,8 +265,11 @@ export function DragDropRebase({
 					<Button variant="outline" onClick={onCancel}>
 						Cancel
 					</Button>
-					<Button onClick={handleRebase} disabled={rebaseMutation.isPending}>
-						{rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}
+					<Button
+						onClick={handleRebase}
+						disabled={isSubmitting || rebaseMutation.isPending}
+					>
+						{isSubmitting || rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}
 					</Button>
 				</div>
 			</CardFooter>

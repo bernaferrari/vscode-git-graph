@@ -141,7 +141,7 @@ export function DragCherryPickDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className="sm:max-w-md ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Copy className="h-5 w-5" />
@@ -176,7 +176,7 @@ export function DragCherryPickDialog({
 					</div>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<Button variant="ghost" onClick={() => onOpenChange(false)}>
 						Cancel
 					</Button>
@@ -237,7 +237,7 @@ export function DragCommitHandler({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className="sm:max-w-md ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						{isExecuting ? (
@@ -276,7 +276,7 @@ export function DragCommitHandler({
 					</div>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="ui-toolbar">
 					<Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isExecuting}>
 						Cancel
 					</Button>

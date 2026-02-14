@@ -22,7 +22,7 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
     <ol
       data-slot="breadcrumb-list"
       className={cn(
-        "text-muted-foreground gap-1.5 text-sm flex flex-wrap items-center wrap-break-word",
+        "text-muted-foreground gap-2 text-sm flex flex-wrap items-center wrap-break-word",
         className
       )}
       {...props}
@@ -79,11 +79,11 @@ function BreadcrumbSeparator({
   ...props
 }: React.ComponentProps<"li">) {
   return (
-    <li
+      <li
       data-slot="breadcrumb-separator"
       role="presentation"
       aria-hidden="true"
-      className={cn("[&>svg]:size-3.5", className)}
+      className={cn("[&>svg]:size-3.5 text-muted-foreground", className)}
       {...props}
     >
       {children ?? (
@@ -103,7 +103,7 @@ function BreadcrumbEllipsis({
       role="presentation"
       aria-hidden="true"
       className={cn(
-        "size-5 [&>svg]:size-4 flex items-center justify-center",
+        "size-5 [&>svg]:size-4 text-muted-foreground flex items-center justify-center",
         className
       )}
       {...props}

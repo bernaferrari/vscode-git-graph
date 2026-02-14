@@ -39,10 +39,13 @@ import {
 	GitPullRequest,
 	FolderGit2,
 	Keyboard,
+	ArrowUp,
+	ArrowDown,
 	Info,
 	Activity,
 	Bug,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { CommitGraph } from './commit-graph';
@@ -112,8 +115,14 @@ import { BulkCommitOperations } from './bulk-commit-operations';
 import { FileAnnotationsPanel } from './file-annotations-panel';
 import { ActivityHeatmap } from './activity-heatmap';
 import { QuickLookPanel, QuickLookButton, useQuickLook, useQuickLookKeyboard } from './quick-look';
+import { OperationStatusBar } from './operation-status-bar';
+import { VisualRebaseTodoEditor } from './visual-rebase-todo';
 import { DragCommitHandler, DraggableCommit, BranchDropZone, useDragCommit } from './drag-commit-to-branch';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { LensSwitcher } from '@/components/lens';
+import { ProfileSwitcher } from '@/components/profile';
+import { OperationTimeline } from '@/components/operation-timeline';
+import { StackedBranchesPanel } from '@/components/stacked-branches';
 import {
 	GraphLayoutCalculator,
 	DEFAULT_GRAPH_CONFIG,
@@ -221,13 +230,15 @@ export function GitGraph() {
 	// New feature states
 	const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
 	const [interactiveRebaseOpen, setInteractiveRebaseOpen] = useState(false);
+	const [rebaseTodoOpen, setRebaseTodoOpen] = useState(false);
 	const [statisticsOpen, setStatisticsOpen] = useState(false);
 	const [terminalOpen, setTerminalOpen] = useState(false);
 	const [remoteManageOpen, setRemoteManageOpen] = useState(false);
 	const [branchCompareOpen, setBranchCompareOpen] = useState(false);
 	const [hooksManageOpen, setHooksManageOpen] = useState(false);
 	const [mergeConflictOpen, setMergeConflictOpen] = useState(false);
-	const [conflictFile, setConflictFile] = useState<{ path: string; ours: string; theirs: string } | null>(null);
+	const [conflictFile, setConflictFile] = useState<{ path: string; ours: string; theirs: string; base?: string } | null>(null);
+	const [conflictFilePath, setConflictFilePath] = useState<string | null>(null);
 
 	// Additional feature states
 	const [commitSigningOpen, setCommitSigningOpen] = useState(false);
@@ -281,6 +292,9 @@ export function GitGraph() {
 	// Settings hook
 	const { settings } = useSettings();
 
+	// Lens mode hook
+	const { setLensMode, isGuided } = useLensMode();
+
 	// Pinned commits hook
 	const { pinnedCommits, pinCommit, unpinCommit, updateNote, isPinned } = usePinnedCommits(activeRepo);
 	
@@ -304,11 +318,173 @@ export function GitGraph() {
 
 	// Git operations hook
 	const gitOps = useGitOperations();
+	const gitUtils = trpc.useUtils();
 
 	// Commit limit state
 	const [maxCommits, setMaxCommits] = useState(500);
 
+	const conflictFileContent = trpc.git.readFile.useQuery(
+		{ repo: activeRepo ?? '', path: conflictFilePath ?? '' },
+		{ enabled: !!activeRepo && !!conflictFilePath }
+	);
+	const conflictVersionsContent = trpc.git.readConflictFile.useQuery(
+		{ repo: activeRepo ?? '', path: conflictFilePath ?? '' },
+		{ enabled: !!activeRepo && !!conflictFilePath }
+	);
+
+	const writeConflictFile = trpc.git.writeFile.useMutation();
+	const stageConflictFile = trpc.git.stage.useMutation();
+	const { mutateAsync: revealInRepo } = trpc.system.revealInRepo.useMutation();
+
+	useEffect(() => {
+		if (!conflictFilePath) {
+			setConflictFile(null);
+			return;
+		}
+
+		if (conflictFileContent.isLoading) {
+			return;
+		}
+
+		if (conflictFileContent.data?.error) {
+			toast.error('Failed to load conflict file', {
+				description: conflictFileContent.data.error,
+			});
+			setConflictFile(null);
+			return;
+		}
+
+		if (conflictVersionsContent.data?.error) {
+			toast.error('Failed to load conflict versions', {
+				description: conflictVersionsContent.data.error,
+			});
+		}
+		if (conflictVersionsContent.data?.warnings?.length) {
+			toast.info('Some conflict-side files could not be loaded', {
+				description: conflictVersionsContent.data.warnings.join(', '),
+			});
+		}
+
+		if (conflictFileContent.data?.content !== undefined) {
+			setConflictFile({
+				path: conflictFilePath,
+				ours: conflictFileContent.data.content ?? '',
+				theirs: conflictVersionsContent.data?.theirs ?? '',
+				base: conflictVersionsContent.data?.base ?? undefined,
+			});
+		}
+	}, [
+		conflictFilePath,
+		conflictFileContent.data?.content,
+		conflictFileContent.data?.error,
+		conflictFileContent.isLoading,
+		conflictVersionsContent.data?.theirs,
+		conflictVersionsContent.data?.base,
+		conflictVersionsContent.data?.error,
+		conflictVersionsContent.data?.warnings,
+		conflictVersionsContent.isLoading,
+	]);
+
+	const handleOpenConflictFile = useCallback((filePath: string) => {
+		if (!activeRepo) {
+			toast.error('No active repository');
+			return;
+		}
+		setConflictFile(null);
+		setConflictFilePath(filePath);
+		setMergeConflictOpen(true);
+		void conflictFileContent.refetch();
+		void conflictVersionsContent.refetch();
+	}, [activeRepo, conflictFileContent, conflictVersionsContent]);
+
+	const handleRevealConflictFile = useCallback((filePath: string) => {
+		if (!activeRepo) {
+			toast.error('No active repository');
+			return;
+		}
+
+		void revealInRepo({
+			repo: activeRepo,
+			path: filePath,
+		}).then((result) => {
+			if (!result.success) {
+				toast.error(result.error ?? 'Failed to reveal conflict file');
+			}
+		}).catch((error) => {
+			toast.error(error instanceof Error ? error.message : 'Failed to reveal conflict file');
+		});
+	}, [activeRepo, revealInRepo]);
+
+	const handleCloseConflictEditor = useCallback((open: boolean) => {
+		setMergeConflictOpen(open);
+		if (!open) {
+			setConflictFile(null);
+			setConflictFilePath(null);
+		}
+	}, []);
+
+	const handleResolveConflictFile = useCallback((path: string, content: string) => {
+		if (!activeRepo) {
+			toast.error('No active repository');
+			return;
+		}
+
+		writeConflictFile.mutate(
+			{ repo: activeRepo, path, content },
+			{
+				onSuccess: (result) => {
+					if (result.error) {
+						toast.error('Failed to save conflict resolution', {
+							description: result.error,
+						});
+						return;
+					}
+
+					stageConflictFile.mutate(
+						{ repo: activeRepo, files: [path] },
+						{
+							onSuccess: (stageResult) => {
+								if (stageResult.error) {
+									toast.error('Failed to stage resolved file', {
+										description: stageResult.error,
+									});
+									return;
+								}
+								toast.success('Conflict marked as resolved');
+								void gitUtils.git.operationState.invalidate();
+								void gitUtils.git.commits.invalidate();
+								void gitUtils.git.repoInfo.invalidate();
+								void gitUtils.git.workingDirectoryStatus.invalidate({ repo: activeRepo });
+								setMergeConflictOpen(false);
+								setConflictFilePath(null);
+							},
+						}
+					);
+				},
+			}
+		);
+	}, [activeRepo, stageConflictFile, writeConflictFile, gitUtils.git.operationState, gitUtils.git.commits, gitUtils.git.repoInfo, gitUtils.git.workingDirectoryStatus]);
+
 	// tRPC queries
+	const commitQueryInput = useMemo(
+		() => ({
+			repo: activeRepo ?? '',
+			branches: selectedBranches.includes('__all__') ? null : selectedBranches,
+			maxCommits,
+			order: 'date' as const,
+			onlyFollowFirstParent: false,
+			showTags: true,
+			showRemoteBranches: true,
+			hideRemotes: [],
+			author: commitFilters.author,
+			search: commitFilters.search,
+			filePath: commitFilters.filePath,
+			dateFrom: commitFilters.dateFrom ? commitFilters.dateFrom.toISOString() : undefined,
+			dateTo: commitFilters.dateTo ? commitFilters.dateTo.toISOString() : undefined,
+		}),
+		[activeRepo, selectedBranches, maxCommits, commitFilters]
+	);
+
 	const { data: repoInfo, isLoading: repoLoading } = trpc.git.repoInfo.useQuery(
 		{
 			repo: activeRepo ?? '',
@@ -324,22 +500,17 @@ export function GitGraph() {
 		isLoading: commitsLoading,
 		refetch: refetchCommits,
 	} = trpc.git.commits.useQuery(
-		{
-			repo: activeRepo ?? '',
-			branches: selectedBranches.includes('__all__') ? null : selectedBranches,
-			maxCommits,
-			order: 'date',
-			onlyFollowFirstParent: false,
-			showTags: true,
-			showRemoteBranches: true,
-			hideRemotes: [],
-		},
+		commitQueryInput,
 		{
 			enabled: !!activeRepo,
 			refetchInterval: 30000,
 			staleTime: 10000,
 		}
 	);
+
+	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
+	const { mutateAsync: revealInFinder } = trpc.system.revealInFinder.useMutation();
+	const { mutateAsync: openTerminalInRepo } = trpc.system.openTerminal.useMutation();
 
 	// Load more commits handler
 	const handleLoadMore = useCallback(() => {
@@ -479,6 +650,15 @@ export function GitGraph() {
 		return commitsData.commits.find((c: ClientCommit) => c.hash === targetCommit);
 	}, [targetCommit, commitsData?.commits]);
 
+	const interactiveRebaseCommits = useMemo(() => {
+		if (!targetCommit || !commitsData?.commits?.length) return [];
+
+		const targetIndex = commitsData.commits.findIndex((c: ClientCommit) => c.hash === targetCommit);
+		if (targetIndex < 0) return [];
+
+		return commitsData.commits.slice(0, targetIndex);
+	}, [targetCommit, commitsData?.commits]);
+
 	// Handle pin commit
 	const handlePinCommit = useCallback(() => {
 		if (selectedCommitData) {
@@ -490,6 +670,54 @@ export function GitGraph() {
 			});
 		}
 	}, [selectedCommitData, pinCommit]);
+
+	const handleAuthorFilter = useCallback((author: string) => {
+		setCommitFilters((prev) => ({
+			...prev,
+			author,
+		}));
+	}, []);
+
+	const handleBranchFilter = useCallback((branch: string) => {
+		setSelectedBranches([branch]);
+	}, []);
+
+	const handleCreateBranchFromHash = useCallback((hash: string) => {
+		setTargetCommit(hash);
+		setCreateBranchOpen(true);
+	}, []);
+
+	const handleOpenInFinder = useCallback(() => {
+		if (!activeRepo) {
+			toast('Open a repository first.');
+			return;
+		}
+		void revealInFinder({
+			path: activeRepo,
+		}).then((result) => {
+			if (!result.success) {
+				toast.error(result.error ?? 'Failed to open repository in finder');
+			}
+		}).catch((error) => {
+			toast.error(error instanceof Error ? error.message : 'Failed to open repository in finder');
+		});
+	}, [activeRepo, revealInFinder]);
+
+	const handleOpenInTerminal = useCallback(() => {
+		if (!activeRepo) {
+			toast('Open a repository first.');
+			return;
+		}
+		void openTerminalInRepo({
+			path: activeRepo,
+		}).then((result) => {
+			if (!result.success) {
+				toast.error(result.error ?? 'Failed to open terminal');
+			}
+		}).catch((error) => {
+			toast.error(error instanceof Error ? error.message : 'Failed to open terminal');
+		});
+	}, [activeRepo, openTerminalInRepo]);
 
 	// Keyboard shortcuts
 	useEffect(() => {
@@ -576,6 +804,18 @@ export function GitGraph() {
 				// Cmd+, for settings
 				e.preventDefault();
 				setSettingsOpen(true);
+			} else if (e.key === '1' && (e.metaKey || e.ctrlKey)) {
+				// Cmd+1 for Guided mode
+				e.preventDefault();
+				setLensMode('guided');
+			} else if (e.key === '2' && (e.metaKey || e.ctrlKey)) {
+				// Cmd+2 for Craft mode
+				e.preventDefault();
+				setLensMode('craft');
+			} else if (e.key === '3' && (e.metaKey || e.ctrlKey)) {
+				// Cmd+3 for Control mode
+				e.preventDefault();
+				setLensMode('control');
 			} else if (e.key === 'P' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
 				// Cmd+Shift+P for command palette
 				e.preventDefault();
@@ -589,10 +829,9 @@ export function GitGraph() {
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen, setKeyboardHelpOpen, setSettingsOpen, setCommandPaletteOpen, setGitFlowOpen]);
+	}, [refetchCommits, commitsData?.commits?.length, selectedCommitIndex, selectedCommit, expandedCommit, handleSelectCommit, handleExpandCommit, setCommitDetailsOpen, terminalOpen, handlePinCommit, setSearchCommitsOpen, setKeyboardHelpOpen, setSettingsOpen, setCommandPaletteOpen, setGitFlowOpen, setLensMode]);
 
 	// tRPC mutations
-	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
 	const { mutate: registerRepo } = trpc.repo.register.useMutation();
 	const { setActiveRepo, addRecentRepo } = useAppStore();
 
@@ -616,8 +855,8 @@ export function GitGraph() {
 	// No repo selected
 	if (!activeRepo) {
 		return (
-			<div className="flex-1 flex items-center justify-center bg-background">
-				<div className="text-center max-w-md p-8">
+			<div className="flex-1 flex items-center justify-center">
+				<div className="max-w-md ui-surface ui-empty-state-shell">
 					<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
 						<GitCommit className="h-10 w-10 text-primary" />
 					</div>
@@ -640,8 +879,8 @@ export function GitGraph() {
 	// Git not available
 	if (gitStatus && !gitStatus.available) {
 		return (
-			<div className="flex-1 flex items-center justify-center bg-background">
-				<div className="text-center max-w-md p-8">
+			<div className="flex-1 flex items-center justify-center">
+				<div className="max-w-md ui-surface ui-empty-state-shell">
 					<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/5 flex items-center justify-center">
 						<X className="h-10 w-10 text-destructive" />
 					</div>
@@ -661,7 +900,7 @@ export function GitGraph() {
 	// Loading
 	if (repoLoading || commitsLoading) {
 		return (
-			<div className="flex-1 flex items-center justify-center bg-background">
+			<div className="flex-1 flex items-center justify-center">
 				<div className="text-center">
 					<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
 					<p className="text-sm text-muted-foreground">Loading commits...</p>
@@ -673,8 +912,8 @@ export function GitGraph() {
 	// Error state
 	if (commitsData?.error) {
 		return (
-			<div className="flex-1 flex items-center justify-center bg-background">
-				<div className="text-center">
+			<div className="flex-1 flex items-center justify-center">
+				<div className="text-center ui-surface ui-empty-state-shell">
 					<p className="text-lg mb-2 text-destructive">Error Loading Commits</p>
 					<p className="text-sm text-muted-foreground mb-4">{commitsData.error}</p>
 					<Button variant="outline" onClick={() => refetchCommits()}>
@@ -690,9 +929,9 @@ export function GitGraph() {
 	return (
 		<UndoStackProvider repoPath={activeRepo}>
 			<TooltipProvider>
-			<div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+			<div className="flex-1 flex flex-col h-full overflow-hidden">
 				{/* Top Toolbar */}
-				<div className="flex items-center gap-1 px-3 py-1.5 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+				<div className="flex items-center gap-1 px-3 py-1.5 ui-toolbar">
 					{/* Repo info */}
 					<div className="flex items-center gap-2 mr-2">
 						<div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50">
@@ -754,36 +993,52 @@ export function GitGraph() {
 
 					<div className="h-5 w-px bg-border mx-1" />
 
-					{/* Main actions */}
-					<ToolbarButton
-						icon={Download}
-						label="Fetch"
-						onClick={() => gitOps.fetch()}
-					/>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="sm" className="h-8 px-2 gap-1.5">
-								<Upload className="h-4 w-4" />
-								<span className="hidden sm:inline">Push</span>
-								<ChevronDown className="h-3 w-3" />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="start">
-							<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, false)}>
-								<Upload className="h-4 w-4 mr-2" />
-								Push
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, true)}>
-								<Upload className="h-4 w-4 mr-2 text-amber-600" />
-								Force Push
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-					<ToolbarButton
-						icon={GitBranch}
-						label="Pull"
-						onClick={() => gitOps.pull()}
-					/>
+					{/* Main actions - adaptive based on lens mode */}
+					{isGuided ? (
+						// Guided mode: Simple "Sync" button
+						<ToolbarButton
+							icon={RefreshCw}
+							label="Sync"
+							onClick={() => {
+								// Quick sync: fetch + pull
+								gitOps.fetch();
+								gitOps.pull();
+							}}
+						/>
+					) : (
+						// Craft/Control mode: Individual buttons
+						<>
+							<ToolbarButton
+								icon={Download}
+								label={isGuided ? 'Check for updates' : 'Fetch'}
+								onClick={() => gitOps.fetch()}
+							/>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button variant="ghost" size="sm" className="h-8 px-2 gap-1.5">
+										<Upload className="h-4 w-4" />
+										<span className="hidden sm:inline">{isGuided ? 'Share' : 'Push'}</span>
+										<ChevronDown className="h-3 w-3" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start">
+									<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, false)}>
+										<Upload className="h-4 w-4 mr-2" />
+										Push
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => gitOps.push(currentHead, 'origin', true, true)}>
+										<Upload className="h-4 w-4 mr-2 text-amber-600" />
+										Force Push
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+							<ToolbarButton
+								icon={GitBranch}
+								label={isGuided ? 'Get changes' : 'Pull'}
+								onClick={() => gitOps.pull()}
+							/>
+						</>
+					)}
 
 					<div className="h-5 w-px bg-border mx-1" />
 
@@ -813,7 +1068,7 @@ export function GitGraph() {
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => {
-								// TODO: Stash
+								setStashManageOpen(true);
 							}}>
 								<Archive className="h-4 w-4 mr-2" />
 								Stash
@@ -829,6 +1084,26 @@ export function GitGraph() {
 							multiple
 							onChange={setSelectedBranches}
 						/>
+					</div>
+
+					{/* Lens Mode Switcher */}
+					<div className="ml-2">
+						<LensSwitcher variant="toolbar" showLabel={false} />
+					</div>
+
+					{/* Profile Switcher */}
+					<div className="ml-2">
+						<ProfileSwitcher />
+					</div>
+
+					{/* Operation Timeline */}
+					<div className="ml-2">
+						<OperationTimeline />
+					</div>
+
+					{/* Stacked Branches */}
+					<div className="ml-2">
+						<StackedBranchesPanel />
 					</div>
 
 					{/* Commit History Filters */}
@@ -902,13 +1177,13 @@ export function GitGraph() {
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
 							<DropdownMenuItem onClick={() => {
-								// TODO: Open in terminal
+								handleOpenInTerminal();
 							}}>
 								<Terminal className="h-4 w-4 mr-2" />
 								Open in Terminal
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => {
-								// TODO: Open in Finder
+								handleOpenInFinder();
 							}}>
 								<FileCode className="h-4 w-4 mr-2" />
 								Open in Finder
@@ -1088,7 +1363,17 @@ export function GitGraph() {
 				<div className="flex-1 flex overflow-hidden min-w-0">
 					{/* Side Panel - Branches/Tags/Stashes */}
 					{showSidePanel && layoutMode === 'panel' && (
-						<SidePanel />
+						<SidePanel
+							onBranchSelect={handleBranchFilter}
+							onCreateBranch={() => {
+								setTargetCommit(selectedCommit ?? 'HEAD');
+								setCreateBranchOpen(true);
+							}}
+							onCreateTag={() => {
+								setTargetCommit(selectedCommit ?? 'HEAD');
+								setAddTagOpen(true);
+							}}
+						/>
 					)}
 
 					{/* Graph and Commit List */}
@@ -1097,7 +1382,7 @@ export function GitGraph() {
 							{commitsLoading ? (
 								// Loading skeleton
 								<div className="flex w-full">
-									<div className="shrink-0 w-28 border-r bg-muted/5">
+									<div className="shrink-0 w-28 ui-commit-col">
 										{Array.from({ length: 15 }).map((_, i) => (
 											<div key={i} className="h-8 px-2 animate-pulse">
 												<div className="h-4 w-16 bg-muted rounded" />
@@ -1122,11 +1407,11 @@ export function GitGraph() {
 								<ScrollArea className="h-full w-full">
 								<div className="flex min-w-max">
 									{/* Refs column - branches and tags */}
-									<div className="shrink-0 w-28 border-r bg-muted/5">
+									<div className="shrink-0 w-28 ui-commit-col">
 										{commitsData?.commits?.map((commit, index) => (
 											<div
 												key={commit.hash}
-												className={`flex items-center gap-1 px-2 h-8 text-xs cursor-pointer transition-colors ${
+												className={`ui-commit-row flex items-center gap-1 px-2 h-8 text-xs cursor-pointer transition-colors ${
 													selectedCommitIndex === index ? 'bg-accent/30' : 'hover:bg-accent/10'
 												}`}
 												onClick={() => handleSelectCommit(index)}
@@ -1146,7 +1431,10 @@ export function GitGraph() {
 									</div>
 
 									{/* Graph */}
-									<div className="shrink-0 bg-background" style={{ width: (graphLayout?.width ?? 200) + 10 }}>
+									<div
+										className="shrink-0 bg-background"
+										style={{ width: (graphLayout?.width ?? 200) + 10 }}
+									>
 										{graphLayout && (
 											<CommitGraph
 												layout={graphLayout}
@@ -1190,20 +1478,31 @@ export function GitGraph() {
 						</div>
 					</div>
 
-					{/* Commit Details Panel */}
+				{/* Commit Details Panel */}
 					{commitDetailsOpen && selectedCommit && (
-						<div className="w-80 shrink-0 border-l">
+						<div className="w-80 shrink-0 border-l border-border/65">
 							<CommitDetailsPanel
 								commitHash={selectedCommit}
 								onClose={() => setCommitDetailsOpen(false)}
 								onNavigateToCommit={handleNavigateToCommit}
+								onFilterByAuthor={handleAuthorFilter}
+								onCreateBranch={handleCreateBranchFromHash}
+								onCreateTag={(hash) => {
+									setTargetCommit(hash);
+									setAddTagOpen(true);
+								}}
+								onReset={(hash) => {
+									setTargetCommit(hash);
+									setResetOpen(true);
+								}}
+								onFileHistoryNavigate={handleNavigateToCommit}
 							/>
 						</div>
 					)}
 				</div>
 
 				{/* Status bar */}
-				<div className="flex items-center gap-3 px-4 py-1.5 text-xs border-t bg-muted/30">
+				<div className="ui-status-bar flex items-center gap-3 px-4 py-1.5 text-xs">
 					{/* Left side - commit info */}
 					<div className="flex items-center gap-3">
 						<span className="text-muted-foreground">
@@ -1313,7 +1612,13 @@ export function GitGraph() {
 					open={rebaseOpen}
 					onOpenChange={setRebaseOpen}
 					onRebase={(interactive) => {
-						gitOps.rebase(targetCommit, interactive);
+						if (interactive) {
+							setRebaseOpen(false);
+							setInteractiveRebaseOpen(true);
+							return;
+						}
+
+						gitOps.rebase(targetCommit, false);
 						setRebaseOpen(false);
 					}}
 					onto={targetCommit}
@@ -1349,7 +1654,10 @@ export function GitGraph() {
 					open={interactiveRebaseOpen}
 					onOpenChange={setInteractiveRebaseOpen}
 					baseCommit={targetCommit}
-					commits={commitsData?.commits?.slice(0, 20) ?? []}
+					commits={interactiveRebaseCommits}
+					onComplete={() => {
+						void refetchCommits();
+					}}
 				/>
 
 				<Statistics
@@ -1376,12 +1684,9 @@ export function GitGraph() {
 
 				<MergeConflictEditor
 					open={mergeConflictOpen}
-					onOpenChange={setMergeConflictOpen}
+					onOpenChange={handleCloseConflictEditor}
 					conflict={conflictFile}
-					onResolve={(path, content) => {
-						console.log('Resolved:', path, content);
-						setMergeConflictOpen(false);
-					}}
+					onResolve={handleResolveConflictFile}
 				/>
 
 				<TerminalPanel
@@ -1417,6 +1722,7 @@ export function GitGraph() {
 				<ReflogViewer
 					open={reflogOpen}
 					onOpenChange={setReflogOpen}
+					onCreateBranchFromHash={handleCreateBranchFromHash}
 				/>
 
 				{/* Commit Templates */}
@@ -1543,26 +1849,32 @@ export function GitGraph() {
 									author: selectedCommitData.author,
 								}}
 								onCreateBranch={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setCreateBranchOpen(true);
 									setContextMenuOpen(false);
 								}}
 								onCreateTag={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setAddTagOpen(true);
 									setContextMenuOpen(false);
 								}}
 								onMerge={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setMergeOpen(true);
 									setContextMenuOpen(false);
 								}}
 								onRebase={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setRebaseOpen(true);
 									setContextMenuOpen(false);
 								}}
 								onCherryPick={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setCherryPickOpen(true);
 									setContextMenuOpen(false);
 								}}
 								onRevert={() => {
+									setTargetCommit(selectedCommitData.hash);
 									setRevertOpen(true);
 									setContextMenuOpen(false);
 								}}
@@ -1575,7 +1887,7 @@ export function GitGraph() {
 
 				{/* Commit Filters Dialog */}
 				<Dialog open={showFiltersDialog} onOpenChange={setShowFiltersDialog}>
-					<DialogContent className="sm:max-w-md">
+					<DialogContent className="sm:max-w-md ui-surface">
 						<DialogHeader>
 							<DialogTitle className="flex items-center gap-2">
 								<Filter className="h-5 w-5" />
@@ -1610,6 +1922,7 @@ export function GitGraph() {
 						onSettings: () => setSettingsOpen(true),
 						onSearch: () => setSearchCommitsOpen(true),
 						onTerminal: () => setTerminalOpen(!terminalOpen),
+						onOpenInFinder: () => handleOpenInFinder(),
 						onStash: () => setStashManageOpen(true),
 						onCommitSigning: () => setCommitSigningOpen(true),
 						onReflog: () => setReflogOpen(true),
@@ -1725,6 +2038,25 @@ export function GitGraph() {
 
 				{/* Quick Look Panel */}
 				<QuickLookPanel />
+
+				{activeRepo && (
+					<OperationStatusBar
+						repo={activeRepo}
+						onOpenRebaseTodo={() => setRebaseTodoOpen(true)}
+						onOpenConflictFile={handleOpenConflictFile}
+						onRevealConflictFile={handleRevealConflictFile}
+						onOperationStateChange={(operationState) => {
+							if (operationState && !operationState.rebasing) {
+								setRebaseTodoOpen(false);
+							}
+						}}
+					/>
+				)}
+
+				<VisualRebaseTodoEditor
+					open={rebaseTodoOpen}
+					onOpenChange={setRebaseTodoOpen}
+				/>
 
 				{/* Status Bar */}
 				<StatusBar

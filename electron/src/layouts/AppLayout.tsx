@@ -1,31 +1,25 @@
-/**
- * Main App Layout with Sidebar
- * Provides repo selection sidebar and main content area
- */
-
 import { Outlet } from '@tanstack/react-router';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
-	FolderOpen,
-	FolderGit2,
+	Clock,
 	ChevronLeft,
 	ChevronRight,
-	Clock,
+	FolderGit2,
+	FolderOpen,
 	Plus,
 } from 'lucide-react';
 
-// Extend CSSProperties to include webkit drag properties
+// Extend CSSProperties to include webkit drag properties.
 declare module 'react' {
 	interface CSSProperties {
 		WebkitAppRegion?: 'drag' | 'no-drag';
 	}
 }
 
-// Detect platform from user agent
 const getPlatform = () => {
 	const ua = navigator.userAgent.toLowerCase();
 	if (ua.includes('mac')) return 'darwin';
@@ -34,9 +28,14 @@ const getPlatform = () => {
 };
 
 export default function AppLayout() {
-	const { activeRepo, setActiveRepo, sidebarOpen, setSidebarOpen, addRecentRepo } = useAppStore();
+	const {
+		activeRepo,
+		addRecentRepo,
+		setActiveRepo,
+		setSidebarOpen,
+		sidebarOpen,
+	} = useAppStore();
 
-	// Add platform class to document for platform-specific styles
 	useEffect(() => {
 		const platform = getPlatform();
 		document.documentElement.classList.add(`platform-${platform}`);
@@ -45,30 +44,24 @@ export default function AppLayout() {
 		};
 	}, []);
 
-	// Detect and apply system theme
 	useEffect(() => {
 		const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-		const updateTheme = (e: MediaQueryListEvent | MediaQueryList) => {
+		const updateTheme = (e: MediaQueryList | MediaQueryListEvent) => {
 			document.documentElement.classList.toggle('dark', e.matches);
 		};
 
-		// Set initial theme
 		updateTheme(mediaQuery);
-
 		const handler = (e: MediaQueryListEvent) => updateTheme(e);
 		mediaQuery.addEventListener('change', handler);
 		return () => mediaQuery.removeEventListener('change', handler);
 	}, []);
 
-	// Get repositories from backend
 	const { data: repoList } = trpc.repo.list.useQuery();
 	const { data: recentRepos } = trpc.repo.recent.useQuery();
 	const { mutate: registerRepo } = trpc.repo.register.useMutation();
 	const { mutate: setLastActive } = trpc.repo.setLastActive.useMutation();
 	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
 
-	// Track active repo changes
 	useEffect(() => {
 		if (activeRepo) {
 			setLastActive({ repo: activeRepo });
@@ -76,16 +69,21 @@ export default function AppLayout() {
 		}
 	}, [activeRepo, setLastActive, addRecentRepo]);
 
-	// Group repos by folder
-	const groupedRepos = repoList?.repos?.reduce(
-		(acc, repo) => {
-			const parentFolder = repo.path.split('/').slice(-2, -1)[0] ?? 'Other';
-			if (!acc[parentFolder]) acc[parentFolder] = [];
+	const groupedRepos = useMemo(() => {
+		if (!repoList?.repos?.length) {
+			return {};
+		}
+
+		return repoList.repos.reduce<Record<string, typeof repoList.repos>>((acc, repo) => {
+			const normalizedPath = repo.path.replace(/\\/g, '/');
+			const parentFolder = normalizedPath.split('/').slice(-2, -1)[0] ?? 'Other';
+			if (!acc[parentFolder]) {
+				acc[parentFolder] = [];
+			}
 			acc[parentFolder].push(repo);
 			return acc;
-		},
-		{} as Record<string, typeof repoList.repos>
-	);
+		}, {});
+	}, [repoList?.repos]);
 
 	const handleOpenFolder = async () => {
 		try {
@@ -104,14 +102,17 @@ export default function AppLayout() {
 	};
 
 	return (
-		<div className="flex h-screen">
-			{/* Sidebar */}
+		<div className="app-shell">
+			<a className="skip-link" href="#main-content">
+				Skip to main content
+			</a>
 			<aside
-				className={`flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
+				className={`app-shell-sidebar ui-reveal flex flex-col ${
 					sidebarOpen ? 'w-60' : 'w-12'
 				}`}
+				role="navigation"
+				aria-label="Repository navigation"
 			>
-				{/* Draggable titlebar with macOS traffic light padding */}
 				<div
 					className="sidebar-header flex items-center justify-between px-3 border-b border-sidebar-border"
 					style={{ WebkitAppRegion: 'drag' }}
@@ -128,30 +129,26 @@ export default function AppLayout() {
 						onClick={() => setSidebarOpen(!sidebarOpen)}
 						className="h-7 w-7 p-0 ml-auto"
 						style={{ WebkitAppRegion: 'no-drag' }}
+						aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
 					>
-						{sidebarOpen ? (
-							<ChevronLeft className="h-4 w-4" />
-						) : (
-							<ChevronRight className="h-4 w-4" />
-						)}
+						{sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
 					</Button>
 				</div>
 
 				{sidebarOpen && (
 					<>
-						{/* Open Repository Button */}
 						<div className="p-2">
 							<Button
 								variant="outline"
 								className="w-full justify-start gap-2 h-9"
 								onClick={handleOpenFolder}
+								aria-label="Open repository"
 							>
 								<Plus className="h-4 w-4" />
 								<span>Open Repository</span>
 							</Button>
 						</div>
 
-						{/* Recent Repositories */}
 						{recentRepos && recentRepos.length > 0 && (
 							<div className="px-2 pb-2">
 								<div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5 px-2 pt-1">
@@ -162,6 +159,7 @@ export default function AppLayout() {
 									{recentRepos.slice(0, 5).map((repo) => (
 										<button
 											key={repo}
+											type="button"
 											className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
 												activeRepo === repo
 													? 'bg-accent text-accent-foreground'
@@ -179,9 +177,8 @@ export default function AppLayout() {
 							</div>
 						)}
 
-						{/* Repository List */}
 						<ScrollArea className="flex-1 px-2">
-							{groupedRepos && Object.keys(groupedRepos).length > 0 && (
+							{Object.keys(groupedRepos).length > 0 && (
 								<div className="pb-2">
 									<div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5 px-2 pt-1">
 										<FolderOpen className="h-3 w-3" />
@@ -195,6 +192,7 @@ export default function AppLayout() {
 											<div className="space-y-0.5">
 												{repos.map((repo) => (
 													<button
+														type="button"
 														key={repo.path}
 														className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
 															activeRepo === repo.path
@@ -214,11 +212,20 @@ export default function AppLayout() {
 									))}
 								</div>
 							)}
+
+							{!repoList || repoList.repos.length === 0 ? (
+								<div className="empty-state ui-reveal">
+									<FolderOpen className="h-6 w-6 text-muted-foreground" />
+									<div className="font-medium text-foreground">No repositories yet</div>
+									<div className="text-xs">
+										Open a folder to start using Git Graph.
+									</div>
+								</div>
+							) : null}
 						</ScrollArea>
 					</>
 				)}
 
-				{/* Collapsed sidebar */}
 				{!sidebarOpen && (
 					<div className="flex flex-col items-center p-2 gap-1">
 						<Button
@@ -227,6 +234,7 @@ export default function AppLayout() {
 							className="h-8 w-8 p-0"
 							onClick={handleOpenFolder}
 							title="Open Repository"
+							aria-label="Open Repository"
 						>
 							<Plus className="h-4 w-4" />
 						</Button>
@@ -234,8 +242,10 @@ export default function AppLayout() {
 				)}
 			</aside>
 
-			{/* Main Content */}
-			<div className="flex-1 flex flex-col overflow-hidden bg-background">
+			<div
+				id="main-content"
+				className="app-shell-main flex-1 flex flex-col overflow-hidden ui-reveal"
+			>
 				<Outlet />
 			</div>
 		</div>

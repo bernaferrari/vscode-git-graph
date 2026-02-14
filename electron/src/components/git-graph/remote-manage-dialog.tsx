@@ -66,7 +66,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 	return (
 		<>
 			<Dialog open={open} onOpenChange={onOpenChange}>
-				<DialogContent className="sm:max-w-md">
+				<DialogContent className="sm:max-w-md ui-surface">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
 							<Globe className="h-5 w-5" />
@@ -146,7 +146,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 						)}
 					</ScrollArea>
 
-					<DialogFooter>
+					<DialogFooter className="ui-toolbar">
 						<Button variant="outline" onClick={() => onOpenChange(false)}>
 							Close
 						</Button>
@@ -156,7 +156,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 
 			{/* Add/Edit Remote Dialog */}
 			<Dialog open={addOpen} onOpenChange={setAddOpen}>
-				<DialogContent>
+				<DialogContent className="ui-surface">
 					<DialogHeader>
 						<DialogTitle>
 							{editRemote ? 'Edit Remote' : 'Add Remote'}
@@ -189,7 +189,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 							/>
 						</div>
 					</div>
-					<DialogFooter>
+					<DialogFooter className="ui-toolbar">
 						<Button variant="outline" onClick={() => {
 							setAddOpen(false);
 							setEditRemote(null);

@@ -194,11 +194,11 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="p-0 gap-0 max-w-xl">
+			<DialogContent className="p-0 gap-0 max-w-xl ui-surface">
 				<DialogHeader className="sr-only">
 					<DialogTitle>Quick Switch</DialogTitle>
 				</DialogHeader>
-				<div className="flex items-center gap-2 px-3 py-2 border-b">
+				<div className="ui-toolbar flex items-center gap-2 px-3 py-2">
 					<Search className="h-4 w-4 text-muted-foreground shrink-0" />
 					<Input
 						placeholder="Search branches, tags, commits..."
@@ -211,7 +211,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 						className="border-0 shadow-none focus-visible:ring-0 px-0"
 						autoFocus
 					/>
-					<kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded">esc</kbd>
+					<kbd className="ui-kbd text-[10px]">esc</kbd>
 				</div>
 				<ScrollArea className="max-h-80">
 					{results.length === 0 ? (
@@ -241,7 +241,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 											</span>
 										)}
 										{index === selectedIndex && (
-											<kbd className="px-1 py-0.5 text-[10px] bg-muted/50 rounded">↵</kbd>
+											<kbd className="ui-kbd text-[10px]">↵</kbd>
 										)}
 									</div>
 								);
@@ -249,15 +249,15 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 						</div>
 					)}
 				</ScrollArea>
-				<div className="px-3 py-2 border-t text-xs text-muted-foreground flex items-center gap-4">
+				<div className="ui-toolbar px-3 py-2 text-xs text-muted-foreground flex items-center gap-4">
 					<span className="flex items-center gap-1">
-						<kbd className="px-1 py-0.5 bg-muted rounded">↑↓</kbd> navigate
+						<kbd className="ui-kbd text-[10px]">↑↓</kbd> navigate
 					</span>
 					<span className="flex items-center gap-1">
-						<kbd className="px-1 py-0.5 bg-muted rounded">↵</kbd> select
+						<kbd className="ui-kbd text-[10px]">↵</kbd> select
 					</span>
 					<span className="flex items-center gap-1">
-						<kbd className="px-1 py-0.5 bg-muted rounded">esc</kbd> close
+						<kbd className="ui-kbd text-[10px]">esc</kbd> close
 					</span>
 				</div>
 			</DialogContent>

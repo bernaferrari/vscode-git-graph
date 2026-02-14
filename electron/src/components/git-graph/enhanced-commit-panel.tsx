@@ -4,8 +4,8 @@
  */
 
 import { useState, useMemo } from 'react';
+import { PatchDiff } from '@pierre/diffs/react';
 import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +87,16 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 
 	const totalAdditions = fileChanges.reduce((sum, f) => sum + f.additions, 0);
 	const totalDeletions = fileChanges.reduce((sum, f) => sum + f.deletions, 0);
+	const inlineDiffOptions = useMemo(
+		() => ({
+			diffStyle: 'unified' as const,
+			lineDiffType: 'word' as const,
+			overflow: 'scroll' as const,
+			themeType: 'system' as const,
+			disableFileHeader: true,
+		}),
+		[]
+	);
 
 	const formatDate = (timestamp: number) => {
 		const date = new Date(timestamp * 1000);
@@ -272,21 +282,12 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 												Binary file - cannot display diff
 											</div>
 										) : fileDiff?.diff ? (
-											<div className="px-4 py-2 bg-muted/30 rounded mx-2 mb-2 overflow-x-auto">
-												<pre className="text-xs font-mono whitespace-pre">
-													{fileDiff.diff.split('\n').map((line, i) => (
-														<div
-															key={i}
-															className={`${
-																line.startsWith('+') && !line.startsWith('+++') ? 'text-green-600 bg-green-50' :
-																line.startsWith('-') && !line.startsWith('---') ? 'text-red-600 bg-red-50' :
-																line.startsWith('@@') ? 'text-blue-600 bg-blue-50' : ''
-															}`}
-														>
-															{line}
-														</div>
-													))}
-												</pre>
+											<div className="px-4 py-2 bg-muted/30 rounded mx-2 mb-2 overflow-hidden">
+												<PatchDiff
+													patch={fileDiff.diff}
+													options={inlineDiffOptions}
+													className="w-full"
+												/>
 											</div>
 										) : (
 											<div className="px-10 py-2 text-xs text-muted-foreground">

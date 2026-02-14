@@ -3,7 +3,7 @@
  * Edit rebase todo list with drag and drop
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -33,10 +33,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type TodoAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop' | 'exec' | 'break';
+type CommandTodoAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop' | 'exec' | 'break' | 'label' | 'reset' | 'merge' | 'noop';
+type NonCommandTodoAction = 'comment' | 'raw';
+type TodoAction = CommandTodoAction | NonCommandTodoAction;
+
+type TodoItemKind = 'command' | 'comment' | 'raw';
 
 interface TodoItem {
 	id: string;
+	kind: TodoItemKind;
 	action: TodoAction;
 	hash: string;
 	message: string;
@@ -51,7 +56,7 @@ interface VisualRebaseTodoEditorProps {
 	fromCommit?: string;
 }
 
-const ACTION_CONFIG: Record<TodoAction, { label: string; color: string; icon: React.ReactNode; description: string }> = {
+const ACTION_CONFIG: Record<CommandTodoAction, { label: string; color: string; icon: React.ReactNode; description: string }> = {
 	pick: { 
 		label: 'pick', 
 		color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30', 
@@ -100,6 +105,194 @@ const ACTION_CONFIG: Record<TodoAction, { label: string; color: string; icon: Re
 		icon: <Square className="h-3 w-3" />,
 		description: 'Stop here'
 	},
+	label: {
+		label: 'label',
+		color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/30',
+		icon: <MessageSquare className="h-3 w-3" />,
+		description: 'Create a branch label'
+	},
+	reset: {
+		label: 'reset',
+		color: 'text-sky-600 bg-sky-50 dark:bg-sky-950/30',
+		icon: <RotateCcw className="h-3 w-3" />,
+		description: 'Reset HEAD to commit'
+	},
+	merge: {
+		label: 'merge',
+		color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30',
+		icon: <GitCommit className="h-3 w-3" />,
+		description: 'Create a merge commit'
+	},
+	noop: {
+		label: 'noop',
+		color: 'text-gray-500 bg-gray-50 dark:bg-gray-950/30',
+		icon: <Square className="h-3 w-3" />,
+		description: 'No-op placeholder'
+	},
+};
+
+const COMMAND_ACTIONS_WITH_HASH = new Set<CommandTodoAction>([
+	'pick',
+	'reword',
+	'edit',
+	'squash',
+	'fixup',
+	'drop',
+]);
+
+const COMMAND_ACTIONS_WITHOUT_HASH = new Set<CommandTodoAction>(['exec', 'break']);
+
+const COMMAND_ACTIONS_WITH_OPTIONAL_HASH = new Set<CommandTodoAction>([
+	'label',
+	'reset',
+	'merge',
+	'noop',
+]);
+
+const KNOWN_COMMAND_ACTIONS = new Set<CommandTodoAction>([
+	'pick',
+	'reword',
+	'edit',
+	'squash',
+	'fixup',
+	'drop',
+	'exec',
+	'break',
+	'label',
+	'reset',
+	'merge',
+	'noop',
+]);
+
+const isCommandAction = (action: TodoAction): action is CommandTodoAction => {
+	return KNOWN_COMMAND_ACTIONS.has(action as CommandTodoAction);
+};
+
+const isHashLike = (value: string): boolean => /^[0-9a-f]{7,40}$/i.test(value);
+
+const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
+	const rawLine = line.trim();
+	if (!rawLine) {
+		return null;
+	}
+
+	if (rawLine.startsWith('#')) {
+		return {
+			id: `comment-${index}`,
+			kind: 'comment',
+			action: 'comment',
+			hash: '',
+			message: line.trimEnd(),
+			originalAction: 'comment',
+			originalIndex: index,
+		};
+	}
+
+	const [action, ...restParts] = rawLine.split(/\s+/);
+	if (!action) return null;
+
+	const normalizedAction = action.toLowerCase();
+	const rest = restParts.join(' ');
+	if (!KNOWN_COMMAND_ACTIONS.has(normalizedAction as CommandTodoAction)) {
+		return {
+			id: `raw-${index}`,
+			kind: 'raw',
+			action: 'raw',
+			hash: '',
+			message: rawLine,
+			originalAction: 'raw',
+			originalIndex: index,
+		};
+	}
+
+	const commandAction = normalizedAction as CommandTodoAction;
+
+	if (COMMAND_ACTIONS_WITH_HASH.has(commandAction) || COMMAND_ACTIONS_WITH_OPTIONAL_HASH.has(commandAction)) {
+		const hash = restParts[0] ?? '';
+
+		if (COMMAND_ACTIONS_WITH_HASH.has(commandAction)) {
+			if (!hash || !isHashLike(hash)) {
+				return {
+					id: `${commandAction}-${index}`,
+					kind: 'raw',
+					action: 'raw',
+					hash: '',
+					message: rawLine,
+					originalAction: commandAction,
+					originalIndex: index,
+				};
+			}
+
+			return {
+				id: hash,
+				kind: 'command',
+				action: commandAction,
+				hash,
+				message: rest.substring(hash.length).trim(),
+				originalAction: commandAction,
+				originalIndex: index,
+			};
+		}
+
+		if (COMMAND_ACTIONS_WITH_OPTIONAL_HASH.has(commandAction)) {
+			if (hash && isHashLike(hash)) {
+				return {
+					id: `${commandAction}-${index}`,
+					kind: 'command',
+					action: commandAction,
+					hash,
+					message: rest.substring(hash.length).trim(),
+					originalAction: commandAction,
+					originalIndex: index,
+				};
+			}
+
+			return {
+				id: `${commandAction}-${index}`,
+				kind: 'command',
+				action: commandAction,
+				hash: '',
+				message: rest,
+				originalAction: commandAction,
+				originalIndex: index,
+			};
+		}
+	}
+
+	return {
+		id: `${commandAction}-${index}`,
+		kind: 'command',
+		action: commandAction,
+		hash: '',
+		message: rest,
+		originalAction: commandAction,
+		originalIndex: index,
+	};
+};
+
+const buildTodoLine = (todo: TodoItem, sanitizeTodoMessage: (message: string) => string): string => {
+	if (todo.kind === 'comment' || todo.kind === 'raw') {
+		return todo.message;
+	}
+
+	if (todo.action === 'drop') {
+		return '';
+	}
+
+	const message = sanitizeTodoMessage(todo.message);
+	const parts = [todo.action];
+
+	if (!COMMAND_ACTIONS_WITHOUT_HASH.has(todo.action)) {
+		if (todo.hash) {
+			parts.push(todo.hash);
+		}
+	}
+
+	if (message) {
+		parts.push(message);
+	}
+
+	return parts.join(' ');
 };
 
 export function VisualRebaseTodoEditor({
@@ -110,57 +303,135 @@ export function VisualRebaseTodoEditor({
 }: VisualRebaseTodoEditorProps) {
 	const { activeRepo } = useAppStore();
 	const [todos, setTodos] = useState<TodoItem[]>([]);
+	const [loadedTodoSource, setLoadedTodoSource] = useState('');
+	const [hasLocalChanges, setHasLocalChanges] = useState(false);
 	const [dragIndex, setDragIndex] = useState<number | null>(null);
 	const [dropIndex, setDropIndex] = useState<number | null>(null);
 	const [isExecuting, setIsExecuting] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [selectedTodo, setSelectedTodo] = useState<string | null>(null);
 
+	const { data: activeRebaseTodo } = trpc.git.rebaseTodo.useQuery(
+		{ repo: activeRepo ?? '' },
+		{
+			enabled: open && !!activeRepo && !fromCommit,
+			refetchInterval: open && !!activeRepo && !fromCommit && !hasLocalChanges ? 2000 : false,
+		}
+	);
+
+	const sanitizeTodoMessage = useCallback((message: string) => {
+		return message.trim().replace(/[\r\n]+/g, ' ');
+	}, []);
+
 	// Load commits when dialog opens
 	const loadCommits = useCallback(async () => {
-		if (!open || !activeRepo || !fromCommit) return;
+		if (!open || !activeRepo) return;
 
 		setIsLoading(true);
 		try {
+			if (!fromCommit) {
+				if (!activeRebaseTodo?.rawTodo) {
+					setTodos([]);
+					setLoadedTodoSource('');
+					setHasLocalChanges(false);
+					return;
+				}
+
+				const parsedTodoItems = activeRebaseTodo.rawTodo
+					.split('\n')
+					.map((line, index) => parseRebaseTodoLine(line, index))
+					.filter((todo): todo is TodoItem => Boolean(todo))
+					.map((todo) => ({
+						...todo,
+						message: sanitizeTodoMessage(todo.message ?? ''),
+					}));
+
+				setTodos(parsedTodoItems);
+				setLoadedTodoSource(activeRebaseTodo.rawTodo);
+				setHasLocalChanges(false);
+				return;
+			}
+
 			const result = await trpc.git.log.query({
 				repo: activeRepo,
 				startHash: fromCommit,
-				limit: 50,
+				maxCommits: 50,
 			});
 
-			const todoItems: TodoItem[] = (result.commits || []).map((commit: any, index: number) => ({
+			if (result.error) {
+				toast.error(result.error);
+				setTodos([]);
+				setLoadedTodoSource(`from:${fromCommit}`);
+				setHasLocalChanges(false);
+				return;
+			}
+
+			const todoItems: TodoItem[] = (result.commits || []).map((commit: { hash: string; message: string }, index: number) => ({
 				id: commit.hash,
-				action: 'pick' as TodoAction,
+				kind: 'command',
+				action: 'pick',
 				hash: commit.hash,
-				message: commit.message.split('\n')[0],
-				originalAction: 'pick' as TodoAction,
+				message: sanitizeTodoMessage(commit.message).split('\n')[0],
+				originalAction: 'pick',
 				originalIndex: index,
 			}));
 
 			setTodos(todoItems);
+			setLoadedTodoSource(`from:${fromCommit}`);
+			setHasLocalChanges(false);
 		} catch (error) {
-			toast.error('Failed to load commits');
+			toast.error(error instanceof Error ? error.message : 'Failed to load commits');
 		} finally {
 			setIsLoading(false);
 		}
-	}, [open, activeRepo, fromCommit]);
+	}, [open, activeRepo, fromCommit, sanitizeTodoMessage, activeRebaseTodo]);
 
-	// Load on open
-	useState(() => {
-		if (open) loadCommits();
-	});
+	const getActiveTodoSource = activeRebaseTodo?.rawTodo ?? '';
+
+	// Load on open and keep in sync when not editing.
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+
+		if (fromCommit) {
+			if (loadedTodoSource === `from:${fromCommit}`) return;
+			void loadCommits();
+			return;
+		}
+
+		if (hasLocalChanges) return;
+		if (getActiveTodoSource === loadedTodoSource) return;
+
+		void loadCommits();
+	}, [open, fromCommit, hasLocalChanges, loadedTodoSource, getActiveTodoSource, loadCommits]);
+
+	useEffect(() => {
+		if (!open) {
+			setTodos([]);
+			setLoadedTodoSource('');
+			setHasLocalChanges(false);
+			setSelectedTodo(null);
+		}
+	}, [open]);
 
 	const handleDragStart = (index: number) => {
+		if (todos[index]?.kind !== 'command') {
+			return;
+		}
 		setDragIndex(index);
 	};
 
 	const handleDragOver = (e: React.DragEvent, index: number) => {
+		if (dragIndex === null || todos[index]?.kind !== 'command') {
+			return;
+		}
 		e.preventDefault();
 		setDropIndex(index);
 	};
 
 	const handleDrop = (index: number) => {
-		if (dragIndex === null || dragIndex === index) {
+		if (dragIndex === null || dragIndex === index || todos[index]?.kind !== 'command') {
 			setDragIndex(null);
 			setDropIndex(null);
 			return;
@@ -170,6 +441,7 @@ export function VisualRebaseTodoEditor({
 		const [draggedItem] = newTodos.splice(dragIndex, 1);
 		newTodos.splice(index, 0, draggedItem);
 		setTodos(newTodos);
+		setHasLocalChanges(true);
 		setDragIndex(null);
 		setDropIndex(null);
 	};
@@ -181,63 +453,107 @@ export function VisualRebaseTodoEditor({
 
 	const moveUp = (index: number) => {
 		if (index === 0) return;
+		if (todos[index]?.kind !== 'command') return;
+		const destinationIndex = (() => {
+			for (let i = index - 1; i >= 0; i--) {
+				if (todos[i]?.kind === 'command') return i;
+			}
+			return null;
+		})();
+		if (destinationIndex === null) return;
+
 		const newTodos = [...todos];
-		[newTodos[index - 1], newTodos[index]] = [newTodos[index], newTodos[index - 1]];
+		[newTodos[destinationIndex], newTodos[index]] = [newTodos[index], newTodos[destinationIndex]];
 		setTodos(newTodos);
+		setHasLocalChanges(true);
 	};
 
 	const moveDown = (index: number) => {
 		if (index === todos.length - 1) return;
+		if (todos[index]?.kind !== 'command') return;
+		let destinationIndex: number | null = null;
+		for (let i = index + 1; i < todos.length; i++) {
+			if (todos[i]?.kind === 'command') {
+				destinationIndex = i;
+				break;
+			}
+		}
+		if (destinationIndex === null) return;
+
 		const newTodos = [...todos];
-		[newTodos[index], newTodos[index + 1]] = [newTodos[index + 1], newTodos[index]];
+		[newTodos[index], newTodos[destinationIndex]] = [newTodos[destinationIndex], newTodos[index]];
 		setTodos(newTodos);
+		setHasLocalChanges(true);
 	};
 
 	const changeAction = (id: string, action: TodoAction) => {
+		if (!isCommandAction(action)) return;
 		setTodos(prev => prev.map(todo => 
 			todo.id === id ? { ...todo, action } : todo
 		));
+		setHasLocalChanges(true);
 	};
 
 	const removeTodo = (id: string) => {
+		const target = todos.find((todo) => todo.id === id);
+		if (!target || target.kind !== 'command') return;
 		setTodos(prev => prev.filter(todo => todo.id !== id));
+		setHasLocalChanges(true);
 	};
 
 	const resetTodo = (id: string) => {
+		const target = todos.find((todo) => todo.id === id);
+		if (!target || target.kind !== 'command') return;
 		setTodos(prev => prev.map(todo => 
 			todo.id === id ? { ...todo, action: todo.originalAction } : todo
 		));
+		setHasLocalChanges(true);
 	};
 
 	const resetAll = () => {
-		setTodos(prev => prev.map(todo => ({ ...todo, action: todo.originalAction })));
+		setTodos(prev => prev
+			.map((todo) => ({
+				...todo,
+				action: todo.kind === 'command' ? todo.originalAction : todo.action,
+			}))
+			.sort((a, b) => a.originalIndex - b.originalIndex));
+		setHasLocalChanges(false);
 	};
 
 	const hasChanges = todos.some((todo, index) => 
-		todo.action !== todo.originalAction || index !== todo.originalIndex
+		todo.kind === 'command' && (todo.action !== todo.originalAction || index !== todo.originalIndex)
 	);
 
 	const handleContinueRebase = async () => {
 		if (!activeRepo) return;
 
+		const activeTodos = todos.filter((t) => t.kind === 'command' && t.action !== 'drop');
+		if (activeTodos.length === 0) {
+			toast.error('No commits selected for rebase.');
+			return;
+		}
+
 		setIsExecuting(true);
 		try {
-			// Generate todo file content
 			const todoContent = todos
-				.filter(t => t.action !== 'drop')
-				.map(t => `${t.action} ${t.hash.substring(0, 7)} ${t.message}`)
+				.map((todo) => buildTodoLine(todo, sanitizeTodoMessage))
+				.filter((line): line is string => Boolean(line))
 				.join('\n');
 
 			// Continue rebase with edited todos
-			await trpc.git.continueRebase.mutate({
+			const result = await trpc.git.rebaseContinue.mutate({
 				repo: activeRepo,
 				todos: todoContent,
 			});
+			if (result?.error) {
+				toast.error(result.error);
+				return;
+			}
 
 			toast.success('Rebase continued');
 			onOpenChange(false);
 		} catch (error) {
-			toast.error('Failed to continue rebase');
+			toast.error(error instanceof Error ? error.message : 'Failed to continue rebase');
 		} finally {
 			setIsExecuting(false);
 		}
@@ -248,17 +564,17 @@ export function VisualRebaseTodoEditor({
 		if (!confirm('Abort the rebase? All changes will be lost.')) return;
 
 		try {
-			await trpc.git.abortRebase.mutate({ repo: activeRepo });
+			await trpc.git.rebaseAbort.mutate({ repo: activeRepo });
 			toast.success('Rebase aborted');
 			onOpenChange(false);
 		} catch (error) {
-			toast.error('Failed to abort rebase');
+			toast.error(error instanceof Error ? error.message : 'Failed to abort rebase');
 		}
 	};
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<GripVertical className="h-5 w-5" />
@@ -273,7 +589,7 @@ export function VisualRebaseTodoEditor({
 
 				{/* Action Legend */}
 				<div className="flex flex-wrap gap-2 py-2 border-b text-xs">
-					{Object.entries(ACTION_CONFIG).slice(0, 6).map(([key, config]) => (
+					{Object.entries(ACTION_CONFIG).map(([key, config]) => (
 						<Badge 
 							key={key} 
 							variant="outline" 
@@ -299,47 +615,68 @@ export function VisualRebaseTodoEditor({
 					) : (
 						<div className="divide-y">
 							{todos.map((todo, index) => {
-								const config = ACTION_CONFIG[todo.action];
-								const isModified = todo.action !== todo.originalAction || index !== todo.originalIndex;
+								const config = todo.kind === 'command'
+									? ACTION_CONFIG[todo.action as CommandTodoAction]
+									: null;
+								const isModified = todo.kind === 'command' && (
+									todo.action !== todo.originalAction || index !== todo.originalIndex
+								);
 								const isSelected = selectedTodo === todo.id;
 								const isDropTarget = dropIndex === index;
+								const isDraggable = todo.kind === 'command';
 
 								return (
 									<div
 										key={todo.id}
-										draggable
-										onDragStart={() => handleDragStart(index)}
-										onDragOver={(e) => handleDragOver(e, index)}
-										onDrop={() => handleDrop(index)}
+										draggable={isDraggable}
+										onDragStart={() => isDraggable && handleDragStart(index)}
+										onDragOver={(e) => isDraggable ? handleDragOver(e, index) : undefined}
+										onDrop={() => isDraggable ? handleDrop(index) : undefined}
 										onDragEnd={handleDragEnd}
-										onClick={() => setSelectedTodo(isSelected ? null : todo.id)}
+										onClick={() => isDraggable && setSelectedTodo(isSelected ? null : todo.id)}
 										className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+											isDraggable ? 'group' : 'cursor-default opacity-90'
+										} ${
 											isSelected ? 'bg-accent' : 'hover:bg-accent/50'
 										} ${isDropTarget ? 'border-t-2 border-primary' : ''} ${
-											todo.action === 'drop' ? 'opacity-50' : ''
+											todo.action === 'drop' ? 'opacity-60' : ''
 										}`}
 									>
 										{/* Drag Handle */}
-										<div className="cursor-grab text-muted-foreground">
-											<GripVertical className="h-4 w-4" />
-										</div>
+										{isDraggable && (
+											<div className="cursor-grab text-muted-foreground">
+												<GripVertical className="h-4 w-4" />
+											</div>
+										)}
+
+										{!isDraggable && <div className="w-4" />}
 
 										{/* Action Badge */}
-										<Badge 
-											variant="outline" 
-											className={`${config.color} border-0 min-w-[60px] justify-center`}
-										>
-											{config.icon}
-											<span className="ml-1">{config.label}</span>
-										</Badge>
+										{config ? (
+											<Badge 
+												variant="outline" 
+												className={`${config.color} border-0 min-w-[60px] justify-center`}
+											>
+												{config.icon}
+												<span className="ml-1">{config.label}</span>
+											</Badge>
+										) : (
+											<Badge variant="outline" className="min-w-[60px] justify-center border-0 text-muted-foreground">
+												{todo.kind === 'comment' ? '#' : 'raw'}
+											</Badge>
+										)}
 
 										{/* Hash */}
-										<code className="text-xs font-mono text-blue-600">
-											{todo.hash.substring(0, 7)}
-										</code>
+										{todo.kind === 'command' && (
+											<code className="text-xs font-mono text-blue-600">
+												{todo.hash ? todo.hash.substring(0, 7) : '—'}
+											</code>
+										)}
 
 										{/* Message */}
-										<span className="flex-1 text-sm truncate">
+										<span className={`flex-1 text-sm truncate ${
+											todo.kind === 'comment' ? 'italic text-muted-foreground' : ''
+										}`}>
 											{todo.message}
 										</span>
 
@@ -351,56 +688,58 @@ export function VisualRebaseTodoEditor({
 										)}
 
 										{/* Actions */}
-										<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-6 w-6 p-0"
-												onClick={(e) => {
-													e.stopPropagation();
-													moveUp(index);
-												}}
-												disabled={index === 0}
-											>
-												<ArrowUp className="h-3 w-3" />
-											</Button>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-6 w-6 p-0"
-												onClick={(e) => {
-													e.stopPropagation();
-													moveDown(index);
-												}}
-												disabled={index === todos.length - 1}
-											>
-												<ArrowDown className="h-3 w-3" />
-											</Button>
-											{isModified && (
+										{isDraggable && (
+											<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
 												<Button
 													variant="ghost"
 													size="sm"
 													className="h-6 w-6 p-0"
 													onClick={(e) => {
 														e.stopPropagation();
-														resetTodo(todo.id);
+														moveUp(index);
+													}}
+													disabled={index === 0}
+												>
+													<ArrowUp className="h-3 w-3" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0"
+													onClick={(e) => {
+														e.stopPropagation();
+														moveDown(index);
+													}}
+													disabled={index === todos.length - 1}
+												>
+													<ArrowDown className="h-3 w-3" />
+												</Button>
+												{isModified && (
+													<Button
+														variant="ghost"
+														size="sm"
+														className="h-6 w-6 p-0"
+														onClick={(e) => {
+															e.stopPropagation();
+															resetTodo(todo.id);
+														}}
+													>
+														<RotateCcw className="h-3 w-3" />
+													</Button>
+												)}
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0 text-red-600"
+													onClick={(e) => {
+														e.stopPropagation();
+														changeAction(todo.id, 'drop');
 													}}
 												>
-													<RotateCcw className="h-3 w-3" />
+													<Trash2 className="h-3 w-3" />
 												</Button>
-											)}
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-6 w-6 p-0 text-red-600"
-												onClick={(e) => {
-													e.stopPropagation();
-													changeAction(todo.id, 'drop');
-												}}
-											>
-												<Trash2 className="h-3 w-3" />
-											</Button>
-										</div>
+											</div>
+										)}
 									</div>
 								);
 							})}
@@ -427,7 +766,7 @@ export function VisualRebaseTodoEditor({
 						</Button>
 						<Button
 							onClick={handleContinueRebase}
-							disabled={isExecuting || todos.filter(t => t.action !== 'drop').length === 0}
+							disabled={isExecuting || todos.filter((t) => t.kind === 'command' && t.action !== 'drop').length === 0}
 						>
 							{isExecuting ? (
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />

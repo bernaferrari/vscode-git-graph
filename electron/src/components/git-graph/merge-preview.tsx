@@ -152,7 +152,7 @@ export function MergePreview({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+			<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<GitMerge className="h-5 w-5" />

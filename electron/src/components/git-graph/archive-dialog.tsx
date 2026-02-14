@@ -61,8 +61,8 @@ export function ArchiveDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
-			<Card className="relative z-50 w-full max-w-md mx-4">
+			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<Card className="relative z-50 w-full ui-surface max-w-md mx-4">
 				<CardHeader>
 					<CardTitle>Create Archive</CardTitle>
 				</CardHeader>

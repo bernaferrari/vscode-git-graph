@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { trpc } from '@/trpc/client';
 import {
 	Dialog,
 	DialogContent,
@@ -79,6 +80,7 @@ export function WorkspacesManager({
 	const [newWorkspaceName, setNewWorkspaceName] = useState('');
 	const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
 	const [editName, setEditName] = useState('');
+	const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
 
 	// Load workspaces
 	useEffect(() => {
@@ -144,8 +146,10 @@ export function WorkspacesManager({
 
 	// Add repo to workspace
 	const handleAddRepo = async (workspaceId: string) => {
-		// This would use Electron's dialog API
-		const result = await window.electron?.ipcRenderer.invoke('open-directory-dialog');
+		const result = await showOpenDialog({
+			title: 'Add repository to workspace',
+			properties: ['openDirectory'],
+		});
 		if (!result || result.canceled) return;
 
 		const path = result.filePaths[0];
@@ -200,7 +204,7 @@ export function WorkspacesManager({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+			<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col ui-surface">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<FolderGit2 className="h-5 w-5" />

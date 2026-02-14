@@ -122,11 +122,18 @@ function CommitRow({
 	return (
 		<div
 			data-index={index}
-			className={`commit-row group flex items-center gap-3 cursor-pointer transition-colors border-b border-transparent ${
+			className={`commit-row ui-commit-row group flex items-center gap-3 cursor-pointer transition-colors ${
 				isSelected
-					? 'bg-accent/40'
+					? 'bg-accent/30 border-accent/60'
 					: 'hover:bg-accent/20'
 			} ${isMuted ? 'opacity-50' : ''}`}
+			tabIndex={0}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					onSelect();
+				}
+			}}
 			onClick={onSelect}
 			onDoubleClick={onToggleExpand}
 			onContextMenu={onContextMenu}
