@@ -25,6 +25,25 @@ const isDev = !!VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 let ipcHandler: ReturnType<typeof createIPCHandler> | null = null;
 
+function logUnhandledError(error: unknown, source: string): void {
+    const normalized = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    console.error(`[main][${source}] ${normalized}`);
+}
+
+function openExternalSafely(url: string): void {
+    void shell.openExternal(url).catch((error) => {
+        logUnhandledError(error, `openExternal:${url}`);
+    });
+}
+
+process.on('unhandledRejection', (reason) => {
+    logUnhandledError(reason, 'unhandledRejection');
+});
+
+process.on('uncaughtException', (error) => {
+    logUnhandledError(error, 'uncaughtException');
+});
+
 function createWindow(): BrowserWindow {
     // Platform-specific visual effects
     const isMac = process.platform === 'darwin';
@@ -60,11 +79,15 @@ function createWindow(): BrowserWindow {
     // preventing the blank flash that occurs with simpler approaches like 'ready-to-show'.
 
     if (isDev) {
-        void win.loadURL(VITE_DEV_SERVER_URL);
+        void win.loadURL(VITE_DEV_SERVER_URL).catch((error) => {
+            logUnhandledError(error, 'loadURL');
+        });
         // Detached devtools avoids layout interference during development
         win.webContents.openDevTools({ mode: 'detach' });
     } else {
-        void win.loadFile(path.join(__dirname, '../dist/index.html'));
+        void win.loadFile(path.join(__dirname, '../dist/index.html')).catch((error) => {
+            logUnhandledError(error, 'loadFile');
+        });
     }
 
     const fallbackTimer = setTimeout(() => {
@@ -72,10 +95,16 @@ function createWindow(): BrowserWindow {
             console.warn('[window] Renderer did not signal ready in time; showing window fallback.');
             win.show();
         }
-    }, 3000);
+    }, 1500);
 
     win.on('show', () => {
         clearTimeout(fallbackTimer);
+    });
+
+    win.webContents.once('dom-ready', () => {
+        if (!win.isVisible()) {
+            win.show();
+        }
     });
 
     // Security: intercept target="_blank" and window.open() to use OS browser
@@ -85,7 +114,7 @@ function createWindow(): BrowserWindow {
         }
 
         if (isSafeExternalUrl(url)) {
-            void shell.openExternal(url);
+            openExternalSafely(url);
         } else {
             console.warn(`[security] Blocked external URL: ${url}`);
         }
@@ -104,7 +133,7 @@ function createWindow(): BrowserWindow {
 
         event.preventDefault();
         if (isSafeExternalUrl(url)) {
-            void shell.openExternal(url);
+            openExternalSafely(url);
         } else {
             console.warn(`[security] Blocked external URL: ${url}`);
         }
@@ -146,29 +175,34 @@ function setupContentSecurityPolicy(): void {
     });
 }
 
-void app.whenReady().then(() => {
-    // Remove default menu bar (File, Edit, View, Help)
-    Menu.setApplicationMenu(null);
+void app
+    .whenReady()
+    .then(() => {
+        // Remove default menu bar (File, Edit, View, Help)
+        Menu.setApplicationMenu(null);
 
-    // Set up Content Security Policy via HTTP headers
-    // This intercepts all responses and injects the CSP header for app content
-    setupContentSecurityPolicy();
+        // Set up Content Security Policy via HTTP headers
+        // This intercepts all responses and injects the CSP header for app content
+        setupContentSecurityPolicy();
 
-    mainWindow = createWindow();
+        mainWindow = createWindow();
 
-    // Wire up tRPC to handle IPC calls from the renderer
-    ipcHandler = createIPCHandler({
-        router: appRouter,
-        windows: [mainWindow],
-        createContext,
+        // Wire up tRPC to handle IPC calls from the renderer
+        ipcHandler = createIPCHandler({
+            router: appRouter,
+            windows: [mainWindow],
+            createContext,
+        });
+
+        app.on('browser-window-created', (_event, window) => {
+            ipcHandler?.attachWindow(window);
+        });
+
+        initAutoUpdater();
+    })
+    .catch((error) => {
+        logUnhandledError(error, 'app.whenReady');
     });
-
-    app.on('browser-window-created', (_event, window) => {
-        ipcHandler?.attachWindow(window);
-    });
-
-    initAutoUpdater();
-});
 
 // Standard quit behavior: exit when all windows closed (except macOS)
 app.on('window-all-closed', () => {

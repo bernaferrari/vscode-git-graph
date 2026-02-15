@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
+import { getGravatarUrl } from '@/lib/gravatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -110,7 +111,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 													#{index + 1}
 												</div>
 												<img
-													src={`https://www.gravatar.com/avatar/${btoa(author.email).slice(0, 32)}?s=32&d=identicon`}
+													src={getGravatarUrl(author.email, 32)}
 													alt={author.name}
 													className="w-6 h-6 rounded-full"
 												/>

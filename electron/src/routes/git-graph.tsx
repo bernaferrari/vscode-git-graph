@@ -4,12 +4,8 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router';
-import { GitGraph } from '@/components/git-graph';
+import { GitGraphPage } from '@/pages/GitGraphPage';
 
 export const Route = createFileRoute('/git-graph')({
-	component: GitGraphPage,
+    component: GitGraphPage,
 });
-
-function GitGraphPage() {
-	return <GitGraph />;
-}

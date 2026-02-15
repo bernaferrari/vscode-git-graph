@@ -7,8 +7,34 @@ import { z } from 'zod';
 import { router, publicProcedure } from '../../init';
 import { getRepoManager } from '../../../services/repoManager';
 import { getGitService } from '../../../services/gitService';
+import { findGit } from '../../../services/gitExecutable';
 import { instanceStore } from '@/app/backend/store';
 import type { GitRepoState } from '@/web/lib/types';
+
+let gitInitPromise: Promise<string | null> | null = null;
+
+async function ensureGitInitialized(): Promise<string | null> {
+	const gitService = getGitService();
+	if (gitService.isGitAvailable()) {
+		return null;
+	}
+
+	if (gitInitPromise === null) {
+		gitInitPromise = (async () => {
+			try {
+				const executable = await findGit();
+				gitService.setGitExecutable(executable);
+				return null;
+			} catch (error) {
+				return error instanceof Error ? error.message : 'Failed to find Git executable';
+			} finally {
+				gitInitPromise = null;
+			}
+		})();
+	}
+
+	return gitInitPromise;
+}
 
 export const repoRouter = router({
 	/**
@@ -69,6 +95,14 @@ export const repoRouter = router({
 			})
 		)
 		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError !== null) {
+				return {
+					root: null,
+					error: `Unable to initialize Git: ${initError}`,
+				};
+			}
+
 			const manager = getRepoManager(getGitService());
 			const result = await manager.registerRepo(input.path);
 			return result;
@@ -181,6 +215,14 @@ export const repoRouter = router({
 			})
 		)
 		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError !== null) {
+				return {
+					found: false,
+					error: `Unable to initialize Git: ${initError}`,
+				};
+			}
+
 			const manager = getRepoManager(getGitService());
 			const found = await manager.searchDirectoryForRepos(input.directory, input.maxDepth);
 			return { found };

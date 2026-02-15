@@ -1,9 +1,10 @@
 /*
- * Home route - redirects to Git Graph
+ * Home route
  */
 
-import { createFileRoute, Navigate } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
+import { GitGraphPage } from '@/pages/GitGraphPage';
 
 export const Route = createFileRoute('/')({
-	component: () => <Navigate to="/git-graph" />,
+    component: GitGraphPage,
 });

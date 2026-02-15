@@ -1,7 +1,7 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/inter';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -25,9 +25,9 @@
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.90 0.18 127);
+    --chart-1: oklch(0.9 0.18 127);
     --chart-2: oklch(0.85 0.21 129);
-    --chart-3: oklch(0.77 0.20 131);
+    --chart-3: oklch(0.77 0.2 131);
     --chart-4: oklch(0.65 0.18 132);
     --chart-5: oklch(0.53 0.14 132);
     --radius: 0.625rem;
@@ -43,6 +43,7 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    --mac-titlebar-offset: 0px;
 }
 
 .dark {
@@ -53,7 +54,7 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.77 0.20 131);
+    --primary: oklch(0.77 0.2 131);
     --primary-foreground: oklch(0.27 0.07 132);
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
@@ -65,9 +66,9 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.90 0.18 127);
+    --chart-1: oklch(0.9 0.18 127);
     --chart-2: oklch(0.85 0.21 129);
-    --chart-3: oklch(0.77 0.20 131);
+    --chart-3: oklch(0.77 0.2 131);
     --chart-4: oklch(0.65 0.18 132);
     --chart-5: oklch(0.53 0.14 132);
     --sidebar: oklch(0.205 0 0);
@@ -127,184 +128,221 @@
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  *:focus-visible {
-    @apply ring-2 ring-ring ring-offset-2 ring-offset-[var(--ring-offset)] outline-none;
-  }
-  html {
-    height: 100%;
-  }
-  body {
-    @apply h-full text-foreground font-sans antialiased;
-    background:
-      radial-gradient(circle at 10% 0%, var(--surface-gradient-1), transparent 44%),
-      radial-gradient(circle at 90% 0%, var(--surface-gradient-2), transparent 46%),
-      var(--surface);
-    color: var(--foreground);
-  }
-  #root {
-    @apply h-full;
-    isolation: isolate;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
+    *:focus-visible {
+        @apply ring-ring ring-2 ring-offset-2 ring-offset-[var(--ring-offset)] outline-none;
+    }
+    html {
+        height: 100%;
+    }
+    body {
+        @apply text-foreground h-full font-sans antialiased;
+        background:
+            radial-gradient(circle at 10% 0%, var(--surface-gradient-1), transparent 44%),
+            radial-gradient(circle at 90% 0%, var(--surface-gradient-2), transparent 46%), var(--surface);
+        color: var(--foreground);
+    }
+    #root {
+        @apply h-full;
+        isolation: isolate;
+    }
 }
 
 .app-shell {
-  @apply min-h-full flex bg-background text-foreground;
+    @apply bg-background text-foreground flex min-h-full;
 }
 
 .app-shell-main {
-  @apply flex-1 min-h-0 overflow-hidden relative;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--surface-elevated) 65%, transparent), transparent),
-    var(--surface-elevated);
+    @apply relative min-h-0 flex-1 overflow-hidden;
+    background:
+        linear-gradient(180deg, color-mix(in oklch, var(--surface-elevated) 65%, transparent), transparent),
+        var(--surface-elevated);
 }
 
 .app-shell-sidebar {
-  @apply border-r border-sidebar-border/80 bg-sidebar shadow-[0_0_30px_-18px_rgba(0,0,0,0.5)];
-  backdrop-filter: blur(4px);
+    @apply border-sidebar-border/80 bg-sidebar border-r shadow-[0_0_30px_-18px_rgba(0,0,0,0.5)];
+    backdrop-filter: blur(4px);
 }
 
 .glossy-panel {
-  @apply bg-card/85 border border-border/80 rounded-2xl shadow-[0_20px_60px_-30px_rgba(0,0,0,0.4)];
-  backdrop-filter: blur(8px);
+    @apply bg-card/85 border-border/80 rounded-2xl border shadow-[0_20px_60px_-30px_rgba(0,0,0,0.4)];
+    backdrop-filter: blur(8px);
 }
 
 .glass-panel {
-  @apply border border-white/20 rounded-xl bg-white/20;
-  backdrop-filter: blur(8px);
+    @apply rounded-xl border border-white/20 bg-white/20;
+    backdrop-filter: blur(8px);
 }
 
 .empty-state {
-  @apply px-4 py-10 text-sm text-muted-foreground flex flex-col items-center justify-center gap-2 text-center;
+    @apply text-muted-foreground flex flex-col items-center justify-center gap-2 px-4 py-10 text-center text-sm;
 }
 
 .skip-link {
-  @apply sr-only focus:not-sr-only focus:fixed focus:z-[100] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-background focus:py-2 focus:px-3 focus:text-sm focus:border focus:border-border;
+    @apply focus:bg-background focus:border-border sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-lg focus:border focus:px-3 focus:py-2 focus:text-sm;
 }
 
 .ui-reveal {
-  animation: ui-reveal 240ms cubic-bezier(0.2, 0.8, 0.4, 1) both;
+    animation: ui-reveal 240ms cubic-bezier(0.2, 0.8, 0.4, 1) both;
 }
 
 .ui-surface {
-  @apply rounded-2xl border border-border/65 bg-card/92 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.45)];
-  backdrop-filter: blur(12px);
+    @apply border-border/65 bg-card/92 rounded-2xl border shadow-[0_20px_60px_-35px_rgba(0,0,0,0.45)];
+    backdrop-filter: blur(12px);
 }
 
 .ui-toolbar {
-  @apply border-b border-border/70 bg-background/90 backdrop-blur-md;
+    @apply border-border/70 bg-background/90 border-b backdrop-blur-md;
 }
 
 .ui-commit-col {
-  @apply border-r border-border/60 bg-muted/20;
+    @apply border-border/60 bg-muted/20 border-r;
 }
 
 .ui-commit-row {
-  @apply border-b border-border/40 transition-[background,transform];
+    @apply border-border/40 border-b transition-[background,transform];
+}
+
+.commit-graph .branch-lines .line {
+    transition:
+        stroke-opacity 140ms ease,
+        stroke-width 140ms ease;
+}
+
+.commit-graph .branch-lines .shadow {
+    transition:
+        stroke-opacity 140ms ease,
+        stroke-width 140ms ease;
+}
+
+.commit-graph .commit-vertices circle {
+    transition:
+        r 140ms ease,
+        stroke-opacity 140ms ease,
+        opacity 140ms ease;
 }
 
 .ui-status-bar {
-  @apply h-6 border-t border-border/70 bg-background/90 backdrop-blur-md;
+    @apply border-border/70 bg-background/90 h-6 border-t backdrop-blur-md;
 }
 
 .ui-empty-state-shell {
-  @apply p-8 flex flex-col items-center justify-center gap-2 text-center;
+    @apply flex flex-col items-center justify-center gap-2 p-8 text-center;
 }
 
 .ui-inline-menu {
-  @apply rounded-lg border border-border/70 bg-popover/95 backdrop-blur-sm shadow-[0_18px_90px_-40px_rgba(0,0,0,0.55)] ring-1 ring-foreground/20;
+    @apply border-border/70 bg-popover/95 ring-foreground/20 rounded-lg border shadow-[0_18px_90px_-40px_rgba(0,0,0,0.55)] ring-1 backdrop-blur-sm;
 }
 
 .ui-kbd {
-  @apply inline-flex items-center rounded-md border border-border/55 bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono;
+    @apply border-border/55 bg-muted/50 text-muted-foreground inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-[10px];
 }
 
 @keyframes ui-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-reveal {
+        animation: none !important;
+    }
+
+    .commit-graph .branch-lines .line,
+    .commit-graph .branch-lines .shadow,
+    .commit-graph .commit-vertices circle,
+    .ui-commit-row {
+        transition: none !important;
+    }
 }
 
 /* Platform-specific styles */
 .platform-darwin .sidebar-header {
-  padding-top: 2.5rem;
-  padding-bottom: 0.5rem;
+    padding-top: 2.75rem;
+    padding-bottom: 0.5rem;
+}
+
+.platform-darwin .tabs-nav-toolbar {
+    --mac-titlebar-offset: 5.25rem;
+    padding-left: calc(var(--mac-titlebar-offset) + env(safe-area-inset-left));
+    min-height: 2.75rem;
 }
 
 /* Word-level diff highlighting */
 .diff-char-removed {
-  background-color: oklch(0.75 0.15 25 / 0.5);
-  border-radius: 2px;
+    background-color: oklch(0.75 0.15 25 / 0.5);
+    border-radius: 2px;
 }
 
 .diff-char-added {
-  background-color: oklch(0.75 0.15 145 / 0.5);
-  border-radius: 2px;
+    background-color: oklch(0.75 0.15 145 / 0.5);
+    border-radius: 2px;
 }
 
 .dark .diff-char-removed {
-  background-color: oklch(0.45 0.12 25 / 0.6);
+    background-color: oklch(0.45 0.12 25 / 0.6);
 }
 
 .dark .diff-char-added {
-  background-color: oklch(0.45 0.12 145 / 0.6);
+    background-color: oklch(0.45 0.12 145 / 0.6);
 }
 
 /* Diff line hover effects */
 .diff-line-removed:hover {
-  background-color: oklch(0.92 0.05 25);
+    background-color: oklch(0.92 0.05 25);
 }
 
 .diff-line-added:hover {
-  background-color: oklch(0.92 0.05 145);
+    background-color: oklch(0.92 0.05 145);
 }
 
 .dark .diff-line-removed:hover {
-  background-color: oklch(0.28 0.04 25);
+    background-color: oklch(0.28 0.04 25);
 }
 
 .dark .diff-line-added:hover {
-  background-color: oklch(0.28 0.04 145);
+    background-color: oklch(0.28 0.04 145);
 }
 
 /* Selection in diff */
 .diff-selected-line {
-  background-color: oklch(0.90 0.05 240 / 0.5) !important;
+    background-color: oklch(0.9 0.05 240 / 0.5) !important;
 }
 
 /* Gutter styling */
 .diff-gutter {
-  user-select: none;
-  min-width: 3rem;
+    user-select: none;
+    min-width: 3rem;
 }
 
 /* Diff line number alignment */
 .diff-line-num {
-  text-align: right;
-  padding-right: 0.5rem;
-  color: oklch(0.556 0 0);
-  font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding-right: 0.5rem;
+    color: oklch(0.556 0 0);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Inline diff indicator */
 .diff-modified-indicator {
-  color: oklch(0.70 0.15 75);
+    color: oklch(0.7 0.15 75);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

@@ -69,7 +69,7 @@ const ACTION_ICONS: Record<ActionType, React.ElementType> = {
 	push: Upload,
 	'force-push': Upload,
 	reset: RotateCcw,
-	cherry-pick: GitCommit,
+	'cherry-pick': GitCommit,
 	revert: GitCommit,
 	squash: GitCommit,
 };
@@ -80,7 +80,7 @@ const ACTION_COLORS: Record<ActionType, string> = {
 	push: 'text-green-500 border-green-500/30 bg-green-500/10',
 	'force-push': 'text-red-500 border-red-500/30 bg-red-500/10',
 	reset: 'text-orange-500 border-orange-500/30 bg-orange-500/10',
-	cherry-pick: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10',
+	'cherry-pick': 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10',
 	revert: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
 	squash: 'text-pink-500 border-pink-500/30 bg-pink-500/10',
 };
