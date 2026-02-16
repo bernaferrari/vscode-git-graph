@@ -3,7 +3,7 @@
  * Stage specific hunks or individual lines from a file
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -18,10 +18,8 @@ import {
 	Plus,
 	Minus,
 	Check,
-	X,
 	ChevronDown,
 	ChevronRight,
-	ListPlus,
 } from 'lucide-react';
 
 interface LineStagingProps {
@@ -51,25 +49,29 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 	const { activeRepo } = useAppStore();
 	const [hunks, setHunks] = useState<DiffHunk[]>([]);
 	const [expandedHunks, setExpandedHunks] = useState<Set<number>>(new Set());
+	const [diffHeaderLines, setDiffHeaderLines] = useState<string[]>([]);
 
 	// Get unstaged diff for the file
-	const { data: diffData, isLoading } = trpc.git.fileDiff.useQuery(
+	const { data: diffData, isLoading } = trpc.git.workingTreeFileDiff.useQuery(
 		{
 			repo: activeRepo ?? '',
-			commitHash: 'HEAD',
 			filePath: filePath,
+			staged: false,
 		},
 		{ enabled: !!activeRepo && !!filePath && open }
 	);
 
 	// Parse diff into hunks and lines
-	useMemo(() => {
+	useEffect(() => {
 		if (!diffData?.diff) {
 			setHunks([]);
+			setDiffHeaderLines([]);
 			return;
 		}
 
 		const lines = diffData.diff.split('\n');
+		const firstHunkIndex = lines.findIndex((line) => line.startsWith('@@'));
+		setDiffHeaderLines(firstHunkIndex >= 0 ? lines.slice(0, firstHunkIndex) : []);
 		const parsedHunks: DiffHunk[] = [];
 		let currentHunk: DiffHunk | null = null;
 		let oldLineNum = 0;
@@ -80,11 +82,13 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 				if (currentHunk) {
 					parsedHunks.push(currentHunk);
 				}
-				const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
-				if (match) {
-					oldLineNum = parseInt(match[1], 10);
-					newLineNum = parseInt(match[2], 10);
-				}
+					const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
+					const oldToken = match?.[1];
+					const newToken = match?.[2];
+					if (oldToken && newToken) {
+						oldLineNum = parseInt(oldToken, 10);
+						newLineNum = parseInt(newToken, 10);
+					}
 				currentHunk = {
 					header: line,
 					startLine: index,
@@ -170,29 +174,25 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 	});
 
 	const handleStageSelected = () => {
-		// Build patch content from selected lines
-		const selectedLines: string[] = [];
+		// Build a full git patch from selected hunks.
+		const selectedLines: string[] = [...diffHeaderLines];
 		hunks.forEach(hunk => {
 			const hunkSelectedLines = hunk.lines.filter(l => l.selected && l.type !== 'context');
 			if (hunkSelectedLines.length > 0) {
 				selectedLines.push(hunk.header);
 				hunk.lines.forEach(line => {
-					if (line.selected || line.type === 'context') {
-						if (line.type === 'added') selectedLines.push(`+${line.content}`);
-						else if (line.type === 'removed') selectedLines.push(`-${line.content}`);
-						else selectedLines.push(` ${line.content}`);
-					} else if (line.type === 'removed') {
-						// If we're not staging the removal, don't include it
-					}
+					if (line.type === 'added') selectedLines.push(`+${line.content}`);
+					else if (line.type === 'removed') selectedLines.push(`-${line.content}`);
+					else selectedLines.push(` ${line.content}`);
 				});
 			}
 		});
 
-		if (selectedLines.length > 0) {
+		if (selectedLines.length > diffHeaderLines.length) {
 			stageSelected.mutate({
 				repo: activeRepo ?? '',
 				filePath: filePath,
-				patch: selectedLines.join('\n'),
+				patch: `${selectedLines.join('\n')}\n`,
 			});
 		}
 	};

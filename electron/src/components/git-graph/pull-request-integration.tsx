@@ -1,9 +1,9 @@
 /**
  * Pull Request Integration
- * Create, view, and manage PRs for GitHub, GitLab, Bitbucket
+ * Create, review, merge, and close PRs for supported providers.
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -11,436 +11,653 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-	GitPullRequest,
-	GitBranch,
-	Plus,
-	ExternalLink,
-	Check,
-	X,
-	Clock,
-	MessageSquare,
-	Loader2,
-	Github,
-	Gitlab,
-	Settings,
-	AlertCircle,
+    AlertCircle,
+    Check,
+    ExternalLink,
+    GitBranch,
+    GitPullRequest,
+    Gitlab,
+    Github,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Save,
+    Settings,
+    X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
+type PullRequestStateFilter = 'open' | 'closed' | 'all';
+
 interface PullRequest {
-	id: number;
-	number: number;
-	title: string;
-	body: string;
-	state: 'open' | 'closed' | 'merged';
-	author: string;
-	createdAt: string;
-	updatedAt: string;
-	head: { ref: string; sha: string };
-	base: { ref: string; sha: string };
-	draft: boolean;
-	mergeable?: boolean | null;
-	reviewStatus?: 'approved' | 'changes_requested' | 'pending';
-	webUrl: string;
+    id: number;
+    number: number;
+    title: string;
+    body: string;
+    state: 'open' | 'closed' | 'merged';
+    author: string;
+    createdAt: string;
+    updatedAt: string;
+    head: { ref: string; sha: string };
+    base: { ref: string; sha: string };
+    draft: boolean;
+    mergeable?: boolean | null;
+    webUrl: string;
 }
 
 interface PRProvider {
-	name: 'github' | 'gitlab' | 'bitbucket';
-	host: string;
-	connected: boolean;
+    name: PullRequestProvider;
+    host: string;
 }
 
 interface PullRequestIntegrationProps {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
 }
+
+interface PullRequestAuthForm {
+    githubToken: string;
+    gitlabToken: string;
+    bitbucketToken: string;
+    bitbucketUsername: string;
+    azureToken: string;
+}
+
+const DEFAULT_AUTH_FORM: PullRequestAuthForm = {
+    githubToken: '',
+    gitlabToken: '',
+    bitbucketToken: '',
+    bitbucketUsername: '',
+    azureToken: '',
+};
 
 export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegrationProps) {
-	const { activeRepo } = useAppStore();
-	const [activeTab, setActiveTab] = useState<'list' | 'create' | 'settings'>('list');
-	const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
-	
-	// Create PR form state
-	const [prTitle, setPrTitle] = useState('');
-	const [prBody, setPrBody] = useState('');
-	const [prHead, setPrHead] = useState('');
-	const [prBase, setPrBase] = useState('main');
-	const [prDraft, setPrDraft] = useState(false);
+    const { activeRepo } = useAppStore();
+    const [activeTab, setActiveTab] = useState<'list' | 'create' | 'settings'>('list');
+    const [stateFilter, setStateFilter] = useState<PullRequestStateFilter>('open');
 
-	// Get remote info
-	const { data: remoteData } = trpc.git.remotes.useQuery(
-		{ repo: activeRepo ?? '' },
-		{ enabled: !!activeRepo && open }
-	);
+    const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
 
-	// Get branches for dropdown
-	const { data: branchData } = trpc.git.branches.useQuery(
-		{ repo: activeRepo ?? '' },
-		{ enabled: !!activeRepo && open }
-	);
+    const [prTitle, setPrTitle] = useState('');
+    const [prBody, setPrBody] = useState('');
+    const [prHead, setPrHead] = useState('');
+    const [prBase, setPrBase] = useState('main');
+    const [prDraft, setPrDraft] = useState(false);
 
-	// Detect PR provider from remote URL
-	const provider = detectProvider(remoteData?.remotes?.find(r => r.name === 'origin')?.url);
+    const [authForm, setAuthForm] = useState<PullRequestAuthForm>(DEFAULT_AUTH_FORM);
+    const [didSeedAuthForm, setDidSeedAuthForm] = useState(false);
 
-	// Fetch PRs (simulated - would need actual API integration)
-	const { data: prData, isLoading, refetch } = trpc.git.listPullRequests.useQuery(
-		{ repo: activeRepo ?? '', provider: provider?.name ?? 'github' },
-		{ enabled: !!activeRepo && open && activeTab === 'list' }
-	);
+    const utils = trpc.useUtils();
 
-	// Create PR mutation
-	const createPRMutation = trpc.git.createPullRequest.useMutation({
-		onSuccess: () => {
-			toast.success('Pull request created successfully');
-			setActiveTab('list');
-			refetch();
-			resetForm();
-		},
-		onError: (error) => {
-			toast.error('Failed to create pull request', { description: error.message });
-		},
-	});
+    const { data: remoteData } = trpc.git.remotes.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: !!activeRepo && open }
+    );
+    const { data: repoInfoData } = trpc.git.repoInfo.useQuery(
+        {
+            repo: activeRepo ?? '',
+            showRemoteBranches: false,
+            showStashes: false,
+            hideRemotes: [],
+        },
+        { enabled: !!activeRepo && open }
+    );
 
-	const resetForm = () => {
-		setPrTitle('');
-		setPrBody('');
-		setPrHead('');
-		setPrBase('main');
-		setPrDraft(false);
-	};
+    const authQuery = trpc.git.getPullRequestAuth.useQuery(undefined, { enabled: open });
 
-	const handleCreatePR = () => {
-		if (!prTitle || !prHead || !prBase) {
-			toast.error('Please fill in all required fields');
-			return;
-		}
+    useEffect(() => {
+        if (!authQuery.data?.auth || didSeedAuthForm) {
+            return;
+        }
+        setAuthForm(authQuery.data.auth);
+        setDidSeedAuthForm(true);
+    }, [authQuery.data?.auth, didSeedAuthForm]);
 
-		createPRMutation.mutate({
-			repo: activeRepo ?? '',
-			provider: provider?.name ?? 'github',
-			title: prTitle,
-			body: prBody,
-			head: prHead,
-			base: prBase,
-			draft: prDraft,
-		});
-	};
+    const detectedProvider = useMemo(
+        () => detectProvider(remoteData?.remotes?.find((remote) => remote.name === 'origin')?.url),
+        [remoteData?.remotes]
+    );
+    const provider = detectedProvider?.name ?? 'github';
 
-	const formatDate = (dateStr: string) => {
-		const date = new Date(dateStr);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hasRequiredToken = useMemo(() => {
+        switch (provider) {
+            case 'github':
+                return Boolean(authForm.githubToken.trim());
+            case 'gitlab':
+                return Boolean(authForm.gitlabToken.trim());
+            case 'bitbucket':
+                return Boolean(authForm.bitbucketToken.trim());
+            case 'azure':
+                return Boolean(authForm.azureToken.trim());
+            default:
+                return false;
+        }
+    }, [authForm.azureToken, authForm.bitbucketToken, authForm.githubToken, authForm.gitlabToken, provider]);
 
-		if (diffDays === 0) return 'Today';
-		if (diffDays === 1) return 'Yesterday';
-		if (diffDays < 7) return `${diffDays} days ago`;
-		return date.toLocaleDateString();
-	};
+    const pullRequestQuery = trpc.git.listPullRequests.useQuery(
+        {
+            repo: activeRepo ?? '',
+            provider,
+            state: stateFilter,
+        },
+        { enabled: !!activeRepo && open && activeTab === 'list' }
+    );
 
-	const getStateColor = (state: string) => {
-		switch (state) {
-			case 'open': return 'bg-green-100 text-green-700';
-			case 'closed': return 'bg-red-100 text-red-700';
-			case 'merged': return 'bg-purple-100 text-purple-700';
-			default: return 'bg-gray-100 text-gray-700';
-		}
-	};
+    const saveAuthMutation = trpc.git.setPullRequestAuth.useMutation({
+        onSuccess: () => {
+            toast.success('Pull request provider authentication updated');
+            void authQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error('Failed to save provider authentication', { description: error.message });
+        },
+    });
 
-	const getProviderIcon = (name: string) => {
-		switch (name) {
-			case 'github': return <Github className="h-4 w-4" />;
-			case 'gitlab': return <Gitlab className="h-4 w-4" />;
-			default: return <GitPullRequest className="h-4 w-4" />;
-		}
-	};
+    const createPRMutation = trpc.git.createPullRequest.useMutation({
+        onSuccess: async (result) => {
+            if (result.error) {
+                toast.error('Failed to create pull request', { description: result.error });
+                return;
+            }
+            toast.success('Pull request created');
+            resetCreateForm();
+            setActiveTab('list');
+            await pullRequestQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error('Failed to create pull request', { description: error.message });
+        },
+    });
 
-	const branches = branchData?.branches ?? [];
-	const pullRequests = prData?.pullRequests ?? [];
+    const mergePRMutation = trpc.git.mergePullRequest.useMutation({
+        onSuccess: async (result) => {
+            if (result.error) {
+                toast.error('Merge failed', { description: result.error });
+                return;
+            }
+            toast.success('Pull request merged');
+            await pullRequestQuery.refetch();
+            await utils.git.getPullRequest.invalidate();
+            setSelectedPR(null);
+        },
+        onError: (error) => {
+            toast.error('Merge failed', { description: error.message });
+        },
+    });
 
-	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-4xl max-h-[90vh] flex flex-col ui-surface">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<GitPullRequest className="h-5 w-5" />
-						Pull Requests
-						{provider && (
-							<Badge variant="outline" className="ml-2">
-								{getProviderIcon(provider.name)}
-								<span className="ml-1 capitalize">{provider.name}</span>
-							</Badge>
-						)}
-					</DialogTitle>
-				</DialogHeader>
+    const closePRMutation = trpc.git.closePullRequest.useMutation({
+        onSuccess: async (result) => {
+            if (result.error) {
+                toast.error('Close failed', { description: result.error });
+                return;
+            }
+            toast.success('Pull request closed');
+            await pullRequestQuery.refetch();
+            setSelectedPR(null);
+        },
+        onError: (error) => {
+            toast.error('Close failed', { description: error.message });
+        },
+    });
 
-				<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 flex flex-col">
-					<TabsList className="grid w-full grid-cols-3">
-						<TabsTrigger value="list">Open PRs</TabsTrigger>
-						<TabsTrigger value="create">Create PR</TabsTrigger>
-						<TabsTrigger value="settings">Settings</TabsTrigger>
-					</TabsList>
+    const resetCreateForm = () => {
+        setPrTitle('');
+        setPrBody('');
+        setPrHead('');
+        setPrBase('main');
+        setPrDraft(false);
+    };
 
-					<TabsContent value="list" className="flex-1 mt-4">
-						{isLoading ? (
-							<div className="flex items-center justify-center py-8">
-								<Loader2 className="h-6 w-6 animate-spin" />
-							</div>
-						) : !provider ? (
-							<div className="text-center py-8">
-								<AlertCircle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
-								<h3 className="font-medium mb-2">No Remote Detected</h3>
-								<p className="text-sm text-muted-foreground mb-4">
-									Add a remote origin to enable pull request integration.
-								</p>
-								<Button variant="outline" onClick={() => setActiveTab('settings')}>
-									<Settings className="h-4 w-4 mr-2" />
-									Configure
-								</Button>
-							</div>
-						) : pullRequests.length === 0 ? (
-							<div className="text-center py-8">
-								<GitPullRequest className="h-12 w-12 mx-auto mb-4 opacity-50" />
-								<h3 className="font-medium mb-2">No Pull Requests</h3>
-								<p className="text-sm text-muted-foreground mb-4">
-									There are no open pull requests for this repository.
-								</p>
-								<Button onClick={() => setActiveTab('create')}>
-									<Plus className="h-4 w-4 mr-2" />
-									Create Pull Request
-								</Button>
-							</div>
-						) : (
-							<ScrollArea className="flex-1">
-								<div className="space-y-2">
-									{pullRequests.map((pr) => (
-										<div
-											key={pr.id}
-											className="p-4 rounded-lg border hover:bg-accent/50 cursor-pointer"
-											onClick={() => setSelectedPR(pr)}
-										>
-											<div className="flex items-start gap-3">
-												<div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-													pr.state === 'open' ? 'bg-green-100' :
-													pr.state === 'merged' ? 'bg-purple-100' : 'bg-red-100'
-												}`}>
-													<GitPullRequest className={`h-4 w-4 ${
-														pr.state === 'open' ? 'text-green-600' :
-														pr.state === 'merged' ? 'text-purple-600' : 'text-red-600'
-													}`} />
-												</div>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-center gap-2 mb-1">
-														<span className="font-medium">#{pr.number}</span>
-														<span className="truncate">{pr.title}</span>
-														{pr.draft && (
-															<Badge variant="outline" className="text-xs">Draft</Badge>
-														)}
-													</div>
-													<div className="flex items-center gap-3 text-xs text-muted-foreground">
-														<span className={`px-1.5 py-0.5 rounded text-xs ${getStateColor(pr.state)}`}>
-															{pr.state}
-														</span>
-														<span>{pr.head.ref} → {pr.base.ref}</span>
-														<span>by {pr.author}</span>
-														<span>{formatDate(pr.createdAt)}</span>
-													</div>
-												</div>
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={(e) => {
-														e.stopPropagation();
-														window.open(pr.webUrl, '_blank');
-													}}
-												>
-													<ExternalLink className="h-4 w-4" />
-												</Button>
-											</div>
-										</div>
-									))}
-								</div>
-							</ScrollArea>
-						)}
-					</TabsContent>
+    const handleSaveAuth = () => {
+        saveAuthMutation.mutate(authForm);
+    };
 
-					<TabsContent value="create" className="flex-1 mt-4">
-						<div className="space-y-4">
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">From Branch</label>
-									<select
-										className="w-full h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-										value={prHead}
-										onChange={(e) => setPrHead(e.target.value)}
-									>
-										<option value="">Select branch...</option>
-										{branches.map((b) => (
-											<option key={b.name} value={b.name}>{b.name}</option>
-										))}
-									</select>
-								</div>
-								<div>
-									<label className="text-sm font-medium mb-1.5 block">Into Branch</label>
-									<select
-										className="w-full h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
-										value={prBase}
-										onChange={(e) => setPrBase(e.target.value)}
-									>
-										{branches.filter(b => b.name === 'main' || b.name === 'master' || b.name === 'develop').map((b) => (
-											<option key={b.name} value={b.name}>{b.name}</option>
-										))}
-									</select>
-								</div>
-							</div>
+    const handleCreatePR = () => {
+        if (!activeRepo) {
+            toast.error('No repository selected');
+            return;
+        }
+        if (!prTitle.trim() || !prHead.trim() || !prBase.trim()) {
+            toast.error('Fill in all required pull request fields');
+            return;
+        }
+        createPRMutation.mutate({
+            repo: activeRepo,
+            provider,
+            title: prTitle.trim(),
+            body: prBody.trim() || undefined,
+            head: prHead.trim(),
+            base: prBase.trim(),
+            draft: prDraft,
+        });
+    };
 
-							<div>
-								<label className="text-sm font-medium mb-1.5 block">Title *</label>
-								<Input
-									placeholder="Add a title for your pull request"
-									value={prTitle}
-									onChange={(e) => setPrTitle(e.target.value)}
-								/>
-							</div>
+    const handleMergePR = (pr: PullRequest) => {
+        if (!activeRepo) return;
+        mergePRMutation.mutate({
+            repo: activeRepo,
+            provider,
+            number: pr.number,
+            mergeMethod: 'merge',
+        });
+    };
 
-							<div>
-								<label className="text-sm font-medium mb-1.5 block">Description</label>
-								<Textarea
-									placeholder="Describe your changes..."
-									value={prBody}
-									onChange={(e) => setPrBody(e.target.value)}
-									className="min-h-[150px]"
-								/>
-							</div>
+    const handleClosePR = (pr: PullRequest) => {
+        if (!activeRepo) return;
+        closePRMutation.mutate({
+            repo: activeRepo,
+            provider,
+            number: pr.number,
+        });
+    };
 
-							<div className="flex items-center gap-2">
-								<input
-									type="checkbox"
-									id="draft"
-									checked={prDraft}
-									onChange={(e) => setPrDraft(e.target.checked)}
-									className="rounded"
-								/>
-								<label htmlFor="draft" className="text-sm">Create as draft</label>
-							</div>
+    const branches = (repoInfoData?.branches ?? []) as string[];
+    const pullRequests = pullRequestQuery.data?.pullRequests ?? [];
+    const queryError = pullRequestQuery.data?.error;
 
-							<div className="flex justify-end gap-2 pt-4">
-								<Button variant="outline" onClick={resetForm}>
-									Clear
-								</Button>
-								<Button
-									onClick={handleCreatePR}
-									disabled={!prTitle || !prHead || createPRMutation.isPending}
-								>
-									{createPRMutation.isPending ? (
-										<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									) : (
-										<GitPullRequest className="h-4 w-4 mr-2" />
-									)}
-									Create Pull Request
-								</Button>
-							</div>
-						</div>
-					</TabsContent>
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className='ui-surface flex max-h-[90vh] max-w-5xl flex-col'>
+                <DialogHeader>
+                    <DialogTitle className='flex items-center gap-2'>
+                        <GitPullRequest className='h-5 w-5' />
+                        Pull Requests
+                        {detectedProvider ? (
+                            <Badge variant='outline' className='ml-2 gap-1'>
+                                {getProviderIcon(detectedProvider.name)}
+                                <span className='capitalize'>{detectedProvider.name}</span>
+                            </Badge>
+                        ) : null}
+                    </DialogTitle>
+                </DialogHeader>
 
-					<TabsContent value="settings" className="flex-1 mt-4">
-						<div className="space-y-6">
-							<div>
-								<h3 className="font-medium mb-2">Provider Configuration</h3>
-								<p className="text-sm text-muted-foreground mb-4">
-									Configure your Git hosting provider for pull request integration.
-								</p>
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as 'list' | 'create' | 'settings')}
+                    className='flex min-h-0 flex-1 flex-col'>
+                    <TabsList className='grid w-full grid-cols-3'>
+                        <TabsTrigger value='list'>Pull Requests</TabsTrigger>
+                        <TabsTrigger value='create'>Create</TabsTrigger>
+                        <TabsTrigger value='settings'>Settings</TabsTrigger>
+                    </TabsList>
 
-								<div className="space-y-3">
-									{(['github', 'gitlab', 'bitbucket'] as const).map((p) => (
-										<div
-											key={p}
-											className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-												provider?.name === p ? 'border-primary bg-accent/50' : 'hover:bg-accent/30'
-											}`}
-										>
-											<div className="flex items-center gap-3">
-												{getProviderIcon(p)}
-												<div className="flex-1">
-													<span className="font-medium capitalize">{p}</span>
-													<p className="text-xs text-muted-foreground">
-														{provider?.name === p ? 'Detected from remote' : 'Not configured'}
-													</p>
-												</div>
-												{provider?.name === p && (
-													<Badge variant="outline">
-														<Check className="h-3 w-3 mr-1 text-green-600" />
-														Active
-													</Badge>
-												)}
-											</div>
-										</div>
-									))}
-								</div>
-							</div>
+                    <TabsContent value='list' className='mt-4 flex min-h-0 flex-1 gap-4'>
+                        <div className='flex min-h-0 flex-1 flex-col rounded-lg border'>
+                            <div className='bg-muted/40 flex items-center justify-between border-b px-3 py-2'>
+                                <div className='flex items-center gap-2'>
+                                    <select
+                                        value={stateFilter}
+                                        onChange={(event) => setStateFilter(event.target.value as PullRequestStateFilter)}
+                                        className='bg-background h-8 rounded-md border px-2 text-xs'>
+                                        <option value='open'>Open</option>
+                                        <option value='closed'>Closed</option>
+                                        <option value='all'>All</option>
+                                    </select>
+                                    <Badge variant='secondary'>{pullRequests.length}</Badge>
+                                </div>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => void pullRequestQuery.refetch()}
+                                    disabled={pullRequestQuery.isFetching}>
+                                    {pullRequestQuery.isFetching ? (
+                                        <Loader2 className='h-4 w-4 animate-spin' />
+                                    ) : (
+                                        <RefreshCw className='h-4 w-4' />
+                                    )}
+                                </Button>
+                            </div>
 
-							<div>
-								<h3 className="font-medium mb-2">Authentication</h3>
-								<p className="text-sm text-muted-foreground mb-4">
-									To create and manage pull requests, you need to authenticate with your Git provider.
-								</p>
-								<Button variant="outline">
-									<Settings className="h-4 w-4 mr-2" />
-									Configure Token
-								</Button>
-							</div>
-						</div>
-					</TabsContent>
-				</Tabs>
-			</DialogContent>
-		</Dialog>
-	);
+                            {!detectedProvider ? (
+                                <div className='flex flex-1 items-center justify-center p-6 text-center'>
+                                    <div>
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-amber-500' />
+                                        <p className='font-medium'>No pull request provider detected</p>
+                                        <p className='text-muted-foreground mt-1 text-sm'>
+                                            Configure an `origin` remote for GitHub, GitLab, Bitbucket, or Azure DevOps.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : !hasRequiredToken ? (
+                                <div className='flex flex-1 items-center justify-center p-6 text-center'>
+                                    <div>
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-amber-500' />
+                                        <p className='font-medium'>Missing provider token</p>
+                                        <p className='text-muted-foreground mt-1 text-sm'>
+                                            Add a {provider} token in Settings to manage pull requests in-app.
+                                        </p>
+                                        <Button variant='outline' size='sm' className='mt-4' onClick={() => setActiveTab('settings')}>
+                                            <Settings className='mr-2 h-4 w-4' />
+                                            Open Settings
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : pullRequestQuery.isLoading ? (
+                                <div className='flex flex-1 items-center justify-center'>
+                                    <Loader2 className='h-6 w-6 animate-spin' />
+                                </div>
+                            ) : queryError ? (
+                                <div className='flex flex-1 items-center justify-center p-6 text-center'>
+                                    <div>
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-red-500' />
+                                        <p className='font-medium'>Unable to load pull requests</p>
+                                        <p className='text-muted-foreground mt-1 text-sm'>{queryError}</p>
+                                    </div>
+                                </div>
+                            ) : pullRequests.length === 0 ? (
+                                <div className='flex flex-1 items-center justify-center p-6 text-center'>
+                                    <div>
+                                        <GitPullRequest className='text-muted-foreground mx-auto mb-3 h-10 w-10' />
+                                        <p className='font-medium'>No pull requests found</p>
+                                        <p className='text-muted-foreground mt-1 text-sm'>
+                                            Create one from the Create tab.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <ScrollArea className='flex-1'>
+                                    <div className='space-y-2 p-2'>
+                                        {pullRequests.map((pr) => (
+                                            <button
+                                                key={`${pr.id}-${pr.number}`}
+                                                type='button'
+                                                className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                                                    selectedPR?.id === pr.id ? 'bg-accent border-primary/50' : 'hover:bg-accent/50'
+                                                }`}
+                                                onClick={() => setSelectedPR(pr)}>
+                                                <div className='flex items-start justify-between gap-2'>
+                                                    <div className='min-w-0'>
+                                                        <p className='truncate text-sm font-medium'>
+                                                            #{pr.number} {pr.title}
+                                                        </p>
+                                                        <p className='text-muted-foreground mt-1 text-xs'>
+                                                            {pr.head.ref} → {pr.base.ref} • {pr.author || 'unknown'}
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant={pr.state === 'open' ? 'secondary' : 'outline'}>
+                                                        {pr.draft ? 'draft' : pr.state}
+                                                    </Badge>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            )}
+                        </div>
+
+                        <div className='flex w-[320px] flex-col rounded-lg border'>
+                            <div className='bg-muted/40 border-b px-3 py-2 text-sm font-medium'>Details</div>
+                            {!selectedPR ? (
+                                <div className='text-muted-foreground flex flex-1 items-center justify-center px-4 text-center text-sm'>
+                                    Select a pull request to view details and actions.
+                                </div>
+                            ) : (
+                                <div className='flex h-full flex-col'>
+                                    <div className='space-y-3 px-3 py-3'>
+                                        <div>
+                                            <p className='text-sm font-semibold'>#{selectedPR.number}</p>
+                                            <p className='text-sm'>{selectedPR.title}</p>
+                                        </div>
+                                        <div className='text-muted-foreground text-xs'>
+                                            <p>Author: {selectedPR.author || 'unknown'}</p>
+                                            <p>Branch: {selectedPR.head.ref} → {selectedPR.base.ref}</p>
+                                            <p>State: {selectedPR.draft ? 'draft' : selectedPR.state}</p>
+                                        </div>
+                                    </div>
+                                    <div className='mt-auto flex flex-wrap gap-2 border-t p-3'>
+                                        <Button
+                                            variant='outline'
+                                            size='sm'
+                                            onClick={() => window.open(selectedPR.webUrl, '_blank')}>
+                                            <ExternalLink className='mr-2 h-4 w-4' />
+                                            Open
+                                        </Button>
+                                        {selectedPR.state === 'open' && (
+                                            <>
+                                                <Button
+                                                    size='sm'
+                                                    onClick={() => handleMergePR(selectedPR)}
+                                                    disabled={mergePRMutation.isPending || closePRMutation.isPending}>
+                                                    {mergePRMutation.isPending ? (
+                                                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                                    ) : (
+                                                        <Check className='mr-2 h-4 w-4' />
+                                                    )}
+                                                    Merge
+                                                </Button>
+                                                <Button
+                                                    variant='destructive'
+                                                    size='sm'
+                                                    onClick={() => handleClosePR(selectedPR)}
+                                                    disabled={mergePRMutation.isPending || closePRMutation.isPending}>
+                                                    {closePRMutation.isPending ? (
+                                                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                                    ) : (
+                                                        <X className='mr-2 h-4 w-4' />
+                                                    )}
+                                                    Close
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value='create' className='mt-4 min-h-0 flex-1'>
+                        {!detectedProvider ? (
+                            <div className='text-muted-foreground flex h-full items-center justify-center rounded-lg border p-6 text-center text-sm'>
+                                Configure an `origin` remote before creating pull requests.
+                            </div>
+                        ) : (
+                            <div className='space-y-4 rounded-lg border p-4'>
+                                <div className='grid grid-cols-2 gap-4'>
+                                    <div>
+                                        <label className='mb-1.5 block text-sm font-medium'>Source Branch</label>
+                                        <select
+                                            className='bg-background h-9 w-full rounded-md border px-3 text-sm'
+                                            value={prHead}
+                                            onChange={(event) => setPrHead(event.target.value)}>
+                                            <option value=''>Select branch</option>
+                                            {branches.map((branchName) => (
+                                                <option key={branchName} value={branchName}>
+                                                    {branchName}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className='mb-1.5 block text-sm font-medium'>Target Branch</label>
+                                        <select
+                                            className='bg-background h-9 w-full rounded-md border px-3 text-sm'
+                                            value={prBase}
+                                            onChange={(event) => setPrBase(event.target.value)}>
+                                            {branches.length > 0 ? (
+                                                branches.map((branchName) => (
+                                                    <option key={branchName} value={branchName}>
+                                                        {branchName}
+                                                    </option>
+                                                ))
+                                            ) : (
+                                                <option value='main'>main</option>
+                                            )}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className='mb-1.5 block text-sm font-medium'>Title</label>
+                                    <Input
+                                        placeholder='Add a title for your pull request'
+                                        value={prTitle}
+                                        onChange={(event) => setPrTitle(event.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className='mb-1.5 block text-sm font-medium'>Description</label>
+                                    <Textarea
+                                        placeholder='Describe your changes'
+                                        value={prBody}
+                                        onChange={(event) => setPrBody(event.target.value)}
+                                        className='min-h-[150px]'
+                                    />
+                                </div>
+
+                                <label className='flex items-center gap-2 text-sm'>
+                                    <input
+                                        type='checkbox'
+                                        className='rounded'
+                                        checked={prDraft}
+                                        onChange={(event) => setPrDraft(event.target.checked)}
+                                    />
+                                    Create as draft
+                                </label>
+
+                                <div className='flex justify-end gap-2 pt-2'>
+                                    <Button variant='outline' onClick={resetCreateForm}>
+                                        Clear
+                                    </Button>
+                                    <Button
+                                        onClick={handleCreatePR}
+                                        disabled={!prTitle.trim() || !prHead.trim() || createPRMutation.isPending}>
+                                        {createPRMutation.isPending ? (
+                                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                        ) : (
+                                            <Plus className='mr-2 h-4 w-4' />
+                                        )}
+                                        Create Pull Request
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value='settings' className='mt-4 min-h-0 flex-1'>
+                        <div className='space-y-4 rounded-lg border p-4'>
+                            <div>
+                                <h3 className='text-sm font-semibold'>Provider Authentication</h3>
+                                <p className='text-muted-foreground mt-1 text-xs'>
+                                    Tokens are stored locally on this machine to enable in-app PR operations.
+                                </p>
+                            </div>
+
+                            <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+                                <AuthField
+                                    label='GitHub Token'
+                                    value={authForm.githubToken}
+                                    onChange={(value) => setAuthForm((current) => ({ ...current, githubToken: value }))}
+                                />
+                                <AuthField
+                                    label='GitLab Token'
+                                    value={authForm.gitlabToken}
+                                    onChange={(value) => setAuthForm((current) => ({ ...current, gitlabToken: value }))}
+                                />
+                                <AuthField
+                                    label='Bitbucket Token'
+                                    value={authForm.bitbucketToken}
+                                    onChange={(value) => setAuthForm((current) => ({ ...current, bitbucketToken: value }))}
+                                />
+                                <AuthField
+                                    label='Bitbucket Username'
+                                    value={authForm.bitbucketUsername}
+                                    onChange={(value) =>
+                                        setAuthForm((current) => ({ ...current, bitbucketUsername: value }))
+                                    }
+                                />
+                                <AuthField
+                                    label='Azure DevOps PAT'
+                                    value={authForm.azureToken}
+                                    onChange={(value) => setAuthForm((current) => ({ ...current, azureToken: value }))}
+                                />
+                            </div>
+
+                            <div className='flex justify-end gap-2'>
+                                <Button
+                                    variant='outline'
+                                    onClick={() => {
+                                        setAuthForm(DEFAULT_AUTH_FORM);
+                                    }}>
+                                    Clear Form
+                                </Button>
+                                <Button onClick={handleSaveAuth} disabled={saveAuthMutation.isPending}>
+                                    {saveAuthMutation.isPending ? (
+                                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                    ) : (
+                                        <Save className='mr-2 h-4 w-4' />
+                                    )}
+                                    Save
+                                </Button>
+                            </div>
+                        </div>
+                    </TabsContent>
+                </Tabs>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
-// Helper to detect provider from remote URL
+function AuthField({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div>
+            <label className='mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground'>{label}</label>
+            <Input type='password' value={value} onChange={(event) => onChange(event.target.value)} />
+        </div>
+    );
+}
+
+function getProviderIcon(provider: PullRequestProvider) {
+    switch (provider) {
+        case 'github':
+            return <Github className='h-4 w-4' />;
+        case 'gitlab':
+            return <Gitlab className='h-4 w-4' />;
+        case 'azure':
+            return <GitBranch className='h-4 w-4' />;
+        default:
+            return <GitPullRequest className='h-4 w-4' />;
+    }
+}
+
 function detectProvider(remoteUrl?: string): PRProvider | null {
-	if (!remoteUrl) return null;
+    if (!remoteUrl) return null;
+    const url = remoteUrl.toLowerCase();
 
-	const url = remoteUrl.toLowerCase();
-	
-	if (url.includes('github.com') || url.includes('github.com:')) {
-		return { name: 'github', host: 'github.com', connected: true };
-	}
-	if (url.includes('gitlab.com') || url.includes('gitlab.com:')) {
-		return { name: 'gitlab', host: 'gitlab.com', connected: true };
-	}
-	if (url.includes('bitbucket.org') || url.includes('bitbucket.org:')) {
-		return { name: 'bitbucket', host: 'bitbucket.org', connected: true };
-	}
+    if (url.includes('github.com')) {
+        return { name: 'github', host: 'github.com' };
+    }
 
-	// Check for self-hosted instances
-	if (url.includes('gitlab')) {
-		return { name: 'gitlab', host: extractHost(url), connected: false };
-	}
-	if (url.includes('gitea') || url.includes('gogs')) {
-		return { name: 'github', host: extractHost(url), connected: false }; // Use GitHub-compatible API
-	}
+    if (url.includes('gitlab.com') || url.includes('gitlab')) {
+        return { name: 'gitlab', host: extractHost(url) };
+    }
 
-	return null;
+    if (url.includes('bitbucket.org')) {
+        return { name: 'bitbucket', host: 'bitbucket.org' };
+    }
+
+    if (url.includes('dev.azure.com') || url.includes('visualstudio.com') || url.includes('ssh.dev.azure.com')) {
+        return { name: 'azure', host: extractHost(url) };
+    }
+
+    return null;
 }
 
 function extractHost(url: string): string {
-	const match = url.match(/@([^:]+):|https?:\/\/([^\/]+)/);
-	return match ? (match[1] || match[2]) : '';
+    const match = url.match(/@([^:]+):|https?:\/\/([^/]+)/);
+    return match ? (match[1] || match[2] || '') : '';
 }
 
 export default PullRequestIntegration;

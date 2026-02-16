@@ -7,6 +7,17 @@ import { z } from 'zod';
 import { router, publicProcedure } from '../../init';
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
+import {
+    closePullRequest as closeRemotePullRequest,
+    createPullRequest as createRemotePullRequest,
+    getPullRequest as getRemotePullRequest,
+    listPullRequests as listRemotePullRequests,
+    mergePullRequest as mergeRemotePullRequest,
+    parseRemoteUrl as parsePullRequestRemoteUrl,
+    type ProviderAuthConfig,
+    type PullRequestProvider,
+} from '../../../services/pullRequest';
+import { appStore } from '@/app/backend/store';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -98,6 +109,44 @@ async function fileExists(filePath: string): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+const pullRequestProviderSchema = z.enum(['github', 'gitlab', 'bitbucket', 'azure']);
+
+function getStoredProviderAuthConfig(): ProviderAuthConfig {
+    const storedAuth = appStore.get('providerAuth');
+    if (!storedAuth) {
+        return {};
+    }
+
+    return {
+        githubToken: storedAuth.githubToken || undefined,
+        gitlabToken: storedAuth.gitlabToken || undefined,
+        bitbucketToken: storedAuth.bitbucketToken || undefined,
+        bitbucketUsername: storedAuth.bitbucketUsername || undefined,
+        azureToken: storedAuth.azureToken || undefined,
+    };
+}
+
+async function getPreferredRemoteUrlForPullRequests(repo: string): Promise<string | null> {
+    const git = getGitService();
+
+    const originRemote = await git.runGitCommandWithOutput(['config', '--get', 'remote.origin.url'], repo);
+    const normalizedOrigin = originRemote?.trim();
+    if (normalizedOrigin) {
+        return normalizedOrigin;
+    }
+
+    const remotes = await git.getRemotes(repo);
+    for (const remoteName of remotes) {
+        const remoteUrl = await git.runGitCommandWithOutput(['config', '--get', `remote.${remoteName}.url`], repo);
+        const normalized = remoteUrl?.trim();
+        if (normalized) {
+            return normalized;
+        }
+    }
+
+    return null;
 }
 
 type RebaseTodoAction =
@@ -843,6 +892,31 @@ export const gitRouter = router({
                     input.repo
                 );
                 return { diff, error: null };
+            } catch (error) {
+                return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+    // Working tree file diff (unstaged or staged)
+    workingTreeFileDiff: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                filePath: z.string(),
+                staged: z.boolean().optional().default(false),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { diff: '', error: initError };
+
+            try {
+                const service = getGitService();
+                const args = input.staged
+                    ? ['diff', '--cached', '--', input.filePath]
+                    : ['diff', '--', input.filePath];
+                const diff = await service.runGitCommandWithOutput(args, input.repo);
+                return { diff: diff ?? '', error: null };
             } catch (error) {
                 return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
             }
@@ -4140,7 +4214,7 @@ export const gitRouter = router({
 
                 // Apply the patch using git apply --cached with stdin
                 return new Promise((resolve) => {
-                    const cmd = spawn(gitPath, ['apply', '--cached', '--unidiff-zero', '-'], {
+                    const cmd = spawn(gitPath, ['apply', '--cached', '--recount', '--unidiff-zero', '-'], {
                         cwd: input.repo,
                     });
 
@@ -4308,42 +4382,162 @@ export const gitRouter = router({
         }),
 
     // ==================== Pull Request Integration ====================
+    getPullRequestAuth: publicProcedure.query(async () => {
+        const auth = getStoredProviderAuthConfig();
+        return {
+            auth: {
+                githubToken: auth.githubToken ?? '',
+                gitlabToken: auth.gitlabToken ?? '',
+                bitbucketToken: auth.bitbucketToken ?? '',
+                bitbucketUsername: auth.bitbucketUsername ?? '',
+                azureToken: auth.azureToken ?? '',
+            },
+            hasAuth: {
+                github: Boolean(auth.githubToken),
+                gitlab: Boolean(auth.gitlabToken),
+                bitbucket: Boolean(auth.bitbucketToken),
+                azure: Boolean(auth.azureToken),
+            },
+        };
+    }),
+
+    setPullRequestAuth: publicProcedure
+        .input(
+            z.object({
+                githubToken: z.string().nullable().optional(),
+                gitlabToken: z.string().nullable().optional(),
+                bitbucketToken: z.string().nullable().optional(),
+                bitbucketUsername: z.string().nullable().optional(),
+                azureToken: z.string().nullable().optional(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const current = appStore.get('providerAuth') ?? {
+                githubToken: '',
+                gitlabToken: '',
+                bitbucketToken: '',
+                bitbucketUsername: '',
+                azureToken: '',
+            };
+
+            const next = {
+                githubToken:
+                    input.githubToken === undefined ? current.githubToken : (input.githubToken ?? '').trim(),
+                gitlabToken:
+                    input.gitlabToken === undefined ? current.gitlabToken : (input.gitlabToken ?? '').trim(),
+                bitbucketToken:
+                    input.bitbucketToken === undefined
+                        ? current.bitbucketToken
+                        : (input.bitbucketToken ?? '').trim(),
+                bitbucketUsername:
+                    input.bitbucketUsername === undefined
+                        ? current.bitbucketUsername
+                        : (input.bitbucketUsername ?? '').trim(),
+                azureToken:
+                    input.azureToken === undefined ? current.azureToken : (input.azureToken ?? '').trim(),
+            };
+
+            appStore.set('providerAuth', next);
+            return {
+                success: true,
+                hasAuth: {
+                    github: Boolean(next.githubToken),
+                    gitlab: Boolean(next.gitlabToken),
+                    bitbucket: Boolean(next.bitbucketToken),
+                    azure: Boolean(next.azureToken),
+                },
+            };
+        }),
+
+    detectPullRequestProvider: publicProcedure
+        .input(z.object({ repo: z.string() }))
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { remoteUrl: null, provider: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { remoteUrl: null, provider: null, error: 'No remotes configured for this repository.' };
+                }
+                const parsed = parsePullRequestRemoteUrl(remoteUrl);
+                return {
+                    remoteUrl,
+                    provider: parsed?.provider ?? null,
+                    error: null,
+                };
+            } catch (error) {
+                return {
+                    remoteUrl: null,
+                    provider: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        }),
+
     listPullRequests: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
-                provider: z.enum(['github', 'gitlab', 'bitbucket']),
+                provider: pullRequestProviderSchema,
                 state: z.enum(['open', 'closed', 'all']).optional().default('open'),
             })
         )
         .query(async ({ input }) => {
-            // This would integrate with GitHub/GitLab/Bitbucket APIs
-            // For now, return mock data structure
-            // In production, you'd use Octokit for GitHub, etc.
-            return {
-                pullRequests: [] as Array<{
-                    id: number;
-                    number: number;
-                    title: string;
-                    body: string;
-                    state: 'open' | 'closed' | 'merged';
-                    author: string;
-                    createdAt: string;
-                    updatedAt: string;
-                    head: { ref: string; sha: string };
-                    base: { ref: string; sha: string };
-                    draft: boolean;
-                    webUrl: string;
-                }>,
-                error: 'Pull request integration requires API token configuration. Use Settings to configure.',
-            };
+            const initError = await ensureGitInitialized();
+            if (initError) {
+                return { pullRequests: [], remoteUrl: null, detectedProvider: null, error: initError };
+            }
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return {
+                        pullRequests: [],
+                        remoteUrl: null,
+                        detectedProvider: null,
+                        error: 'No remotes configured for this repository.',
+                    };
+                }
+
+                const parsed = parsePullRequestRemoteUrl(remoteUrl);
+                if (!parsed) {
+                    return {
+                        pullRequests: [],
+                        remoteUrl,
+                        detectedProvider: null,
+                        error: 'Unable to detect pull request provider from repository remotes.',
+                    };
+                }
+
+                const auth = getStoredProviderAuthConfig();
+                const pullRequests = await listRemotePullRequests(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.state
+                );
+                return {
+                    pullRequests,
+                    remoteUrl,
+                    detectedProvider: parsed.provider,
+                    error: null,
+                };
+            } catch (error) {
+                return {
+                    pullRequests: [],
+                    remoteUrl: null,
+                    detectedProvider: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
         }),
 
     createPullRequest: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
-                provider: z.enum(['github', 'gitlab', 'bitbucket']),
+                provider: pullRequestProviderSchema,
                 title: z.string(),
                 body: z.string().optional(),
                 head: z.string(),
@@ -4352,51 +4546,124 @@ export const gitRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            // This would create a PR via the provider's API
-            return {
-                pullRequest: null,
-                error: 'Pull request creation requires API token configuration. Use Settings to configure.',
-            };
+            const initError = await ensureGitInitialized();
+            if (initError) return { pullRequest: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { pullRequest: null, error: 'No remotes configured for this repository.' };
+                }
+
+                const auth = getStoredProviderAuthConfig();
+                const pullRequest = await createRemotePullRequest(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    {
+                        title: input.title,
+                        body: input.body,
+                        head: input.head,
+                        base: input.base,
+                        draft: input.draft,
+                    }
+                );
+                return { pullRequest, error: null };
+            } catch (error) {
+                return { pullRequest: null, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
         }),
 
     getPullRequest: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
-                provider: z.enum(['github', 'gitlab', 'bitbucket']),
+                provider: pullRequestProviderSchema,
                 number: z.number(),
             })
         )
         .query(async ({ input }) => {
-            return {
-                pullRequest: null,
-                error: 'Pull request integration requires API token configuration.',
-            };
+            const initError = await ensureGitInitialized();
+            if (initError) return { pullRequest: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { pullRequest: null, error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                const pullRequest = await getRemotePullRequest(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number
+                );
+                return { pullRequest, error: null };
+            } catch (error) {
+                return { pullRequest: null, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
         }),
 
     mergePullRequest: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
-                provider: z.enum(['github', 'gitlab', 'bitbucket']),
+                provider: pullRequestProviderSchema,
                 number: z.number(),
                 mergeMethod: z.enum(['merge', 'squash', 'rebase']).optional().default('merge'),
             })
         )
         .mutation(async ({ input }) => {
-            return { error: 'Pull request integration requires API token configuration.' };
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                await mergeRemotePullRequest(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number,
+                    input.mergeMethod
+                );
+                return { error: null };
+            } catch (error) {
+                return { error: error instanceof Error ? error.message : 'Unknown error' };
+            }
         }),
 
     closePullRequest: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
-                provider: z.enum(['github', 'gitlab', 'bitbucket']),
+                provider: pullRequestProviderSchema,
                 number: z.number(),
             })
         )
         .mutation(async ({ input }) => {
-            return { error: 'Pull request integration requires API token configuration.' };
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                await closeRemotePullRequest(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number
+                );
+                return { error: null };
+            } catch (error) {
+                return { error: error instanceof Error ? error.message : 'Unknown error' };
+            }
         }),
 
     // ==================== Stash Operations ====================

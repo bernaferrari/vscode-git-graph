@@ -5,6 +5,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,8 +14,6 @@ import {
 	X,
 	Maximize2,
 	Minimize2,
-	ChevronUp,
-	ChevronDown,
 } from 'lucide-react';
 
 interface TerminalPanelProps {
@@ -25,13 +24,14 @@ interface TerminalPanelProps {
 
 export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 	const { activeRepo } = useAppStore();
-	const [history, setHistory] = useState<Array<{ type: 'input' | 'output'; text: string }>>([]);
+	const [history, setHistory] = useState<Array<{ type: 'input' | 'output' | 'error'; text: string }>>([]);
 	const [input, setInput] = useState('');
 	const [maximized, setMaximized] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const runTerminalCommand = trpc.system.runTerminalCommand.useMutation();
 
-	const workingDir = cwd || activeRepo || '~';
+	const workingDir = cwd || activeRepo || '';
 
 	// Scroll to bottom on new output
 	useEffect(() => {
@@ -50,47 +50,69 @@ export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 	const executeCommand = useCallback(async (cmd: string) => {
 		if (!cmd.trim()) return;
 
+		if (cmd.trim().toLowerCase() === 'clear') {
+			setHistory([]);
+			return;
+		}
+
+		if (cmd.trim().toLowerCase() === 'help') {
+			setHistory((prev) => [
+				...prev,
+				{ type: 'input', text: `$ ${cmd}` },
+				{
+					type: 'output',
+					text: `Built-in terminal commands:
+  clear   - Clear terminal output
+  help    - Show this help
+Any other command is executed by your system shell in the active repository.`,
+				},
+			]);
+			return;
+		}
+
 		setHistory((prev) => [...prev, { type: 'input', text: `$ ${cmd}` }]);
 
-		// Simple command handling (in a real app, this would go through electron IPC)
+		if (!workingDir) {
+			setHistory((prev) => [...prev, { type: 'error', text: 'No active repository selected.' }]);
+			return;
+		}
+
 		try {
-			// For now, just simulate some common commands
-			const parts = cmd.trim().split(' ');
-			const command = parts[0];
+			const result = await runTerminalCommand.mutateAsync({
+				cwd: workingDir,
+				command: cmd,
+				timeoutMs: 60_000,
+			});
 
-			let output = '';
-
-			if (command === 'clear') {
-				setHistory([]);
-				return;
-			} else if (command === 'pwd') {
-				output = workingDir;
-			} else if (command === 'ls' || command === 'dir') {
-				output = '(Directory listing would appear here)';
-			} else if (command === 'git') {
-				output = `(Git command: ${parts.slice(1).join(' ')})`;
-			} else if (command === 'echo') {
-				output = parts.slice(1).join(' ');
-			} else if (command === 'help') {
-				output = `Available commands:
-  clear   - Clear terminal
-  pwd     - Print working directory
-  ls      - List files
-  git     - Git commands
-  echo    - Print text
-  help    - Show this help`;
-			} else {
-				output = `Command not found: ${command}`;
+			const nextEntries: Array<{ type: 'output' | 'error'; text: string }> = [];
+			if (result.stdout.trim().length > 0) {
+				nextEntries.push({ type: 'output', text: result.stdout.trimEnd() });
+			}
+			if (result.stderr.trim().length > 0) {
+				nextEntries.push({ type: 'error', text: result.stderr.trimEnd() });
+			}
+			if (result.error && nextEntries.length === 0) {
+				nextEntries.push({ type: 'error', text: result.error });
+			}
+			if (result.timedOut) {
+				nextEntries.push({ type: 'error', text: `Command timed out after 60000ms` });
+			}
+			if (result.exitCode !== null && result.exitCode !== 0) {
+				nextEntries.push({ type: 'error', text: `Exited with code ${result.exitCode}` });
 			}
 
-			setHistory((prev) => [...prev, { type: 'output', text: output }]);
+			if (nextEntries.length === 0) {
+				nextEntries.push({ type: 'output', text: '(no output)' });
+			}
+
+			setHistory((prev) => [...prev, ...nextEntries]);
 		} catch (error) {
 			setHistory((prev) => [
 				...prev,
-				{ type: 'output', text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}` },
+				{ type: 'error', text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}` },
 			]);
 		}
-	}, [workingDir]);
+	}, [runTerminalCommand, workingDir]);
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter') {
@@ -112,7 +134,7 @@ export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 				<Terminal className="h-4 w-4 text-muted-foreground" />
 				<span className="text-xs font-medium flex-1">Terminal</span>
 				<span className="text-xs text-muted-foreground truncate max-w-[200px]">
-					{workingDir}
+					{workingDir || 'No repository selected'}
 				</span>
 				<Button
 					variant="ghost"
@@ -148,7 +170,11 @@ export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 							<div
 								key={i}
 								className={`${
-									item.type === 'input' ? 'text-foreground' : 'text-muted-foreground'
+									item.type === 'input'
+										? 'text-foreground'
+										: item.type === 'error'
+											? 'text-red-500'
+											: 'text-muted-foreground'
 								}`}
 							>
 								{item.text}
@@ -167,6 +193,7 @@ export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 					onChange={(e) => setInput(e.target.value)}
 					onKeyDown={handleKeyDown}
 					placeholder="Enter command..."
+					disabled={runTerminalCommand.isPending}
 					className="h-6 text-xs font-mono border-0 shadow-none focus-visible:ring-0 px-0"
 				/>
 			</div>

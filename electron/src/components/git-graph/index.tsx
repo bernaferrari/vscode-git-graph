@@ -41,6 +41,7 @@ import {
     Activity,
     Bug,
     Copy,
+    ListPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { trpc } from '@/trpc/client';
@@ -70,7 +71,6 @@ import { useGraphLayoutWorker } from '@/lib/graph/useGraphLayoutWorker';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
@@ -283,6 +283,9 @@ const RemoteManageDialog = lazy(() =>
     import('./remote-manage-dialog').then((mod) => ({ default: mod.RemoteManageDialog }))
 );
 const BranchCompare = lazy(() => import('./branch-compare').then((mod) => ({ default: mod.BranchCompare })));
+const CloneRepositoryDialog = lazy(() =>
+    import('./clone-repository-dialog').then((mod) => ({ default: mod.CloneRepositoryDialog }))
+);
 const HooksManageDialog = lazy(() =>
     import('./hooks-manage-dialog').then((mod) => ({ default: mod.HooksManageDialog }))
 );
@@ -336,6 +339,7 @@ const KeyboardShortcutsHelp = lazy(() =>
 const RecentRepositories = lazy(() =>
     import('./recent-repositories').then((mod) => ({ default: mod.RecentRepositories }))
 );
+const WorkspacesManager = lazy(() => import('./workspaces').then((mod) => ({ default: mod.WorkspacesManager })));
 const StashManagement = lazy(() => import('./stash-management').then((mod) => ({ default: mod.StashManagement })));
 const SettingsDialog = lazy(() => import('./settings-dialog').then((mod) => ({ default: mod.SettingsDialog })));
 const CommandPalette = lazy(() => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })));
@@ -421,7 +425,7 @@ export function GitGraph() {
         setRepoLoadState,
         resetRepoLoadState,
     } = useAppStore();
-    const { openRepositoryDialog, isRepoLoading, isRepoBusy } = useRepoActivation();
+    const { openRepositoryDialog, activateRepoPath, isRepoLoading, isRepoBusy } = useRepoActivation();
 
     // Local state
     const [expandedCommit, setExpandedCommit] = useState<number | null>(null);
@@ -466,7 +470,7 @@ export function GitGraph() {
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
     const [showFiltersDialog, setShowFiltersDialog] = useState(false);
     const [lineStagingOpen, setLineStagingOpen] = useState(false);
-    const [stagingFile] = useState<string | null>(null);
+    const [stagingFile, setStagingFile] = useState<string | null>(null);
     const [reflogOpen, setReflogOpen] = useState(false);
     const [templatesOpen, setTemplatesOpen] = useState(false);
     const [gitignoreOpen, setGitignoreOpen] = useState(false);
@@ -479,11 +483,13 @@ export function GitGraph() {
     const [submoduleOpen, setSubmoduleOpen] = useState(false);
     const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
     const [recentReposOpen, setRecentReposOpen] = useState(false);
+    const [workspacesOpen, setWorkspacesOpen] = useState(false);
     const [stashManageOpen, setStashManageOpen] = useState(false);
     const [graphLegendOpen, setGraphLegendOpen] = useState(false);
     const [cherryPickDialogOpen, setCherryPickDialogOpen] = useState(false);
     const [cherryPickCommit] = useState<{ hash: string; message: string; author: string } | null>(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
     const [perfPanelOpen, setPerfPanelOpen] = useState(false);
     const [copyingPerfDiagnostics, setCopyingPerfDiagnostics] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -1564,10 +1570,33 @@ export function GitGraph() {
                         {isRepoLoading ? <Loader2 className='h-5 w-5 animate-spin' /> : <Plus className='h-5 w-5' />}
                         {isRepoLoading ? 'Opening…' : 'Open Repository'}
                     </Button>
+                    <Button
+                        size='lg'
+                        variant='outline'
+                        onClick={() => setCloneDialogOpen(true)}
+                        className='mt-3 gap-2'
+                        disabled={isRepoBusy}>
+                        <Download className='h-5 w-5' />
+                        Clone Repository
+                    </Button>
                     <p className='text-muted-foreground mt-4 text-xs'>
                         or use the sidebar to browse recent repositories
                     </p>
                 </div>
+                {cloneDialogOpen && (
+                    <Suspense fallback={<DialogLoadingFallback />}>
+                        <CloneRepositoryDialog
+                            open={cloneDialogOpen}
+                            onOpenChange={setCloneDialogOpen}
+                            onCloned={async (repoPath) => {
+                                await activateRepoPath(repoPath, {
+                                    ensureRegistered: true,
+                                    errorTitle: 'Failed to open cloned repository',
+                                });
+                            }}
+                        />
+                    </Suspense>
+                )}
             </div>
         );
     }
@@ -2093,6 +2122,11 @@ export function GitGraph() {
                             </Suspense>
                         </div>
 
+                        {/* Workspaces Launchpad */}
+                        <div className='ml-1 shrink-0'>
+                            <ToolbarButton icon={FolderGit2} label='Workspaces' onClick={() => setWorkspacesOpen(true)} />
+                        </div>
+
                         {/* Commit History Filters */}
                         {(commitFilters.author ||
                             commitFilters.search ||
@@ -2172,6 +2206,10 @@ export function GitGraph() {
                                     <FileCode className='mr-2 h-4 w-4' />
                                     Open in Finder
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setCloneDialogOpen(true)}>
+                                    <Download className='mr-2 h-4 w-4' />
+                                    Clone Repository
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => setFuzzyFinderOpen(true)}>
                                     <Search className='mr-2 h-4 w-4' />
@@ -2181,6 +2219,20 @@ export function GitGraph() {
                                 <DropdownMenuItem onClick={() => setShowFiltersDialog(true)}>
                                     <Filter className='mr-2 h-4 w-4' />
                                     Filter Commits...
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        const fileForLineStaging =
+                                            workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file;
+                                        if (!fileForLineStaging) {
+                                            toast.info('No changed files available for line staging');
+                                            return;
+                                        }
+                                        setStagingFile(fileForLineStaging);
+                                        setLineStagingOpen(true);
+                                    }}>
+                                    <ListPlus className='mr-2 h-4 w-4' />
+                                    Line Staging...
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setTerminalOpen(!terminalOpen)}>
                                     <Terminal className='mr-2 h-4 w-4' />
@@ -2256,6 +2308,10 @@ export function GitGraph() {
                                 <DropdownMenuItem onClick={() => setRecentReposOpen(true)}>
                                     <FolderGit2 className='mr-2 h-4 w-4' />
                                     Recent Repositories
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setWorkspacesOpen(true)}>
+                                    <FolderGit2 className='mr-2 h-4 w-4' />
+                                    Workspaces Launchpad
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setKeyboardHelpOpen(true)}>
                                     <Keyboard className='mr-2 h-4 w-4' />
@@ -3017,6 +3073,29 @@ export function GitGraph() {
                         </Suspense>
                     )}
 
+                    {/* Workspaces Launchpad */}
+                    {workspacesOpen && (
+                        <Suspense fallback={<DialogLoadingFallback />}>
+                            <WorkspacesManager open={workspacesOpen} onOpenChange={setWorkspacesOpen} />
+                        </Suspense>
+                    )}
+
+                    {/* Clone Repository */}
+                    {cloneDialogOpen && (
+                        <Suspense fallback={<DialogLoadingFallback />}>
+                            <CloneRepositoryDialog
+                                open={cloneDialogOpen}
+                                onOpenChange={setCloneDialogOpen}
+                                onCloned={async (repoPath) => {
+                                    await activateRepoPath(repoPath, {
+                                        ensureRegistered: true,
+                                        errorTitle: 'Failed to open cloned repository',
+                                    });
+                                }}
+                            />
+                        </Suspense>
+                    )}
+
                     {/* Stash Management */}
                     {stashManageOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
@@ -3046,7 +3125,12 @@ export function GitGraph() {
                         <Suspense fallback={<DialogLoadingFallback />}>
                             <LineStaging
                                 open={lineStagingOpen}
-                                onOpenChange={setLineStagingOpen}
+                                onOpenChange={(nextOpen) => {
+                                    setLineStagingOpen(nextOpen);
+                                    if (!nextOpen) {
+                                        setStagingFile(null);
+                                    }
+                                }}
                                 filePath={stagingFile}
                                 onStaged={() => {
                                     void gitUtils.git.workingTreeStatus
@@ -3157,6 +3241,7 @@ export function GitGraph() {
                                     onSettings: () => setSettingsOpen(true),
                                     onSearch: () => setSearchCommitsOpen(true),
                                     onTerminal: () => setTerminalOpen(!terminalOpen),
+                                    onClone: () => setCloneDialogOpen(true),
                                     onOpenInFinder: () => handleOpenInFinder(),
                                     onStash: () => setStashManageOpen(true),
                                     onCommitSigning: () => setCommitSigningOpen(true),
@@ -3172,6 +3257,17 @@ export function GitGraph() {
                                     onRemotes: () => setRemoteManageOpen(true),
                                     onFilters: () => setShowFiltersDialog(true),
                                     onPinned: () => setPinnedCommitsOpen(true),
+                                    onLineStaging: () => {
+                                        const fileForLineStaging =
+                                            workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file;
+                                        if (!fileForLineStaging) {
+                                            toast.info('No changed files available for line staging');
+                                            return;
+                                        }
+                                        setStagingFile(fileForLineStaging);
+                                        setLineStagingOpen(true);
+                                    },
+                                    onWorkspaces: () => setWorkspacesOpen(true),
                                     onKeyboardHelp: () => setKeyboardHelpOpen(true),
                                     onHealthCheck: () => setHealthCheckOpen(true),
                                     onFuzzyFinder: () => setFuzzyFinderOpen(true),

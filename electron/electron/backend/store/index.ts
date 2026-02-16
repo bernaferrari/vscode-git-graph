@@ -10,6 +10,15 @@ export const appStore = new Store<{
 	// Git executable
 	lastKnownGitPath: string | null;
 
+	// Pull request provider authentication
+	providerAuth: {
+		githubToken: string;
+		gitlabToken: string;
+		bitbucketToken: string;
+		bitbucketUsername: string;
+		azureToken: string;
+	};
+
 	// Global view state
 	globalViewState: {
 		alwaysAcceptCheckoutCommit: boolean;
@@ -30,6 +39,13 @@ export const appStore = new Store<{
 	name: 'git-graph-config',
 	defaults: {
 		lastKnownGitPath: null,
+		providerAuth: {
+			githubToken: '',
+			gitlabToken: '',
+			bitbucketToken: '',
+			bitbucketUsername: '',
+			azureToken: '',
+		},
 		globalViewState: {
 			alwaysAcceptCheckoutCommit: false,
 			issueLinkingConfig: null,

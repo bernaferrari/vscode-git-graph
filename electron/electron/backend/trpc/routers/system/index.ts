@@ -4,7 +4,7 @@
  */
 
 import { dialog, app, shell } from 'electron';
-import { spawn, spawnSync } from 'node:child_process';
+import { exec, spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { publicProcedure, router } from '@/app/backend/trpc/init';
 import { z } from 'zod';
@@ -200,6 +200,48 @@ export const systemRouter = router({
     // Open a repository in OS terminal
     openTerminal: openTerminalProcedure,
     openTerminalInRepo: openTerminalProcedure,
+
+    // Execute a shell command in a specific working directory (used by embedded terminal)
+    runTerminalCommand: publicProcedure
+        .input(
+            z.object({
+                cwd: z.string(),
+                command: z.string().min(1),
+                timeoutMs: z.number().min(1000).max(120000).optional(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const timeoutMs = input.timeoutMs ?? 30_000;
+            return await new Promise<{
+                success: boolean;
+                stdout: string;
+                stderr: string;
+                exitCode: number | null;
+                timedOut: boolean;
+                error: string | null;
+            }>((resolve) => {
+                exec(
+                    input.command,
+                    {
+                        cwd: input.cwd,
+                        timeout: timeoutMs,
+                        maxBuffer: 10 * 1024 * 1024,
+                        shell: process.env.SHELL || true,
+                    },
+                    (error, stdout, stderr) => {
+                        const execError = error as (Error & { code?: number; killed?: boolean }) | null;
+                        resolve({
+                            success: !execError,
+                            stdout: stdout ?? '',
+                            stderr: stderr ?? '',
+                            exitCode: typeof execError?.code === 'number' ? execError.code : null,
+                            timedOut: Boolean(execError?.killed),
+                            error: execError ? execError.message : null,
+                        });
+                    }
+                );
+            });
+        }),
 
     // Get app version
     getVersion: publicProcedure.query(() => {

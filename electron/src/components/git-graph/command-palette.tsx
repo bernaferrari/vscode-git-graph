@@ -4,14 +4,11 @@
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
-	DialogHeader,
 } from '@/components/ui/dialog';
 import {
 	GitBranch,
@@ -29,15 +26,11 @@ import {
 	Package,
 	GitPullRequest,
 	FolderGit2,
-	Trash2,
-	RotateCcw,
 	Keyboard,
-	HelpCircle,
 	BarChart3,
 	Globe,
 	Filter,
 	Pin,
-	User,
 	Activity,
 	FolderOpen,
 	Command,
@@ -69,6 +62,7 @@ interface CommandPaletteProps {
 	onSettings: () => void;
 	onSearch: () => void;
 	onTerminal: () => void;
+	onClone?: () => void;
 	onOpenInFinder?: () => void;
 	onStash: () => void;
 	onCommitSigning: () => void;
@@ -84,6 +78,8 @@ interface CommandPaletteProps {
 		onRemotes: () => void;
 		onFilters: () => void;
 		onPinned: () => void;
+		onLineStaging?: () => void;
+		onWorkspaces?: () => void;
 		onKeyboardHelp: () => void;
 		onHealthCheck: () => void;
 		onFuzzyFinder: () => void;
@@ -187,6 +183,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Tools',
 			action: actions.onOpenInFinder ?? (() => {}),
 		},
+		...(actions.onClone ? [{
+			id: 'clone',
+			label: 'Clone Repository',
+			icon: <Download className="h-4 w-4" />,
+			category: 'Tools',
+			action: actions.onClone,
+		}] : []),
 		{
 			id: 'statistics',
 			label: 'Repository Statistics',
@@ -202,6 +205,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Tools',
 			action: actions.onFilters,
 		},
+		...(actions.onLineStaging ? [{
+			id: 'line-staging',
+			label: 'Line Staging',
+			icon: <Plus className="h-4 w-4" />,
+			category: 'Tools',
+			action: actions.onLineStaging,
+		}] : []),
 		{
 			id: 'pinned',
 			label: 'Pinned Commits',
@@ -284,6 +294,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Integrations',
 			action: actions.onSubmodules,
 		},
+		...(actions.onWorkspaces ? [{
+			id: 'workspaces',
+			label: 'Workspaces Launchpad',
+			icon: <FolderGit2 className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onWorkspaces,
+		}] : []),
 		// Advanced
 		...(actions.onUndoStack ? [{
 			id: 'undo-stack',
@@ -389,8 +406,9 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 				break;
 			case 'Enter':
 				e.preventDefault();
-				if (filteredCommands[selectedIndex]) {
-					filteredCommands[selectedIndex].action();
+				const selectedCommand = filteredCommands[selectedIndex];
+				if (selectedCommand) {
+					selectedCommand.action();
 					onOpenChange(false);
 					setQuery('');
 				}
@@ -424,18 +442,19 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 						</div>
 					) : (
 						<div className="py-2">
-							{Object.entries(
-								filteredCommands.reduce((acc, cmd) => {
-									if (!acc[cmd.category]) acc[cmd.category] = [];
-									acc[cmd.category].push(cmd);
-									return acc;
-								}, {} as Record<string, Command[]>)
-							).map(([category, cmds]) => (
+								{Object.entries(
+									filteredCommands.reduce((acc, cmd) => {
+										const bucket = acc[cmd.category] ?? [];
+										bucket.push(cmd);
+										acc[cmd.category] = bucket;
+										return acc;
+									}, {} as Record<string, Command[]>)
+								).map(([category, cmds]) => (
 								<div key={category}>
 									<div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
 										{category}
 									</div>
-									{cmds.map((cmd, index) => {
+									{cmds.map((cmd) => {
 										const globalIndex = filteredCommands.indexOf(cmd);
 										return (
 											<div

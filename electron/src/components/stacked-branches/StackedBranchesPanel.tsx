@@ -3,7 +3,9 @@
  * Visualize and manage branch stacks like GitButler/Graphite
  */
 
+import { useMemo, useState } from 'react';
 import { useStackedBranches, getStackOrder, type StackedBranch } from '@/lib/stackedBranches';
+import { trpc } from '@/trpc/client';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -26,9 +28,13 @@ import {
 	Check,
 	Clock,
 	AlertCircle,
+	Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/lib/store';
+import { toast } from 'sonner';
+
+type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 
 const STATUS_CONFIG: Record<StackedBranch['status'], { icon: React.ElementType; color: string; label: string }> = {
 	draft: { icon: Clock, color: 'text-yellow-500', label: 'Draft' },
@@ -43,30 +49,129 @@ interface StackedBranchesPanelProps {
 
 export function StackedBranchesPanel({ children }: StackedBranchesPanelProps) {
 	const { activeRepo } = useAppStore();
-	const { getStack, removeBranch, reorderBranch } = useStackedBranches();
+	const { getStack, removeBranch, reorderBranch, addBranch, updateBranch } = useStackedBranches();
+	const [creatingPrBranchId, setCreatingPrBranchId] = useState<string | null>(null);
+	const { data: repoInfo, refetch: refetchRepoInfo } = trpc.git.repoInfo.useQuery(
+		{
+			repo: activeRepo ?? '',
+			showRemoteBranches: false,
+			showStashes: false,
+			hideRemotes: [],
+		},
+		{
+			enabled: !!activeRepo,
+			staleTime: 10_000,
+		}
+	);
+	const { data: remotesData, refetch: refetchRemotes } = trpc.git.remotes.useQuery(
+		{ repo: activeRepo ?? '' },
+		{ enabled: !!activeRepo, staleTime: 10_000 }
+	);
+	const createPullRequest = trpc.git.createPullRequest.useMutation();
 
 	const stack = activeRepo ? getStack(activeRepo) : [];
 	const sortedStack = getStackOrder(stack);
+	const branchNames = useMemo(
+		() => ((repoInfo?.branches ?? []) as string[]).filter((name) => !name.startsWith('remotes/')),
+		[repoInfo?.branches]
+	);
+	const currentBranch = repoInfo?.head ?? null;
+	const defaultBaseBranch = useMemo(() => {
+		const preferred = ['main', 'master', 'develop'].find((branch) => branchNames.includes(branch));
+		return preferred ?? branchNames[0] ?? 'main';
+	}, [branchNames]);
+	const remoteUrl = remotesData?.remotes?.find((remote) => remote.name === 'origin')?.url ?? '';
+	const provider = detectProvider(remoteUrl);
 
 	if (!activeRepo) {
 		return null;
 	}
 
-	return (
-		<Sheet>
-			<SheetTrigger asChild>
-				{children || (
-					<Button variant="ghost" size="sm" className="gap-1.5">
-						<GitBranch className="h-4 w-4" />
-						<span className="hidden sm:inline">Stack</span>
-						{stack.length > 0 && (
-							<Badge variant="secondary" className="h-5 px-1.5 text-xs">
-								{stack.length}
-							</Badge>
-						)}
-					</Button>
-				)}
-			</SheetTrigger>
+	const handleAddCurrentBranch = () => {
+		if (!currentBranch || currentBranch === 'HEAD') {
+			toast.error('No checked-out branch available to add');
+			return;
+		}
+
+		if (stack.some((branch) => branch.name === currentBranch)) {
+			toast.info(`${currentBranch} is already in the stack`);
+			return;
+		}
+
+		const parent = sortedStack[sortedStack.length - 1] ?? null;
+		addBranch(activeRepo, {
+			name: currentBranch,
+			baseBranch: parent?.name ?? defaultBaseBranch,
+			parentId: parent?.id ?? null,
+			commitHash: 'HEAD',
+			status: 'draft',
+		});
+		toast.success(`Added ${currentBranch} to branch stack`);
+	};
+
+	const handleCreateStackedPr = async (branch: StackedBranch) => {
+		if (!provider) {
+			toast.error('No supported pull request provider found on origin remote');
+			return;
+		}
+
+		const parentBranch = stack.find((candidate) => candidate.id === branch.parentId);
+		const targetBranch = parentBranch?.name ?? branch.baseBranch;
+
+		if (!targetBranch || targetBranch === branch.name) {
+			toast.error('Stack branch base is invalid for pull request creation');
+			return;
+		}
+
+		setCreatingPrBranchId(branch.id);
+		try {
+			const result = await createPullRequest.mutateAsync({
+				repo: activeRepo,
+				provider,
+				title: branch.name,
+				body: `Stacked branch PR targeting ${targetBranch}.`,
+				head: branch.name,
+				base: targetBranch,
+				draft: branch.status === 'draft',
+			});
+
+			if (result.error || !result.pullRequest) {
+				toast.error('Failed to create pull request', {
+					description: result.error ?? 'Unknown error',
+				});
+				return;
+			}
+
+			updateBranch(activeRepo, branch.id, {
+				prUrl: result.pullRequest.webUrl,
+				status: result.pullRequest.state === 'merged' ? 'merged' : 'ready',
+				baseBranch: targetBranch,
+			});
+			toast.success(`Created PR #${result.pullRequest.number} for ${branch.name}`);
+		} catch (error) {
+			toast.error('Failed to create pull request', {
+				description: error instanceof Error ? error.message : 'Unknown error',
+			});
+		} finally {
+			setCreatingPrBranchId(null);
+		}
+	};
+
+		return (
+			<Sheet>
+				<SheetTrigger>
+					{children || (
+						<Button variant="ghost" size="sm" className="gap-1.5">
+							<GitBranch className="h-4 w-4" />
+							<span className="hidden sm:inline">Stack</span>
+							{stack.length > 0 && (
+								<Badge variant="secondary" className="h-5 px-1.5 text-xs">
+									{stack.length}
+								</Badge>
+							)}
+						</Button>
+					)}
+				</SheetTrigger>
 			<SheetContent className="w-80 sm:w-96">
 				<SheetHeader className="mb-4">
 					<SheetTitle className="flex items-center gap-2">
@@ -74,6 +179,22 @@ export function StackedBranchesPanel({ children }: StackedBranchesPanelProps) {
 						Branch Stack
 					</SheetTitle>
 				</SheetHeader>
+
+				<div className='mb-3 flex items-center gap-2'>
+					<Button variant='outline' size='sm' className='flex-1' onClick={handleAddCurrentBranch}>
+						<Plus className='mr-1 h-4 w-4' />
+						Add Current Branch
+					</Button>
+					<Button
+						variant='ghost'
+						size='sm'
+						onClick={() => {
+							void refetchRepoInfo();
+							void refetchRemotes();
+						}}>
+						<RefreshCw className='h-4 w-4' />
+					</Button>
+				</div>
 
 				<ScrollArea className="h-[calc(100vh-8rem)]">
 					{sortedStack.length === 0 ? (
@@ -99,19 +220,25 @@ export function StackedBranchesPanel({ children }: StackedBranchesPanelProps) {
 									branch={branch}
 									index={index}
 									isLast={index === sortedStack.length - 1}
-									onMoveUp={() => {
-										if (index > 0) {
-											const above = sortedStack[index - 1];
-											reorderBranch(activeRepo, branch.id, above.parentId);
-										}
-									}}
-									onMoveDown={() => {
-										if (index < sortedStack.length - 1) {
-											const below = sortedStack[index + 1];
-											reorderBranch(activeRepo, branch.id, below.id);
-										}
-									}}
+									isCreatingPr={creatingPrBranchId === branch.id}
+										onMoveUp={() => {
+											if (index > 0) {
+												const above = sortedStack[index - 1];
+												if (above) {
+													reorderBranch(activeRepo, branch.id, above.parentId);
+												}
+											}
+										}}
+										onMoveDown={() => {
+											if (index < sortedStack.length - 1) {
+												const below = sortedStack[index + 1];
+												if (below) {
+													reorderBranch(activeRepo, branch.id, below.id);
+												}
+											}
+										}}
 									onRemove={() => removeBranch(activeRepo, branch.id)}
+									onCreatePr={() => void handleCreateStackedPr(branch)}
 								/>
 							))}
 						</div>
@@ -126,18 +253,22 @@ interface StackedBranchItemProps {
 	branch: StackedBranch;
 	index: number;
 	isLast: boolean;
+	isCreatingPr: boolean;
 	onMoveUp: () => void;
 	onMoveDown: () => void;
 	onRemove: () => void;
+	onCreatePr: () => void;
 }
 
 function StackedBranchItem({
 	branch,
 	index,
 	isLast,
+	isCreatingPr,
 	onMoveUp,
 	onMoveDown,
 	onRemove,
+	onCreatePr,
 }: StackedBranchItemProps) {
 	const StatusIcon = STATUS_CONFIG[branch.status].icon;
 	const statusConfig = STATUS_CONFIG[branch.status];
@@ -184,6 +315,16 @@ function StackedBranchItem({
 					)}
 				</div>
 				<div className="flex flex-col gap-1">
+					{branch.status !== 'merged' && (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-6 w-6 p-0 text-indigo-600"
+							onClick={onCreatePr}
+						>
+							{isCreatingPr ? <Loader2 className='h-3 w-3 animate-spin' /> : <GitPullRequest className='h-3 w-3' />}
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="sm"
@@ -214,4 +355,16 @@ function StackedBranchItem({
 			</div>
 		</div>
 	);
+}
+
+function detectProvider(remoteUrl: string): PullRequestProvider | null {
+	const url = remoteUrl.toLowerCase();
+	if (!url) return null;
+	if (url.includes('github.com')) return 'github';
+	if (url.includes('gitlab')) return 'gitlab';
+	if (url.includes('bitbucket.org')) return 'bitbucket';
+	if (url.includes('dev.azure.com') || url.includes('visualstudio.com') || url.includes('ssh.dev.azure.com')) {
+		return 'azure';
+	}
+	return null;
 }

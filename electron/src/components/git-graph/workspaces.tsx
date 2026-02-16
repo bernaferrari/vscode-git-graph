@@ -3,7 +3,7 @@
  * Group related repositories for quick access
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,7 +11,23 @@ import { Badge } from '@/components/ui/badge';
 import { trpc } from '@/trpc/client';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FolderGit2, Plus, Trash2, Edit, Star, StarOff, FolderOpen, MoreHorizontal, Check, X } from 'lucide-react';
+import {
+    FolderGit2,
+    Plus,
+    Trash2,
+    Edit,
+    Star,
+    StarOff,
+    FolderOpen,
+    MoreHorizontal,
+    Check,
+    X,
+    RefreshCw,
+    GitPullRequest,
+    ArrowUp,
+    ArrowDown,
+    CircleAlert,
+} from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -67,6 +83,25 @@ export function WorkspacesManager({
     const [editName, setEditName] = useState('');
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
     const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
+    const selectedWorkspaceRepoPaths = useMemo(
+        () => selectedWorkspace?.repos.map((repo) => repo.path) ?? [],
+        [selectedWorkspace]
+    );
+    const launchpadQuery = trpc.repo.launchpad.useQuery(
+        {
+            repos: selectedWorkspaceRepoPaths,
+            includePullRequests: true,
+        },
+        {
+            enabled: open && Boolean(selectedWorkspace) && selectedWorkspaceRepoPaths.length > 0,
+            staleTime: 15_000,
+            refetchOnWindowFocus: false,
+        }
+    );
+    const launchpadByPath = useMemo(() => {
+        const entries = launchpadQuery.data?.repos ?? [];
+        return new Map(entries.map((entry) => [entry.path, entry]));
+    }, [launchpadQuery.data?.repos]);
 
     // Load workspaces
     useEffect(() => {
@@ -299,37 +334,92 @@ export function WorkspacesManager({
                             <>
                                 <div className='bg-muted/30 flex items-center justify-between border-b p-2'>
                                     <span className='text-sm font-medium'>{selectedWorkspace.name}</span>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger className='hover:bg-accent inline-flex h-6 w-6 items-center justify-center rounded-md p-0'>
-                                            <MoreHorizontal className='h-4 w-4' />
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align='end'>
-                                            <DropdownMenuItem onClick={() => handleAddRepo(selectedWorkspace.id)}>
-                                                <Plus className='mr-2 h-4 w-4' />
-                                                Add Repository
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => {
-                                                    setEditingWorkspace(selectedWorkspace.id);
-                                                    setEditName(selectedWorkspace.name);
-                                                }}>
-                                                <Edit className='mr-2 h-4 w-4' />
-                                                Rename
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => handleDeleteWorkspace(selectedWorkspace.id)}
-                                                className='text-red-600'>
-                                                <Trash2 className='mr-2 h-4 w-4' />
-                                                Delete
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <div className='flex items-center gap-1'>
+                                        <Button
+                                            variant='ghost'
+                                            size='sm'
+                                            className='h-6 w-6 p-0'
+                                            onClick={() => void launchpadQuery.refetch()}
+                                            title='Refresh workspace launchpad'>
+                                            <RefreshCw
+                                                className={`h-3.5 w-3.5 ${
+                                                    launchpadQuery.isFetching ? 'animate-spin' : ''
+                                                }`}
+                                            />
+                                        </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger className='hover:bg-accent inline-flex h-6 w-6 items-center justify-center rounded-md p-0'>
+                                                <MoreHorizontal className='h-4 w-4' />
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align='end'>
+                                                <DropdownMenuItem onClick={() => handleAddRepo(selectedWorkspace.id)}>
+                                                    <Plus className='mr-2 h-4 w-4' />
+                                                    Add Repository
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => {
+                                                        setEditingWorkspace(selectedWorkspace.id);
+                                                        setEditName(selectedWorkspace.name);
+                                                    }}>
+                                                    <Edit className='mr-2 h-4 w-4' />
+                                                    Rename
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => handleDeleteWorkspace(selectedWorkspace.id)}
+                                                    className='text-red-600'>
+                                                    <Trash2 className='mr-2 h-4 w-4' />
+                                                    Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
 
                                 <ScrollArea className='flex-1'>
+                                    {selectedWorkspace.repos.length > 0 && (
+                                        <div className='border-b px-3 py-2'>
+                                            <div className='mb-1 flex items-center justify-between'>
+                                                <span className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                                                    Launchpad
+                                                </span>
+                                                <span className='text-[11px] text-muted-foreground'>
+                                                    {launchpadQuery.isFetching ? 'syncing...' : 'ready'}
+                                                </span>
+                                            </div>
+                                            <div className='grid grid-cols-3 gap-2 text-xs'>
+                                                <div className='rounded border px-2 py-1'>
+                                                    <p className='text-muted-foreground'>Dirty</p>
+                                                    <p className='font-semibold'>
+                                                        {Array.from(launchpadByPath.values()).filter((repo) => repo.dirtyCount > 0)
+                                                            .length}
+                                                    </p>
+                                                </div>
+                                                <div className='rounded border px-2 py-1'>
+                                                    <p className='text-muted-foreground'>Ahead</p>
+                                                    <p className='font-semibold'>
+                                                        {Array.from(launchpadByPath.values()).filter((repo) => repo.ahead > 0)
+                                                            .length}
+                                                    </p>
+                                                </div>
+                                                <div className='rounded border px-2 py-1'>
+                                                    <p className='text-muted-foreground'>Open PRs</p>
+                                                    <p className='font-semibold'>
+                                                        {Array.from(launchpadByPath.values()).reduce(
+                                                            (sum, repo) => sum + (repo.openPullRequests ?? 0),
+                                                            0
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {selectedWorkspace.repos.length > 0 ? (
                                         <div className='divide-y'>
                                             {selectedWorkspace.repos.map((repo) => (
+                                                (() => {
+                                                    const launchpad = launchpadByPath.get(repo.path);
+                                                    return (
                                                 <div
                                                     key={repo.path}
                                                     className='hover:bg-accent/50 group flex cursor-pointer items-center gap-3 px-3 py-2'
@@ -337,9 +427,48 @@ export function WorkspacesManager({
                                                     <FolderGit2 className='text-muted-foreground h-4 w-4' />
                                                     <div className='min-w-0 flex-1'>
                                                         <p className='truncate text-sm font-medium'>{repo.name}</p>
-                                                        <p className='text-muted-foreground truncate text-xs'>
-                                                            {repo.path}
-                                                        </p>
+                                                        <p className='text-muted-foreground truncate text-xs'>{repo.path}</p>
+                                                        {launchpad ? (
+                                                            <div className='text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]'>
+                                                                {launchpad.error ? (
+                                                                    <span className='inline-flex items-center gap-1 text-amber-600'>
+                                                                        <CircleAlert className='h-3 w-3' />
+                                                                        {launchpad.error}
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        <span>{launchpad.head ?? 'detached'}</span>
+                                                                        {launchpad.dirtyCount > 0 && (
+                                                                            <span className='rounded bg-amber-100 px-1.5 py-0.5 text-amber-700'>
+                                                                                {launchpad.dirtyCount} changed
+                                                                            </span>
+                                                                        )}
+                                                                        {(launchpad.ahead > 0 || launchpad.behind > 0) && (
+                                                                            <span className='inline-flex items-center gap-1'>
+                                                                                {launchpad.ahead > 0 && (
+                                                                                    <span className='inline-flex items-center gap-0.5 text-emerald-600'>
+                                                                                        <ArrowUp className='h-3 w-3' />
+                                                                                        {launchpad.ahead}
+                                                                                    </span>
+                                                                                )}
+                                                                                {launchpad.behind > 0 && (
+                                                                                    <span className='inline-flex items-center gap-0.5 text-sky-600'>
+                                                                                        <ArrowDown className='h-3 w-3' />
+                                                                                        {launchpad.behind}
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        )}
+                                                                        {(launchpad.openPullRequests ?? 0) > 0 && (
+                                                                            <span className='inline-flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700'>
+                                                                                <GitPullRequest className='h-3 w-3' />
+                                                                                {launchpad.openPullRequests}
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                     {repo.isFavorite && (
                                                         <Star className='h-4 w-4 fill-amber-500 text-amber-500' />
@@ -371,6 +500,8 @@ export function WorkspacesManager({
                                                         </Button>
                                                     </div>
                                                 </div>
+                                                    );
+                                                })()
                                             ))}
                                         </div>
                                     ) : (
