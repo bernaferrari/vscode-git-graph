@@ -50,6 +50,14 @@ interface ConflictChunk {
 	raw: string;
 }
 
+function isBinaryContent(content: string | undefined): boolean {
+	return (content ?? '').includes('\u0000');
+}
+
+function formatContentSize(content: string | undefined): string {
+	return `${new TextEncoder().encode(content ?? '').length} bytes`;
+}
+
 export function MergeConflictEditor({
 	open,
 	onOpenChange,
@@ -107,15 +115,17 @@ export function MergeConflictEditor({
 				continue;
 			}
 
-			if (line.startsWith('>>>>>>>')) {
-				if (current) {
-					current.rawEnd = lineEnd;
-					current.endLine = index;
-					current.raw = content.slice(current.rawStart, current.rawEnd);
-					conflicts.push(current as ConflictChunk);
-				}
-				current = null;
-				state = null;
+				if (line.startsWith('>>>>>>>')) {
+					if (current) {
+						current.rawEnd = lineEnd;
+						current.endLine = index;
+						conflicts.push({
+							...current,
+							raw: content.slice(current.rawStart, current.rawEnd),
+						});
+					}
+					current = null;
+					state = null;
 				lineOffset = lineEnd;
 				continue;
 			}
@@ -135,16 +145,22 @@ export function MergeConflictEditor({
 			lineOffset = lineEnd;
 		}
 
-		if (current) {
-			current.endLine = lines.length - 1;
-			current.raw = content.slice(current.rawStart, current.rawEnd);
-			conflicts.push(current as ConflictChunk);
-		}
+			if (current) {
+				current.endLine = lines.length - 1;
+				conflicts.push({
+					...current,
+					raw: content.slice(current.rawStart, current.rawEnd),
+				});
+			}
 
 		return conflicts;
 	};
 
 	const editableContent = useMemo(() => resolved || conflict.ours, [resolved, conflict.ours]);
+	const isBinaryConflict = useMemo(
+		() => isBinaryContent(conflict.ours) || isBinaryContent(conflict.theirs) || isBinaryContent(conflict.base),
+		[conflict.base, conflict.ours, conflict.theirs]
+	);
 	const unresolvedConflicts = useMemo(() => parseConflictBlocks(editableContent), [editableContent]);
 	const totalConflictCount = useMemo(() => parseConflictBlocks(conflict.ours).length, [conflict.ours]);
 	const hasOriginalConflicts = totalConflictCount > 0;
@@ -175,6 +191,12 @@ export function MergeConflictEditor({
 			setActiveConflictIndex(unresolvedConflicts.length - 1);
 		}
 	}, [activeConflictIndex, unresolvedConflicts.length]);
+
+	useEffect(() => {
+		if (isBinaryConflict && viewMode === 'unified') {
+			setViewMode('split');
+		}
+	}, [isBinaryConflict, viewMode]);
 
 	const buildReplacement = (chunk: ConflictChunk, mode: 'ours' | 'theirs' | 'base' | 'both'): string => {
 		if (mode === 'ours') return chunk.ours;
@@ -301,8 +323,11 @@ export function MergeConflictEditor({
 	const goToNextConflict = () => setActiveConflictIndex((current) => Math.min(unresolvedConflicts.length - 1, current + 1));
 	const goToFirstConflict = () => setActiveConflictIndex(0);
 	const handleClose = (nextOpen: boolean) => {
-		if (!nextOpen && manualOverride) {
-			const canClose = window.confirm('You have unsaved conflict edits. Close anyway?');
+		if (!nextOpen && (manualOverride || hasUnresolvedConflicts)) {
+			const message = hasUnresolvedConflicts
+				? 'There are still unresolved conflict markers in this file. Close anyway?'
+				: 'You have unsaved conflict edits. Close anyway?';
+			const canClose = window.confirm(message);
 			if (!canClose) return;
 		}
 		onOpenChange(nextOpen);
@@ -418,23 +443,31 @@ export function MergeConflictEditor({
 							: 'No conflict markers'}
 					</Badge>
 					<div className="flex-1" />
-					<Button
-						variant={viewMode === 'split' ? 'secondary' : 'ghost'}
-						size="sm"
-						onClick={() => setViewMode('split')}
-					>
-						Split
-					</Button>
-					<Button
-						variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
-						size="sm"
-						onClick={() => setViewMode('unified')}
-					>
-						Unified
-					</Button>
-				</div>
+						<Button
+							variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+							size="sm"
+							onClick={() => setViewMode('split')}
+						>
+							Split
+						</Button>
+						<Button
+							variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
+							size="sm"
+							onClick={() => setViewMode('unified')}
+							disabled={isBinaryConflict}
+						>
+							Unified
+						</Button>
+					</div>
 
-				{hasUnresolvedConflicts && (
+					{isBinaryConflict ? (
+						<div className="border-b px-2 py-1.5 text-xs text-amber-600">
+							<AlertTriangle className="mr-1 inline h-3.5 w-3.5 align-text-top" />
+							Binary conflict detected. Preview/edit is limited to side selection.
+						</div>
+					) : null}
+
+					{hasUnresolvedConflicts && (
 					<div className="flex items-center gap-2 px-2 py-1.5 text-xs text-amber-600">
 						<AlertTriangle className="h-3.5 w-3.5" />
 						<span>
@@ -485,59 +518,81 @@ export function MergeConflictEditor({
 				<ScrollArea className="flex-1">
 					{viewMode === 'split' ? (
 						<div className={`grid gap-2 p-2 ${hasBase ? 'grid-cols-3' : 'grid-cols-2'}`}>
-							<div>
-								<div className="flex items-center justify-between p-2 bg-green-500/10 rounded-t border-b border-green-500/20">
-									<span className="text-xs font-medium text-green-600">Ours (Current)</span>
-									<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptOurs}>
-										Use This
-									</Button>
-								</div>
-								<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
-									{conflict.ours}
-								</pre>
-							</div>
-							{hasBase ? (
 								<div>
-									<div className="flex items-center justify-between p-2 bg-slate-500/10 rounded-t border-b border-slate-500/20">
-										<span className="text-xs font-medium text-slate-600">Base</span>
-										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptBase}>
+									<div className="flex items-center justify-between p-2 bg-green-500/10 rounded-t border-b border-green-500/20">
+										<span className="text-xs font-medium text-green-600">Ours (Current)</span>
+										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptOurs}>
 											Use This
 										</Button>
 									</div>
-									<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
-										{conflict.base ?? 'No base content was available for this conflict.'}
-									</pre>
+									{isBinaryConflict ? (
+										<div className="p-2 text-xs text-muted-foreground bg-muted/20 rounded-b min-h-[200px]">
+											Binary content preview is unavailable ({formatContentSize(conflict.ours)}).
+										</div>
+									) : (
+										<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
+											{conflict.ours}
+										</pre>
+									)}
 								</div>
-							) : null}
-							<div>
+								{hasBase ? (
+									<div>
+									<div className="flex items-center justify-between p-2 bg-slate-500/10 rounded-t border-b border-slate-500/20">
+										<span className="text-xs font-medium text-slate-600">Base</span>
+										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptBase}>
+												Use This
+											</Button>
+										</div>
+										{isBinaryConflict ? (
+											<div className="p-2 text-xs text-muted-foreground bg-muted/20 rounded-b min-h-[200px]">
+												Binary base content preview is unavailable ({formatContentSize(conflict.base)}).
+											</div>
+										) : (
+											<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
+												{conflict.base ?? 'No base content was available for this conflict.'}
+											</pre>
+										)}
+									</div>
+								) : null}
+								<div>
 								<div className="flex items-center justify-between p-2 bg-blue-500/10 rounded-t border-b border-blue-500/20">
 									<span className="text-xs font-medium text-blue-600">Theirs (Incoming)</span>
-									<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptTheirs}>
-										Use This
-									</Button>
-								</div>
-								{conflict.theirs ? (
-									<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
-										{conflict.theirs}
-									</pre>
-								) : (
+										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptTheirs}>
+											Use This
+										</Button>
+									</div>
+									{isBinaryConflict ? (
+										<div className="p-2 text-xs text-muted-foreground bg-muted/20 min-h-[200px] rounded-b">
+											Binary content preview is unavailable ({formatContentSize(conflict.theirs)}).
+										</div>
+									) : conflict.theirs ? (
+										<pre className="p-2 text-xs font-mono bg-muted/30 rounded-b min-h-[200px] overflow-auto">
+											{conflict.theirs}
+										</pre>
+									) : (
 									<div className="p-2 text-xs text-muted-foreground bg-muted/20 min-h-[200px] rounded-b">
 										Theirs version is not available from index.
 									</div>
 								)}
 							</div>
 						</div>
-					) : (
-						<div className="p-2">
-							<textarea
-								className="w-full h-64 p-2 text-xs font-mono bg-muted/30 rounded resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-								value={resolved || conflict.ours}
-								onChange={(e) => setResolved(e.target.value)}
-								placeholder="Edit the merged content here..."
-							/>
-						</div>
-					)}
-				</ScrollArea>
+						) : (
+							<div className="p-2">
+								{isBinaryConflict ? (
+									<div className="h-64 rounded bg-muted/20 p-2 text-xs text-muted-foreground">
+										Binary conflicts cannot be edited in unified mode. Use side selection in split view.
+									</div>
+								) : (
+									<textarea
+										className="w-full h-64 p-2 text-xs font-mono bg-muted/30 rounded resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+										value={resolved || conflict.ours}
+										onChange={(e) => setResolved(e.target.value)}
+										placeholder="Edit the merged content here..."
+									/>
+								)}
+							</div>
+						)}
+					</ScrollArea>
 
 				<DialogFooter className="ui-toolbar">
 					<Button variant="outline" onClick={() => handleClose(false)}>

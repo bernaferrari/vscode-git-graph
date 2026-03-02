@@ -3,20 +3,6 @@
  * Link commits to Jira, Linear, GitHub Issues, Asana, etc.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	ExternalLink,
 	Link,
@@ -35,7 +21,23 @@ import {
 	Clock,
 	Globe,
 } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 // Issue types
 type IssueProvider = 'github' | 'jira' | 'linear' | 'asana' | 'trello' | 'clickup' | 'notion';
@@ -259,7 +261,7 @@ export function IssueTrackerPanel({
 					variant="ghost"
 					size="sm"
 					className="h-6"
-					onClick={() => setShowSearch(!showSearch)}
+					onClick={() => { setShowSearch(!showSearch); }}
 				>
 					<Plus className="h-4 w-4" />
 				</Button>
@@ -274,7 +276,7 @@ export function IssueTrackerPanel({
 							<Input
 								placeholder="Search issues..."
 								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
+								onChange={(e) => { setSearchQuery(e.target.value); }}
 								onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
 								className="pl-9"
 							/>
@@ -295,7 +297,7 @@ export function IssueTrackerPanel({
 									<div
 										key={issue.id}
 										className="flex items-center gap-2 p-2 rounded hover:bg-accent/50 cursor-pointer"
-										onClick={() => handleLinkIssue(issue)}
+										onClick={() => { handleLinkIssue(issue); }}
 									>
 										<span className={PROVIDER_CONFIG[issue.provider].color}>
 											{PROVIDER_CONFIG[issue.provider].icon}
@@ -365,7 +367,7 @@ export function IssueTrackerPanel({
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0 text-red-600"
-										onClick={() => handleUnlinkIssue(link.issueKey)}
+										onClick={() => { handleUnlinkIssue(link.issueKey); }}
 									>
 										<Unlink className="h-3 w-3" />
 									</Button>
@@ -449,7 +451,7 @@ export function IssueTrackerSettings({
 										className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer ${
 											isEnabled ? 'border-primary bg-primary/5' : ''
 										}`}
-										onClick={() => handleToggleProvider(provider)}
+										onClick={() => { handleToggleProvider(provider); }}
 									>
 										<div className="flex items-center gap-3">
 											<span className={cfg.color}>{cfg.icon}</span>
@@ -473,7 +475,7 @@ export function IssueTrackerSettings({
 						<Button
 							variant={config.autoDetect ? 'default' : 'outline'}
 							size="sm"
-							onClick={() => setConfig(prev => ({ ...prev, autoDetect: !prev.autoDetect }))}
+							onClick={() => { setConfig(prev => ({ ...prev, autoDetect: !prev.autoDetect })); }}
 						>
 							{config.autoDetect ? 'On' : 'Off'}
 						</Button>
@@ -492,7 +494,7 @@ export function IssueTrackerSettings({
 				</div>
 
 				<div className="flex justify-end gap-2 pt-4 border-t">
-					<Button variant="ghost" onClick={() => onOpenChange(false)}>
+					<Button variant="ghost" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleSave}>

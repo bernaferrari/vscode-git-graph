@@ -3,17 +3,6 @@
  * Quick switch branches, tags, commits, files
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	GitBranch,
 	Tag,
@@ -23,7 +12,19 @@ import {
 	Globe,
 	Clock,
 } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface FuzzyFinderProps {
 	open: boolean;
@@ -231,7 +232,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 												: 'hover:bg-accent/50'
 										}`}
 										onClick={result.action}
-										onMouseEnter={() => setSelectedIndex(index)}
+										onMouseEnter={() => { setSelectedIndex(index); }}
 									>
 										<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
 										<span className="flex-1 truncate text-sm">{result.name}</span>

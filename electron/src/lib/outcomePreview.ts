@@ -94,10 +94,18 @@ export const useOutcomePreview = create<PreviewState>((set) => ({
 	isLoading: false,
 	error: null,
 	
-	setPreview: (preview) => set({ currentPreview: preview, previewStatus: preview ? 'previewing' : 'idle' }),
-	setLoading: (isLoading) => set({ isLoading }),
-	setError: (error) => set({ error, previewStatus: error ? 'error' : 'idle' }),
-	clearPreview: () => set({ currentPreview: null, previewStatus: 'idle', error: null }),
+	setPreview: (preview) => {
+		set({ currentPreview: preview, previewStatus: preview ? 'previewing' : 'idle' });
+	},
+	setLoading: (isLoading) => {
+		set({ isLoading });
+	},
+	setError: (error) => {
+		set({ error, previewStatus: error ? 'error' : 'idle' });
+	},
+	clearPreview: () => {
+		set({ currentPreview: null, previewStatus: 'idle', error: null });
+	},
 }));
 
 // Helper to analyze risk level
@@ -122,9 +130,9 @@ export function analyzeRiskLevel(
 	}
 	
 	if (conflictsCount > 5) {
-		reasons.push(`${conflictsCount} files have conflicts`);
+		reasons.push(`${String(conflictsCount)} files have conflicts`);
 	} else if (conflictsCount > 0) {
-		reasons.push(`${conflictsCount} file(s) will have conflicts`);
+		reasons.push(`${String(conflictsCount)} file(s) will have conflicts`);
 	}
 	
 	let level: 'low' | 'medium' | 'high' = 'low';

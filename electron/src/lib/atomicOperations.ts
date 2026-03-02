@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useOperationLog } from './operationLog';
 
 export type OperationType = 
 	| 'merge'
@@ -64,7 +63,7 @@ export const useAtomicOperations = create<AtomicOperationState>()(
 			isApplying: false,
 			
 			startOperation: (op) => {
-				const id = `atomic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+				const id = `atomic-${String(Date.now())}-${Math.random().toString(36).slice(2, 11)}`;
 				const operation: AtomicOperation = {
 					...op,
 					id,
@@ -98,10 +97,10 @@ export const useAtomicOperations = create<AtomicOperationState>()(
 				}));
 			},
 			
-			undoOperation: async (id) => {
+			undoOperation: (id) => {
 				const operation = get().operations.find((op) => op.id === id);
 				if (!operation || operation.status !== 'applied') {
-					return false;
+					return Promise.resolve(false);
 				}
 				
 				try {
@@ -117,10 +116,10 @@ export const useAtomicOperations = create<AtomicOperationState>()(
 						),
 					}));
 					
-					return true;
+					return Promise.resolve(true);
 				} catch (error) {
 					console.error('Failed to undo:', error);
-					return false;
+					return Promise.resolve(false);
 				}
 			},
 			
@@ -156,14 +155,15 @@ export function buildAtomicOperation(
 ): Omit<AtomicOperation, 'id' | 'timestamp'> {
 	// Build undo commands (reverse the operations)
 	const undoCommands: string[] = [];
+	const sourceTip = oldTips[plan.sourceBranch] ?? 'HEAD';
 	
 	// For rebase, undo is essentially resetting to old tip
-	undoCommands.push(`git reset --hard ${oldTips[plan.sourceBranch]}`);
+	undoCommands.push(`git reset --hard ${sourceTip}`);
 	
 	return {
 		type: 'rewrite_plan',
 		name: plan.name,
-		description: `Rewrite ${plan.sourceBranch} (${plan.ops.length} operations)`,
+		description: `Rewrite ${plan.sourceBranch} (${String(plan.ops.length)} operations)`,
 		oldState: {
 			refTips: oldTips,
 			workingTree: 'snapshot', // Would capture actual state
@@ -190,7 +190,7 @@ export function buildMergeOperation(
 		: [`git merge ${branch}`];
 	
 	const undoCommands = [
-		`git reset --hard ${oldTips[intoBranch]}`,
+		`git reset --hard ${oldTips[intoBranch] ?? 'HEAD'}`,
 	];
 	
 	return {
@@ -224,7 +224,7 @@ export function buildRebaseOperation(
 	];
 	
 	const undoCommands = [
-		`git reset --hard ${oldTips[branch]}`,
+		`git reset --hard ${oldTips[branch] ?? 'HEAD'}`,
 	];
 	
 	return {

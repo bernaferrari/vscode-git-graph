@@ -3,19 +3,6 @@
  * UI for viewing and editing .gitignore files
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	FileText,
 	Plus,
@@ -25,7 +12,22 @@ import {
 	Search,
 	GitBranch,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 // Common gitignore patterns organized by category
 const COMMON_PATTERNS: Record<string, string[]> = {
@@ -221,7 +223,7 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 							<Input
 								placeholder="Search patterns..."
 								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
+								onChange={(e) => { setSearchQuery(e.target.value); }}
 								className="h-8"
 							/>
 						</div>
@@ -237,7 +239,7 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 												<button
 													key={pattern}
 													className="w-full text-left px-2 py-1 text-xs font-mono rounded hover:bg-accent flex items-center gap-2"
-													onClick={() => addPattern(pattern)}
+													onClick={() => { addPattern(pattern); }}
 												>
 													<Plus className="h-3 w-3 text-muted-foreground" />
 													{pattern}

@@ -4,12 +4,12 @@
  */
 
 import { router } from '@/app/backend/trpc/init';
-import { systemRouter } from '@/app/backend/trpc/routers/system';
-import { gitRouter } from '@/app/backend/trpc/routers/git';
-import { repoRouter } from '@/app/backend/trpc/routers/repo';
 import { configRouter } from '@/app/backend/trpc/routers/config';
-import { watcherRouter } from '@/app/backend/trpc/routers/watcher';
+import { gitRouter } from '@/app/backend/trpc/routers/git';
 import { pullRequestRouter } from '@/app/backend/trpc/routers/pr';
+import { repoRouter } from '@/app/backend/trpc/routers/repo';
+import { systemRouter } from '@/app/backend/trpc/routers/system';
+import { watcherRouter } from '@/app/backend/trpc/routers/watcher';
 
 export const appRouter = router({
     system: systemRouter,

@@ -48,7 +48,9 @@ export function LFSPanel({ repo }: LFSPanelProps) {
 	};
 
 	const isInstalled = lfsStatus?.installed ?? false;
-	const tracking = lfsStatus?.tracking ?? [];
+	const tracking = lfsStatus?.trackingPatterns ?? lfsStatus?.tracking ?? [];
+	const trackedFiles = lfsStatus?.trackedFiles ?? [];
+	const summary = lfsStatus?.summary;
 
 	if (isLoading) {
 		return (
@@ -130,22 +132,22 @@ export function LFSPanel({ repo }: LFSPanelProps) {
 						{/* Tracked files */}
 						<div className="space-y-1">
 							<div className="text-xs font-medium text-muted-foreground">
-								Tracked Files ({tracking.length})
+								Tracked Patterns ({tracking.length})
 							</div>
 							<ScrollArea className="h-32">
 								{tracking.length > 0 ? (
 									<div className="space-y-1">
-										{tracking.map((file: string) => (
+										{tracking.map((pattern: string) => (
 											<div
-												key={file}
+												key={pattern}
 												className="flex items-center justify-between p-1 rounded hover:bg-accent text-xs"
 											>
-												<span className="truncate font-mono">{file}</span>
+												<span className="truncate font-mono">{pattern}</span>
 												<Button
 													variant="ghost"
 													size="sm"
 													className="h-5 px-1"
-													onClick={() => handleUntrack(file.split(' - ')[0] ?? file)}
+													onClick={() => handleUntrack(pattern)}
 												>
 													Untrack
 												</Button>
@@ -154,10 +156,15 @@ export function LFSPanel({ repo }: LFSPanelProps) {
 									</div>
 								) : (
 									<div className="text-center text-muted-foreground text-xs py-4">
-										No LFS files tracked
+										No LFS patterns configured
 									</div>
 								)}
 							</ScrollArea>
+						</div>
+
+						<div className="text-xs text-muted-foreground">
+							Tracked files: {summary?.trackedFileCount ?? trackedFiles.length}
+							{summary?.totalSizeLabel ? ` • Size: ${summary.totalSizeLabel}` : ''}
 						</div>
 					</>
 				)}

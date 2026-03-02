@@ -3,8 +3,6 @@
  * Real API calls for issues, PRs, and CI/CD status
  */
 
-import { z } from 'zod';
-
 // GitHub API types
 export interface GitHubIssue {
 	id: number;
@@ -67,21 +65,22 @@ export class GitHubClient {
 	}
 
 	private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+		const headers = new Headers(options.headers);
+		headers.set('Authorization', `Bearer ${this.token}`);
+		headers.set('Accept', 'application/vnd.github.v3+json');
+		headers.set('Content-Type', 'application/json');
+
 		const response = await fetch(`${this.baseUrl}${path}`, {
 			...options,
-			headers: {
-				'Authorization': `Bearer ${this.token}`,
-				'Accept': 'application/vnd.github.v3+json',
-				'Content-Type': 'application/json',
-				...options.headers,
-			},
+			headers,
 		});
 
 		if (!response.ok) {
-			throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+			throw new Error(`GitHub API error: ${String(response.status)} ${response.statusText}`);
 		}
 
-		return response.json();
+		const data: unknown = await response.json();
+		return data as T;
 	}
 
 	// Get authenticated user
@@ -114,7 +113,7 @@ export class GitHubClient {
 
 	// Get issue
 	async getIssue(owner: string, repo: string, issueNumber: number): Promise<GitHubIssue> {
-		return this.request<GitHubIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`);
+		return this.request<GitHubIssue>(`/repos/${owner}/${repo}/issues/${String(issueNumber)}`);
 	}
 
 	// Create issue
@@ -150,7 +149,7 @@ export class GitHubClient {
 
 	// Get pull request
 	async getPullRequest(owner: string, repo: string, prNumber: number): Promise<GitHubPullRequest> {
-		return this.request<GitHubPullRequest>(`/repos/${owner}/${repo}/pulls/${prNumber}`);
+		return this.request<GitHubPullRequest>(`/repos/${owner}/${repo}/pulls/${String(prNumber)}`);
 	}
 
 	// Create pull request

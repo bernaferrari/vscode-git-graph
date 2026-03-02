@@ -3,23 +3,6 @@
  * Build a sequence of logical commits before pushing
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	GitCommit,
 	Plus,
@@ -39,8 +22,26 @@ import {
 	Play,
 	Loader2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useCallback, useMemo } from 'react';
+
 import { useAIFeatures } from '@/components/ai';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface FileChange {
 	path: string;
@@ -319,7 +320,7 @@ export function CommitSeriesBuilder({
 															variant="ghost"
 															size="sm"
 															className="h-5 w-5 p-0"
-															onClick={() => moveCommit(commit.id, 'up')}
+															onClick={() => { moveCommit(commit.id, 'up'); }}
 															disabled={index === 0}
 														>
 															<ArrowUp className="h-3 w-3" />
@@ -328,7 +329,7 @@ export function CommitSeriesBuilder({
 															variant="ghost"
 															size="sm"
 															className="h-5 w-5 p-0"
-															onClick={() => moveCommit(commit.id, 'down')}
+															onClick={() => { moveCommit(commit.id, 'down'); }}
 															disabled={index === commits.length - 1}
 														>
 															<ArrowDown className="h-3 w-3" />
@@ -355,7 +356,7 @@ export function CommitSeriesBuilder({
 														
 														<Textarea
 															value={commit.message}
-															onChange={(e) => updateCommitMessage(commit.id, e.target.value)}
+															onChange={(e) => { updateCommitMessage(commit.id, e.target.value); }}
 															placeholder="Commit message..."
 															className="h-16 text-sm"
 														/>
@@ -381,7 +382,7 @@ export function CommitSeriesBuilder({
 														variant="ghost"
 														size="sm"
 														className="h-8 w-8 p-0 text-red-500"
-														onClick={() => removeCommit(commit.id)}
+														onClick={() => { removeCommit(commit.id); }}
 													>
 														<Trash2 className="h-4 w-4" />
 													</Button>
@@ -401,7 +402,7 @@ export function CommitSeriesBuilder({
 						{validCommits} of {commits.length} commits ready
 					</div>
 					<div className="flex gap-2">
-						<Button variant="outline" onClick={() => onOpenChange(false)}>
+						<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button onClick={handleApply} disabled={validCommits === 0}>

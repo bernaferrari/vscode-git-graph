@@ -3,22 +3,6 @@
  * Visual editor for safe history rewriting
  */
 
-import { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from '@/components/ui/sheet';
 import {
 	GitBranch,
 	GitCommit,
@@ -42,6 +26,24 @@ import {
 	Collapse,
 	Expand,
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type RewriteOpType = 
@@ -289,7 +291,7 @@ export function RewritePlanEditor({
 					<Input
 						placeholder="Plan name..."
 						value={planName}
-						onChange={(e) => setPlanName(e.target.value)}
+						onChange={(e) => { setPlanName(e.target.value); }}
 						className="h-9"
 					/>
 				</div>
@@ -309,7 +311,7 @@ export function RewritePlanEditor({
 								{Object.entries(OP_CONFIG).map(([type, config]) => (
 									<DropdownMenuItem
 										key={type}
-										onClick={() => addOperation(type as RewriteOpType)}
+										onClick={() => { addOperation(type as RewriteOpType); }}
 									>
 										<config.icon className={cn('h-4 w-4 mr-2', config.color)} />
 										{config.label}
@@ -336,10 +338,10 @@ export function RewritePlanEditor({
 										op={op}
 										index={index}
 										total={operations.length}
-										onUpdate={(updates) => updateOperation(op.id, updates)}
-										onRemove={() => removeOperation(op.id)}
-										onMoveUp={() => moveOperation(op.id, 'up')}
-										onMoveDown={() => moveOperation(op.id, 'down')}
+										onUpdate={(updates) => { updateOperation(op.id, updates); }}
+										onRemove={() => { removeOperation(op.id); }}
+										onMoveUp={() => { moveOperation(op.id, 'up'); }}
+										onMoveDown={() => { moveOperation(op.id, 'down'); }}
 									/>
 								))}
 							</div>
@@ -472,14 +474,14 @@ function RewriteOpItem({
 						{op.type === 'reword' ? (
 							<Textarea
 								value={op.message}
-								onChange={(e) => onUpdate({ message: e.target.value })}
+								onChange={(e) => { onUpdate({ message: e.target.value }); }}
 								placeholder="New commit message..."
 								className="h-16 text-sm"
 							/>
 						) : op.type === 'cherry-pick' || op.type === 'move' ? (
 							<Input
 								value={op.target || ''}
-								onChange={(e) => onUpdate({ target: e.target.value })}
+								onChange={(e) => { onUpdate({ target: e.target.value }); }}
 								placeholder="Target branch..."
 								className="h-8 text-sm"
 							/>
@@ -510,4 +512,3 @@ function RewriteOpItem({
 }
 
 // Need to import DropdownMenu
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';

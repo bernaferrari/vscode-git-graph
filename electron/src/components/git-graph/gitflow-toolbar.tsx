@@ -3,11 +3,18 @@
  * Start/finish feature, release, hotfix branches
  */
 
+import {
+	GitBranch,
+	Play,
+	Flag,
+	Flame,
+	Check,
+	ChevronDown,
+	GitPullRequest,
+} from 'lucide-react';
 import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
 	Dialog,
 	DialogContent,
@@ -22,16 +29,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-	GitBranch,
-	Play,
-	Flag,
-	Flame,
-	Check,
-	ChevronDown,
-	GitPullRequest,
-} from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface GitFlowToolbarProps {
 	currentBranch: string;
@@ -136,12 +137,12 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						<DropdownMenuItem onClick={() => openDialog('feature', 'start')}>
+						<DropdownMenuItem onClick={() => { openDialog('feature', 'start'); }}>
 							<Play className="h-4 w-4 mr-2 text-blue-500" />
 							Start New Feature
 						</DropdownMenuItem>
 						{branchInfo?.type === 'feature' && (
-							<DropdownMenuItem onClick={() => openDialog('feature', 'finish')}>
+							<DropdownMenuItem onClick={() => { openDialog('feature', 'finish'); }}>
 								<Check className="h-4 w-4 mr-2 text-green-500" />
 								Finish Feature: {branchInfo.name}
 							</DropdownMenuItem>
@@ -159,12 +160,12 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						<DropdownMenuItem onClick={() => openDialog('release', 'start')}>
+						<DropdownMenuItem onClick={() => { openDialog('release', 'start'); }}>
 							<Play className="h-4 w-4 mr-2 text-green-500" />
 							Start New Release
 						</DropdownMenuItem>
 						{branchInfo?.type === 'release' && (
-							<DropdownMenuItem onClick={() => openDialog('release', 'finish')}>
+							<DropdownMenuItem onClick={() => { openDialog('release', 'finish'); }}>
 								<Check className="h-4 w-4 mr-2 text-green-500" />
 								Finish Release: {branchInfo.name}
 							</DropdownMenuItem>
@@ -182,12 +183,12 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
-						<DropdownMenuItem onClick={() => openDialog('hotfix', 'start')}>
+						<DropdownMenuItem onClick={() => { openDialog('hotfix', 'start'); }}>
 							<Play className="h-4 w-4 mr-2 text-red-500" />
 							Start New Hotfix
 						</DropdownMenuItem>
 						{branchInfo?.type === 'hotfix' && (
-							<DropdownMenuItem onClick={() => openDialog('hotfix', 'finish')}>
+							<DropdownMenuItem onClick={() => { openDialog('hotfix', 'finish'); }}>
 								<Check className="h-4 w-4 mr-2 text-green-500" />
 								Finish Hotfix: {branchInfo.name}
 							</DropdownMenuItem>
@@ -215,7 +216,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 							<Input
 								placeholder={`e.g., ${flowType === 'feature' ? 'user-authentication' : flowType === 'release' ? 'v1.2.0' : 'critical-bug'}`}
 								value={name}
-								onChange={(e) => setName(e.target.value)}
+								onChange={(e) => { setName(e.target.value); }}
 							/>
 						</div>
 						{action === 'finish' && (flowType === 'release' || flowType === 'hotfix') && (
@@ -226,7 +227,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 								<Input
 									placeholder="e.g., v1.2.0"
 									value={tagName}
-									onChange={(e) => setTagName(e.target.value)}
+									onChange={(e) => { setTagName(e.target.value); }}
 								/>
 							</div>
 						)}
@@ -237,7 +238,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 						</p>
 					</div>
 					<DialogFooter className="ui-toolbar">
-						<Button variant="outline" onClick={() => setDialogOpen(false)}>
+						<Button variant="outline" onClick={() => { setDialogOpen(false); }}>
 							Cancel
 						</Button>
 						<Button onClick={handleAction} disabled={!name.trim()}>

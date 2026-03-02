@@ -7,6 +7,7 @@
 import * as chokidar from 'chokidar';
 import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
+
 import { Disposable, toDisposable } from '../../../src/lib/utils/disposable';
 
 // Regex to match files that should trigger a refresh
@@ -89,12 +90,12 @@ export class RepoFileWatcher extends Disposable {
             },
         });
 
-        this.watcher.on('add', (path) => this.refresh(path));
-        this.watcher.on('change', (path) => this.refresh(path));
-        this.watcher.on('unlink', (path) => this.refresh(path));
-        this.watcher.on('addDir', (path) => this.refresh(path));
-        this.watcher.on('unlinkDir', (path) => this.refresh(path));
-        this.watcher.on('error', (error) => this.handleWatcherError(error));
+        this.watcher.on('add', (path) => { this.refresh(path); });
+        this.watcher.on('change', (path) => { this.refresh(path); });
+        this.watcher.on('unlink', (path) => { this.refresh(path); });
+        this.watcher.on('addDir', (path) => { this.refresh(path); });
+        this.watcher.on('unlinkDir', (path) => { this.refresh(path); });
+        this.watcher.on('error', (error) => { this.handleWatcherError(error); });
 
         this.registerDisposable(
             toDisposable(() => {

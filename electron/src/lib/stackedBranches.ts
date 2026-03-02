@@ -35,7 +35,7 @@ export const useStackedBranches = create<StackedBranchesState>()(
 			stacks: {},
 
 			addBranch: (repoPath, branch) => {
-				const id = `stack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+				const id = ['stack', String(Date.now()), Math.random().toString(36).slice(2, 11)].join('-');
 				set((state) => ({
 					stacks: {
 						...state.stacks,

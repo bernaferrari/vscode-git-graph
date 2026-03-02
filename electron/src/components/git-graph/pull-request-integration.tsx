@@ -3,16 +3,6 @@
  * Create, review, merge, and close PRs for supported providers.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     AlertCircle,
     Check,
@@ -22,13 +12,27 @@ import {
     Gitlab,
     Github,
     Loader2,
+    MessageSquare,
     Plus,
     RefreshCw,
     Save,
+    Send,
     Settings,
     X,
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 type PullRequestStateFilter = 'open' | 'closed' | 'all';
@@ -52,6 +56,15 @@ interface PullRequest {
 interface PRProvider {
     name: PullRequestProvider;
     host: string;
+}
+
+interface PullRequestComment {
+    id: string;
+    author: string;
+    body: string;
+    createdAt: string;
+    updatedAt: string;
+    url: string;
 }
 
 interface PullRequestIntegrationProps {
@@ -81,6 +94,8 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const [stateFilter, setStateFilter] = useState<PullRequestStateFilter>('open');
 
     const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
+    const [mergeMethod, setMergeMethod] = useState<'merge' | 'squash' | 'rebase'>('merge');
+    const [commentDraft, setCommentDraft] = useState('');
 
     const [prTitle, setPrTitle] = useState('');
     const [prBody, setPrBody] = useState('');
@@ -146,6 +161,17 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         },
         { enabled: !!activeRepo && open && activeTab === 'list' }
     );
+    const commentsQuery = trpc.git.listPullRequestComments.useQuery(
+        {
+            repo: activeRepo ?? '',
+            provider,
+            number: selectedPR?.number ?? 0,
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'list' && !!selectedPR,
+            staleTime: 5_000,
+        }
+    );
 
     const saveAuthMutation = trpc.git.setPullRequestAuth.useMutation({
         onSuccess: () => {
@@ -203,6 +229,20 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             toast.error('Close failed', { description: error.message });
         },
     });
+    const addCommentMutation = trpc.git.addPullRequestComment.useMutation({
+        onSuccess: async (result) => {
+            if (result.error) {
+                toast.error('Failed to add comment', { description: result.error });
+                return;
+            }
+            setCommentDraft('');
+            await commentsQuery.refetch();
+            toast.success('Comment posted');
+        },
+        onError: (error) => {
+            toast.error('Failed to add comment', { description: error.message });
+        },
+    });
 
     const resetCreateForm = () => {
         setPrTitle('');
@@ -242,7 +282,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             repo: activeRepo,
             provider,
             number: pr.number,
-            mergeMethod: 'merge',
+            mergeMethod,
         });
     };
 
@@ -258,6 +298,21 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const branches = (repoInfoData?.branches ?? []) as string[];
     const pullRequests = pullRequestQuery.data?.pullRequests ?? [];
     const queryError = pullRequestQuery.data?.error;
+    const comments = (commentsQuery.data?.comments ?? []) as PullRequestComment[];
+
+    const handleAddComment = () => {
+        if (!activeRepo || !selectedPR) return;
+        if (!commentDraft.trim()) {
+            toast.error('Comment cannot be empty');
+            return;
+        }
+        addCommentMutation.mutate({
+            repo: activeRepo,
+            provider,
+            number: selectedPR.number,
+            body: commentDraft.trim(),
+        });
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -277,7 +332,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
 
                 <Tabs
                     value={activeTab}
-                    onValueChange={(value) => setActiveTab(value as 'list' | 'create' | 'settings')}
+                    onValueChange={(value) => { setActiveTab(value as 'list' | 'create' | 'settings'); }}
                     className='flex min-h-0 flex-1 flex-col'>
                     <TabsList className='grid w-full grid-cols-3'>
                         <TabsTrigger value='list'>Pull Requests</TabsTrigger>
@@ -291,7 +346,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                 <div className='flex items-center gap-2'>
                                     <select
                                         value={stateFilter}
-                                        onChange={(event) => setStateFilter(event.target.value as PullRequestStateFilter)}
+                                        onChange={(event) => { setStateFilter(event.target.value as PullRequestStateFilter); }}
                                         className='bg-background h-8 rounded-md border px-2 text-xs'>
                                         <option value='open'>Open</option>
                                         <option value='closed'>Closed</option>
@@ -330,7 +385,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                         <p className='text-muted-foreground mt-1 text-sm'>
                                             Add a {provider} token in Settings to manage pull requests in-app.
                                         </p>
-                                        <Button variant='outline' size='sm' className='mt-4' onClick={() => setActiveTab('settings')}>
+                                        <Button variant='outline' size='sm' className='mt-4' onClick={() => { setActiveTab('settings'); }}>
                                             <Settings className='mr-2 h-4 w-4' />
                                             Open Settings
                                         </Button>
@@ -368,7 +423,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 className={`w-full rounded-lg border p-3 text-left transition-colors ${
                                                     selectedPR?.id === pr.id ? 'bg-accent border-primary/50' : 'hover:bg-accent/50'
                                                 }`}
-                                                onClick={() => setSelectedPR(pr)}>
+                                                onClick={() => { setSelectedPR(pr); }}>
                                                 <div className='flex items-start justify-between gap-2'>
                                                     <div className='min-w-0'>
                                                         <p className='truncate text-sm font-medium'>
@@ -407,6 +462,70 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                             <p>Branch: {selectedPR.head.ref} → {selectedPR.base.ref}</p>
                                             <p>State: {selectedPR.draft ? 'draft' : selectedPR.state}</p>
                                         </div>
+                                        {selectedPR.state === 'open' && (
+                                            <div>
+                                                <label className='mb-1 block text-xs font-medium text-muted-foreground'>
+                                                    Merge Method
+                                                </label>
+                                                <select
+                                                    value={mergeMethod}
+                                                    onChange={(event) =>
+                                                        { setMergeMethod(event.target.value as 'merge' | 'squash' | 'rebase'); }
+                                                    }
+                                                    className='bg-background h-8 w-full rounded-md border px-2 text-xs'>
+                                                    <option value='merge'>Merge commit</option>
+                                                    <option value='squash'>Squash</option>
+                                                    <option value='rebase'>Rebase</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div className='space-y-2 rounded border p-2'>
+                                            <div className='flex items-center gap-1 text-xs font-medium text-muted-foreground'>
+                                                <MessageSquare className='h-3.5 w-3.5' />
+                                                Comments
+                                                <Badge variant='outline' className='ml-auto h-5 px-1.5 text-[10px]'>
+                                                    {comments.length}
+                                                </Badge>
+                                            </div>
+                                            <ScrollArea className='h-28'>
+                                                <div className='space-y-2 pr-2'>
+                                                    {commentsQuery.isFetching ? (
+                                                        <p className='text-xs text-muted-foreground'>Loading comments...</p>
+                                                    ) : comments.length === 0 ? (
+                                                        <p className='text-xs text-muted-foreground'>No comments yet.</p>
+                                                    ) : (
+                                                        comments.map((comment) => (
+                                                            <div key={comment.id} className='rounded border p-1.5'>
+                                                                <p className='text-[11px] font-medium'>
+                                                                    {comment.author || 'unknown'}
+                                                                </p>
+                                                                <p className='mt-0.5 whitespace-pre-wrap text-[11px] text-muted-foreground'>
+                                                                    {comment.body}
+                                                                </p>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </ScrollArea>
+                                            <Textarea
+                                                value={commentDraft}
+                                                onChange={(event) => { setCommentDraft(event.target.value); }}
+                                                placeholder='Add a comment'
+                                                className='min-h-[64px] text-xs'
+                                            />
+                                            <Button
+                                                size='sm'
+                                                className='w-full'
+                                                onClick={handleAddComment}
+                                                disabled={addCommentMutation.isPending || !commentDraft.trim()}>
+                                                {addCommentMutation.isPending ? (
+                                                    <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' />
+                                                ) : (
+                                                    <Send className='mr-2 h-3.5 w-3.5' />
+                                                )}
+                                                Post Comment
+                                            </Button>
+                                        </div>
                                     </div>
                                     <div className='mt-auto flex flex-wrap gap-2 border-t p-3'>
                                         <Button
@@ -420,7 +539,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                             <>
                                                 <Button
                                                     size='sm'
-                                                    onClick={() => handleMergePR(selectedPR)}
+                                                    onClick={() => { handleMergePR(selectedPR); }}
                                                     disabled={mergePRMutation.isPending || closePRMutation.isPending}>
                                                     {mergePRMutation.isPending ? (
                                                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -432,7 +551,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 <Button
                                                     variant='destructive'
                                                     size='sm'
-                                                    onClick={() => handleClosePR(selectedPR)}
+                                                    onClick={() => { handleClosePR(selectedPR); }}
                                                     disabled={mergePRMutation.isPending || closePRMutation.isPending}>
                                                     {closePRMutation.isPending ? (
                                                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -462,7 +581,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                         <select
                                             className='bg-background h-9 w-full rounded-md border px-3 text-sm'
                                             value={prHead}
-                                            onChange={(event) => setPrHead(event.target.value)}>
+                                            onChange={(event) => { setPrHead(event.target.value); }}>
                                             <option value=''>Select branch</option>
                                             {branches.map((branchName) => (
                                                 <option key={branchName} value={branchName}>
@@ -476,7 +595,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                         <select
                                             className='bg-background h-9 w-full rounded-md border px-3 text-sm'
                                             value={prBase}
-                                            onChange={(event) => setPrBase(event.target.value)}>
+                                            onChange={(event) => { setPrBase(event.target.value); }}>
                                             {branches.length > 0 ? (
                                                 branches.map((branchName) => (
                                                     <option key={branchName} value={branchName}>
@@ -495,7 +614,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                     <Input
                                         placeholder='Add a title for your pull request'
                                         value={prTitle}
-                                        onChange={(event) => setPrTitle(event.target.value)}
+                                        onChange={(event) => { setPrTitle(event.target.value); }}
                                     />
                                 </div>
 
@@ -504,7 +623,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                     <Textarea
                                         placeholder='Describe your changes'
                                         value={prBody}
-                                        onChange={(event) => setPrBody(event.target.value)}
+                                        onChange={(event) => { setPrBody(event.target.value); }}
                                         className='min-h-[150px]'
                                     />
                                 </div>
@@ -514,7 +633,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                         type='checkbox'
                                         className='rounded'
                                         checked={prDraft}
-                                        onChange={(event) => setPrDraft(event.target.checked)}
+                                        onChange={(event) => { setPrDraft(event.target.checked); }}
                                     />
                                     Create as draft
                                 </label>
@@ -551,29 +670,29 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                 <AuthField
                                     label='GitHub Token'
                                     value={authForm.githubToken}
-                                    onChange={(value) => setAuthForm((current) => ({ ...current, githubToken: value }))}
+                                    onChange={(value) => { setAuthForm((current) => ({ ...current, githubToken: value })); }}
                                 />
                                 <AuthField
                                     label='GitLab Token'
                                     value={authForm.gitlabToken}
-                                    onChange={(value) => setAuthForm((current) => ({ ...current, gitlabToken: value }))}
+                                    onChange={(value) => { setAuthForm((current) => ({ ...current, gitlabToken: value })); }}
                                 />
                                 <AuthField
                                     label='Bitbucket Token'
                                     value={authForm.bitbucketToken}
-                                    onChange={(value) => setAuthForm((current) => ({ ...current, bitbucketToken: value }))}
+                                    onChange={(value) => { setAuthForm((current) => ({ ...current, bitbucketToken: value })); }}
                                 />
                                 <AuthField
                                     label='Bitbucket Username'
                                     value={authForm.bitbucketUsername}
                                     onChange={(value) =>
-                                        setAuthForm((current) => ({ ...current, bitbucketUsername: value }))
+                                        { setAuthForm((current) => ({ ...current, bitbucketUsername: value })); }
                                     }
                                 />
                                 <AuthField
                                     label='Azure DevOps PAT'
                                     value={authForm.azureToken}
-                                    onChange={(value) => setAuthForm((current) => ({ ...current, azureToken: value }))}
+                                    onChange={(value) => { setAuthForm((current) => ({ ...current, azureToken: value })); }}
                                 />
                             </div>
 
@@ -614,7 +733,7 @@ function AuthField({
     return (
         <div>
             <label className='mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground'>{label}</label>
-            <Input type='password' value={value} onChange={(event) => onChange(event.target.value)} />
+            <Input type='password' value={value} onChange={(event) => { onChange(event.target.value); }} />
         </div>
     );
 }

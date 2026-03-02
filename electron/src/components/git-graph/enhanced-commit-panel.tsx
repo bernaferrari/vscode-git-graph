@@ -3,17 +3,7 @@
  * Better file preview, diff stats, and commit actions
  */
 
-import { useState, useMemo } from 'react';
 import { PatchDiff } from '@pierre/diffs/react';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import {
 	GitCommit,
 	ChevronRight,
@@ -33,7 +23,18 @@ import {
 	Hash,
 	Mail,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
 import { InlineBlame } from './inline-blame';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 
 interface FileChange {
 	path: string;
@@ -106,7 +107,7 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 	const handleCopyHash = () => {
 		navigator.clipboard.writeText(commit.hash);
 		setCopiedHash(commit.hash);
-		setTimeout(() => setCopiedHash(null), 2000);
+		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};
 
 	const toggleFile = (path: string) => {
@@ -248,7 +249,7 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 								<Collapsible
 									key={file.path}
 									open={expandedFiles.has(file.path)}
-									onOpenChange={() => toggleFile(file.path)}
+									onOpenChange={() => { toggleFile(file.path); }}
 								>
 									<CollapsibleTrigger className="w-full">
 										<div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer group">

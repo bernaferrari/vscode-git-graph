@@ -3,9 +3,10 @@
  * Provides real-time file change notifications to the renderer
  */
 
-import { z } from 'zod';
-import { publicProcedure, router } from '../../init';
 import { observable } from '@trpc/server/observable';
+import { z } from 'zod';
+
+import { publicProcedure, router } from '../../init';
 
 // Simple event emitter for file changes
 type ChangeListener = (repo: string) => void;
@@ -30,6 +31,7 @@ export const watcherRouter = router({
 	 */
 	onChange: publicProcedure
 		.input(z.object({ repo: z.string() }))
+		// eslint-disable-next-line @typescript-eslint/no-deprecated
 		.subscription(({ input }) => {
 			return observable<string>((emit) => {
 				const handler: ChangeListener = (changedRepo) => {

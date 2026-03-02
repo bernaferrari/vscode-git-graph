@@ -3,18 +3,19 @@
  * Tooltip with commit info when hovering over lines in diff
  */
 
+import { GitCommit, Calendar, Copy, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { cn } from '@/lib/utils';
+
+import { Avatar } from './avatar';
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Avatar } from './avatar';
-import { GitCommit, Calendar, Copy, Check } from 'lucide-react';
 import { parseGitBlame } from '@/lib/git-blame-utils';
+import { useAppStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
+import { trpc } from '@/trpc/client';
 
 interface BlameInfo {
 	hash: string;
@@ -112,7 +113,7 @@ export function BlameOnHover({
 		if (blameInfo?.hash) {
 			navigator.clipboard.writeText(blameInfo.hash);
 			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
+			setTimeout(() => { setCopied(false); }, 2000);
 		}
 	}, [blameInfo?.hash]);
 

@@ -4,9 +4,10 @@
  * Provides logging for the Electron application
  */
 
+import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+
 import { Disposable, toDisposable } from '../../../src/lib/utils/disposable';
 
 const DOUBLE_QUOTE_REGEXP = /"/g;
@@ -92,16 +93,16 @@ export class Logger extends Disposable {
 		const minutes = pad2(date.getMinutes());
 		const seconds = pad2(date.getSeconds());
 		const ms = pad3(date.getMilliseconds());
-		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
+		return `${String(year)}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
 	}
 }
 
 function pad2(n: number): string {
-	return (n > 9 ? '' : '0') + n;
+	return `${n > 9 ? '' : '0'}${String(n)}`;
 }
 
 function pad3(n: number): string {
-	return (n > 99 ? '' : n > 9 ? '0' : '00') + n;
+	return `${n > 99 ? '' : n > 9 ? '0' : '00'}${String(n)}`;
 }
 
 // Singleton instance

@@ -60,6 +60,15 @@ export interface LinearUser {
 	avatarUrl: string;
 }
 
+interface LinearGraphQLError {
+	message: string;
+}
+
+interface LinearGraphQLResponse<T> {
+	data?: T;
+	errors?: LinearGraphQLError[];
+}
+
 // GraphQL queries
 const QUERIES = {
 	// Get current user
@@ -233,13 +242,17 @@ export class LinearClient {
 		});
 
 		if (!response.ok) {
-			throw new Error(`Linear API error: ${response.status} ${response.statusText}`);
+			throw new Error(`Linear API error: ${String(response.status)} ${response.statusText}`);
 		}
 
-		const result = await response.json();
+		const result = await response.json() as LinearGraphQLResponse<T>;
 
-		if (result.errors) {
-			throw new Error(`Linear API error: ${result.errors[0].message}`);
+		if (result.errors && result.errors.length > 0) {
+			throw new Error(`Linear API error: ${result.errors[0]?.message ?? 'Unknown error'}`);
+		}
+
+		if (result.data === undefined) {
+			throw new Error('Linear API error: Missing response data');
 		}
 
 		return result.data;

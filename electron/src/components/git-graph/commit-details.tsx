@@ -3,18 +3,6 @@
  * Shows detailed information about a selected commit
  */
 
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { getGravatarUrl } from '@/lib/gravatar';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     X,
     GitBranch,
@@ -31,7 +19,21 @@ import {
     History,
 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
+
+import { CIStatusPanel } from './ci-status';
 import { FileHistory } from './file-history';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { getGravatarUrl } from '@/lib/gravatar';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 const LazySideBySideDiff = lazy(() => import('./side-by-side-diff').then((mod) => ({ default: mod.SideBySideDiff })));
 const LazyImageDiff = lazy(() => import('./image-diff').then((mod) => ({ default: mod.ImageDiff })));
@@ -169,7 +171,7 @@ export function CommitDetailsPanel({
                         variant='ghost'
                         size='sm'
                         className='hover:bg-accent h-6 w-6 rounded-md p-0'
-                        onClick={() => copyToClipboard(details.hash)}
+                        onClick={() => { copyToClipboard(details.hash); }}
                         title='Copy full SHA'>
                         <Copy className='h-3 w-3' />
                     </Button>
@@ -262,6 +264,9 @@ export function CommitDetailsPanel({
                         </div>
                     )}
 
+                    {/* CI/CD */}
+                    <CIStatusPanel commitHash={details.hash} repo={activeRepo ?? undefined} />
+
                     {/* File Changes */}
                     <div className='space-y-2'>
                         <div className='flex items-center justify-between'>
@@ -295,7 +300,7 @@ export function CommitDetailsPanel({
                                             ? 'bg-accent border-primary/35 shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
                                             : 'hover:bg-accent/45'
                                     }`}
-                                    onClick={() => handleFileClick(file.newFilePath)}>
+                                    onClick={() => { handleFileClick(file.newFilePath); }}>
                                     {/* Change type icon */}
                                     <FileChangeIcon type={file.type} />
                                     <span
@@ -332,16 +337,16 @@ export function CommitDetailsPanel({
                                                     ? 'opacity-100'
                                                     : 'opacity-0 group-hover:opacity-100'
                                             }`}
-                                            onClick={(e) => e.stopPropagation()}>
+                                            onClick={(e) => { e.stopPropagation(); }}>
                                             <MoreHorizontal className='h-3 w-3' />
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align='end' className='w-48'>
-                                            <DropdownMenuItem onClick={() => copyToClipboard(file.newFilePath)}>
+                                            <DropdownMenuItem onClick={() => { copyToClipboard(file.newFilePath); }}>
                                                 <Copy className='mr-2 h-4 w-4' />
                                                 Copy path
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleViewHistory(file.newFilePath)}>
+                                            <DropdownMenuItem onClick={() => { handleViewHistory(file.newFilePath); }}>
                                                 <History className='mr-2 h-4 w-4' />
                                                 View History
                                             </DropdownMenuItem>
@@ -371,7 +376,7 @@ export function CommitDetailsPanel({
                                 variant='ghost'
                                 size='sm'
                                 className='h-6 w-6 p-0'
-                                onClick={() => setShowDiff(false)}>
+                                onClick={() => { setShowDiff(false); }}>
                                 <X className='h-4 w-4' />
                             </Button>
                             <span className='max-w-[200px] truncate text-sm font-medium'>{selectedFile}</span>
@@ -419,7 +424,7 @@ export function CommitDetailsPanel({
                                 variant='ghost'
                                 size='sm'
                                 className='h-6 w-6 p-0'
-                                onClick={() => setShowFileHistory(false)}>
+                                onClick={() => { setShowFileHistory(false); }}>
                                 <X className='h-4 w-4' />
                             </Button>
                             <span className='max-w-[200px] truncate text-sm font-medium'>{historyFile}</span>

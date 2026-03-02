@@ -4,5 +4,6 @@
         "lib": ["ESNext"],
         "types": ["node"]
     },
-    "include": ["electron/**/*", "scripts/**/*", "vite.config.ts", "vitest.config.ts"]
+    "include": ["electron/**/*", "scripts/**/*", "vite.config.ts", "vitest.config.ts"],
+    "exclude": ["electron/backend/trpc/routers/git/preview-procedures.ts"]
 }

@@ -109,10 +109,10 @@ async function findGitOnWin32(): Promise<GitExecutable> {
 		() => findSystemGitWin32(process.env['ProgramW6432']),
 		() => findSystemGitWin32(process.env['ProgramFiles(x86)']),
 		() => findSystemGitWin32(process.env['ProgramFiles']),
-		() =>
-			process.env['LocalAppData']
-				? findSystemGitWin32(path.join(process.env['LocalAppData'], 'Programs'))
-				: Promise.reject(),
+			() =>
+				process.env['LocalAppData']
+					? findSystemGitWin32(path.join(process.env['LocalAppData'], 'Programs'))
+					: Promise.reject(new Error('LocalAppData is not set')),
 		() => findGitWin32InPath(),
 	];
 
@@ -207,13 +207,15 @@ function resolveSpawnOutput(cmd: cp.ChildProcess): Promise<
 		new Promise<Buffer>((resolve) => {
 			const buffers: Buffer[] = [];
 			cmd.stdout?.on('data', (b: Buffer) => buffers.push(b));
-			cmd.stdout?.on('close', () => resolve(Buffer.concat(buffers)));
+			cmd.stdout?.on('close', () => { resolve(Buffer.concat(buffers)); });
 		}),
-		new Promise<string>((resolve) => {
-			let stderr = '';
-			cmd.stderr?.on('data', (d) => (stderr += d));
-			cmd.stderr?.on('close', () => resolve(stderr));
-		}),
+			new Promise<string>((resolve) => {
+				let stderr = '';
+				cmd.stderr?.on('data', (d: Buffer | string) => {
+					stderr += Buffer.isBuffer(d) ? d.toString('utf8') : d;
+				});
+				cmd.stderr?.on('close', () => { resolve(stderr); });
+			}),
 	]);
 }
 

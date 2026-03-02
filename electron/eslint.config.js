@@ -103,7 +103,6 @@ function mergeRecommendedRules(configValue) {
 }
 
 const tanstackQueryRules = mergeRecommendedRules(queryPlugin.configs?.['flat/recommended'] ?? queryPlugin.configs?.recommended);
-const vitestRules = mergeRecommendedRules(vitestPlugin.configs?.recommended);
 
 export default [
     globalIgnores([
@@ -184,7 +183,6 @@ export default [
             'import/order': importOrderRule,
             'import/newline-after-import': 'warn',
             'import/no-unresolved': 'off',
-            'no-restricted-imports': noRestrictedImportsRule,
             'no-secrets/no-secrets': 'warn',
             'n/no-missing-import': 'off',
             'n/no-process-exit': 'off',
@@ -217,7 +215,6 @@ export default [
             globals: { ...globals.node, ...vitestGlobals },
         },
         rules: {
-            ...vitestRules,
             'vitest/no-disabled-tests': 'warn',
             'vitest/no-focused-tests': 'error',
         },

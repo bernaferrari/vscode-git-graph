@@ -65,7 +65,7 @@ export const useOperationLog = create<OperationLogState>()(
             maxOperations: 100,
 
             addOperation: (operation) => {
-                const id = `op-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const id = ['op', String(Date.now()), Math.random().toString(36).slice(2, 11)].join('-');
                 const receipt: OperationReceipt = {
                     ...operation,
                     id,
@@ -114,7 +114,7 @@ export const useOperationLog = create<OperationLogState>()(
 export function formatOperationDescription(receipt: OperationReceipt): string {
     switch (receipt.type) {
         case 'commit':
-            return `Committed ${receipt.affectedCommits.length} change(s)`;
+            return `Committed ${String(receipt.affectedCommits.length)} change(s)`;
         case 'rebase':
             return `Rebased onto ${receipt.details}`;
         case 'merge':

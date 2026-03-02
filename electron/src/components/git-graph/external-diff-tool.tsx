@@ -3,29 +3,6 @@
  * Support for opening diffs in external tools like VSCode, Beyond Compare, etc.
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-import {
-	Switch,
-} from '@/components/ui/switch';
 import {
 	ExternalLink,
 	Settings,
@@ -37,7 +14,32 @@ import {
 	FolderOpen,
 	Terminal,
 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import {
+	Switch,
+} from '@/components/ui/switch';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 // Predefined diff tools
 interface DiffTool {
@@ -337,7 +339,7 @@ export function ExternalDiffConfig({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => setIsAddingCustom(!isAddingCustom)}
+								onClick={() => { setIsAddingCustom(!isAddingCustom); }}
 							>
 								<Plus className="h-4 w-4 mr-1" />
 								Add Custom
@@ -349,23 +351,23 @@ export function ExternalDiffConfig({
 								<Input
 									placeholder="Tool name"
 									value={customTool.name || ''}
-									onChange={e => setCustomTool(prev => ({ ...prev, name: e.target.value }))}
+									onChange={e => { setCustomTool(prev => ({ ...prev, name: e.target.value })); }}
 								/>
 								<Input
 									placeholder="Command (e.g., code, bcompare)"
 									value={customTool.command || ''}
-									onChange={e => setCustomTool(prev => ({ ...prev, command: e.target.value }))}
+									onChange={e => { setCustomTool(prev => ({ ...prev, command: e.target.value })); }}
 								/>
 								<Input
 									placeholder="Arguments (use $LOCAL, $REMOTE, $BASE, $MERGED)"
 									value={customTool.args || ''}
-									onChange={e => setCustomTool(prev => ({ ...prev, args: e.target.value }))}
+									onChange={e => { setCustomTool(prev => ({ ...prev, args: e.target.value })); }}
 								/>
 								<div className="flex justify-end gap-2">
 									<Button
 										variant="ghost"
 										size="sm"
-										onClick={() => setIsAddingCustom(false)}
+										onClick={() => { setIsAddingCustom(false); }}
 									>
 										Cancel
 									</Button>
@@ -393,7 +395,7 @@ export function ExternalDiffConfig({
 											variant="ghost"
 											size="sm"
 											className="h-7 w-7 p-0 text-red-600"
-											onClick={() => handleDeleteTool(tool.id)}
+											onClick={() => { handleDeleteTool(tool.id); }}
 										>
 											<Trash2 className="h-4 w-4" />
 										</Button>
@@ -421,7 +423,7 @@ export function ExternalDiffConfig({
 				</div>
 
 				<DialogFooter className="ui-toolbar">
-					<Button variant="ghost" onClick={() => onOpenChange(false)}>
+					<Button variant="ghost" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</DialogFooter>

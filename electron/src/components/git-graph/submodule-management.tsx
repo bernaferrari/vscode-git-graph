@@ -3,19 +3,6 @@
  * Add, update, and manage git submodules
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Package,
 	Plus,
@@ -29,7 +16,22 @@ import {
 	Download,
 	Upload,
 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface Submodule {
 	name: string;
@@ -170,7 +172,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 						)}
 						<Button
 							size="sm"
-							onClick={() => setIsAdding(!isAdding)}
+							onClick={() => { setIsAdding(!isAdding); }}
 						>
 							<Plus className="h-4 w-4 mr-1" />
 							Add Submodule
@@ -186,21 +188,21 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 							<Input
 								placeholder="Repository URL (e.g., https://github.com/user/repo)"
 								value={newSubmodule.url}
-								onChange={(e) => setNewSubmodule(prev => ({ ...prev, url: e.target.value }))}
+								onChange={(e) => { setNewSubmodule(prev => ({ ...prev, url: e.target.value })); }}
 							/>
 							<Input
 								placeholder="Local path (e.g., lib/my-module)"
 								value={newSubmodule.path}
-								onChange={(e) => setNewSubmodule(prev => ({ ...prev, path: e.target.value }))}
+								onChange={(e) => { setNewSubmodule(prev => ({ ...prev, path: e.target.value })); }}
 							/>
 							<Input
 								placeholder="Branch (optional, defaults to default branch)"
 								value={newSubmodule.branch}
-								onChange={(e) => setNewSubmodule(prev => ({ ...prev, branch: e.target.value }))}
+								onChange={(e) => { setNewSubmodule(prev => ({ ...prev, branch: e.target.value })); }}
 							/>
 						</div>
 						<div className="flex justify-end gap-2">
-							<Button variant="outline" size="sm" onClick={() => setIsAdding(false)}>
+							<Button variant="outline" size="sm" onClick={() => { setIsAdding(false); }}>
 								Cancel
 							</Button>
 							<Button
@@ -277,7 +279,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 										<Button
 											variant="ghost"
 											size="sm"
-											onClick={() => handleSyncSubmodule(sm.path)}
+											onClick={() => { handleSyncSubmodule(sm.path); }}
 											disabled={syncMutation.isPending}
 										>
 											<RefreshCw className="h-4 w-4" />
@@ -285,7 +287,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 										<Button
 											variant="ghost"
 											size="sm"
-											onClick={() => handleUpdateSubmodule(sm.path)}
+											onClick={() => { handleUpdateSubmodule(sm.path); }}
 											disabled={updateMutation.isPending}
 										>
 											<Download className="h-4 w-4" />
@@ -294,7 +296,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 											variant="ghost"
 											size="sm"
 											className="text-red-600"
-											onClick={() => handleRemoveSubmodule(sm.path)}
+											onClick={() => { handleRemoveSubmodule(sm.path); }}
 											disabled={removeMutation.isPending}
 										>
 											<Trash2 className="h-4 w-4" />

@@ -7,6 +7,8 @@
 import { useLensStore, type LensMode, type LensConfig, LENS_CONFIGS } from '@/lib/lensStore';
 import { useMemo, useCallback } from 'react';
 
+export type { LensMode, LensConfig };
+
 export function useLensMode() {
 	const { mode, setMode } = useLensStore();
 

@@ -3,15 +3,16 @@
  * GitHub-style contribution calendar showing commit activity
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Activity, Calendar, TrendingUp, ChevronLeft, ChevronRight, Users, GitCommit, Loader2 } from 'lucide-react';
 import { format, subDays, eachDayOfInterval, getDay } from 'date-fns';
+import { Activity, Calendar, TrendingUp, ChevronLeft, ChevronRight, Users, GitCommit, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface DayActivity {
     date: Date;
@@ -98,7 +99,7 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
         let totalCommits = 0;
         let activeDays = 0;
         let maxCommits = 0;
-        let totalAuthors = new Set<string>();
+        const totalAuthors = new Set<string>();
         let currentStreak = 0;
         let longestStreak = 0;
         let tempStreak = 0;
@@ -211,14 +212,14 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
                         <Activity className='h-5 w-5' />
                         Activity Heatmap
                         <div className='ml-auto flex items-center gap-2'>
-                            <Button variant='ghost' size='sm' onClick={() => setYear(year - 1)}>
+                            <Button variant='ghost' size='sm' onClick={() => { setYear(year - 1); }}>
                                 <ChevronLeft className='h-4 w-4' />
                             </Button>
                             <span className='w-16 text-center text-lg font-bold'>{year}</span>
                             <Button
                                 variant='ghost'
                                 size='sm'
-                                onClick={() => setYear(Math.min(year + 1, new Date().getFullYear()))}
+                                onClick={() => { setYear(Math.min(year + 1, new Date().getFullYear())); }}
                                 disabled={year >= new Date().getFullYear()}>
                                 <ChevronRight className='h-4 w-4' />
                             </Button>
@@ -351,7 +352,7 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
                             </Badge>
                         )}
                     </div>
-                    <Button variant='ghost' onClick={() => onOpenChange(false)}>
+                    <Button variant='ghost' onClick={() => { onOpenChange(false); }}>
                         Close
                     </Button>
                 </div>

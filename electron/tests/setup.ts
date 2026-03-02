@@ -70,21 +70,37 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-	observe: vi.fn(),
-	unobserve: vi.fn(),
-	disconnect: vi.fn(),
-}));
+class MockResizeObserver {
+	observe = vi.fn();
+	unobserve = vi.fn();
+	disconnect = vi.fn();
+}
+Object.defineProperty(globalThis, 'ResizeObserver', {
+	writable: true,
+	value: MockResizeObserver,
+});
 
 // Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-	observe: vi.fn(),
-	unobserve: vi.fn(),
-	disconnect: vi.fn(),
-}));
+class MockIntersectionObserver {
+	observe = vi.fn();
+	unobserve = vi.fn();
+	disconnect = vi.fn();
+}
+Object.defineProperty(globalThis, 'IntersectionObserver', {
+	writable: true,
+	value: MockIntersectionObserver,
+});
 
 // Mock HTMLCanvasElement.getContext
 HTMLCanvasElement.prototype.getContext = vi.fn(() => null);
+
+// Base UI scroll-area expects getAnimations in test DOM.
+if (!Element.prototype.getAnimations) {
+	Object.defineProperty(Element.prototype, 'getAnimations', {
+		configurable: true,
+		value: vi.fn(() => []),
+	});
+}
 
 // Mock localStorage
 const localStorageMock = {

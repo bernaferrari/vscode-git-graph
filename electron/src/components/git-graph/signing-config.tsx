@@ -37,6 +37,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 	const [signingMethod, setSigningMethod] = useState<'gpg' | 'ssh'>('gpg');
 	const [signingKey, setSigningKey] = useState('');
 	const [gpgProgram, setGpgProgram] = useState('');
+	const [allowedSignersFile, setAllowedSignersFile] = useState('');
 
 	useEffect(() => {
 		if (signingStatus) {
@@ -44,6 +45,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 			setSigningMethod((signingStatus.method as 'gpg' | 'ssh') ?? 'gpg');
 			setSigningKey(signingStatus.key ?? '');
 			setGpgProgram(signingStatus.gpgProgram ?? '');
+			setAllowedSignersFile(signingStatus.allowedSignersFile ?? '');
 		}
 	}, [signingStatus]);
 
@@ -54,11 +56,15 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 			method: signingMethod,
 			key: signingKey || undefined,
 			gpgProgram: gpgProgram || undefined,
+			allowedSignersFile: signingMethod === 'ssh' ? allowedSignersFile || undefined : undefined,
 			global,
 		});
 	};
 
 	const gpgKeys = signingStatus?.gpgKeys ?? [];
+	const sshKeys = signingStatus?.sshKeys ?? [];
+	const hasSigningKey = signingKey.trim().length > 0;
+	const canSave = !signingEnabled || hasSigningKey;
 
 	return (
 		<Card>
@@ -144,15 +150,53 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 
 						{/* SSH specific options */}
 						{signingMethod === 'ssh' && (
-							<div className="space-y-2">
-								<Label className="text-xs">SSH Public Key Path</Label>
-								<Input
-									value={signingKey}
-									onChange={(e) => setSigningKey(e.target.value)}
-									placeholder="~/.ssh/id_ed25519.pub"
-									className="h-8"
-								/>
-							</div>
+							<>
+								{sshKeys.length > 0 && (
+									<div className="space-y-2">
+										<Label className="text-xs">Discovered SSH Public Keys</Label>
+										<Select
+											value={signingKey}
+											onValueChange={(v) => v && setSigningKey(v)}
+										>
+											<SelectTrigger className="h-8">
+												<SelectValue placeholder="Select an SSH key..." />
+											</SelectTrigger>
+											<SelectContent>
+												{sshKeys.map((key: { path: string; fileName: string; algorithm: string; comment?: string | null; fingerprint?: string | null }) => (
+													<SelectItem key={key.path} value={key.path}>
+														{key.fileName} ({key.algorithm})
+														{key.comment ? ` - ${key.comment}` : ''}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								)}
+
+								<div className="space-y-2">
+									<Label className="text-xs">SSH Public Key Path</Label>
+									<Input
+										value={signingKey}
+										onChange={(e) => setSigningKey(e.target.value)}
+										placeholder="~/.ssh/id_ed25519.pub"
+										className="h-8"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label className="text-xs">Allowed Signers File (optional)</Label>
+									<Input
+										value={allowedSignersFile}
+										onChange={(e) => setAllowedSignersFile(e.target.value)}
+										placeholder="~/.config/git/allowed_signers"
+										className="h-8"
+									/>
+								</div>
+
+								<p className="text-xs text-muted-foreground">
+									Use an allowed signers file to verify SSH-signed commits locally.
+								</p>
+							</>
 						)}
 					</>
 				)}
@@ -162,7 +206,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 					<Button
 						size="sm"
 						onClick={() => handleSave(false)}
-						disabled={setSigningMutation.isPending}
+						disabled={setSigningMutation.isPending || !canSave}
 					>
 						Save for Repo
 					</Button>
@@ -170,11 +214,19 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 						variant="outline"
 						size="sm"
 						onClick={() => handleSave(true)}
-						disabled={setSigningMutation.isPending}
+						disabled={setSigningMutation.isPending || !canSave}
 					>
 						Save Global
 					</Button>
 				</div>
+
+				{signingEnabled && !hasSigningKey && (
+					<Alert variant="destructive">
+						<AlertDescription className="text-xs">
+							A signing key is required while commit signing is enabled.
+						</AlertDescription>
+					</Alert>
+				)}
 
 				{signingStatus?.error && (
 					<Alert variant="destructive">

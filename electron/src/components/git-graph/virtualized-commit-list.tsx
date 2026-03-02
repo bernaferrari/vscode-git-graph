@@ -7,6 +7,7 @@ import { useRef, useCallback, memo, useMemo, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { GraphLayout } from '@/lib/graph/layout';
 import { getGravatarUrl } from '@/lib/gravatar';
+import { CIStatusMini } from './ci-status';
 
 // Minimal commit type for display
 interface DisplayCommit {
@@ -40,6 +41,7 @@ interface VirtualizedCommitListProps {
     hideRefs?: boolean;
     estimatedRowHeight?: number;
     overscan?: number;
+    repo?: string;
 }
 
 // Row height - must match graph grid Y spacing
@@ -110,6 +112,7 @@ const CommitRow = memo(function CommitRow({
     onContextMenu,
     showAvatar,
     hideRefs,
+    repo,
 }: {
     commit: DisplayCommit;
     heads: string[];
@@ -123,6 +126,7 @@ const CommitRow = memo(function CommitRow({
     onContextMenu?: (e: React.MouseEvent) => void;
     showAvatar: boolean;
     hideRefs: boolean;
+    repo?: string;
 }) {
     const isUncommitted = commit.hash === '*';
     const parsed = useMemo(() => parseCommitMessage(commit.message), [commit.message]);
@@ -221,6 +225,7 @@ const CommitRow = memo(function CommitRow({
                         isSelected ? 'opacity-100' : 'opacity-45 group-hover:opacity-85'
                     }`}>
                     <span className='w-24 truncate font-medium'>{commit.author}</span>
+                    <CIStatusMini commitHash={commit.hash} repo={repo} />
                     <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
                         {commit.hash.slice(0, 7)}
                     </span>
@@ -297,6 +302,7 @@ export function VirtualizedCommitList({
     showAvatars = false,
     hideRefs = false,
     overscan = 10,
+    repo,
 }: VirtualizedCommitListProps) {
     const parentRef = useRef<HTMLDivElement>(null);
     const visibleRangeRef = useRef<{ start: number; end: number } | null>(null);
@@ -401,6 +407,7 @@ export function VirtualizedCommitList({
                                 }
                                 showAvatar={showAvatars}
                                 hideRefs={hideRefs}
+                                repo={repo}
                                 {...(onContextMenu
                                     ? { onContextMenu: (e: React.MouseEvent) => onContextMenu(virtualRow.index, e) }
                                     : {})}

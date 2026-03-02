@@ -29,6 +29,15 @@ export interface PullRequestRecord {
 	webUrl: string;
 }
 
+export interface PullRequestComment {
+	id: string;
+	author: string;
+	body: string;
+	createdAt: string;
+	updatedAt: string;
+	url: string;
+}
+
 export interface ProviderAuthConfig {
 	githubToken?: string;
 	gitlabToken?: string;
@@ -226,7 +235,7 @@ function extractErrorMessage(payload: unknown): string | null {
 	}
 
 	if (Array.isArray(payload)) {
-		const first = payload[0];
+		const first = (payload as unknown[])[0];
 		return typeof first === 'string' ? first : null;
 	}
 
@@ -245,7 +254,7 @@ function extractErrorMessage(payload: unknown): string | null {
 }
 
 async function requestJson<T>(url: string, options: RequestJsonOptions = {}): Promise<T> {
-	const response = await fetch(url, {
+	const requestInit: RequestInit = {
 		method: options.method ?? 'GET',
 		headers: {
 			Accept: 'application/json',
@@ -253,8 +262,12 @@ async function requestJson<T>(url: string, options: RequestJsonOptions = {}): Pr
 			'User-Agent': 'vscode-git-graph-electron',
 			...(options.headers ?? {}),
 		},
-		body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-	});
+	};
+	if (options.body !== undefined) {
+		requestInit.body = JSON.stringify(options.body);
+	}
+
+	const response = await fetch(url, requestInit);
 
 	if (!response.ok) {
 		let parsedBody: unknown = null;
@@ -271,7 +284,7 @@ async function requestJson<T>(url: string, options: RequestJsonOptions = {}): Pr
 
 		const payloadMessage = extractErrorMessage(parsedBody) ?? rawBody.trim();
 		const statusText = payloadMessage || response.statusText || 'Unknown error';
-		throw new Error(`HTTP ${response.status}: ${statusText}`);
+			throw new Error(`HTTP ${String(response.status)}: ${statusText}`);
 	}
 
 	if (response.status === 204) {
@@ -336,6 +349,25 @@ function normalizeBranchRef(ref: string): string {
 	return ref;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function toText(value: unknown, fallback = ''): string {
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+	return fallback;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (typeof value === 'string' && value.trim() !== '') {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) return parsed;
+	}
+	return fallback;
+}
+
 function toIsoDate(value: unknown): string {
 	return typeof value === 'string' && value ? value : new Date().toISOString();
 }
@@ -347,105 +379,123 @@ function toStateLabel(state: string, merged = false): 'open' | 'closed' | 'merge
 	return 'closed';
 }
 
-function mapGitHubPullRequest(pr: Record<string, any>): PullRequestRecord {
-	const state = toStateLabel(String(pr.state ?? ''), Boolean(pr.merged_at));
+function mapGitHubPullRequest(pr: Record<string, unknown>): PullRequestRecord {
+	const user = isRecord(pr.user) ? pr.user : {};
+	const head = isRecord(pr.head) ? pr.head : {};
+	const base = isRecord(pr.base) ? pr.base : {};
+	const mergeable = pr.mergeable;
+	const state = toStateLabel(toText(pr.state), Boolean(pr.merged_at));
 	return {
-		id: Number(pr.id ?? 0),
-		number: Number(pr.number ?? 0),
-		title: String(pr.title ?? ''),
-		body: String(pr.body ?? ''),
+		id: toNumber(pr.id),
+		number: toNumber(pr.number),
+		title: toText(pr.title),
+		body: toText(pr.body),
 		state,
-		author: String(pr.user?.login ?? ''),
+		author: toText(user.login),
 		createdAt: toIsoDate(pr.created_at),
 		updatedAt: toIsoDate(pr.updated_at),
 		head: {
-			ref: String(pr.head?.ref ?? ''),
-			sha: String(pr.head?.sha ?? ''),
+			ref: toText(head.ref),
+			sha: toText(head.sha),
 		},
 		base: {
-			ref: String(pr.base?.ref ?? ''),
-			sha: String(pr.base?.sha ?? ''),
+			ref: toText(base.ref),
+			sha: toText(base.sha),
 		},
 		draft: Boolean(pr.draft),
-		mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
-		webUrl: String(pr.html_url ?? ''),
+		mergeable: typeof mergeable === 'boolean' ? mergeable : null,
+		webUrl: toText(pr.html_url),
 	};
 }
 
-function mapGitLabPullRequest(pr: Record<string, any>): PullRequestRecord {
+function mapGitLabPullRequest(pr: Record<string, unknown>): PullRequestRecord {
+	const author = isRecord(pr.author) ? pr.author : {};
+	const diffRefs = isRecord(pr.diff_refs) ? pr.diff_refs : {};
 	return {
-		id: Number(pr.id ?? 0),
-		number: Number(pr.iid ?? 0),
-		title: String(pr.title ?? ''),
-		body: String(pr.description ?? ''),
-		state: toStateLabel(String(pr.state ?? '')),
-		author: String(pr.author?.username ?? pr.author?.name ?? ''),
+		id: toNumber(pr.id),
+		number: toNumber(pr.iid),
+		title: toText(pr.title),
+		body: toText(pr.description),
+		state: toStateLabel(toText(pr.state)),
+		author: toText(author.username, toText(author.name)),
 		createdAt: toIsoDate(pr.created_at),
 		updatedAt: toIsoDate(pr.updated_at),
 		head: {
-			ref: String(pr.source_branch ?? ''),
-			sha: String(pr.diff_refs?.head_sha ?? ''),
+			ref: toText(pr.source_branch),
+			sha: toText(diffRefs.head_sha),
 		},
 		base: {
-			ref: String(pr.target_branch ?? ''),
-			sha: String(pr.diff_refs?.base_sha ?? ''),
+			ref: toText(pr.target_branch),
+			sha: toText(diffRefs.base_sha),
 		},
-		draft: Boolean(pr.draft) || String(pr.work_in_progress ?? 'false') === 'true',
+		draft: Boolean(pr.draft) || toText(pr.work_in_progress, 'false') === 'true',
 		mergeable:
 			typeof pr.merge_status === 'string'
 				? pr.merge_status === 'can_be_merged'
 				: null,
-		webUrl: String(pr.web_url ?? ''),
+		webUrl: toText(pr.web_url),
 	};
 }
 
-function mapBitbucketPullRequest(pr: Record<string, any>): PullRequestRecord {
+function mapBitbucketPullRequest(pr: Record<string, unknown>): PullRequestRecord {
+	const author = isRecord(pr.author) ? pr.author : {};
+	const source = isRecord(pr.source) ? pr.source : {};
+	const destination = isRecord(pr.destination) ? pr.destination : {};
+	const sourceBranch = isRecord(source.branch) ? source.branch : {};
+	const sourceCommit = isRecord(source.commit) ? source.commit : {};
+	const destinationBranch = isRecord(destination.branch) ? destination.branch : {};
+	const destinationCommit = isRecord(destination.commit) ? destination.commit : {};
+	const links = isRecord(pr.links) ? pr.links : {};
+	const html = isRecord(links.html) ? links.html : {};
 	return {
-		id: Number(pr.id ?? 0),
-		number: Number(pr.id ?? 0),
-		title: String(pr.title ?? ''),
-		body: String(pr.description ?? ''),
-		state: toStateLabel(String(pr.state ?? '')),
-		author: String(pr.author?.display_name ?? pr.author?.nickname ?? ''),
+		id: toNumber(pr.id),
+		number: toNumber(pr.id),
+		title: toText(pr.title),
+		body: toText(pr.description),
+		state: toStateLabel(toText(pr.state)),
+		author: toText(author.display_name, toText(author.nickname)),
 		createdAt: toIsoDate(pr.created_on),
 		updatedAt: toIsoDate(pr.updated_on),
 		head: {
-			ref: String(pr.source?.branch?.name ?? ''),
-			sha: String(pr.source?.commit?.hash ?? ''),
+			ref: toText(sourceBranch.name),
+			sha: toText(sourceCommit.hash),
 		},
 		base: {
-			ref: String(pr.destination?.branch?.name ?? ''),
-			sha: String(pr.destination?.commit?.hash ?? ''),
+			ref: toText(destinationBranch.name),
+			sha: toText(destinationCommit.hash),
 		},
 		draft: false,
-		webUrl: String(pr.links?.html?.href ?? ''),
+		webUrl: toText(html.href),
 	};
 }
 
 function mapAzurePullRequest(
 	target: AzurePullRequestTarget,
-	pr: Record<string, any>
+	pr: Record<string, unknown>
 ): PullRequestRecord {
-	const id = Number(pr.pullRequestId ?? pr.codeReviewId ?? 0);
+	const createdBy = isRecord(pr.createdBy) ? pr.createdBy : {};
+	const sourceCommit = isRecord(pr.lastMergeSourceCommit) ? pr.lastMergeSourceCommit : {};
+	const targetCommit = isRecord(pr.lastMergeTargetCommit) ? pr.lastMergeTargetCommit : {};
+	const id = toNumber(pr.pullRequestId, toNumber(pr.codeReviewId));
 	return {
 		id,
 		number: id,
-		title: String(pr.title ?? ''),
-		body: String(pr.description ?? ''),
-		state: toStateLabel(String(pr.status ?? '')),
-		author: String(pr.createdBy?.displayName ?? pr.createdBy?.uniqueName ?? ''),
+		title: toText(pr.title),
+		body: toText(pr.description),
+		state: toStateLabel(toText(pr.status)),
+		author: toText(createdBy.displayName, toText(createdBy.uniqueName)),
 		createdAt: toIsoDate(pr.creationDate),
 		updatedAt: toIsoDate(pr.closedDate ?? pr.creationDate),
 		head: {
-			ref: normalizeBranchRef(String(pr.sourceRefName ?? '')),
-			sha: String(pr.lastMergeSourceCommit?.commitId ?? ''),
+			ref: normalizeBranchRef(toText(pr.sourceRefName)),
+			sha: toText(sourceCommit.commitId),
 		},
 		base: {
-			ref: normalizeBranchRef(String(pr.targetRefName ?? '')),
-			sha: String(pr.lastMergeTargetCommit?.commitId ?? ''),
+			ref: normalizeBranchRef(toText(pr.targetRefName)),
+			sha: toText(targetCommit.commitId),
 		},
 		draft: Boolean(pr.isDraft),
-		webUrl: `${target.webBaseUrl}/pullrequest/${id}`,
+		webUrl: `${target.webBaseUrl}/pullrequest/${String(id)}`,
 	};
 }
 
@@ -518,7 +568,7 @@ export async function listPullRequests(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		const data = await requestJson<Array<Record<string, any>>>(
+		const data = await requestJson<Array<Record<string, unknown>>>(
 			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls?state=${state}&per_page=100`,
 			{ headers }
 		);
@@ -527,7 +577,7 @@ export async function listPullRequests(
 
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
-		const data = await requestJson<Array<Record<string, any>>>(
+		const data = await requestJson<Array<Record<string, unknown>>>(
 			`${target.apiBaseUrl}/projects/${projectId}/merge_requests?scope=all&state=${gitLabStateToApi(state)}&per_page=100`,
 			{ headers }
 		);
@@ -541,17 +591,17 @@ export async function listPullRequests(
 				: state === 'closed'
 					? `q=${encodeURIComponent('state = "DECLINED" OR state = "MERGED"')}&`
 					: '';
-		const data = await requestJson<{ values?: Array<Record<string, any>> }>(
+		const data = await requestJson<{ values?: Array<Record<string, unknown>> }>(
 			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests?${query}pagelen=50`,
 			{ headers }
 		);
 		return (data.values ?? []).map((entry) => mapBitbucketPullRequest(entry));
 	}
 
-	const data = await requestJson<{ value?: Array<Record<string, any>> }>(
-		`${target.apiBaseUrl}/pullrequests?searchCriteria.status=${azureStatusToApi(state)}&api-version=7.1`,
-		{ headers }
-	);
+	const data = await requestJson<{ value?: Array<Record<string, unknown>> }>(
+			`${target.apiBaseUrl}/pullrequests?searchCriteria.status=${azureStatusToApi(state)}&api-version=7.1`,
+			{ headers }
+		);
 	return (data.value ?? []).map((entry) => mapAzurePullRequest(target, entry));
 }
 
@@ -565,8 +615,8 @@ export async function getPullRequest(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		const pr = await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${number}`,
+		const pr = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}`,
 			{ headers }
 		);
 		return mapGitHubPullRequest(pr);
@@ -574,23 +624,23 @@ export async function getPullRequest(
 
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
-		const pr = await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${number}`,
+		const pr = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}`,
 			{ headers }
 		);
 		return mapGitLabPullRequest(pr);
 	}
 
 	if (target.provider === 'bitbucket') {
-		const pr = await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${number}`,
+		const pr = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}`,
 			{ headers }
 		);
 		return mapBitbucketPullRequest(pr);
 	}
 
-	const pr = await requestJson<Record<string, any>>(
-		`${target.apiBaseUrl}/pullrequests/${number}?api-version=7.1`,
+	const pr = await requestJson<Record<string, unknown>>(
+		`${target.apiBaseUrl}/pullrequests/${String(number)}?api-version=7.1`,
 		{ headers }
 	);
 	return mapAzurePullRequest(target, pr);
@@ -612,7 +662,7 @@ export async function createPullRequest(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		const pr = await requestJson<Record<string, any>>(
+		const pr = await requestJson<Record<string, unknown>>(
 			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls`,
 			{
 				method: 'POST',
@@ -632,7 +682,7 @@ export async function createPullRequest(
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
 		const title = input.draft && !/^draft:/i.test(input.title) ? `Draft: ${input.title}` : input.title;
-		const pr = await requestJson<Record<string, any>>(
+		const pr = await requestJson<Record<string, unknown>>(
 			`${target.apiBaseUrl}/projects/${projectId}/merge_requests`,
 			{
 				method: 'POST',
@@ -649,7 +699,7 @@ export async function createPullRequest(
 	}
 
 	if (target.provider === 'bitbucket') {
-		const pr = await requestJson<Record<string, any>>(
+		const pr = await requestJson<Record<string, unknown>>(
 			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests`,
 			{
 				method: 'POST',
@@ -665,7 +715,7 @@ export async function createPullRequest(
 		return mapBitbucketPullRequest(pr);
 	}
 
-	const pr = await requestJson<Record<string, any>>(
+	const pr = await requestJson<Record<string, unknown>>(
 		`${target.apiBaseUrl}/pullrequests?api-version=7.1`,
 		{
 			method: 'POST',
@@ -693,8 +743,8 @@ export async function mergePullRequest(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${number}/merge`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}/merge`,
 			{
 				method: 'PUT',
 				headers,
@@ -708,8 +758,8 @@ export async function mergePullRequest(
 
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${number}/merge`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/merge`,
 			{
 				method: 'PUT',
 				headers,
@@ -722,8 +772,8 @@ export async function mergePullRequest(
 	}
 
 	if (target.provider === 'bitbucket') {
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${number}/merge`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}/merge`,
 			{
 				method: 'POST',
 				headers,
@@ -737,8 +787,8 @@ export async function mergePullRequest(
 		squash: 'squash',
 		rebase: 'rebase',
 	};
-	await requestJson<Record<string, any>>(
-		`${target.apiBaseUrl}/pullrequests/${number}?api-version=7.1`,
+	await requestJson<Record<string, unknown>>(
+		`${target.apiBaseUrl}/pullrequests/${String(number)}?api-version=7.1`,
 		{
 			method: 'PATCH',
 			headers,
@@ -762,8 +812,8 @@ export async function closePullRequest(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${number}`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}`,
 			{
 				method: 'PATCH',
 				headers,
@@ -775,8 +825,8 @@ export async function closePullRequest(
 
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${number}`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}`,
 			{
 				method: 'PUT',
 				headers,
@@ -787,8 +837,8 @@ export async function closePullRequest(
 	}
 
 	if (target.provider === 'bitbucket') {
-		await requestJson<Record<string, any>>(
-			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${number}/decline`,
+		await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}/decline`,
 			{
 				method: 'POST',
 				headers,
@@ -797,8 +847,8 @@ export async function closePullRequest(
 		return;
 	}
 
-	await requestJson<Record<string, any>>(
-		`${target.apiBaseUrl}/pullrequests/${number}?api-version=7.1`,
+	await requestJson<Record<string, unknown>>(
+		`${target.apiBaseUrl}/pullrequests/${String(number)}?api-version=7.1`,
 		{
 			method: 'PATCH',
 			headers,
@@ -807,6 +857,187 @@ export async function closePullRequest(
 			},
 		}
 	);
+}
+
+function mapGitHubPullRequestComment(comment: Record<string, unknown>): PullRequestComment {
+	const user = isRecord(comment.user) ? comment.user : {};
+	return {
+		id: toText(comment.id),
+		author: toText(user.login),
+		body: toText(comment.body),
+		createdAt: toIsoDate(comment.created_at),
+		updatedAt: toIsoDate(comment.updated_at),
+		url: toText(comment.html_url),
+	};
+}
+
+function mapGitLabPullRequestComment(comment: Record<string, unknown>): PullRequestComment {
+	const author = isRecord(comment.author) ? comment.author : {};
+	return {
+		id: toText(comment.id),
+		author: toText(author.username, toText(author.name)),
+		body: toText(comment.body),
+		createdAt: toIsoDate(comment.created_at),
+		updatedAt: toIsoDate(comment.updated_at),
+		url: '',
+	};
+}
+
+function mapBitbucketPullRequestComment(comment: Record<string, unknown>): PullRequestComment {
+	const user = isRecord(comment.user) ? comment.user : {};
+	const content = isRecord(comment.content) ? comment.content : {};
+	const links = isRecord(comment.links) ? comment.links : {};
+	const html = isRecord(links.html) ? links.html : {};
+	return {
+		id: toText(comment.id),
+		author: toText(user.display_name, toText(user.nickname)),
+		body: toText(content.raw),
+		createdAt: toIsoDate(comment.created_on),
+		updatedAt: toIsoDate(comment.updated_on),
+		url: toText(html.href),
+	};
+}
+
+function mapAzurePullRequestComment(
+	target: AzurePullRequestTarget,
+	comment: Record<string, unknown>,
+	fallbackThreadId: number
+): PullRequestComment {
+	const author = isRecord(comment.author) ? comment.author : {};
+	const commentId = toNumber(comment.id);
+	return {
+		id: toText(commentId || fallbackThreadId),
+		author: toText(author.displayName, toText(author.uniqueName)),
+		body: toText(comment.content),
+		createdAt: toIsoDate(comment.publishedDate),
+		updatedAt: toIsoDate(comment.lastUpdatedDate ?? comment.publishedDate),
+		url: `${target.webBaseUrl}/pullrequest/${String(fallbackThreadId)}`,
+	};
+}
+
+export async function listPullRequestComments(
+	remoteUrl: string,
+	provider: PullRequestProvider,
+	auth: ProviderAuthConfig | undefined,
+	number: number
+): Promise<PullRequestComment[]> {
+	const target = parseTarget(remoteUrl, provider);
+	const headers = buildProviderHeaders(provider, auth);
+
+	if (target.provider === 'github') {
+		const comments = await requestJson<Array<Record<string, unknown>>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/issues/${String(number)}/comments?per_page=100`,
+			{ headers }
+		);
+		return comments.map((comment) => mapGitHubPullRequestComment(comment));
+	}
+
+	if (target.provider === 'gitlab') {
+		const projectId = encodeURIComponent(target.projectPath);
+		const comments = await requestJson<Array<Record<string, unknown>>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/notes?per_page=100`,
+			{ headers }
+		);
+		return comments
+			.filter((comment) => comment.system !== true)
+			.map((comment) => mapGitLabPullRequestComment(comment));
+	}
+
+	if (target.provider === 'bitbucket') {
+		const response = await requestJson<{ values?: Array<Record<string, unknown>> }>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}/comments?pagelen=100`,
+			{ headers }
+		);
+		return (response.values ?? []).map((comment) => mapBitbucketPullRequestComment(comment));
+	}
+
+	const response = await requestJson<{ value?: Array<Record<string, unknown>> }>(
+		`${target.apiBaseUrl}/pullRequests/${String(number)}/threads?api-version=7.1`,
+		{ headers }
+	);
+
+	const comments: PullRequestComment[] = [];
+	for (const thread of response.value ?? []) {
+		const threadId = toNumber(thread.id, number);
+		const threadComments = Array.isArray(thread.comments) ? thread.comments : [];
+		for (const comment of threadComments) {
+			if (isRecord(comment)) {
+				comments.push(mapAzurePullRequestComment(target, comment, threadId));
+			}
+		}
+	}
+	return comments;
+}
+
+export async function addPullRequestComment(
+	remoteUrl: string,
+	provider: PullRequestProvider,
+	auth: ProviderAuthConfig | undefined,
+	number: number,
+	body: string
+): Promise<PullRequestComment> {
+	const target = parseTarget(remoteUrl, provider);
+	const headers = buildProviderHeaders(provider, auth);
+
+	if (target.provider === 'github') {
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/issues/${String(number)}/comments`,
+			{
+				method: 'POST',
+				headers,
+				body: { body },
+			}
+		);
+		return mapGitHubPullRequestComment(comment);
+	}
+
+	if (target.provider === 'gitlab') {
+		const projectId = encodeURIComponent(target.projectPath);
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/notes`,
+			{
+				method: 'POST',
+				headers,
+				body: { body },
+			}
+		);
+		return mapGitLabPullRequestComment(comment);
+	}
+
+	if (target.provider === 'bitbucket') {
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}/comments`,
+			{
+				method: 'POST',
+				headers,
+				body: { content: { raw: body } },
+			}
+		);
+		return mapBitbucketPullRequestComment(comment);
+	}
+
+	const thread = await requestJson<Record<string, unknown>>(
+		`${target.apiBaseUrl}/pullRequests/${String(number)}/threads?api-version=7.1`,
+		{
+			method: 'POST',
+			headers,
+			body: {
+				comments: [
+					{
+						parentCommentId: 0,
+						content: body,
+						commentType: 1,
+					},
+				],
+				status: 'active',
+			},
+		}
+	);
+	const threadId = toNumber(thread.id, number);
+	const firstComment = Array.isArray(thread.comments) && isRecord(thread.comments[0])
+		? thread.comments[0]
+		: null;
+	return mapAzurePullRequestComment(target, firstComment ?? { content: body }, threadId);
 }
 
 export async function checkBranchPullRequest(
@@ -818,15 +1049,18 @@ export async function checkBranchPullRequest(
 		const parsed = parseRemoteUrl(remoteUrl);
 		if (!parsed) return null;
 
+		const auth: ProviderAuthConfig = {};
+		if (githubToken) {
+			auth.githubToken = githubToken;
+			auth.gitlabToken = githubToken;
+			auth.bitbucketToken = githubToken;
+			auth.azureToken = githubToken;
+		}
+
 		const results = await listPullRequests(
 			remoteUrl,
 			parsed.provider,
-			{
-				githubToken,
-				gitlabToken: githubToken,
-				bitbucketToken: githubToken,
-				azureToken: githubToken,
-			},
+			auth,
 			'open'
 		);
 
@@ -853,15 +1087,17 @@ export async function getPullRequests(
 	try {
 		const parsed = parseRemoteUrl(remoteUrl);
 		if (!parsed) return [];
+		const auth: ProviderAuthConfig = {};
+		if (githubToken) {
+			auth.githubToken = githubToken;
+			auth.gitlabToken = githubToken;
+			auth.bitbucketToken = githubToken;
+			auth.azureToken = githubToken;
+		}
 		const pullRequests = await listPullRequests(
 			remoteUrl,
 			parsed.provider,
-			{
-				githubToken,
-				gitlabToken: githubToken,
-				bitbucketToken: githubToken,
-				azureToken: githubToken,
-			},
+			auth,
 			state
 		);
 		return pullRequests.map((pr) => ({

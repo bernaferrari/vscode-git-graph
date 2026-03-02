@@ -3,7 +3,7 @@
  * Unified API for GitHub Actions, CircleCI, GitLab CI, etc.
  */
 
-import { GitHubClient, getGitHubClient } from './github';
+import { GitHubClient } from './github';
 
 // CI/CD types
 export interface CIPipeline {
@@ -71,10 +71,11 @@ export class CircleCIClient {
 		});
 
 		if (!response.ok) {
-			throw new Error(`CircleCI API error: ${response.status}`);
+			throw new Error(`CircleCI API error: ${String(response.status)}`);
 		}
 
-		return response.json();
+		const data: unknown = await response.json();
+		return data as T;
 	}
 
 	async getPipelines(projectSlug: string): Promise<CIPipeline[]> {
@@ -91,9 +92,9 @@ export class CircleCIClient {
 			}>;
 		}>(`/project/${projectSlug}/pipeline`);
 
-		return data.items.map(item => ({
-			id: item.id,
-			name: `Pipeline #${item.number}`,
+			return data.items.map(item => ({
+				id: item.id,
+				name: `Pipeline #${String(item.number)}`,
 			status: this.mapStatus(item.state),
 			branch: item.branch,
 			commit: {
@@ -101,7 +102,7 @@ export class CircleCIClient {
 				message: item.commit.message,
 				author: item.commit.author.name,
 			},
-			url: `https://app.circleci.com/pipelines/${projectSlug}/${item.number}`,
+				url: `https://app.circleci.com/pipelines/${projectSlug}/${String(item.number)}`,
 			startedAt: item.created_at,
 			finishedAt: item.updated_at,
 			provider: 'circleci' as const,
@@ -138,10 +139,11 @@ export class GitLabCIClient {
 		});
 
 		if (!response.ok) {
-			throw new Error(`GitLab API error: ${response.status}`);
+			throw new Error(`GitLab API error: ${String(response.status)}`);
 		}
 
-		return response.json();
+		const data: unknown = await response.json();
+		return data as T;
 	}
 
 	async getPipelines(projectId: string | number): Promise<CIPipeline[]> {
@@ -154,11 +156,11 @@ export class GitLabCIClient {
 			updated_at: string;
 			web_url: string;
 			user: { name: string };
-		}>>(`/projects/${projectId}/pipelines`);
+		}>>(`/projects/${String(projectId)}/pipelines`);
 
 		return data.map(item => ({
 			id: String(item.id),
-			name: `Pipeline ${item.id}`,
+			name: `Pipeline ${String(item.id)}`,
 			status: this.mapStatus(item.status),
 			branch: item.ref,
 			commit: {
@@ -210,7 +212,6 @@ export class CIService {
 		sha: string
 	): Promise<CIStatus> {
 		const checks: CICheck[] = [];
-		let pipeline: CIPipeline | null = null;
 
 		// GitHub
 		if (this.github) {
@@ -256,7 +257,7 @@ export class CIService {
 			running: checks.filter(c => c.status === 'running').length,
 		};
 
-		return { pipeline, checks, summary };
+		return { pipeline: null, checks, summary };
 	}
 
 	// Get pipelines for a branch

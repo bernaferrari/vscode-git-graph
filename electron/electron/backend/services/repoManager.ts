@@ -4,23 +4,24 @@
  * Manages Git repository discovery and state in Electron
  */
 
+import { dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { dialog } from 'electron';
+
+import { RepoFileWatcher } from './fileWatcher';
+import { GitService } from './gitService';
+import {
+	BooleanOverride,
+	FileViewType,
+	type GitRepoState,
+	type GitRepoSet,
+	RepoCommitOrdering,
+} from '../../../src/lib/types';
+import { BufferedQueue } from '../../../src/lib/utils/bufferedQueue';
 import { Disposable, toDisposable } from '../../../src/lib/utils/disposable';
 import { EventEmitter, type Event } from '../../../src/lib/utils/event';
-import { BufferedQueue } from '../../../src/lib/utils/bufferedQueue';
-import { GitService } from './gitService';
-import { RepoFileWatcher } from './fileWatcher';
 import { instanceStore } from '../store';
 import { notifyRepoChanged } from '../trpc/routers/watcher';
-import {
-    BooleanOverride,
-    FileViewType,
-    type GitRepoState,
-    type GitRepoSet,
-    RepoCommitOrdering,
-} from '../../../src/lib/types';
 
 // ==================== Types ====================
 
@@ -79,7 +80,7 @@ export class RepoManager extends Disposable {
 
         this.gitService = gitService;
         this.repos = this.loadRepos();
-        this.ignoredRepos = instanceStore.get('ignoredRepos') ?? [];
+        this.ignoredRepos = instanceStore.get('ignoredRepos');
         this.maxDepthOfRepoSearch = 0; // Could be configurable
 
         this.repoEventEmitter = new EventEmitter<RepoChangeEvent>();
@@ -212,7 +213,7 @@ export class RepoManager extends Disposable {
             instanceStore.set('ignoredRepos', this.ignoredRepos);
         }
 
-        await this.addRepo(root);
+        this.addRepo(root);
         this.emitRepoChange(loadRepo ? root : null);
 
         return { root, error: null };
@@ -224,11 +225,13 @@ export class RepoManager extends Disposable {
     public removeRepo(repo: string): void {
         if (!this.isKnownRepo(repo)) return;
 
-        delete this.repos[repo];
+        this.repos = Object.fromEntries(
+            Object.entries(this.repos).filter(([repoPath]) => repoPath !== repo)
+        ) as GitRepoSet;
         this.saveRepos();
 
         // Update recent repos
-        const recentRepos = instanceStore.get('recentRepos') ?? [];
+        const recentRepos = instanceStore.get('recentRepos');
         instanceStore.set(
             'recentRepos',
             recentRepos.filter((p: string) => p !== repo)
@@ -271,7 +274,7 @@ export class RepoManager extends Disposable {
             instanceStore.set('lastActiveRepo', repo);
 
             // Update recent repos
-            const recentRepos = instanceStore.get('recentRepos') ?? [];
+            const recentRepos = instanceStore.get('recentRepos');
             const filtered = recentRepos.filter((p: string) => p !== repo);
             instanceStore.set('recentRepos', [repo, ...filtered].slice(0, 10));
         }
@@ -288,7 +291,7 @@ export class RepoManager extends Disposable {
      * Get recent repositories.
      */
     public getRecentRepos(): string[] {
-        return instanceStore.get('recentRepos') ?? [];
+        return instanceStore.get('recentRepos');
     }
 
     /**
@@ -352,11 +355,12 @@ export class RepoManager extends Disposable {
         const stored = instanceStore.get('repoStates');
         const outputSet: GitRepoSet = {};
 
-        if (stored && typeof stored === 'object') {
+        if (typeof stored === 'object') {
             for (const [repo, state] of Object.entries(stored)) {
-                if (state && typeof state === 'object') {
-                    outputSet[repo] = { ...DEFAULT_REPO_STATE, ...(state as Partial<GitRepoState>) } as GitRepoState;
-                }
+                outputSet[repo] = {
+                    ...DEFAULT_REPO_STATE,
+                    ...(state as unknown as Partial<GitRepoState>),
+                } as GitRepoState;
             }
         }
 
@@ -367,7 +371,7 @@ export class RepoManager extends Disposable {
         instanceStore.set('repoStates', this.repos);
     }
 
-    private async addRepo(repo: string): Promise<boolean> {
+    private addRepo(repo: string): boolean {
         if (this.ignoredRepos.includes(repo)) {
             return false;
         }
@@ -430,7 +434,9 @@ export class RepoManager extends Disposable {
 
             for (const repoPath of repoPaths) {
                 if (repoPath === filePath || repoPath.startsWith(filePath + '/')) {
-                    delete this.repos[repoPath];
+                    this.repos = Object.fromEntries(
+                        Object.entries(this.repos).filter(([existingRepoPath]) => existingRepoPath !== repoPath)
+                    ) as GitRepoSet;
                     changed = true;
                 }
             }
@@ -454,7 +460,9 @@ export class RepoManager extends Disposable {
 
     private pathExists(filePath: string): Promise<boolean> {
         return new Promise((resolve) => {
-            fs.stat(filePath, (err) => resolve(!err));
+            fs.stat(filePath, (err) => {
+                resolve(!err);
+            });
         });
     }
 }

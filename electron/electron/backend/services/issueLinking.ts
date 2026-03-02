@@ -3,9 +3,6 @@
  * Detects and links issue references in commit messages
  */
 
-import * as crypto from 'crypto';
-import * as https from 'https';
-
 export interface IssueLinkingConfig {
 	/** Issue pattern (regex) */
 	issue: string;
@@ -23,19 +20,6 @@ export interface IssueInfo {
 	/** Issue status */
 	status?: 'open' | 'closed';
 }
-
-// Default issue patterns for common platforms
-const DEFAULT_PATTERNS: IssueLinkingConfig[] = [
-	// GitHub: #123 or GH-123
-	{ issue: '#(\\d+)', url: 'https://github.com/{repo}/issues/{issue}' },
-	{ issue: 'GH-(\\d+)', url: 'https://github.com/{repo}/issues/{issue}' },
-	// GitLab: #123 or !123 (merge request)
-	{ issue: '!(\\d+)', url: 'https://gitlab.com/{repo}/-/merge_requests/{issue}' },
-	// Jira: PROJECT-123
-	{ issue: '([A-Z][A-Z0-9]+)-(\\d+)', url: 'https://atlassian.net/browse/{issue}' },
-	// Linear: ENG-123
-	{ issue: '([A-Z][A-Z0-9]+)-(\\d+)', url: 'https://linear.app/issue/{issue}' },
-];
 
 /**
  * Issue Linking Manager
@@ -72,7 +56,8 @@ export class IssueLinkingManager {
 		let match;
 
 		while ((match = pattern.exec(message)) !== null) {
-			const issueId = match[0];
+			const rawIssueId = match[0];
+			const issueId = this.normalizeIssueId(rawIssueId);
 			const cached = this.issueCache.get(issueId);
 
 			if (cached) {
@@ -88,6 +73,10 @@ export class IssueLinkingManager {
 		}
 
 		return issues;
+	}
+
+	private normalizeIssueId(issueId: string): string {
+		return issueId.replace(/^(?:GH-|AB#|#|!)/i, '');
 	}
 
 	/**
@@ -117,13 +106,33 @@ export class IssueLinkingManager {
 	 * e.g., "https://github.com/owner/repo.git" -> "owner/repo"
 	 */
 	private extractRepoPath(remoteUrl: string): string | null {
+		const azureHttpsMatch = remoteUrl.match(
+			/https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+?)(?:\.git)?$/i
+		);
+		if (azureHttpsMatch?.[1] && azureHttpsMatch[2] && azureHttpsMatch[3]) {
+			return `${azureHttpsMatch[1]}/${azureHttpsMatch[2]}/${azureHttpsMatch[3]}`;
+		}
+
+		const azureVisualStudioMatch = remoteUrl.match(
+			/https?:\/\/([^/.]+)\.visualstudio\.com\/([^/]+)\/_git\/([^/]+?)(?:\.git)?$/i
+		);
+		if (azureVisualStudioMatch?.[1] && azureVisualStudioMatch[2] && azureVisualStudioMatch[3]) {
+			return `${azureVisualStudioMatch[1]}/${azureVisualStudioMatch[2]}/${azureVisualStudioMatch[3]}`;
+		}
+
 		// HTTPS URL
 		const httpsMatch = remoteUrl.match(/https?:\/\/[^/]+\/([^/]+\/[^/]+?)(?:\.git)?$/);
-		if (httpsMatch) return httpsMatch[1];
+		if (httpsMatch) return httpsMatch[1] ?? null;
 
 		// SSH URL (git@github.com:owner/repo.git)
 		const sshMatch = remoteUrl.match(/git@[^:]+:([^/]+\/[^/]+?)(?:\.git)?$/);
-		if (sshMatch) return sshMatch[1];
+		if (sshMatch) return sshMatch[1] ?? null;
+
+		// Azure DevOps SSH URL (git@ssh.dev.azure.com:v3/org/project/repo)
+		const azureSshMatch = remoteUrl.match(/git@ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+		if (azureSshMatch?.[1] && azureSshMatch[2] && azureSshMatch[3]) {
+			return `${azureSshMatch[1]}/${azureSshMatch[2]}/${azureSshMatch[3]}`;
+		}
 
 		return null;
 	}
@@ -157,6 +166,22 @@ export class IssueLinkingManager {
 				issue: '#(\\d+)',
 				url: `https://bitbucket.org/${repoPath}/issues/{issue}`,
 			};
+		}
+
+		if (
+			remoteUrl.includes('dev.azure.com') ||
+			remoteUrl.includes('visualstudio.com') ||
+			remoteUrl.includes('ssh.dev.azure.com')
+		) {
+			const parts = repoPath.split('/');
+			const organization = parts[0];
+			const project = parts[1];
+			if (organization && project) {
+				return {
+					issue: 'AB#(\\d+)|#(\\d+)',
+					url: `https://dev.azure.com/${organization}/${project}/_workitems/edit/{issue}`,
+				};
+			}
 		}
 
 		return null;

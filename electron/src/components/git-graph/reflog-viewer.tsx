@@ -3,17 +3,6 @@
  * View and recover from reflog entries
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	History,
 	RotateCcw,
@@ -24,8 +13,21 @@ import {
 	ArrowRight,
 	Loader2,
 } from 'lucide-react';
-import { useGitOperations } from '@/hooks/useGitOperations';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface ReflogEntry {
 	hash: string;
@@ -57,7 +59,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 	const handleCopyHash = (hash: string) => {
 		navigator.clipboard.writeText(hash);
 		setCopiedHash(hash);
-		setTimeout(() => setCopiedHash(null), 2000);
+		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};
 
 	const handleResetTo = (hash: string, mode: 'soft' | 'mixed' | 'hard') => {
@@ -182,7 +184,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 												variant="ghost"
 												size="sm"
 												className="h-7 w-7 p-0"
-												onClick={() => handleCopyHash(entry.hash)}
+												onClick={() => { handleCopyHash(entry.hash); }}
 											>
 												{copiedHash === entry.hash ? (
 													<Check className="h-3 w-3 text-green-600" />
@@ -194,7 +196,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 												variant="ghost"
 												size="sm"
 												className="h-7 px-2 text-xs"
-												onClick={() => handleCreateBranch(entry.hash)}
+												onClick={() => { handleCreateBranch(entry.hash); }}
 											>
 												<GitBranch className="h-3 w-3 mr-1" />
 												Branch
@@ -203,7 +205,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 												variant="ghost"
 												size="sm"
 												className="h-7 px-2 text-xs text-amber-600"
-												onClick={() => handleResetTo(entry.hash, 'mixed')}
+												onClick={() => { handleResetTo(entry.hash, 'mixed'); }}
 											>
 												<RotateCcw className="h-3 w-3 mr-1" />
 												Reset
@@ -220,7 +222,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 					<p>
 						Reflog tracks all HEAD movements. Use it to recover lost commits.
 					</p>
-					<Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" size="sm" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>

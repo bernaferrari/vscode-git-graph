@@ -4,14 +4,16 @@
  */
 
 import { z } from 'zod';
-import { router, publicProcedure } from '../../init';
+
 import { configStore, appStore, instanceStore } from '@/app/backend/store';
+
+import { router, publicProcedure } from '../../init';
 
 export const configRouter = router({
 	/**
 	 * Get all configuration.
 	 */
-	getAll: publicProcedure.query(async () => {
+	getAll: publicProcedure.query(() => {
 		return {
 			graph: configStore.get('graph'),
 			date: configStore.get('date'),
@@ -25,7 +27,7 @@ export const configRouter = router({
 	/**
 	 * Get graph configuration.
 	 */
-	graph: publicProcedure.query(async () => {
+	graph: publicProcedure.query(() => {
 		return configStore.get('graph');
 	}),
 
@@ -40,7 +42,7 @@ export const configRouter = router({
 				uncommittedChanges: z.enum(['openCircleAtUncommittedChanges', 'openCircleAtCheckedOutCommit']).optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = configStore.get('graph');
 			configStore.set('graph', { ...current, ...input });
 			return { success: true };
@@ -49,7 +51,7 @@ export const configRouter = router({
 	/**
 	 * Get date configuration.
 	 */
-	date: publicProcedure.query(async () => {
+	date: publicProcedure.query(() => {
 		return configStore.get('date');
 	}),
 
@@ -63,7 +65,7 @@ export const configRouter = router({
 				type: z.enum(['author', 'commit']).optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = configStore.get('date');
 			configStore.set('date', { ...current, ...input });
 			return { success: true };
@@ -72,7 +74,7 @@ export const configRouter = router({
 	/**
 	 * Get repository configuration.
 	 */
-	repository: publicProcedure.query(async () => {
+	repository: publicProcedure.query(() => {
 		return configStore.get('repository');
 	}),
 
@@ -96,7 +98,7 @@ export const configRouter = router({
 				useMailmap: z.boolean().optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = configStore.get('repository');
 			configStore.set('repository', { ...current, ...input });
 			return { success: true };
@@ -105,7 +107,7 @@ export const configRouter = router({
 	/**
 	 * Get dialog defaults.
 	 */
-	dialog: publicProcedure.query(async () => {
+	dialog: publicProcedure.query(() => {
 		return configStore.get('dialog');
 	}),
 
@@ -127,7 +129,7 @@ export const configRouter = router({
 				stashIncludeUntracked: z.boolean().optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = configStore.get('dialog');
 			configStore.set('dialog', { ...current, ...input });
 			return { success: true };
@@ -136,7 +138,7 @@ export const configRouter = router({
 	/**
 	 * Get UI configuration.
 	 */
-	ui: publicProcedure.query(async () => {
+	ui: publicProcedure.query(() => {
 		return configStore.get('ui');
 	}),
 
@@ -151,7 +153,7 @@ export const configRouter = router({
 				tabIconColourTheme: z.enum(['colour', 'grey']).optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = configStore.get('ui');
 			configStore.set('ui', { ...current, ...input });
 			return { success: true };
@@ -160,7 +162,7 @@ export const configRouter = router({
 	/**
 	 * Get global view state.
 	 */
-	globalViewState: publicProcedure.query(async () => {
+	globalViewState: publicProcedure.query(() => {
 		return appStore.get('globalViewState');
 	}),
 
@@ -181,7 +183,7 @@ export const configRouter = router({
 				pushTagSkipRemoteCheck: z.boolean().optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = appStore.get('globalViewState');
 			appStore.set('globalViewState', { ...current, ...input });
 			return { success: true };
@@ -190,7 +192,7 @@ export const configRouter = router({
 	/**
 	 * Get workspace view state.
 	 */
-	workspaceViewState: publicProcedure.query(async () => {
+	workspaceViewState: publicProcedure.query(() => {
 		return instanceStore.get('workspaceViewState');
 	}),
 
@@ -205,7 +207,7 @@ export const configRouter = router({
 				findOpenCommitDetailsView: z.boolean().optional(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const current = instanceStore.get('workspaceViewState');
 			instanceStore.set('workspaceViewState', { ...current, ...input });
 			return { success: true };
@@ -214,7 +216,7 @@ export const configRouter = router({
 	/**
 	 * Reset all configuration to defaults.
 	 */
-	reset: publicProcedure.mutation(async () => {
+	reset: publicProcedure.mutation(() => {
 		configStore.clear();
 		return { success: true };
 	}),

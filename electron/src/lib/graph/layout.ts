@@ -11,7 +11,7 @@
 interface LayoutCommit {
 	hash: string;
 	parents: string[];
-	stash?: unknown | null;
+	stash?: unknown;
 }
 
 export interface Point {
@@ -331,12 +331,11 @@ export class GraphLayoutCalculator {
 		}
 
 		let lastPoint = vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint();
-		let curPoint: Point;
+		let curPoint: Point | null;
 		let curVertex: Vertex;
 
 		// Check for merge between two vertices already on branches
 		if (
-			parentVertex !== null &&
 			parentVertex.id !== NULL_VERTEX_ID &&
 			vertex.isMerge() &&
 			!vertex.isNotOnBranch() &&
@@ -344,10 +343,13 @@ export class GraphLayoutCalculator {
 		) {
 			// Branch is a merge between two vertices already on branches
 			let foundPointToParent = false;
-			const parentBranch = parentVertex.branch!;
+			const parentBranch = parentVertex.branch;
+			if (!parentBranch) {
+				vertex.registerParentProcessed();
+				return;
+			}
 			for (i = startAt + 1; i < this.vertices.length; i++) {
 				curVertex = this.vertices[i];
-				if (!curVertex) continue;
 
 				curPoint = curVertex.getPointConnectingTo(parentVertex, parentBranch);
 				if (curPoint !== null) {
@@ -372,7 +374,6 @@ export class GraphLayoutCalculator {
 
 			for (i = startAt + 1; i < this.vertices.length; i++) {
 				curVertex = this.vertices[i];
-				if (!curVertex) continue;
 
 				curPoint = parentVertex === curVertex && !curVertex.isNotOnBranch()
 					? curVertex.getPoint()
@@ -459,7 +460,7 @@ export class GraphLayoutCalculator {
 	}
 
 	private getMutedCommits(): boolean[] {
-		const muted: boolean[] = new Array(this.commits.length).fill(false);
+		const muted: boolean[] = Array.from({ length: this.commits.length }, () => false);
 
 		// Mute merge commits
 		if (this.muteConfig.mergeCommits) {
@@ -479,7 +480,7 @@ export class GraphLayoutCalculator {
 		) {
 			const headIndex = this.commitLookup[this.commitHead];
 			if (typeof headIndex === 'number') {
-				const ancestor: boolean[] = new Array(this.commits.length).fill(false);
+				const ancestor: boolean[] = Array.from({ length: this.commits.length }, () => false);
 				this.markAncestors(headIndex, ancestor);
 
 				for (let i = 0; i < this.commits.length; i++) {

@@ -3,7 +3,6 @@
  * View and toggle git hooks
  */
 
-import { useState } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import {
 } from '@/components/ui/switch';
 import {
 	Settings,
-	Play,
 	FileCode,
 	Info,
 } from 'lucide-react';

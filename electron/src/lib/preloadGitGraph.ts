@@ -14,7 +14,7 @@ interface SchedulePreloadOptions {
 
 function loadGitGraphModule(): Promise<unknown> {
     if (!gitGraphPreloadPromise) {
-        gitGraphPreloadPromise = import('@/components/git-graph').catch((error) => {
+        gitGraphPreloadPromise = import('@/components/git-graph').catch((error: unknown) => {
             gitGraphPreloadPromise = null;
             throw error;
         });
@@ -43,7 +43,7 @@ export function scheduleGitGraphPreload(options: SchedulePreloadOptions = {}): (
             return;
         }
         gitGraphPreloadScheduled = false;
-        void loadGitGraphModule().catch((error) => {
+        void loadGitGraphModule().catch((error: unknown) => {
             console.warn('[preload] Failed to preload Git Graph module:', error);
         });
     };
@@ -53,7 +53,9 @@ export function scheduleGitGraphPreload(options: SchedulePreloadOptions = {}): (
             return;
         }
         if (idleWindow.requestIdleCallback) {
-            idleId = idleWindow.requestIdleCallback(() => run());
+            idleId = idleWindow.requestIdleCallback(() => {
+                run();
+            });
             return;
         }
         run();
@@ -62,11 +64,9 @@ export function scheduleGitGraphPreload(options: SchedulePreloadOptions = {}): (
     return () => {
         canceled = true;
         gitGraphPreloadScheduled = false;
-        if (timeoutId !== null) {
-            window.clearTimeout(timeoutId);
-        }
-        if (idleId !== null && idleWindow.cancelIdleCallback) {
-            idleWindow.cancelIdleCallback(idleId);
+        window.clearTimeout(timeoutId);
+        if (idleId !== null) {
+            idleWindow.cancelIdleCallback?.(idleId);
         }
     };
 }

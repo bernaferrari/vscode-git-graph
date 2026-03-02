@@ -158,13 +158,13 @@ export function InteractiveRebase({
 			.map((c) => `${c.action} ${c.hash} ${sanitizeTodoMessage(c.message)}`)
 			.join('\n');
 
-		try {
-			const result = await gitOps.rebase(baseCommit, true, todoContent);
-			if (result && typeof result === 'object' && 'error' in result && result.error) {
-				toast.error(result.error);
-				return;
-			}
-		} finally {
+			try {
+				const result = await gitOps.rebase(baseCommit, true, todoContent);
+				if (result && typeof result === 'object' && 'error' in result && result.error) {
+					toast.error(String(result.error));
+					return;
+				}
+			} finally {
 			setIsSubmitting(false);
 		}
 

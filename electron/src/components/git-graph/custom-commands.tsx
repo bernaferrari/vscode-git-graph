@@ -3,18 +3,6 @@
  * Define and run custom git commands with aliases
  */
 
-import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Terminal,
 	Plus,
@@ -28,7 +16,21 @@ import {
 	Clock,
 	AlertCircle,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 export interface CustomCommand {
 	id: string;
@@ -222,14 +224,14 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 						<Input
 							placeholder="Search commands..."
 							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
+							onChange={(e) => { setSearchQuery(e.target.value); }}
 							className="pl-8"
 						/>
 					</div>
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => setIsCreating(true)}
+						onClick={() => { setIsCreating(true); }}
 					>
 						<Plus className="h-4 w-4 mr-1" />
 						New
@@ -244,26 +246,26 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 								<Input
 									placeholder="Command name"
 									value={newCommand.name}
-									onChange={(e) => setNewCommand(prev => ({ ...prev, name: e.target.value }))}
+									onChange={(e) => { setNewCommand(prev => ({ ...prev, name: e.target.value })); }}
 								/>
 								<Input
 									placeholder="git <command>"
 									value={newCommand.command}
-									onChange={(e) => setNewCommand(prev => ({ ...prev, command: e.target.value }))}
+									onChange={(e) => { setNewCommand(prev => ({ ...prev, command: e.target.value })); }}
 									className="font-mono"
 								/>
 								<Input
 									placeholder="Description (optional)"
 									value={newCommand.description}
-									onChange={(e) => setNewCommand(prev => ({ ...prev, description: e.target.value }))}
+									onChange={(e) => { setNewCommand(prev => ({ ...prev, description: e.target.value })); }}
 								/>
 								<Input
 									placeholder="Short alias (optional)"
 									value={newCommand.alias}
-									onChange={(e) => setNewCommand(prev => ({ ...prev, alias: e.target.value }))}
+									onChange={(e) => { setNewCommand(prev => ({ ...prev, alias: e.target.value })); }}
 								/>
 								<div className="flex justify-end gap-2">
-									<Button variant="outline" size="sm" onClick={() => setIsCreating(false)}>
+									<Button variant="outline" size="sm" onClick={() => { setIsCreating(false); }}>
 										Cancel
 									</Button>
 									<Button size="sm" onClick={handleSaveNew}>
@@ -285,16 +287,16 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 										<Input
 											placeholder="Command name"
 											value={editingCommand.name}
-											onChange={(e) => setEditingCommand(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+											onChange={(e) => { setEditingCommand(prev => prev ? ({ ...prev, name: e.target.value }) : null); }}
 										/>
 										<Input
 											placeholder="git <command>"
 											value={editingCommand.command}
-											onChange={(e) => setEditingCommand(prev => prev ? ({ ...prev, command: e.target.value }) : null)}
+											onChange={(e) => { setEditingCommand(prev => prev ? ({ ...prev, command: e.target.value }) : null); }}
 											className="font-mono"
 										/>
 										<div className="flex justify-end gap-2">
-											<Button variant="outline" size="sm" onClick={() => setEditingCommand(null)}>
+											<Button variant="outline" size="sm" onClick={() => { setEditingCommand(null); }}>
 												Cancel
 											</Button>
 											<Button size="sm" onClick={handleUpdate}>
@@ -303,8 +305,7 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 										</div>
 									</div>
 								) : (
-									<>
-										<div className="flex items-start gap-3">
+									<div className="flex items-start gap-3">
 											<div className="flex-1 min-w-0">
 												<div className="flex items-center gap-2 mb-1">
 													<span className="font-medium">{cmd.name}</span>
@@ -342,7 +343,7 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => setEditingCommand(cmd)}
+													onClick={() => { setEditingCommand(cmd); }}
 												>
 													<Edit className="h-4 w-4" />
 												</Button>
@@ -350,13 +351,12 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 													variant="ghost"
 													size="sm"
 													className="text-red-600"
-													onClick={() => deleteCommand(cmd.id)}
+													onClick={() => { deleteCommand(cmd.id); }}
 												>
 													<Trash2 className="h-4 w-4" />
 												</Button>
 											</div>
 										</div>
-									</>
 								)}
 							</div>
 						))}

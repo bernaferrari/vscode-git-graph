@@ -3,25 +3,6 @@
  * Automate Git Flow workflows
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from '@/components/ui/tabs';
 import {
 	GitBranch,
 	Plus,
@@ -33,7 +14,28 @@ import {
 	AlertTriangle,
 	History,
 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from '@/components/ui/tabs';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface GitFlowBranch {
 	name: string;
@@ -225,7 +227,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => handleStart(branch.name)}
+									onClick={() => { handleStart(branch.name); }}
 								>
 									Start
 								</Button>
@@ -233,7 +235,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => handleFinish(branch.name)}
+								onClick={() => { handleFinish(branch.name); }}
 								disabled={isFinishing === branch.name}
 							>
 								{isFinishing === branch.name ? (
@@ -246,7 +248,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
 								variant="ghost"
 								size="sm"
 								className="text-red-600"
-								onClick={() => handleDelete(branch.name)}
+								onClick={() => { handleDelete(branch.name); }}
 							>
 								<X className="h-4 w-4" />
 							</Button>
@@ -267,7 +269,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
 					</DialogTitle>
 				</DialogHeader>
 
-				<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 flex flex-col">
+				<Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as typeof activeTab); }} className="flex-1 flex flex-col">
 					<TabsList className="grid w-full grid-cols-3">
 						<TabsTrigger value="feature">
 							Feature
@@ -300,7 +302,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
 							<Input
 								placeholder={`New ${activeTab} name...`}
 								value={newBranchName}
-								onChange={(e) => setNewBranchName(e.target.value)}
+								onChange={(e) => { setNewBranchName(e.target.value); }}
 								onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
 								className="flex-1"
 							/>

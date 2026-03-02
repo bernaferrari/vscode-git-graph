@@ -3,13 +3,6 @@
  * Beautiful, clean sidebar for branches, tags, remotes, stashes
  */
 
-import { useMemo, useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     ChevronRight,
     ChevronDown,
@@ -28,7 +21,15 @@ import {
     Box,
     Ellipsis,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 const SIDE_ITEM_CLASS =
     'group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
@@ -38,6 +39,18 @@ interface SidePanelProps {
     onCreateBranch?: (() => void) | undefined;
     onCreateTag?: (() => void) | undefined;
     onMergeBranch?: ((branch: string) => void) | undefined;
+}
+
+interface AheadBehindEntry {
+    branch: string;
+    ahead: number;
+    behind: number;
+    upstream: string | null;
+}
+
+interface AheadBehindResult {
+    branches: AheadBehindEntry[];
+    error: string | null;
 }
 
 export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMergeBranch }: SidePanelProps) {
@@ -69,10 +82,11 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
         { enabled: !!activeRepo }
     );
 
-    const { data: aheadBehindData } = trpc.git.aheadBehindAll.useQuery(
+    const { data: aheadBehindRawData } = trpc.git.aheadBehindAll.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo }
     );
+    const aheadBehindData = aheadBehindRawData as AheadBehindResult | undefined;
 
     const { data: submodulesData } = trpc.git.submodule.list.useQuery(
         { repo: activeRepo ?? '' },
@@ -99,7 +113,10 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
     const filteredRemoteBranches = filterBySearch(remoteBranches);
     const filteredTags = filterBySearch(tags);
     const aheadBehindLookup = useMemo(
-        () => new Map((aheadBehindData?.branches ?? []).map((entry) => [entry.branch, entry])),
+        () =>
+            new Map<string, AheadBehindEntry>(
+                (aheadBehindData?.branches ?? []).map((entry) => [entry.branch, entry])
+            ),
         [aheadBehindData?.branches]
     );
 
@@ -112,7 +129,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                     <Input
                         placeholder='Filter...'
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); }}
                         className='border-border/70 bg-background/85 focus-visible:ring-primary/30 h-8 pl-8 text-sm focus-visible:ring-2'
                     />
                 </div>
@@ -126,7 +143,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                         icon={GitBranch}
                         count={filteredLocalBranches.length}
                         expanded={!!expandedSections.branches}
-                        onToggle={() => toggleSection('branches')}
+                        onToggle={() => { toggleSection('branches'); }}
                         action={
                             <Button
                                 variant='ghost'
@@ -141,30 +158,19 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                         }>
                         {filteredLocalBranches.map((branch) => {
                             const aheadBehind = aheadBehindLookup.get(branch);
-                            const branchItemProps: {
-                                key: string;
-                                branch: string;
-                                isCurrent: boolean;
-                                onCheckout: () => Promise<{ error: string | null }>;
-                                onDelete: () => Promise<{ error: string | null }>;
-                                onSelect?: (branch: string) => void;
-                                onMerge?: () => void;
-                                ahead?: number;
-                                behind?: number;
-                            } = {
-                                key: branch,
-                                branch,
-                                isCurrent: branch === currentHead,
-                                onCheckout: () => gitOps.checkout(branch),
-                                onDelete: () => gitOps.deleteBranch(branch, false),
-                            };
-
-                            if (aheadBehind?.ahead !== undefined) branchItemProps.ahead = aheadBehind.ahead;
-                            if (aheadBehind?.behind !== undefined) branchItemProps.behind = aheadBehind.behind;
-                            if (onBranchSelect) branchItemProps.onSelect = onBranchSelect;
-                            if (onMergeBranch) branchItemProps.onMerge = () => onMergeBranch(branch);
-
-                            return <BranchItem {...branchItemProps} />;
+                            return (
+                                <BranchItem
+                                    key={branch}
+                                    branch={branch}
+                                    isCurrent={branch === currentHead}
+                                    onCheckout={() => gitOps.checkout(branch)}
+                                    onDelete={() => gitOps.deleteBranch(branch, false)}
+                                    onSelect={onBranchSelect}
+                                    onMerge={onMergeBranch ? () => { onMergeBranch(branch); } : undefined}
+                                    ahead={aheadBehind?.ahead}
+                                    behind={aheadBehind?.behind}
+                                />
+                            );
                         })}
                         {filteredLocalBranches.length === 0 && (
                             <div className='text-muted-foreground px-2 py-1 text-xs'>No local branches found</div>
@@ -178,7 +184,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             icon={Globe}
                             count={filteredRemoteBranches.length}
                             expanded={!!expandedSections.remotes}
-                            onToggle={() => toggleSection('remotes')}>
+                            onToggle={() => { toggleSection('remotes'); }}>
                             {filteredRemoteBranches.slice(0, 20).map((branch) => (
                                 <RemoteBranchItem
                                     key={branch}
@@ -214,7 +220,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             icon={Tag}
                             count={filteredTags.length}
                             expanded={!!expandedSections.tags}
-                            onToggle={() => toggleSection('tags')}
+                            onToggle={() => { toggleSection('tags'); }}
                             action={
                                 <Button
                                     variant='ghost'
@@ -250,7 +256,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             icon={Archive}
                             count={stashes.length}
                             expanded={!!expandedSections.stashes}
-                            onToggle={() => toggleSection('stashes')}>
+                            onToggle={() => { toggleSection('stashes'); }}>
                             {stashes.map((stash, index) => (
                                 <StashItem
                                     key={index}
@@ -271,7 +277,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             icon={FolderTree}
                             count={worktrees.length}
                             expanded={!!expandedSections.worktrees}
-                            onToggle={() => toggleSection('worktrees')}>
+                            onToggle={() => { toggleSection('worktrees'); }}>
                             {worktrees.map((wt: { path: string; branch?: string; isMain?: boolean }) => (
                                 <WorktreeItem key={wt.path} worktree={wt} />
                             ))}
@@ -285,7 +291,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             icon={Box}
                             count={submodulesData.submodules.length}
                             expanded={!!expandedSections.submodules}
-                            onToggle={() => toggleSection('submodules')}>
+                            onToggle={() => { toggleSection('submodules'); }}>
                             {submodulesData.submodules.flatMap((sm) => {
                                 if (!sm || typeof sm.path !== 'string' || typeof sm.status !== 'string') {
                                     return [];
@@ -482,7 +488,7 @@ function TagItem({ tag, onDelete }: { tag: string; onDelete: () => void }) {
             <ActionMenu>
                 <button
                     className='flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                    onClick={() => onDelete()}>
+                    onClick={() => { onDelete(); }}>
                     <Trash2 className='h-3.5 w-3.5' /> Delete
                 </button>
             </ActionMenu>
@@ -574,7 +580,7 @@ function ActionMenu({ children }: { children: React.ReactNode }) {
         <Popover>
             <PopoverTrigger
                 className='hover:bg-accent text-muted-foreground hover:text-foreground h-5 w-5 rounded p-0 opacity-0 transition-all duration-150 group-hover:opacity-100'
-                onClick={(e) => e.stopPropagation()}>
+                onClick={(e) => { e.stopPropagation(); }}>
                 <Ellipsis className='h-3.5 w-3.5' />
             </PopoverTrigger>
             <PopoverContent className='ui-inline-menu w-40 p-1' align='end' side='right' sideOffset={5}>

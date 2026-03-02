@@ -3,20 +3,23 @@
  * Exposes repository management operations to the renderer
  */
 
-import { z } from 'zod';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { router, publicProcedure } from '../../init';
-import { getRepoManager } from '../../../services/repoManager';
-import { getGitService } from '../../../services/gitService';
-import { findGit } from '../../../services/gitExecutable';
+import { z } from 'zod';
+
+import type { GitRepoState } from '@/web/lib/types';
+
 import { appStore, instanceStore } from '@/app/backend/store';
+
+import { findGit } from '../../../services/gitExecutable';
+import { getGitService } from '../../../services/gitService';
 import {
 	listPullRequests as listRemotePullRequests,
 	parseRemoteUrl as parsePullRequestRemoteUrl,
 	type ProviderAuthConfig,
 } from '../../../services/pullRequest';
-import type { GitRepoState } from '@/web/lib/types';
+import { getRepoManager } from '../../../services/repoManager';
+import { router, publicProcedure } from '../../init';
 
 let gitInitPromise: Promise<string | null> | null = null;
 
@@ -45,17 +48,13 @@ async function ensureGitInitialized(): Promise<string | null> {
 
 function getStoredProviderAuthConfig(): ProviderAuthConfig {
 	const storedAuth = appStore.get('providerAuth');
-	if (!storedAuth) {
-		return {};
-	}
-
-	return {
-		githubToken: storedAuth.githubToken || undefined,
-		gitlabToken: storedAuth.gitlabToken || undefined,
-		bitbucketToken: storedAuth.bitbucketToken || undefined,
-		bitbucketUsername: storedAuth.bitbucketUsername || undefined,
-		azureToken: storedAuth.azureToken || undefined,
-	};
+	const auth: ProviderAuthConfig = {};
+	if (storedAuth.githubToken.trim()) auth.githubToken = storedAuth.githubToken.trim();
+	if (storedAuth.gitlabToken.trim()) auth.gitlabToken = storedAuth.gitlabToken.trim();
+	if (storedAuth.bitbucketToken.trim()) auth.bitbucketToken = storedAuth.bitbucketToken.trim();
+	if (storedAuth.bitbucketUsername.trim()) auth.bitbucketUsername = storedAuth.bitbucketUsername.trim();
+	if (storedAuth.azureToken.trim()) auth.azureToken = storedAuth.azureToken.trim();
+	return auth;
 }
 
 interface RemoteRepository {
@@ -68,6 +67,20 @@ interface RemoteRepository {
 	webUrl: string;
 	private: boolean;
 	defaultBranch: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function readString(value: unknown, fallback: string = ''): string {
+	if (typeof value === 'string') {
+		return value;
+	}
+	if (typeof value === 'number' || typeof value === 'boolean') {
+		return String(value);
+	}
+	return fallback;
 }
 
 function buildProviderAuthHeader(provider: 'github' | 'gitlab' | 'bitbucket'): Record<string, string> {
@@ -106,7 +119,7 @@ async function requestProviderJson<T>(url: string, headers: Record<string, strin
 	});
 	if (!response.ok) {
 		const body = await response.text();
-		throw new Error(`HTTP ${response.status}: ${body || response.statusText}`);
+		throw new Error(`HTTP ${String(response.status)}: ${body || response.statusText}`);
 	}
 	return (await response.json()) as T;
 }
@@ -115,7 +128,7 @@ export const repoRouter = router({
 	/**
 	 * Get all known repositories.
 	 */
-	list: publicProcedure.query(async () => {
+	list: publicProcedure.query(() => {
 		const manager = getRepoManager(getGitService());
 		const repos = manager.getRepos();
 
@@ -132,7 +145,7 @@ export const repoRouter = router({
 	/**
 	 * Get recent repositories.
 	 */
-	recent: publicProcedure.query(async () => {
+	recent: publicProcedure.query(() => {
 		const manager = getRepoManager(getGitService());
 		return manager.getRecentRepos();
 	}),
@@ -140,7 +153,7 @@ export const repoRouter = router({
 	/**
 	 * Get the last active repository.
 	 */
-	lastActive: publicProcedure.query(async () => {
+	lastActive: publicProcedure.query(() => {
 		const manager = getRepoManager(getGitService());
 		return manager.getLastActiveRepo();
 	}),
@@ -154,7 +167,7 @@ export const repoRouter = router({
 				repo: z.string(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const manager = getRepoManager(getGitService());
 			manager.setActiveRepo(input.repo);
 			return { success: true };
@@ -169,7 +182,7 @@ export const repoRouter = router({
 				path: z.string(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(async ({ input }) => {
 			const initError = await ensureGitInitialized();
 			if (initError !== null) {
 				return {
@@ -192,7 +205,7 @@ export const repoRouter = router({
 				repo: z.string(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const manager = getRepoManager(getGitService());
 			manager.removeRepo(input.repo);
 			return { success: true };
@@ -207,7 +220,7 @@ export const repoRouter = router({
 				repo: z.string(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const manager = getRepoManager(getGitService());
 			const success = manager.ignoreRepo(input.repo);
 			return { success };
@@ -222,7 +235,7 @@ export const repoRouter = router({
 				repo: z.string(),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const manager = getRepoManager(getGitService());
 			manager.unignoreRepo(input.repo);
 			return { success: true };
@@ -231,8 +244,8 @@ export const repoRouter = router({
 	/**
 	 * Get ignored repositories.
 	 */
-	ignoredList: publicProcedure.query(async () => {
-		return instanceStore.get('ignoredRepos') ?? [];
+	ignoredList: publicProcedure.query(() => {
+		return instanceStore.get('ignoredRepos');
 	}),
 
 	/**
@@ -269,7 +282,7 @@ export const repoRouter = router({
 				}),
 			})
 		)
-		.mutation(async ({ input }) => {
+			.mutation(({ input }) => {
 			const manager = getRepoManager(getGitService());
 			// Strip undefined values and cast to satisfy exactOptionalPropertyTypes
 			const state = Object.fromEntries(
@@ -453,6 +466,53 @@ export const repoRouter = router({
 		}),
 
 	/**
+	 * Fetch many repositories in batch.
+	 */
+	fetchMany: publicProcedure
+		.input(
+			z.object({
+				repos: z.array(z.string()).max(100),
+				prune: z.boolean().optional().default(true),
+			})
+		)
+		.mutation(async ({ input }) => {
+			const initError = await ensureGitInitialized();
+			if (initError !== null) {
+				return {
+					results: input.repos.map((repoPath) => ({
+						path: repoPath,
+						error: initError,
+					})),
+					error: initError,
+				};
+			}
+
+			const gitService = getGitService();
+			const results = await Promise.all(
+				input.repos.map(async (repoPath) => {
+					const root = await gitService.getRepoRoot(repoPath);
+					if (!root) {
+						return {
+							path: repoPath,
+							error: 'Not a Git repository.',
+						};
+					}
+					const args = ['fetch', '--all'];
+					if (input.prune) {
+						args.push('--prune');
+					}
+					const error = await gitService.runGitCommand(args, root);
+					return {
+						path: root,
+						error,
+					};
+				})
+			);
+
+			return { results, error: null as string | null };
+		}),
+
+	/**
 	 * List remote repositories for a provider using stored account credentials.
 	 */
 	listRemoteRepositories: publicProcedure
@@ -480,14 +540,14 @@ export const repoRouter = router({
 					);
 					repositories = data.map((repo) => ({
 						provider: 'github',
-						name: String(repo.name ?? ''),
-						fullName: String(repo.full_name ?? repo.name ?? ''),
-						description: String(repo.description ?? ''),
-						cloneUrl: String(repo.clone_url ?? ''),
-						sshUrl: String(repo.ssh_url ?? ''),
-						webUrl: String(repo.html_url ?? ''),
+						name: readString(repo.name),
+						fullName: readString(repo.full_name, readString(repo.name)),
+						description: readString(repo.description),
+						cloneUrl: readString(repo.clone_url),
+						sshUrl: readString(repo.ssh_url),
+						webUrl: readString(repo.html_url),
 						private: Boolean(repo.private),
-						defaultBranch: String(repo.default_branch ?? 'main'),
+						defaultBranch: readString(repo.default_branch, 'main'),
 					}));
 				}
 
@@ -498,14 +558,14 @@ export const repoRouter = router({
 					);
 					repositories = data.map((repo) => ({
 						provider: 'gitlab',
-						name: String(repo.name ?? ''),
-						fullName: String(repo.path_with_namespace ?? repo.name ?? ''),
-						description: String(repo.description ?? ''),
-						cloneUrl: String(repo.http_url_to_repo ?? ''),
-						sshUrl: String(repo.ssh_url_to_repo ?? ''),
-						webUrl: String(repo.web_url ?? ''),
-						private: String(repo.visibility ?? '') !== 'public',
-						defaultBranch: String(repo.default_branch ?? 'main'),
+						name: readString(repo.name),
+						fullName: readString(repo.path_with_namespace, readString(repo.name)),
+						description: readString(repo.description),
+						cloneUrl: readString(repo.http_url_to_repo),
+						sshUrl: readString(repo.ssh_url_to_repo),
+						webUrl: readString(repo.web_url),
+						private: readString(repo.visibility) !== 'public',
+						defaultBranch: readString(repo.default_branch, 'main'),
 					}));
 				}
 
@@ -515,23 +575,24 @@ export const repoRouter = router({
 						headers
 					);
 					repositories = (data.values ?? []).map((repo) => {
-						const cloneLinks = (repo.links as Record<string, any> | undefined)?.clone;
-						const httpsLink =
-							Array.isArray(cloneLinks) ? cloneLinks.find((entry) => entry?.name === 'https')?.href : '';
-						const sshLink =
-							Array.isArray(cloneLinks) ? cloneLinks.find((entry) => entry?.name === 'ssh')?.href : '';
+						const links = isRecord(repo.links) ? repo.links : {};
+						const cloneLinks = Array.isArray(links.clone)
+							? links.clone.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+							: [];
+						const httpsLink = cloneLinks.find((entry) => readString(entry.name) === 'https');
+						const sshLink = cloneLinks.find((entry) => readString(entry.name) === 'ssh');
+						const htmlLink = isRecord(links.html) ? links.html : {};
+						const mainBranch = isRecord(repo.mainbranch) ? repo.mainbranch : {};
 						return {
 							provider: 'bitbucket',
-							name: String(repo.name ?? ''),
-							fullName: String(repo.full_name ?? repo.name ?? ''),
-							description: String(repo.description ?? ''),
-							cloneUrl: String(httpsLink ?? ''),
-							sshUrl: String(sshLink ?? ''),
-							webUrl: String((repo.links as Record<string, any> | undefined)?.html?.href ?? ''),
+							name: readString(repo.name),
+							fullName: readString(repo.full_name, readString(repo.name)),
+							description: readString(repo.description),
+							cloneUrl: readString(httpsLink?.href),
+							sshUrl: readString(sshLink?.href),
+							webUrl: readString(htmlLink.href),
 							private: Boolean(repo.is_private),
-							defaultBranch: String(
-								(repo.mainbranch as Record<string, string> | undefined)?.name ?? 'main'
-							),
+							defaultBranch: readString(mainBranch.name, 'main'),
 						};
 					});
 				}
@@ -601,7 +662,7 @@ export const repoRouter = router({
 	/**
 	 * Mute file watcher (before Git operations).
 	 */
-	muteWatcher: publicProcedure.mutation(async () => {
+	muteWatcher: publicProcedure.mutation(() => {
 		const manager = getRepoManager(getGitService());
 		manager.muteWatcher();
 		return { success: true };
@@ -610,7 +671,7 @@ export const repoRouter = router({
 	/**
 	 * Unmute file watcher (after Git operations).
 	 */
-	unmuteWatcher: publicProcedure.mutation(async () => {
+	unmuteWatcher: publicProcedure.mutation(() => {
 		const manager = getRepoManager(getGitService());
 		manager.unmuteWatcher();
 		return { success: true };

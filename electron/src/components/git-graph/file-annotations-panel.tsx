@@ -3,18 +3,7 @@
  * Detailed blame information alongside file content (like Tower/Sublime Merge)
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
+import { formatDistanceToNow } from 'date-fns';
 import {
 	User,
 	Calendar,
@@ -31,8 +20,21 @@ import {
 	PanelRightOpen,
 	Info,
 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
 import { Avatar, AvatarWithTooltip } from './avatar';
-import { formatDistanceToNow } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface AnnotationLine {
 	lineNumber: number;
@@ -179,7 +181,7 @@ export function FileAnnotationsPanel({
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => setCompactMode(!compactMode)}
+								onClick={() => { setCompactMode(!compactMode); }}
 								title="Toggle compact mode"
 							>
 								{compactMode ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
@@ -187,7 +189,7 @@ export function FileAnnotationsPanel({
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => setShowAuthorColumn(!showAuthorColumn)}
+								onClick={() => { setShowAuthorColumn(!showAuthorColumn); }}
 								className={showAuthorColumn ? 'text-primary' : 'text-muted-foreground'}
 							>
 								<User className="h-4 w-4" />
@@ -195,7 +197,7 @@ export function FileAnnotationsPanel({
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => setShowDateColumn(!showDateColumn)}
+								onClick={() => { setShowDateColumn(!showDateColumn); }}
 								className={showDateColumn ? 'text-primary' : 'text-muted-foreground'}
 							>
 								<Calendar className="h-4 w-4" />
@@ -203,7 +205,7 @@ export function FileAnnotationsPanel({
 							<Button
 								variant="ghost"
 								size="sm"
-								onClick={() => setShowCommitColumn(!showCommitColumn)}
+								onClick={() => { setShowCommitColumn(!showCommitColumn); }}
 								className={showCommitColumn ? 'text-primary' : 'text-muted-foreground'}
 							>
 								<GitCommit className="h-4 w-4" />
@@ -223,7 +225,7 @@ export function FileAnnotationsPanel({
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0"
-										onClick={() => navigateCommit('prev')}
+										onClick={() => { navigateCommit('prev'); }}
 									>
 										<ChevronLeft className="h-4 w-4" />
 									</Button>
@@ -231,7 +233,7 @@ export function FileAnnotationsPanel({
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0"
-										onClick={() => navigateCommit('next')}
+										onClick={() => { navigateCommit('next'); }}
 									>
 										<ChevronRight className="h-4 w-4" />
 									</Button>
@@ -309,7 +311,7 @@ export function FileAnnotationsPanel({
 											className={`flex border-l-2 cursor-pointer transition-colors ${
 												isSelected ? 'bg-accent/50 border-l-primary' : bgColor
 											} hover:bg-accent/30`}
-											onClick={() => setSelectedCommit(line.commitHash)}
+											onClick={() => { setSelectedCommit(line.commitHash); }}
 										>
 											{/* Line number */}
 											<div className="w-12 shrink-0 px-2 py-0.5 text-right text-muted-foreground bg-muted/20 select-none border-r">

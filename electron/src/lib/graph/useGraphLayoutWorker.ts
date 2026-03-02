@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+
 import { GraphLayoutCalculator, type GraphConfig, type GraphLayout } from '@/lib/graph/layout';
 
 interface LayoutCommit {
     hash: string;
     parents: string[];
-    stash?: unknown | null;
+    stash?: unknown;
 }
 
 interface UseGraphLayoutWorkerOptions {

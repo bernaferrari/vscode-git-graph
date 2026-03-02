@@ -3,18 +3,6 @@
  * View, apply, drop, and pop stashes
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Archive,
 	Plus,
@@ -27,8 +15,21 @@ import {
 	AlertCircle,
 	Eye,
 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface StashEntry {
 	index: number;
@@ -151,7 +152,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 					<Input
 						placeholder="Stash message (optional)"
 						value={newStashMessage}
-						onChange={(e) => setNewStashMessage(e.target.value)}
+						onChange={(e) => { setNewStashMessage(e.target.value); }}
 						className="flex-1"
 					/>
 					<Button
@@ -212,14 +213,14 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => setViewingStash(viewingStash === idx ? null : idx)}
+													onClick={() => { setViewingStash(viewingStash === idx ? null : idx); }}
 												>
 													<Eye className="h-4 w-4" />
 												</Button>
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => handleApplyStash(stash.index, true)}
+													onClick={() => { handleApplyStash(stash.index, true); }}
 													disabled={applyMutation.isPending}
 													title="Apply (keep in list)"
 												>
@@ -228,7 +229,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => handleApplyStash(stash.index, false)}
+													onClick={() => { handleApplyStash(stash.index, false); }}
 													disabled={popMutation.isPending}
 													title="Pop (remove from list)"
 												>
@@ -238,7 +239,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 													variant="ghost"
 													size="sm"
 													className="text-red-600"
-													onClick={() => handleDropStash(stash.index)}
+													onClick={() => { handleDropStash(stash.index); }}
 													disabled={dropMutation.isPending}
 												>
 													<Trash2 className="h-4 w-4" />

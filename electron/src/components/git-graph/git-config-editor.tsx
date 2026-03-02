@@ -3,21 +3,6 @@
  * Visual editor for .gitconfig with sections and key-value pairs
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Settings,
 	User,
@@ -36,7 +21,24 @@ import {
 	AlertTriangle,
 	Loader2,
 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface ConfigSection {
 	name: string;
@@ -207,10 +209,14 @@ export function GitConfigEditor({
 
 		setIsSaving(true);
 		try {
-			await trpc.git.configSetRaw.mutate({
+			const result = await trpc.git.configSetRaw.mutate({
 				repo: activeRepo,
 				content: rawConfig,
 			});
+			if (result.error) {
+				toast.error('Failed to save configuration', { description: result.error });
+				return;
+			}
 			toast.success('Configuration saved');
 		} catch (error) {
 			toast.error('Failed to save configuration');
@@ -344,7 +350,7 @@ export function GitConfigEditor({
 					</DialogTitle>
 				</DialogHeader>
 
-				<Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'visual' | 'raw')} className="flex-1 flex flex-col">
+				<Tabs value={viewMode} onValueChange={(v) => { setViewMode(v as 'visual' | 'raw'); }} className="flex-1 flex flex-col">
 					<div className="flex items-center justify-between mb-4">
 						<TabsList>
 							<TabsTrigger value="visual">Visual Editor</TabsTrigger>
@@ -377,7 +383,7 @@ export function GitConfigEditor({
 							<Input
 								placeholder="Search configuration..."
 								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
+								onChange={(e) => { setSearchQuery(e.target.value); }}
 								className="pl-9"
 							/>
 						</div>
@@ -389,20 +395,20 @@ export function GitConfigEditor({
 								<Input
 									placeholder="Section (e.g., user)"
 									value={newSection}
-									onChange={(e) => setNewSection(e.target.value)}
+									onChange={(e) => { setNewSection(e.target.value); }}
 									className="w-32"
 								/>
 								<span className="text-muted-foreground">.</span>
 								<Input
 									placeholder="Key"
 									value={newKey}
-									onChange={(e) => setNewKey(e.target.value)}
+									onChange={(e) => { setNewKey(e.target.value); }}
 									className="w-32"
 								/>
 								<Input
 									placeholder="Value"
 									value={newValue}
-									onChange={(e) => setNewValue(e.target.value)}
+									onChange={(e) => { setNewValue(e.target.value); }}
 									className="flex-1"
 								/>
 								<Button size="sm" onClick={handleAddKey}>
@@ -462,20 +468,20 @@ export function GitConfigEditor({
 																<div className="flex items-center gap-2 flex-1">
 																	<Input
 																		value={editValue}
-																		onChange={(e) => setEditValue(e.target.value)}
+																		onChange={(e) => { setEditValue(e.target.value); }}
 																		className="flex-1"
 																		autoFocus
 																	/>
 																	<Button
 																		size="sm"
-																		onClick={() => handleUpdateKey(section.name, configKey.key, editValue)}
+																		onClick={() => { handleUpdateKey(section.name, configKey.key, editValue); }}
 																	>
 																		<Check className="h-4 w-4" />
 																	</Button>
 																	<Button
 																		size="sm"
 																		variant="ghost"
-																		onClick={() => setEditingKey(null)}
+																		onClick={() => { setEditingKey(null); }}
 																	>
 																		<X className="h-4 w-4" />
 																	</Button>
@@ -528,7 +534,7 @@ export function GitConfigEditor({
 						<div className="h-full">
 							<Textarea
 								value={rawConfig}
-								onChange={(e) => setRawConfig(e.target.value)}
+								onChange={(e) => { setRawConfig(e.target.value); }}
 								className="h-full font-mono text-sm resize-none"
 								placeholder="# Git config file content"
 							/>
@@ -541,7 +547,7 @@ export function GitConfigEditor({
 						<AlertTriangle className="h-4 w-4" />
 						<span>Changes affect global git configuration</span>
 					</div>
-					<Button variant="ghost" onClick={() => onOpenChange(false)}>
+					<Button variant="ghost" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>

@@ -1,42 +1,28 @@
 /**
  * CI/CD Status Display
- * Show GitHub Actions/GitLab CI status badges on commits
+ * Uses backend provider APIs (GitHub/GitLab/Bitbucket/Azure) instead of mock status data.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+import { CheckCircle, XCircle, Clock, Loader2, AlertCircle, MinusCircle, ExternalLink, RefreshCw, GitBranch } from 'lucide-react';
+import { useMemo } from 'react';
+
 import { Badge } from '@/components/ui/badge';
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-	CheckCircle,
-	XCircle,
-	Clock,
-	Loader2,
-	AlertCircle,
-	MinusCircle,
-	GitBranch,
-	ExternalLink,
-	RefreshCw,
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
+import type { ReactNode } from 'react';
 
 export type CIStatus = 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown';
 
 interface CIStatusInfo {
 	status: CIStatus;
-	provider: 'github' | 'gitlab' | 'circleci' | 'travis' | 'unknown';
-	workflowName?: string;
-	runId?: string;
-	url?: string;
-	sha?: string;
-	startedAt?: string;
-	finishedAt?: string;
-	duration?: number;
-	branches?: string[];
+	provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' | 'unknown';
+	workflowName?: string | null;
+	runId?: string | null;
+	url?: string | null;
+	error?: string | null;
 }
 
 interface CIStatusBadgeProps {
@@ -45,128 +31,96 @@ interface CIStatusBadgeProps {
 	showDetails?: boolean;
 }
 
-// Map status to colors and icons
-const STATUS_CONFIG: Record<CIStatus, { color: string; bg: string; icon: React.ReactNode }> = {
+const STATUS_CONFIG: Record<CIStatus, { color: string; bg: string; icon: ReactNode }> = {
 	success: {
 		color: 'text-green-600 dark:text-green-400',
 		bg: 'bg-green-100 dark:bg-green-900/30',
-		icon: <CheckCircle className="h-3 w-3" />,
+		icon: <CheckCircle className='h-3 w-3' />,
 	},
 	failure: {
 		color: 'text-red-600 dark:text-red-400',
 		bg: 'bg-red-100 dark:bg-red-900/30',
-		icon: <XCircle className="h-3 w-3" />,
+		icon: <XCircle className='h-3 w-3' />,
 	},
 	pending: {
 		color: 'text-amber-600 dark:text-amber-400',
 		bg: 'bg-amber-100 dark:bg-amber-900/30',
-		icon: <Clock className="h-3 w-3" />,
+		icon: <Clock className='h-3 w-3' />,
 	},
 	running: {
 		color: 'text-blue-600 dark:text-blue-400',
 		bg: 'bg-blue-100 dark:bg-blue-900/30',
-		icon: <Loader2 className="h-3 w-3 animate-spin" />,
+		icon: <Loader2 className='h-3 w-3 animate-spin' />,
 	},
 	cancelled: {
 		color: 'text-gray-600 dark:text-gray-400',
 		bg: 'bg-gray-100 dark:bg-gray-900/30',
-		icon: <MinusCircle className="h-3 w-3" />,
+		icon: <MinusCircle className='h-3 w-3' />,
 	},
 	unknown: {
 		color: 'text-muted-foreground',
 		bg: 'bg-muted',
-		icon: <AlertCircle className="h-3 w-3" />,
+		icon: <AlertCircle className='h-3 w-3' />,
 	},
 };
 
-// In-memory cache for CI status (would be replaced with proper caching in production)
-const statusCache = new Map<string, { status: CIStatusInfo; timestamp: number }>();
-const CACHE_TTL = 60000; // 1 minute
+function toCiStatus(value: string): CIStatus {
+	if (value === 'success' || value === 'failure' || value === 'pending' || value === 'running' || value === 'cancelled') {
+		return value;
+	}
+	return 'unknown';
+}
 
-export function CIStatusBadge({ commitHash, repo, showDetails = false }: CIStatusBadgeProps) {
+function useCommitCiStatus(commitHash: string, repo?: string): CIStatusInfo | null {
 	const { activeRepo } = useAppStore();
-	const [isRefreshing, setIsRefreshing] = useState(false);
-	
 	const effectiveRepo = repo || activeRepo;
-	const cacheKey = `${effectiveRepo}-${commitHash}`;
+	const query = trpc.git.ciStatus.useQuery(
+		{ repo: effectiveRepo ?? '', commitHash },
+		{ enabled: !!effectiveRepo && !!commitHash, staleTime: 30_000, refetchOnWindowFocus: false }
+	);
 
-	// Get CI status (mock implementation - would connect to actual APIs)
-	const statusInfo = useMemo<CIStatusInfo>(() => {
-		// Check cache first
-		const cached = statusCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-			return cached.status;
-		}
-
-		// In a real implementation, this would:
-		// 1. Detect the git remote (GitHub, GitLab, etc.)
-		// 2. Make API calls to get CI status
-		// 3. Cache the result
-		
-		// For now, return a mock status based on commit hash
-		const hashNum = parseInt(commitHash.slice(0, 4), 16);
-		const statuses: CIStatus[] = ['success', 'failure', 'pending', 'running', 'cancelled', 'unknown'];
-		const mockStatus = statuses[hashNum % statuses.length];
-		
-		const status: CIStatusInfo = {
-			status: mockStatus,
-			provider: 'github',
-			workflowName: 'CI',
-			runId: `${hashNum}`,
-			url: `https://github.com/example/repo/actions/runs/${hashNum}`,
+	return useMemo(() => {
+		if (!query.data) return null;
+		return {
+			status: toCiStatus(query.data.status),
+			provider: query.data.provider,
+			workflowName: query.data.workflowName,
+			runId: query.data.runId,
+			url: query.data.url,
+			error: query.data.error,
 		};
+	}, [query.data]);
+}
 
-		// Cache it
-		statusCache.set(cacheKey, { status, timestamp: Date.now() });
-		
-		return status;
-	}, [cacheKey, commitHash]);
+export function CIStatusBadge({ commitHash, repo }: CIStatusBadgeProps) {
+	const statusInfo = useCommitCiStatus(commitHash, repo);
+	if (!statusInfo || statusInfo.status === 'unknown') return null;
 
 	const config = STATUS_CONFIG[statusInfo.status];
 
-	const handleRefresh = useCallback(async () => {
-		setIsRefreshing(true);
-		// Clear cache and refetch
-		statusCache.delete(cacheKey);
-		// In real implementation, would refetch from API
-		await new Promise(resolve => setTimeout(resolve, 500));
-		setIsRefreshing(false);
-	}, [cacheKey]);
-
-	if (statusInfo.status === 'unknown') {
-		return null;
-	}
-
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<Badge 
-					variant="outline" 
-					className={`${config.bg} ${config.color} border-0 cursor-pointer`}
-				>
+			<TooltipTrigger>
+				<Badge variant='outline' className={`${config.bg} ${config.color} border-0 cursor-pointer`}>
 					{config.icon}
 				</Badge>
 			</TooltipTrigger>
-			<TooltipContent side="top" className="max-w-xs">
-				<div className="space-y-2">
-					<div className="flex items-center gap-2">
+			<TooltipContent side='top' className='max-w-xs'>
+				<div className='space-y-2'>
+					<div className='flex items-center gap-2'>
 						{config.icon}
-						<span className="font-medium capitalize">{statusInfo.status}</span>
+						<span className='font-medium capitalize'>{statusInfo.status}</span>
 					</div>
-					{statusInfo.workflowName && (
-						<p className="text-xs text-muted-foreground">
-							{statusInfo.workflowName}
-						</p>
-					)}
+					{statusInfo.workflowName && <p className='text-xs text-muted-foreground'>{statusInfo.workflowName}</p>}
+					{statusInfo.error && <p className='text-xs text-amber-600'>{statusInfo.error}</p>}
 					{statusInfo.url && (
-						<a 
+						<a
 							href={statusInfo.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="flex items-center gap-1 text-xs text-primary hover:underline"
-							onClick={(e) => e.stopPropagation()}
-						>
-							<ExternalLink className="h-3 w-3" />
+							target='_blank'
+							rel='noopener noreferrer'
+							className='flex items-center gap-1 text-xs text-primary hover:underline'
+							onClick={(event) => { event.stopPropagation(); }}>
+							<ExternalLink className='h-3 w-3' />
 							View details
 						</a>
 					)}
@@ -176,161 +130,76 @@ export function CIStatusBadge({ commitHash, repo, showDetails = false }: CIStatu
 	);
 }
 
-// Compact version for commit list
 export function CIStatusMini({ commitHash, repo }: { commitHash: string; repo?: string }) {
-	const { activeRepo } = useAppStore();
-	const effectiveRepo = repo || activeRepo;
-	const cacheKey = `${effectiveRepo}-${commitHash}`;
-
-	const statusInfo = useMemo<CIStatusInfo>(() => {
-		const cached = statusCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-			return cached.status;
-		}
-
-		const hashNum = parseInt(commitHash.slice(0, 4), 16);
-		const statuses: CIStatus[] = ['success', 'failure', 'pending', 'running', 'cancelled', 'unknown'];
-		const mockStatus = statuses[hashNum % statuses.length];
-		
-		return {
-			status: mockStatus,
-			provider: 'github',
-		};
-	}, [cacheKey, commitHash]);
-
-	if (statusInfo.status === 'unknown') return null;
+	const statusInfo = useCommitCiStatus(commitHash, repo);
+	if (!statusInfo || statusInfo.status === 'unknown') return null;
 
 	const config = STATUS_CONFIG[statusInfo.status];
-
-	return (
-		<span className={`${config.color}`}>
-			{config.icon}
-		</span>
-	);
+	return <span className={config.color}>{config.icon}</span>;
 }
 
-// Full status panel for commit details
 export function CIStatusPanel({ commitHash, repo }: { commitHash: string; repo?: string }) {
 	const { activeRepo } = useAppStore();
 	const effectiveRepo = repo || activeRepo;
-	const cacheKey = `${effectiveRepo}-${commitHash}`;
+	const query = trpc.git.ciStatus.useQuery(
+		{ repo: effectiveRepo ?? '', commitHash },
+		{ enabled: !!effectiveRepo && !!commitHash, staleTime: 30_000 }
+	);
 
-	const statusInfo = useMemo<CIStatusInfo>(() => {
-		const cached = statusCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-			return cached.status;
-		}
+	const statusInfo = query.data;
+	if (!statusInfo || statusInfo.status === 'unknown') return null;
 
-		const hashNum = parseInt(commitHash.slice(0, 4), 16);
-		const statuses: CIStatus[] = ['success', 'failure', 'pending', 'running', 'cancelled', 'unknown'];
-		const mockStatus = statuses[hashNum % statuses.length];
-		
-		return {
-			status: mockStatus,
-			provider: 'github',
-			workflowName: 'CI / Build and Test',
-			runId: `${hashNum}`,
-			url: `https://github.com/example/repo/actions/runs/${hashNum}`,
-			startedAt: new Date(Date.now() - 300000).toISOString(),
-			finishedAt: mockStatus === 'success' || mockStatus === 'failure' 
-				? new Date(Date.now() - 120000).toISOString() 
-				: undefined,
-			duration: 180,
-		};
-	}, [cacheKey, commitHash]);
-
-	const config = STATUS_CONFIG[statusInfo.status];
-
-	const formatDuration = (seconds: number) => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}m ${secs}s`;
-	};
+	const config = STATUS_CONFIG[toCiStatus(statusInfo.status)];
 
 	return (
-		<div className="border rounded-lg overflow-hidden">
-			<div className="px-3 py-2 bg-muted/50 border-b flex items-center justify-between">
-				<span className="text-sm font-medium flex items-center gap-2">
-					<GitBranch className="h-4 w-4" />
+		<div className='border rounded-lg overflow-hidden'>
+			<div className='px-3 py-2 bg-muted/50 border-b flex items-center justify-between'>
+				<span className='text-sm font-medium flex items-center gap-2'>
+					<GitBranch className='h-4 w-4' />
 					CI/CD Status
 				</span>
-				<Badge className={`${config.bg} ${config.color} border-0`}>
-					{config.icon}
-					<span className="ml-1 capitalize">{statusInfo.status}</span>
-				</Badge>
+				<div className='flex items-center gap-2'>
+					<Badge className={`${config.bg} ${config.color} border-0`}>
+						{config.icon}
+						<span className='ml-1 capitalize'>{statusInfo.status}</span>
+					</Badge>
+					<Button variant='ghost' size='sm' className='h-7 w-7 p-0' onClick={() => query.refetch()}>
+						<RefreshCw className={`h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />
+					</Button>
+				</div>
 			</div>
-			
-			<div className="p-3 space-y-3">
+			<div className='p-3 space-y-2 text-sm'>
+				<div className='flex justify-between'>
+					<span className='text-muted-foreground'>Provider</span>
+					<span className='uppercase'>{statusInfo.provider}</span>
+				</div>
 				{statusInfo.workflowName && (
-					<div className="flex items-center justify-between">
-						<span className="text-sm text-muted-foreground">Workflow</span>
-						<span className="text-sm font-medium">{statusInfo.workflowName}</span>
+					<div className='flex justify-between'>
+						<span className='text-muted-foreground'>Workflow</span>
+						<span>{statusInfo.workflowName}</span>
 					</div>
 				)}
-				
-				{statusInfo.duration && (
-					<div className="flex items-center justify-between">
-						<span className="text-sm text-muted-foreground">Duration</span>
-						<span className="text-sm">{formatDuration(statusInfo.duration)}</span>
-					</div>
-				)}
-
 				{statusInfo.runId && (
-					<div className="flex items-center justify-between">
-						<span className="text-sm text-muted-foreground">Run ID</span>
-						<span className="text-sm font-mono">#{statusInfo.runId}</span>
+					<div className='flex justify-between'>
+						<span className='text-muted-foreground'>Run</span>
+						<span>{statusInfo.runId}</span>
 					</div>
 				)}
-
+				{statusInfo.error && <p className='text-xs text-amber-600'>{statusInfo.error}</p>}
 				{statusInfo.url && (
 					<a
 						href={statusInfo.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="flex items-center justify-center gap-2 text-sm text-primary hover:underline mt-2"
+						target='_blank'
+						rel='noopener noreferrer'
+						className='inline-flex items-center gap-1 text-primary hover:underline'
 					>
-						<ExternalLink className="h-4 w-4" />
-						View on {statusInfo.provider === 'github' ? 'GitHub' : 'GitLab'}
+						<ExternalLink className='h-3.5 w-3.5' />
+						Open run details
 					</a>
 				)}
 			</div>
 		</div>
 	);
-}
-
-// Hook to fetch CI status for multiple commits
-export function useCIStatuses(commitHashes: string[], repo?: string) {
-	const { activeRepo } = useAppStore();
-	const effectiveRepo = repo || activeRepo;
-
-	return useMemo(() => {
-		const statuses = new Map<string, CIStatusInfo>();
-		
-		for (const hash of commitHashes) {
-			const cacheKey = `${effectiveRepo}-${hash}`;
-			const cached = statusCache.get(cacheKey);
-			
-			if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-				statuses.set(hash, cached.status);
-				continue;
-			}
-
-			// Mock status
-			const hashNum = parseInt(hash.slice(0, 4), 16);
-			const statusList: CIStatus[] = ['success', 'failure', 'pending', 'unknown'];
-			const mockStatus = statusList[hashNum % statusList.length];
-			
-			const status: CIStatusInfo = {
-				status: mockStatus,
-				provider: 'github',
-			};
-			
-			statuses.set(hash, status);
-			statusCache.set(cacheKey, { status, timestamp: Date.now() });
-		}
-		
-		return statuses;
-	}, [commitHashes, effectiveRepo]);
 }
 
 export default CIStatusBadge;

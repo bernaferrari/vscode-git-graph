@@ -22,16 +22,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-	parseDiffWithInlineDiffs,
-	DiffCharRenderer,
 	type LineDiff,
 } from '@/lib/diff-utils';
+
+interface HunkLine extends LineDiff {
+	content: string;
+}
 
 interface Hunk {
 	startLine: number;
 	endLine: number;
 	header: string;
-	lines: LineDiff[];
+	lines: HunkLine[];
 	staged: boolean;
 	partiallyStaged: boolean;
 }
@@ -285,24 +287,25 @@ function parseDiffIntoHunks(diffText: string, isStaged: boolean): Hunk[] {
 				partiallyStaged: false,
 			};
 		} else if (currentHunk) {
-			const type: 'added' | 'removed' | 'context' = 
-				line.startsWith('+') ? 'added' :
-				line.startsWith('-') ? 'removed' : 'context';
-			
-			if (type !== 'context' || line.startsWith(' ')) {
-				currentHunk.lines.push({
-					type,
-					content: line.slice(1),
-					left: type === 'removed' || type === 'context' ? {
-						chars: line.slice(1).split('').map(c => ({ char: c, type: 'unchanged' as const })),
-						html: line.slice(1),
-					} : null,
-					right: type === 'added' || type === 'context' ? {
-						chars: line.slice(1).split('').map(c => ({ char: c, type: 'unchanged' as const })),
-						html: line.slice(1),
-					} : null,
-					leftLineNum: 0,
-					rightLineNum: 0,
+				const type: 'added' | 'removed' | 'context' = 
+					line.startsWith('+') ? 'added' :
+					line.startsWith('-') ? 'removed' : 'context';
+				
+				if (type !== 'context' || line.startsWith(' ')) {
+					const content = line.slice(1);
+					currentHunk.lines.push({
+						type,
+						content,
+						left: type === 'removed' || type === 'context' ? {
+							chars: content.split('').map(c => ({ char: c, type: 'unchanged' as const })),
+							html: content,
+						} : null,
+						right: type === 'added' || type === 'context' ? {
+							chars: content.split('').map(c => ({ char: c, type: 'unchanged' as const })),
+							html: content,
+						} : null,
+						leftLineNum: 0,
+						rightLineNum: 0,
 				});
 				currentHunk.endLine = lineNum;
 			}

@@ -4,18 +4,18 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Select,
 	SelectContent,
@@ -24,8 +24,9 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { trpc } from '@/trpc/client';
 
 interface SettingsDialogProps {
 	open: boolean;
@@ -253,7 +254,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 								<CardContent className="space-y-4">
 									<div className="space-y-2">
 										<Label>Graph Style</Label>
-										<Select value={graphStyle} onValueChange={(v) => setGraphStyle(v as 'rounded' | 'angular')}>
+										<Select value={graphStyle} onValueChange={(v) => { setGraphStyle(v as 'rounded' | 'angular'); }}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>
@@ -269,7 +270,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 										<textarea
 											className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
 											value={graphColors}
-											onChange={(e) => setGraphColors(e.target.value)}
+											onChange={(e) => { setGraphColors(e.target.value); }}
 											placeholder="#0085d9&#10;#d9008f&#10;#00d90a"
 										/>
 									</div>
@@ -293,7 +294,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 										<Input
 											type="number"
 											value={initialLoadCommits}
-											onChange={(e) => setInitialLoadCommits(parseInt(e.target.value) || 300)}
+											onChange={(e) => { setInitialLoadCommits(parseInt(e.target.value) || 300); }}
 											min={50}
 											max={1000}
 										/>
@@ -344,7 +345,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 								<CardContent className="space-y-4">
 									<div className="space-y-2">
 										<Label>Reset Mode</Label>
-										<Select value={resetCommitMode} onValueChange={(v) => setResetCommitMode(v as 'soft' | 'mixed' | 'hard')}>
+										<Select value={resetCommitMode} onValueChange={(v) => { setResetCommitMode(v as 'soft' | 'mixed' | 'hard'); }}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>
@@ -358,7 +359,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
 									<div className="space-y-2">
 										<Label>Add Tag Type</Label>
-										<Select value={addTagType} onValueChange={(v) => setAddTagType(v as 'annotated' | 'lightweight')}>
+										<Select value={addTagType} onValueChange={(v) => { setAddTagType(v as 'annotated' | 'lightweight'); }}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>

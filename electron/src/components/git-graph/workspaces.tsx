@@ -3,14 +3,6 @@
  * Group related repositories for quick access
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { trpc } from '@/trpc/client';
-import { useRepoActivation } from '@/hooks/useRepoActivation';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     FolderGit2,
     Plus,
@@ -27,14 +19,25 @@ import {
     ArrowUp,
     ArrowDown,
     CircleAlert,
+    Loader2,
 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useRepoActivation } from '@/hooks/useRepoActivation';
+import { trpc } from '@/trpc/client';
+
 
 export interface Workspace {
     id: string;
@@ -66,6 +69,29 @@ const COLORS = [
 ];
 const DEFAULT_WORKSPACE_COLOR = 'bg-blue-500';
 
+interface LaunchpadRepoStatus {
+    path: string;
+    name: string;
+    head: string | null;
+    dirtyCount: number;
+    ahead: number;
+    behind: number;
+    lastCommit: {
+        hash: string;
+        message: string;
+        author: string;
+        timestamp: number;
+    } | null;
+    provider: string | null;
+    openPullRequests: number | null;
+    error: string | null;
+}
+
+interface LaunchpadResult {
+    repos: LaunchpadRepoStatus[];
+    error?: string | null;
+}
+
 export function WorkspacesManager({
     open,
     onOpenChange,
@@ -83,6 +109,20 @@ export function WorkspacesManager({
     const [editName, setEditName] = useState('');
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
     const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
+    const fetchManyMutation = trpc.repo.fetchMany.useMutation({
+        onSuccess: (result) => {
+            const failed = result.results.filter((entry) => entry.error);
+            if (failed.length === 0) {
+                toast.success('Fetched all workspace repositories');
+            } else {
+                toast.error(`Fetched with ${failed.length} failures`);
+            }
+            void launchpadQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error('Failed to fetch repositories', { description: error.message });
+        },
+    });
     const selectedWorkspaceRepoPaths = useMemo(
         () => selectedWorkspace?.repos.map((repo) => repo.path) ?? [],
         [selectedWorkspace]
@@ -98,10 +138,11 @@ export function WorkspacesManager({
             refetchOnWindowFocus: false,
         }
     );
+    const launchpadData = launchpadQuery.data as LaunchpadResult | undefined;
     const launchpadByPath = useMemo(() => {
-        const entries = launchpadQuery.data?.repos ?? [];
-        return new Map(entries.map((entry) => [entry.path, entry]));
-    }, [launchpadQuery.data?.repos]);
+        const entries = launchpadData?.repos ?? [];
+        return new Map<string, LaunchpadRepoStatus>(entries.map((entry) => [entry.path, entry]));
+    }, [launchpadData?.repos]);
 
     // Load workspaces
     useEffect(() => {
@@ -241,6 +282,17 @@ export function WorkspacesManager({
         }
     };
 
+    const handleFetchWorkspace = async (workspace: Workspace) => {
+        if (workspace.repos.length === 0) {
+            toast.info('No repositories in this workspace');
+            return;
+        }
+        fetchManyMutation.mutate({
+            repos: workspace.repos.map((repo) => repo.path),
+            prune: true,
+        });
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className='ui-surface flex max-h-[85vh] max-w-3xl flex-col'>
@@ -260,7 +312,7 @@ export function WorkspacesManager({
                                 variant='ghost'
                                 size='sm'
                                 className='h-6 w-6 p-0'
-                                onClick={() => setIsCreating(true)}>
+                                onClick={() => { setIsCreating(true); }}>
                                 <Plus className='h-4 w-4' />
                             </Button>
                         </div>
@@ -271,7 +323,7 @@ export function WorkspacesManager({
                                     <Input
                                         placeholder='Workspace name...'
                                         value={newWorkspaceName}
-                                        onChange={(e) => setNewWorkspaceName(e.target.value)}
+                                        onChange={(e) => { setNewWorkspaceName(e.target.value); }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') handleCreateWorkspace();
                                             if (e.key === 'Escape') setIsCreating(false);
@@ -282,7 +334,7 @@ export function WorkspacesManager({
                                         <Button size='sm' onClick={handleCreateWorkspace}>
                                             <Check className='h-3 w-3' />
                                         </Button>
-                                        <Button size='sm' variant='ghost' onClick={() => setIsCreating(false)}>
+                                        <Button size='sm' variant='ghost' onClick={() => { setIsCreating(false); }}>
                                             <X className='h-3 w-3' />
                                         </Button>
                                     </div>
@@ -295,18 +347,18 @@ export function WorkspacesManager({
                                     className={`hover:bg-accent/50 flex cursor-pointer items-center gap-2 px-3 py-2 ${
                                         selectedWorkspace?.id === workspace.id ? 'bg-accent' : ''
                                     }`}
-                                    onClick={() => setSelectedWorkspace(workspace)}>
+                                    onClick={() => { setSelectedWorkspace(workspace); }}>
                                     <div className={`h-3 w-3 rounded ${workspace.color}`} />
                                     <span className='flex-1 truncate text-sm'>
                                         {editingWorkspace === workspace.id ? (
                                             <Input
                                                 value={editName}
-                                                onChange={(e) => setEditName(e.target.value)}
+                                                onChange={(e) => { setEditName(e.target.value); }}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') handleRenameWorkspace(workspace.id);
                                                     if (e.key === 'Escape') setEditingWorkspace(null);
                                                 }}
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) => { e.stopPropagation(); }}
                                                 className='h-6'
                                             />
                                         ) : (
@@ -352,6 +404,13 @@ export function WorkspacesManager({
                                                 <MoreHorizontal className='h-4 w-4' />
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align='end'>
+                                                <DropdownMenuItem
+                                                    onClick={() => {
+                                                        void handleFetchWorkspace(selectedWorkspace);
+                                                    }}>
+                                                    <RefreshCw className='mr-2 h-4 w-4' />
+                                                    Fetch All
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleAddRepo(selectedWorkspace.id)}>
                                                     <Plus className='mr-2 h-4 w-4' />
                                                     Add Repository
@@ -365,7 +424,7 @@ export function WorkspacesManager({
                                                     Rename
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
-                                                    onClick={() => handleDeleteWorkspace(selectedWorkspace.id)}
+                                                    onClick={() => { handleDeleteWorkspace(selectedWorkspace.id); }}
                                                     className='text-red-600'>
                                                     <Trash2 className='mr-2 h-4 w-4' />
                                                     Delete
@@ -382,9 +441,25 @@ export function WorkspacesManager({
                                                 <span className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
                                                     Launchpad
                                                 </span>
-                                                <span className='text-[11px] text-muted-foreground'>
-                                                    {launchpadQuery.isFetching ? 'syncing...' : 'ready'}
-                                                </span>
+                                                <div className='flex items-center gap-2'>
+                                                    <span className='text-[11px] text-muted-foreground'>
+                                                        {launchpadQuery.isFetching ? 'syncing...' : 'ready'}
+                                                    </span>
+                                                    <Button
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        className='h-5 px-1.5 text-[10px]'
+                                                        onClick={() => {
+                                                            void handleFetchWorkspace(selectedWorkspace);
+                                                        }}
+                                                        disabled={fetchManyMutation.isPending}>
+                                                        {fetchManyMutation.isPending ? (
+                                                            <Loader2 className='h-3 w-3 animate-spin' />
+                                                        ) : (
+                                                            'Fetch all'
+                                                        )}
+                                                    </Button>
+                                                </div>
                                             </div>
                                             <div className='grid grid-cols-3 gap-2 text-xs'>
                                                 <div className='rounded border px-2 py-1'>

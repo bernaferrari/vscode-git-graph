@@ -274,15 +274,19 @@ const buildTodoLine = (todo: TodoItem, sanitizeTodoMessage: (message: string) =>
 	if (todo.kind === 'comment' || todo.kind === 'raw') {
 		return todo.message;
 	}
+	if (!isCommandAction(todo.action)) {
+		return todo.message;
+	}
 
-	if (todo.action === 'drop') {
+	const commandAction = todo.action;
+	if (commandAction === 'drop') {
 		return '';
 	}
 
 	const message = sanitizeTodoMessage(todo.message);
-	const parts = [todo.action];
+	const parts: string[] = [commandAction];
 
-	if (!COMMAND_ACTIONS_WITHOUT_HASH.has(todo.action)) {
+	if (!COMMAND_ACTIONS_WITHOUT_HASH.has(commandAction)) {
 		if (todo.hash) {
 			parts.push(todo.hash);
 		}

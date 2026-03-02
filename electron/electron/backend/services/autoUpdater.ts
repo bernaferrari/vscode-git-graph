@@ -3,8 +3,9 @@
  * Handles automatic application updates using electron-updater
  */
 
-import { autoUpdater, type UpdateInfo } from 'electron-updater';
 import { BrowserWindow, dialog, Notification } from 'electron';
+import { autoUpdater, type UpdateInfo } from 'electron-updater';
+
 import { getLogger } from './logger';
 
 export interface UpdateStatus {
@@ -100,7 +101,7 @@ class AutoUpdateManager {
 
 	private updateStatus(partial: Partial<UpdateStatus>): void {
 		this.status = { ...this.status, ...partial };
-		this.callbacks.forEach((callback) => callback(this.status));
+		this.callbacks.forEach((callback) => { callback(this.status); });
 	}
 
 	private notifyUpdateAvailable(info: UpdateInfo): void {
@@ -109,9 +110,9 @@ class AutoUpdateManager {
 			body: `Version ${info.version} is available. Click to download.`,
 		});
 
-		notification.on('click', () => {
-			this.downloadUpdate();
-		});
+			notification.on('click', () => {
+				void this.downloadUpdate();
+			});
 
 		notification.show();
 	}
@@ -149,13 +150,13 @@ class AutoUpdateManager {
 	/**
 	 * Check for updates
 	 */
-	public async checkForUpdates(): Promise<void> {
-		try {
-			await autoUpdater.checkForUpdates();
-		} catch (error) {
-			this.logger.logError(`Failed to check for updates: ${error}`);
+		public async checkForUpdates(): Promise<void> {
+			try {
+				await autoUpdater.checkForUpdates();
+			} catch (error) {
+				this.logger.logError(`Failed to check for updates: ${String(error)}`);
+			}
 		}
-	}
 
 	/**
 	 * Download the available update

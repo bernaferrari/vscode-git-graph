@@ -156,7 +156,7 @@ class NotificationsManager {
 		return configs[type];
 	}
 
-	private getDefaultIcon(): nativeImage {
+	private getDefaultIcon(): Electron.NativeImage {
 		const iconPath = app.isPackaged
 			? path.join(process.resourcesPath, 'icon.png')
 			: path.join(__dirname, '../../../public/icon.png');

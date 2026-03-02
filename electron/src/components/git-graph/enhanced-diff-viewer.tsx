@@ -3,12 +3,6 @@
  * Side-by-side and unified diff with word/character-level highlighting
  */
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { Toggle } from '@/components/ui/toggle';
 import {
 	AlignLeft,
 	Columns,
@@ -21,6 +15,11 @@ import {
 	Eye,
 	EyeOff,
 } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Toggle } from '@/components/ui/toggle';
 import {
 	parseDiffWithInlineDiffs,
 	computeInlineDiff,
@@ -28,6 +27,8 @@ import {
 	type DiffChar,
 	DiffCharRenderer,
 } from '@/lib/diff-utils';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface EnhancedDiffViewerProps {
 	file: {
@@ -120,7 +121,7 @@ export function EnhancedDiffViewer({
 	const handleCopy = () => {
 		navigator.clipboard.writeText(diffData?.diff ?? '');
 		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
+		setTimeout(() => { setCopied(false); }, 2000);
 	};
 
 	// Render whitespace characters
@@ -208,7 +209,7 @@ export function EnhancedDiffViewer({
 							type="text"
 							placeholder="Search..."
 							value={searchQuery}
-							onChange={(e) => handleSearch(e.target.value)}
+							onChange={(e) => { handleSearch(e.target.value); }}
 							className="h-7 w-32 pl-7 pr-2 text-xs rounded border bg-background"
 						/>
 						{searchResults.length > 0 && (
@@ -224,7 +225,7 @@ export function EnhancedDiffViewer({
 							variant={viewMode === 'side-by-side' ? 'default' : 'ghost'}
 							size="sm"
 							className="h-7 px-2 rounded-r-none"
-							onClick={() => setViewMode('side-by-side')}
+							onClick={() => { setViewMode('side-by-side'); }}
 						>
 							<Columns className="h-3 w-3" />
 						</Button>
@@ -232,7 +233,7 @@ export function EnhancedDiffViewer({
 							variant={viewMode === 'unified' ? 'default' : 'ghost'}
 							size="sm"
 							className="h-7 px-2 rounded-l-none"
-							onClick={() => setViewMode('unified')}
+							onClick={() => { setViewMode('unified'); }}
 						>
 							<AlignLeft className="h-3 w-3" />
 						</Button>

@@ -107,9 +107,8 @@ function getOperationIcon(type: GitOperationType) {
 		case 'cherry_pick':
 		case 'revert':
 			return <GitPullRequest className="h-4 w-4" />;
-		case 'push':
-		case 'upload':
-			return <Upload className="h-4 w-4" />;
+			case 'push':
+				return <Upload className="h-4 w-4" />;
 		case 'pull':
 		case 'fetch':
 			return <Download className="h-4 w-4" />;

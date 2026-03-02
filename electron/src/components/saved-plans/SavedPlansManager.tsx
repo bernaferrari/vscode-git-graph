@@ -3,30 +3,7 @@
  * Store, share, and reuse rewrite plans
  */
 
-import { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from '@/components/ui/sheet';
+import { formatDistanceToNow } from 'date-fns';
 import {
 	Save,
 	FolderOpen,
@@ -43,8 +20,34 @@ import {
 	MoreHorizontal,
 	ExternalLink,
 } from 'lucide-react';
+import { Play } from 'lucide-react';
+import { useState, useCallback } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+
 
 export interface SavedPlan {
 	id: string;
@@ -185,7 +188,7 @@ export function SavedPlansManager({
 					<Input
 						placeholder="Search plans..."
 						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
+						onChange={(e) => { setSearchQuery(e.target.value); }}
 						className="h-9"
 					/>
 					<div className="flex flex-wrap gap-1">
@@ -194,11 +197,11 @@ export function SavedPlansManager({
 								key={tag}
 								variant={filterTags.includes(tag) ? 'default' : 'outline'}
 								className="cursor-pointer"
-								onClick={() => setFilterTags(prev =>
+								onClick={() => { setFilterTags(prev =>
 									prev.includes(tag)
 										? prev.filter(t => t !== tag)
 										: [...prev, tag]
-								)}
+								); }}
 							>
 								{tag}
 							</Badge>
@@ -226,7 +229,7 @@ export function SavedPlansManager({
 											'cursor-pointer transition-colors',
 											selectedPlan?.id === plan.id && 'border-primary'
 										)}
-										onClick={() => setSelectedPlan(plan)}
+										onClick={() => { setSelectedPlan(plan); }}
 									>
 										<CardContent className="p-3">
 											<div className="flex items-start justify-between">
@@ -277,7 +280,7 @@ export function SavedPlansManager({
 														variant="ghost"
 														size="sm"
 														className="h-8 w-8 p-0"
-														onClick={() => duplicatePlan(selectedPlan)}
+														onClick={() => { duplicatePlan(selectedPlan); }}
 													>
 														<Copy className="h-4 w-4" />
 													</Button>
@@ -290,7 +293,7 @@ export function SavedPlansManager({
 														variant="ghost"
 														size="sm"
 														className="h-8 w-8 p-0 text-red-500"
-														onClick={() => deletePlan(selectedPlan.id)}
+														onClick={() => { deletePlan(selectedPlan.id); }}
 													>
 														<Trash2 className="h-4 w-4" />
 													</Button>
@@ -368,4 +371,3 @@ export function SavedPlansManager({
 }
 
 // Import Play icon
-import { Play } from 'lucide-react';

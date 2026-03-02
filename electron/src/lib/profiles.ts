@@ -80,7 +80,7 @@ export const useProfiles = create<ProfilesState>()(
 			repoPolicies: {},
 
 			addProfile: (profile) => {
-				const id = `profile-${Date.now()}`;
+				const id = `profile-${String(Date.now())}`;
 				set((state) => ({
 					profiles: [...state.profiles, { ...profile, id }],
 				}));

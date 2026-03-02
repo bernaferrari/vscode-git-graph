@@ -162,6 +162,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                     </select>
                                 </SettingRow>
                                 <SettingRow
+                                    label='High-contrast mode'
+                                    description='Increase contrast and focus visibility for accessibility'>
+                                    <Switch
+                                        checked={settings.enhancedAccessibility}
+                                        onCheckedChange={(v) => updateSetting('enhancedAccessibility', v)}
+                                    />
+                                </SettingRow>
+                                <SettingRow
                                     label='Commit message length'
                                     description='Max characters before truncating (0 = no limit)'>
                                     <Input

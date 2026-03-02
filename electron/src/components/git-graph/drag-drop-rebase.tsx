@@ -3,12 +3,14 @@
  * Improved UX with drag-to-reorder commits
  */
 
+import { GripVertical } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Select,
 	SelectContent,
@@ -17,8 +19,8 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { GripVertical } from 'lucide-react';
-import { toast } from 'sonner';
+import { trpc } from '@/trpc/client';
+
 
 type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
 
@@ -221,7 +223,7 @@ const rebaseMutation = trpc.git.rebase.useMutation({
 								{/* Action selector */}
 								<Select
 									value={commit.action}
-									onValueChange={(v) => handleActionChange(index, v as RebaseAction)}
+									onValueChange={(v) => { handleActionChange(index, v as RebaseAction); }}
 								>
 									<SelectTrigger className={cn(
 										'w-24 h-7 text-xs',

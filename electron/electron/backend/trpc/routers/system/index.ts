@@ -6,8 +6,9 @@
 import { dialog, app, shell } from 'electron';
 import { exec, spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { publicProcedure, router } from '@/app/backend/trpc/init';
 import { z } from 'zod';
+
+import { publicProcedure, router } from '@/app/backend/trpc/init';
 
 import { signalReady } from './signalReady';
 import { getAutoUpdateManager } from '../../../services/autoUpdater';
@@ -113,7 +114,7 @@ const openTerminalProcedure = publicProcedure
 			path: z.string(),
 		})
 	)
-	.mutation(async ({ input }) => {
+	.mutation(({ input }) => {
 		try {
 			const launched = launchTerminal(input.path);
 			if (!launched) {
@@ -159,13 +160,13 @@ export const systemRouter = router({
         }),
 
     // Reveal a repository path in the OS file explorer
-    revealInFinder: publicProcedure
+	    revealInFinder: publicProcedure
         .input(
             z.object({
                 path: z.string(),
             })
         )
-        .mutation(async ({ input }) => {
+	        .mutation(({ input }) => {
             try {
                 shell.showItemInFolder(input.path);
                 return { success: true };
@@ -177,14 +178,14 @@ export const systemRouter = router({
             }
         }),
 
-    revealInRepo: publicProcedure
+	    revealInRepo: publicProcedure
         .input(
             z.object({
                 repo: z.string(),
                 path: z.string(),
             })
         )
-        .mutation(async ({ input }) => {
+	        .mutation(({ input }) => {
             try {
                 const fullPath = resolvePathInRepo(input.repo, input.path);
                 shell.showItemInFolder(fullPath);
@@ -226,18 +227,18 @@ export const systemRouter = router({
                         cwd: input.cwd,
                         timeout: timeoutMs,
                         maxBuffer: 10 * 1024 * 1024,
-                        shell: process.env.SHELL || true,
+                        ...(process.env.SHELL ? { shell: process.env.SHELL } : {}),
                     },
-                    (error, stdout, stderr) => {
-                        const execError = error as (Error & { code?: number; killed?: boolean }) | null;
-                        resolve({
-                            success: !execError,
-                            stdout: stdout ?? '',
-                            stderr: stderr ?? '',
-                            exitCode: typeof execError?.code === 'number' ? execError.code : null,
-                            timedOut: Boolean(execError?.killed),
-                            error: execError ? execError.message : null,
-                        });
+	                    (error: Error | null, stdout: string, stderr: string) => {
+	                        const execError = error as (Error & { code?: number; killed?: boolean }) | null;
+	                        resolve({
+	                            success: !execError,
+	                            stdout,
+	                            stderr,
+	                            exitCode: typeof execError?.code === 'number' ? execError.code : null,
+	                            timedOut: Boolean(execError?.killed),
+	                            error: execError ? execError.message : null,
+	                        });
                     }
                 );
             });

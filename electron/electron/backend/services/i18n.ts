@@ -3,8 +3,6 @@
  * Provides translation support for the Git Graph application
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
 import { app } from 'electron';
 
 export type Locale = 'en' | 'es' | 'fr' | 'de' | 'ja' | 'zh-CN' | 'zh-TW' | 'ko' | 'pt-BR' | 'ru';
@@ -276,7 +274,7 @@ export class I18nManager {
 	 */
 	public setLocale(locale: Locale): void {
 		this.locale = locale;
-		this.translations = translations[locale] ?? translations.en;
+		this.translations = translations[locale];
 	}
 
 	/**

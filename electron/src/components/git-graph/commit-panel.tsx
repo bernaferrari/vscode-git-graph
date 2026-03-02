@@ -4,13 +4,6 @@
  * Now with inline staging diff support
  */
 
-import { useState, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     GitCommit,
     Plus,
@@ -27,16 +20,24 @@ import {
     List,
     X,
 } from 'lucide-react';
-import { useGitOperations } from '@/hooks/useGitOperations';
+import { useState, useMemo, useCallback } from 'react';
+
+import { FileTreeView } from './file-tree-view';
+import { InlineStagingDiff } from './inline-staging-diff';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FileTreeView } from './file-tree-view';
-import { InlineStagingDiff } from './inline-staging-diff';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface CommitPanelProps {
     onCommit?: () => void;
@@ -147,7 +148,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                 variant={viewMode === 'tree' ? 'secondary' : 'ghost'}
                                 size='sm'
                                 className='h-6 w-6 p-0'
-                                onClick={() => setViewMode(viewMode === 'tree' ? 'flat' : 'tree')}>
+                                onClick={() => { setViewMode(viewMode === 'tree' ? 'flat' : 'tree'); }}>
                                 {viewMode === 'tree' ? (
                                     <FolderTree className='h-3 w-3' />
                                 ) : (
@@ -173,7 +174,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                     {staged.length > 0 && (
                         <div className='mb-2'>
                             <button
-                                onClick={() => setExpandedStaged(!expandedStaged)}
+                                onClick={() => { setExpandedStaged(!expandedStaged); }}
                                 className='text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-xs font-medium'>
                                 {expandedStaged ? (
                                     <ChevronDown className='h-3 w-3' />
@@ -204,7 +205,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                             selected={selectedFile?.path === file.file}
                                             onToggle={() => handleUnstageFile(file.file)}
                                             onClick={() =>
-                                                setSelectedFile({ path: file.file, status: file.status, staged: true })
+                                                { setSelectedFile({ path: file.file, status: file.status, staged: true }); }
                                             }
                                         />
                                     ))}
@@ -217,7 +218,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                     {unstaged.length > 0 && (
                         <div className='mb-2'>
                             <button
-                                onClick={() => setExpandedUnstaged(!expandedUnstaged)}
+                                onClick={() => { setExpandedUnstaged(!expandedUnstaged); }}
                                 className='text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-xs font-medium'>
                                 {expandedUnstaged ? (
                                     <ChevronDown className='h-3 w-3' />
@@ -248,7 +249,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                             selected={selectedFile?.path === file.file}
                                             onToggle={() => handleStageFile(file.file)}
                                             onClick={() =>
-                                                setSelectedFile({ path: file.file, status: file.status, staged: false })
+                                                { setSelectedFile({ path: file.file, status: file.status, staged: false }); }
                                             }
                                         />
                                     ))}
@@ -272,7 +273,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                 <div className='flex h-64 flex-col border-t'>
                     <div className='bg-muted/50 flex items-center justify-between border-b px-2 py-1'>
                         <span className='truncate text-xs font-medium'>{selectedFile.path}</span>
-                        <Button variant='ghost' size='sm' className='h-5 w-5 p-0' onClick={() => setSelectedFile(null)}>
+                        <Button variant='ghost' size='sm' className='h-5 w-5 p-0' onClick={() => { setSelectedFile(null); }}>
                             <span className='sr-only'>Close inline diff</span>
                             <X className='h-3 w-3' />
                         </Button>
@@ -292,7 +293,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                 <Textarea
                     placeholder='Commit message...'
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => { setMessage(e.target.value); }}
                     className='min-h-[60px] resize-none text-sm'
                     disabled={!hasChanges}
                 />

@@ -3,19 +3,7 @@
  * Shows recent Git operations with undo capability
  */
 
-import {
-    useOperationLog,
-    formatOperationDescription,
-    getOperationStatusColor,
-    type OperationReceipt,
-} from '@/lib/operationLog';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
-import { isValidElement, useCallback, useState, type ReactElement } from 'react';
-import { toast } from 'sonner';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { formatDistanceToNow } from 'date-fns';
 import {
     History,
     RotateCcw,
@@ -33,8 +21,22 @@ import {
     Loader2,
     X,
 } from 'lucide-react';
+import { isValidElement, useCallback, useState, type ReactElement } from 'react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+    useOperationLog,
+    formatOperationDescription,
+    getOperationStatusColor,
+    type OperationReceipt,
+} from '@/lib/operationLog';
+import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { trpc } from '@/trpc/client';
+
 
 const OPERATION_ICONS: Record<string, React.ElementType> = {
     commit: GitCommit,
@@ -204,7 +206,7 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                                             variant='ghost'
                                             size='sm'
                                             className='h-7 w-7 p-0'
-                                            onClick={() => cancelQueuedOperation(entry.id)}
+                                            onClick={() => { cancelQueuedOperation(entry.id); }}
                                             aria-label={`Cancel ${entry.label}`}>
                                             <X className='h-3.5 w-3.5' />
                                         </Button>

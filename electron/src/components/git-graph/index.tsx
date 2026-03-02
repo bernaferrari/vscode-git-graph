@@ -3,7 +3,6 @@
  * GitKraken-style Git visualization
  */
 
-import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef, startTransition } from 'react';
 import {
     Loader2,
     GitBranch,
@@ -43,35 +42,34 @@ import {
     Copy,
     ListPlus,
 } from 'lucide-react';
+import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef, startTransition } from 'react';
 import { toast } from 'sonner';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { CommitGraph } from './commit-graph';
-import type { FindOptions } from './find-widget';
+
 import { BranchDropdown } from './branch-dropdown';
-import { SidePanel } from './side-panel';
-import type { CommitFilter } from './commit-history-filters';
-import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
-import { useCommitTemplates } from './useCommitTemplates';
-import { DragDropCherryPick } from './drag-drop-cherry-pick';
+import { CommitGraph } from './commit-graph';
 import { CommitGraphLegend } from './commit-graph-legend';
-import { useSettings } from './useSettings';
+import { DragCommitHandler } from './drag-commit-to-branch';
+import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
+import { OperationStatusBar } from './operation-status-bar';
+import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
+import { SidePanel } from './side-panel';
+
+import { useCommitTemplates } from './useCommitTemplates';
+import { useSettings } from './useSettings';
 import { VirtualizedCommitList } from './virtualized-commit-list';
 import { UndoStackProvider, UndoStackDialog } from './undo-stack';
 import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
-import { OperationStatusBar } from './operation-status-bar';
-import { DragCommitHandler } from './drag-commit-to-branch';
-import { useGitOperations } from '@/hooks/useGitOperations';
-import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { useActionPreview, type ActionPreview } from '@/components/action-preview';
 import { LensSwitcher, useLensMode } from '@/components/lens';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { DEFAULT_GRAPH_CONFIG } from '@/lib/graph/layout';
 import { useGraphLayoutWorker } from '@/lib/graph/useGraphLayoutWorker';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -80,6 +78,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
+import type { CommitFilter } from './commit-history-filters';
+import type { FindOptions } from './find-widget';
 
 // Type for commits returned by tRPC
 interface ClientCommit {
@@ -135,6 +138,14 @@ interface PerfTrend {
     deltaPct: number | null;
 }
 
+interface PersistedCommitFilters {
+    author?: string;
+    filePath?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
 // Graph configuration
 const GRAPH_CONFIG = DEFAULT_GRAPH_CONFIG;
 const GRAPH_MUTE_CONFIG = {
@@ -152,6 +163,7 @@ const PERF_TREND_MIN_SAMPLES = 5;
 const PERF_WATCH_DELTA_PCT = 20;
 const PERF_REGRESSION_DELTA_PCT = 45;
 const PERF_IMPROVING_DELTA_PCT = -25;
+const COMMIT_FILTERS_STORAGE_PREFIX = 'git-graph:commit-filters:';
 
 function createEmptyPerfHistory(): PerfHistoryWindow {
     return {
@@ -336,6 +348,7 @@ const PullRequestIntegration = lazy(() =>
 const KeyboardShortcutsHelp = lazy(() =>
     import('./keyboard-shortcuts-help').then((mod) => ({ default: mod.KeyboardShortcutsHelp }))
 );
+const OnboardingDialog = lazy(() => import('./onboarding').then((mod) => ({ default: mod.OnboardingDialog })));
 const RecentRepositories = lazy(() =>
     import('./recent-repositories').then((mod) => ({ default: mod.RecentRepositories }))
 );
@@ -482,6 +495,7 @@ export function GitGraph() {
     const [worktreeOpen, setWorktreeOpen] = useState(false);
     const [submoduleOpen, setSubmoduleOpen] = useState(false);
     const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
+    const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [recentReposOpen, setRecentReposOpen] = useState(false);
     const [workspacesOpen, setWorkspacesOpen] = useState(false);
     const [stashManageOpen, setStashManageOpen] = useState(false);
@@ -518,6 +532,13 @@ export function GitGraph() {
     // Settings hook
     const { settings } = useSettings();
     const showPerfDebug = settings.telemetryEnabled;
+
+    useEffect(() => {
+        if (!activeRepo) return;
+        if (!localStorage.getItem('git-graph-onboarding-complete')) {
+            setOnboardingOpen(true);
+        }
+    }, [activeRepo]);
 
     // Lens mode hook
     const { setLensMode, isGuided } = useLensMode();
@@ -559,6 +580,53 @@ export function GitGraph() {
     // Commit and layout limit state
     const [maxCommits, setMaxCommits] = useState(INITIAL_MAX_COMMITS);
     const [layoutCommitLimit, setLayoutCommitLimit] = useState(INITIAL_LAYOUT_COMMIT_WINDOW);
+
+    useEffect(() => {
+        if (!activeRepo) {
+            setCommitFilters({});
+            return;
+        }
+
+        const storageKey = `${COMMIT_FILTERS_STORAGE_PREFIX}${activeRepo}`;
+        const saved = localStorage.getItem(storageKey);
+        if (!saved) {
+            setCommitFilters({});
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(saved) as PersistedCommitFilters;
+            setCommitFilters({
+                ...(parsed.author ? { author: parsed.author } : {}),
+                ...(parsed.filePath ? { filePath: parsed.filePath } : {}),
+                ...(parsed.search ? { search: parsed.search } : {}),
+                ...(parsed.dateFrom ? { dateFrom: new Date(parsed.dateFrom) } : {}),
+                ...(parsed.dateTo ? { dateTo: new Date(parsed.dateTo) } : {}),
+            });
+        } catch {
+            setCommitFilters({});
+        }
+    }, [activeRepo]);
+
+    useEffect(() => {
+        if (!activeRepo) return;
+
+        const storageKey = `${COMMIT_FILTERS_STORAGE_PREFIX}${activeRepo}`;
+        const persisted: PersistedCommitFilters = {
+            ...(commitFilters.author ? { author: commitFilters.author } : {}),
+            ...(commitFilters.filePath ? { filePath: commitFilters.filePath } : {}),
+            ...(commitFilters.search ? { search: commitFilters.search } : {}),
+            ...(commitFilters.dateFrom ? { dateFrom: commitFilters.dateFrom.toISOString() } : {}),
+            ...(commitFilters.dateTo ? { dateTo: commitFilters.dateTo.toISOString() } : {}),
+        };
+
+        if (Object.keys(persisted).length === 0) {
+            localStorage.removeItem(storageKey);
+            return;
+        }
+
+        localStorage.setItem(storageKey, JSON.stringify(persisted));
+    }, [activeRepo, commitFilters]);
 
     const conflictFileContent = trpc.git.readFile.useQuery(
         { repo: activeRepo ?? '', path: conflictFilePath ?? '' },
@@ -654,7 +722,7 @@ export function GitGraph() {
             })
                 .then((result) => {
                     if (!result.success) {
-                        toast.error(result.error ?? 'Failed to reveal conflict file');
+                        toast.error('error' in result ? result.error : 'Failed to reveal conflict file');
                     }
                 })
                 .catch((error) => {
@@ -1004,9 +1072,9 @@ export function GitGraph() {
         }
 
         const refs = refsData as RefTips;
-        refs.heads.forEach((head) => append(headsByHash, head.hash, head.name));
-        refs.tags.forEach((tag) => append(tagsByHash, tag.hash, tag.name));
-        refs.remotes.forEach((remote) => append(remotesByHash, remote.hash, remote.name));
+        refs.heads.forEach((head) => { append(headsByHash, head.hash, head.name); });
+        refs.tags.forEach((tag) => { append(tagsByHash, tag.hash, tag.name); });
+        refs.remotes.forEach((remote) => { append(remotesByHash, remote.hash, remote.name); });
 
         return {
             headsByHash,
@@ -1321,7 +1389,7 @@ export function GitGraph() {
         })
             .then((result) => {
                 if (!result.success) {
-                    toast.error(result.error ?? 'Failed to open repository in finder');
+                    toast.error('error' in result ? result.error : 'Failed to open repository in finder');
                 }
             })
             .catch((error) => {
@@ -1339,7 +1407,7 @@ export function GitGraph() {
         })
             .then((result) => {
                 if (!result.success) {
-                    toast.error(result.error ?? 'Failed to open terminal');
+                    toast.error('error' in result ? result.error : 'Failed to open terminal');
                 }
             })
             .catch((error) => {
@@ -1458,7 +1526,7 @@ export function GitGraph() {
         };
 
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        return () => { window.removeEventListener('keydown', handleKeyDown); };
     }, [
         handleRefreshAll,
         commitsData?.commits?.length,
@@ -1573,7 +1641,7 @@ export function GitGraph() {
                     <Button
                         size='lg'
                         variant='outline'
-                        onClick={() => setCloneDialogOpen(true)}
+                        onClick={() => { setCloneDialogOpen(true); }}
                         className='mt-3 gap-2'
                         disabled={isRepoBusy}>
                         <Download className='h-5 w-5' />
@@ -1937,7 +2005,7 @@ export function GitGraph() {
                                     <div className='bg-popover sticky top-0 z-10 border-b p-2'>
                                         <Input
                                             value={branchSearch}
-                                            onChange={(event) => setBranchSearch(event.target.value)}
+                                            onChange={(event) => { setBranchSearch(event.target.value); }}
                                             onKeyDown={(event) => {
                                                 if (event.key === 'Enter') {
                                                     event.preventDefault();
@@ -2013,7 +2081,7 @@ export function GitGraph() {
                                 label='Sync'
                                 onClick={async () => {
                                     await gitOps.fetch();
-                                    await gitOps.pull(currentHead, 'origin', false);
+                                    await gitOps.pull(currentHead, 'origin', false, false);
                                 }}
                             />
                         ) : (
@@ -2031,21 +2099,33 @@ export function GitGraph() {
                                         <ChevronDown className='h-3 w-3' />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align='start'>
-                                        <DropdownMenuItem onClick={() => handlePreviewedPush(false)}>
+                                        <DropdownMenuItem onClick={() => { handlePreviewedPush(false); }}>
                                             <Upload className='mr-2 h-4 w-4' />
                                             Push
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handlePreviewedPush(true)}>
+                                        <DropdownMenuItem onClick={() => { handlePreviewedPush(true); }}>
                                             <Upload className='mr-2 h-4 w-4 text-amber-600' />
                                             Force Push
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
-                                <ToolbarButton
-                                    icon={GitBranch}
-                                    label={isGuided ? 'Get changes' : 'Pull'}
-                                    onClick={() => gitOps.pull(currentHead, 'origin', false)}
-                                />
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
+                                        <Download className='h-4 w-4' />
+                                        <span className='hidden sm:inline'>Pull</span>
+                                        <ChevronDown className='h-3 w-3' />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align='start'>
+                                        <DropdownMenuItem onClick={() => gitOps.pull(currentHead, 'origin', false, false)}>
+                                            <Download className='mr-2 h-4 w-4' />
+                                            Pull
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => gitOps.pull(currentHead, 'origin', false, true)}>
+                                            <Download className='mr-2 h-4 w-4 text-emerald-600' />
+                                            Pull (Fast-forward only)
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </>
                         )}
 
@@ -2124,7 +2204,7 @@ export function GitGraph() {
 
                         {/* Workspaces Launchpad */}
                         <div className='ml-1 shrink-0'>
-                            <ToolbarButton icon={FolderGit2} label='Workspaces' onClick={() => setWorkspacesOpen(true)} />
+                            <ToolbarButton icon={FolderGit2} label='Workspaces' onClick={() => { setWorkspacesOpen(true); }} />
                         </div>
 
                         {/* Commit History Filters */}
@@ -2158,7 +2238,7 @@ export function GitGraph() {
                             icon={Search}
                             label='Find'
                             shortcut='⌘F'
-                            onClick={() => setFindWidgetOpen(true)}
+                            onClick={() => { setFindWidgetOpen(true); }}
                         />
 
                         {/* Refresh */}
@@ -2168,7 +2248,7 @@ export function GitGraph() {
                         <ToolbarButton
                             icon={PanelLeft}
                             label='Toggle Panel'
-                            onClick={() => setShowSidePanel(!showSidePanel)}
+                            onClick={() => { setShowSidePanel(!showSidePanel); }}
                         />
 
                         {/* Pinned Commits */}
@@ -2176,7 +2256,7 @@ export function GitGraph() {
                             variant='ghost'
                             size='sm'
                             className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 relative h-8 w-8 rounded-md border border-transparent p-0 transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'
-                            onClick={() => setPinnedCommitsOpen(true)}
+                            onClick={() => { setPinnedCommitsOpen(true); }}
                             title='Pinned Commits'>
                             <Pin className='h-4 w-4' />
                             {pinnedCommits.length > 0 && (
@@ -2206,17 +2286,17 @@ export function GitGraph() {
                                     <FileCode className='mr-2 h-4 w-4' />
                                     Open in Finder
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setCloneDialogOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setCloneDialogOpen(true); }}>
                                     <Download className='mr-2 h-4 w-4' />
                                     Clone Repository
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setFuzzyFinderOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setFuzzyFinderOpen(true); }}>
                                     <Search className='mr-2 h-4 w-4' />
                                     Quick Switch...
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘K</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setShowFiltersDialog(true)}>
+                                <DropdownMenuItem onClick={() => { setShowFiltersDialog(true); }}>
                                     <Filter className='mr-2 h-4 w-4' />
                                     Filter Commits...
                                 </DropdownMenuItem>
@@ -2234,147 +2314,155 @@ export function GitGraph() {
                                     <ListPlus className='mr-2 h-4 w-4' />
                                     Line Staging...
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setTerminalOpen(!terminalOpen)}>
+                                <DropdownMenuItem onClick={() => { setTerminalOpen(!terminalOpen); }}>
                                     <Terminal className='mr-2 h-4 w-4' />
                                     Toggle Terminal
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘P</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setStatisticsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setStatisticsOpen(true); }}>
                                     <BarChart3 className='mr-2 h-4 w-4' />
                                     Statistics
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setRemoteManageOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setRemoteManageOpen(true); }}>
                                     <Globe className='mr-2 h-4 w-4' />
                                     Manage Remotes
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setBranchCompareOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setBranchCompareOpen(true); }}>
                                     <GitBranch className='mr-2 h-4 w-4' />
                                     Compare Branches
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setHooksManageOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setHooksManageOpen(true); }}>
                                     <Settings className='mr-2 h-4 w-4' />
                                     Hooks
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setCommitSigningOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setCommitSigningOpen(true); }}>
                                     <Key className='mr-2 h-4 w-4' />
                                     Commit Signing
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setReflogOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setReflogOpen(true); }}>
                                     <History className='mr-2 h-4 w-4' />
                                     Reflog
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setTemplatesOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setTemplatesOpen(true); }}>
                                     <FileText className='mr-2 h-4 w-4' />
                                     Commit Templates
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setGitignoreOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setGitignoreOpen(true); }}>
                                     <FileText className='mr-2 h-4 w-4' />
                                     Edit .gitignore
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setCustomCommandsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setCustomCommandsOpen(true); }}>
                                     <Terminal className='mr-2 h-4 w-4' />
                                     Custom Commands
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setSearchCommitsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setSearchCommitsOpen(true); }}>
                                     <Search className='mr-2 h-4 w-4' />
                                     Search Commits
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘⇧F</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLfsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setLfsOpen(true); }}>
                                     <Package className='mr-2 h-4 w-4' />
                                     LFS Management
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setInlineBlameEnabled(!inlineBlameEnabled)}>
+                                <DropdownMenuItem onClick={() => { setInlineBlameEnabled(!inlineBlameEnabled); }}>
                                     <User className='mr-2 h-4 w-4' />
                                     {inlineBlameEnabled ? 'Disable' : 'Enable'} Inline Blame
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setPrIntegrationOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setPrIntegrationOpen(true); }}>
                                     <GitPullRequest className='mr-2 h-4 w-4' />
                                     Pull Requests
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setWorktreeOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setWorktreeOpen(true); }}>
                                     <FolderGit2 className='mr-2 h-4 w-4' />
                                     Worktrees
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setSubmoduleOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setSubmoduleOpen(true); }}>
                                     <Package className='mr-2 h-4 w-4' />
                                     Submodules
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setRecentReposOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setRecentReposOpen(true); }}>
                                     <FolderGit2 className='mr-2 h-4 w-4' />
                                     Recent Repositories
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setWorkspacesOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setWorkspacesOpen(true); }}>
                                     <FolderGit2 className='mr-2 h-4 w-4' />
                                     Workspaces Launchpad
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setKeyboardHelpOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setKeyboardHelpOpen(true); }}>
                                     <Keyboard className='mr-2 h-4 w-4' />
                                     Keyboard Shortcuts
                                     <span className='text-muted-foreground ml-auto text-xs'>?</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setStashManageOpen(true)}>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        localStorage.removeItem('git-graph-onboarding-complete');
+                                        setOnboardingOpen(true);
+                                    }}>
+                                    <Info className='mr-2 h-4 w-4' />
+                                    Start Onboarding Tour
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setStashManageOpen(true); }}>
                                     <Archive className='mr-2 h-4 w-4' />
                                     Manage Stashes
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setGraphLegendOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setGraphLegendOpen(true); }}>
                                     <Info className='mr-2 h-4 w-4' />
                                     Graph Legend
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setGitFlowOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setGitFlowOpen(true); }}>
                                     <GitBranch className='mr-2 h-4 w-4' />
                                     Git Flow
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setHealthCheckOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setHealthCheckOpen(true); }}>
                                     <Activity className='mr-2 h-4 w-4' />
                                     Health Check
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setBisectOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setBisectOpen(true); }}>
                                     <Bug className='mr-2 h-4 w-4' />
                                     Git Bisect
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setUndoStackOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setUndoStackOpen(true); }}>
                                     <History className='mr-2 h-4 w-4' />
                                     Undo History
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘Z</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setConfigEditorOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setConfigEditorOpen(true); }}>
                                     <Settings className='mr-2 h-4 w-4' />
                                     Git Configuration
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setExternalDiffOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setExternalDiffOpen(true); }}>
                                     <FileCode className='mr-2 h-4 w-4' />
                                     External Diff Settings
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setIssueTrackerOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setIssueTrackerOpen(true); }}>
                                     <GitPullRequest className='mr-2 h-4 w-4' />
                                     Issue Tracker Settings
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setBulkOpsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setBulkOpsOpen(true); }}>
                                     <GitCommit className='mr-2 h-4 w-4' />
                                     Bulk Operations
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setFileAnnotationsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setFileAnnotationsOpen(true); }}>
                                     <FileCode className='mr-2 h-4 w-4' />
                                     File Annotations
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setActivityHeatmapOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setActivityHeatmapOpen(true); }}>
                                     <BarChart3 className='mr-2 h-4 w-4' />
                                     Activity Heatmap
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setSettingsOpen(true); }}>
                                     <Settings className='mr-2 h-4 w-4' />
                                     Settings
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘,</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setCommandPaletteOpen(true)}>
+                                <DropdownMenuItem onClick={() => { setCommandPaletteOpen(true); }}>
                                     <Search className='mr-2 h-4 w-4' />
                                     Command Palette
                                     <span className='text-muted-foreground ml-auto text-xs'>⌘⇧P</span>
@@ -2393,7 +2481,7 @@ export function GitGraph() {
                         <Suspense fallback={<DialogLoadingFallback />}>
                             <FindWidget
                                 open={findWidgetOpen}
-                                onClose={() => setFindWidgetOpen(false)}
+                                onClose={() => { setFindWidgetOpen(false); }}
                                 onFind={handleFind}
                                 onFindNext={handleFindNext}
                                 onFindPrevious={handleFindPrevious}
@@ -2520,6 +2608,7 @@ export function GitGraph() {
                                                         commits={commitsData.commits}
                                                         layout={graphLayout}
                                                         refLookup={refsLookup}
+                                                        repo={activeRepo ?? undefined}
                                                         selectedIndex={selectedCommitIndex}
                                                         expandedIndex={expandedCommit}
                                                         onSelect={handleSelectCommit}
@@ -2553,7 +2642,7 @@ export function GitGraph() {
                                     }>
                                     <CommitDetailsPanel
                                         commitHash={selectedCommit}
-                                        onClose={() => setCommitDetailsOpen(false)}
+                                        onClose={() => { setCommitDetailsOpen(false); }}
                                         onNavigateToCommit={handleNavigateToCommit}
                                         onFilterByAuthor={handleAuthorFilter}
                                         onCreateBranch={handleCreateBranchFromHash}
@@ -2631,7 +2720,7 @@ export function GitGraph() {
                             {showPerfDebug && (
                                 <button
                                     className='hover:bg-accent/60 text-muted-foreground hover:text-foreground inline-flex h-6 items-center gap-1 rounded border border-transparent px-1.5 transition-colors'
-                                    onClick={() => setPerfPanelOpen(true)}
+                                    onClick={() => { setPerfPanelOpen(true); }}
                                     title={
                                         hasPerfRegression
                                             ? 'Startup query regression detected'
@@ -2905,7 +2994,7 @@ export function GitGraph() {
 
                     {statisticsOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
-                            <Statistics open={statisticsOpen} onClose={() => setStatisticsOpen(false)} />
+                            <Statistics open={statisticsOpen} onClose={() => { setStatisticsOpen(false); }} />
                         </Suspense>
                     )}
 
@@ -2965,7 +3054,7 @@ export function GitGraph() {
                         open={pinnedCommitsOpen}
                         onOpenChange={setPinnedCommitsOpen}
                         pinnedCommits={pinnedCommits}
-                        onPin={(commit) => pinCommit(commit as Omit<PinnedCommit, 'pinnedAt'>)}
+                        onPin={(commit) => { pinCommit(commit as Omit<PinnedCommit, 'pinnedAt'>); }}
                         onUnpin={unpinCommit}
                         onUpdateNote={updateNote}
                         onJumpToCommit={(hash) => {
@@ -3066,6 +3155,13 @@ export function GitGraph() {
                         </Suspense>
                     )}
 
+                    {/* Onboarding Tour */}
+                    {onboardingOpen && (
+                        <Suspense fallback={<DialogLoadingFallback />}>
+                            <OnboardingDialog open={onboardingOpen} onOpenChange={setOnboardingOpen} />
+                        </Suspense>
+                    )}
+
                     {/* Recent Repositories */}
                     {recentReposOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
@@ -3147,8 +3243,8 @@ export function GitGraph() {
                     {contextMenuOpen && selectedCommitData && (
                         <div
                             className='fixed inset-0 z-50'
-                            onClick={() => setContextMenuOpen(false)}
-                            onContextMenu={() => setContextMenuOpen(false)}>
+                            onClick={() => { setContextMenuOpen(false); }}
+                            onContextMenu={() => { setContextMenuOpen(false); }}>
                             <div
                                 className='fixed z-50'
                                 style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}>
@@ -3232,31 +3328,32 @@ export function GitGraph() {
                                 open={commandPaletteOpen}
                                 onOpenChange={setCommandPaletteOpen}
                                 actions={{
-                                    onCreateBranch: () => setCreateBranchOpen(true),
-                                    onCreateTag: () => setAddTagOpen(true),
+                                    onCreateBranch: () => { setCreateBranchOpen(true); },
+                                    onCreateTag: () => { setAddTagOpen(true); },
                                     onFetch: () => gitOps.fetch(),
                                     onPull: () => gitOps.pull(currentHead, 'origin', false),
+                                    onPullFfOnly: () => gitOps.pull(currentHead, 'origin', false, true),
                                     onPush: () => gitOps.push(currentHead, 'origin', true, false),
                                     onRefresh: handleRefreshAll,
-                                    onSettings: () => setSettingsOpen(true),
-                                    onSearch: () => setSearchCommitsOpen(true),
-                                    onTerminal: () => setTerminalOpen(!terminalOpen),
-                                    onClone: () => setCloneDialogOpen(true),
-                                    onOpenInFinder: () => handleOpenInFinder(),
-                                    onStash: () => setStashManageOpen(true),
-                                    onCommitSigning: () => setCommitSigningOpen(true),
-                                    onReflog: () => setReflogOpen(true),
-                                    onTemplates: () => setTemplatesOpen(true),
-                                    onGitignore: () => setGitignoreOpen(true),
-                                    onCustomCommands: () => setCustomCommandsOpen(true),
-                                    onLFS: () => setLfsOpen(true),
-                                    onPRIntegration: () => setPrIntegrationOpen(true),
-                                    onWorktrees: () => setWorktreeOpen(true),
-                                    onSubmodules: () => setSubmoduleOpen(true),
-                                    onStatistics: () => setStatisticsOpen(true),
-                                    onRemotes: () => setRemoteManageOpen(true),
-                                    onFilters: () => setShowFiltersDialog(true),
-                                    onPinned: () => setPinnedCommitsOpen(true),
+                                    onSettings: () => { setSettingsOpen(true); },
+                                    onSearch: () => { setSearchCommitsOpen(true); },
+                                    onTerminal: () => { setTerminalOpen(!terminalOpen); },
+                                    onClone: () => { setCloneDialogOpen(true); },
+                                    onOpenInFinder: () => { handleOpenInFinder(); },
+                                    onStash: () => { setStashManageOpen(true); },
+                                    onCommitSigning: () => { setCommitSigningOpen(true); },
+                                    onReflog: () => { setReflogOpen(true); },
+                                    onTemplates: () => { setTemplatesOpen(true); },
+                                    onGitignore: () => { setGitignoreOpen(true); },
+                                    onCustomCommands: () => { setCustomCommandsOpen(true); },
+                                    onLFS: () => { setLfsOpen(true); },
+                                    onPRIntegration: () => { setPrIntegrationOpen(true); },
+                                    onWorktrees: () => { setWorktreeOpen(true); },
+                                    onSubmodules: () => { setSubmoduleOpen(true); },
+                                    onStatistics: () => { setStatisticsOpen(true); },
+                                    onRemotes: () => { setRemoteManageOpen(true); },
+                                    onFilters: () => { setShowFiltersDialog(true); },
+                                    onPinned: () => { setPinnedCommitsOpen(true); },
                                     onLineStaging: () => {
                                         const fileForLineStaging =
                                             workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file;
@@ -3267,20 +3364,20 @@ export function GitGraph() {
                                         setStagingFile(fileForLineStaging);
                                         setLineStagingOpen(true);
                                     },
-                                    onWorkspaces: () => setWorkspacesOpen(true),
-                                    onKeyboardHelp: () => setKeyboardHelpOpen(true),
-                                    onHealthCheck: () => setHealthCheckOpen(true),
-                                    onFuzzyFinder: () => setFuzzyFinderOpen(true),
-                                    onUndoStack: () => setUndoStackOpen(true),
-                                    onConfigEditor: () => setConfigEditorOpen(true),
-                                    onExternalDiff: () => setExternalDiffOpen(true),
-                                    onIssueTracker: () => setIssueTrackerOpen(true),
-                                    onBulkOps: () => setBulkOpsOpen(true),
+                                    onWorkspaces: () => { setWorkspacesOpen(true); },
+                                    onKeyboardHelp: () => { setKeyboardHelpOpen(true); },
+                                    onHealthCheck: () => { setHealthCheckOpen(true); },
+                                    onFuzzyFinder: () => { setFuzzyFinderOpen(true); },
+                                    onUndoStack: () => { setUndoStackOpen(true); },
+                                    onConfigEditor: () => { setConfigEditorOpen(true); },
+                                    onExternalDiff: () => { setExternalDiffOpen(true); },
+                                    onIssueTracker: () => { setIssueTrackerOpen(true); },
+                                    onBulkOps: () => { setBulkOpsOpen(true); },
                                     onFileAnnotations: () => {
                                         setAnnotationsFile('README.md'); // Default file
                                         setFileAnnotationsOpen(true);
                                     },
-                                    onActivityHeatmap: () => setActivityHeatmapOpen(true),
+                                    onActivityHeatmap: () => { setActivityHeatmapOpen(true); },
                                 }}
                             />
                         </Suspense>
@@ -3394,7 +3491,7 @@ export function GitGraph() {
                     {activeRepo && (
                         <OperationStatusBar
                             repo={activeRepo}
-                            onOpenRebaseTodo={() => setRebaseTodoOpen(true)}
+                            onOpenRebaseTodo={() => { setRebaseTodoOpen(true); }}
                             onOpenConflictFile={handleOpenConflictFile}
                             onRevealConflictFile={handleRevealConflictFile}
                             onOperationStateChange={(operationState) => {

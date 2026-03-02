@@ -1,11 +1,4 @@
 import { Outlet } from '@tanstack/react-router';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { useRepoActivation } from '@/hooks/useRepoActivation';
-import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Clock,
     ChevronLeft,
@@ -18,6 +11,20 @@ import {
     Plus,
     X,
 } from 'lucide-react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useRepoActivation } from '@/hooks/useRepoActivation';
+import {
+    GIT_GRAPH_SETTINGS_STORAGE_KEY,
+    GIT_GRAPH_SETTINGS_UPDATED_EVENT,
+    readGitGraphUiSettingsFromStorage,
+} from '@/lib/gitGraphSettings';
+import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 // Extend CSSProperties to include webkit drag properties.
 declare module 'react' {
@@ -40,7 +47,7 @@ function MainViewLoadingFallback() {
         const timerId = window.setTimeout(() => {
             setShowSlowHint(true);
         }, 1200);
-        return () => window.clearTimeout(timerId);
+        return () => { window.clearTimeout(timerId); };
     }, []);
 
     return (
@@ -86,6 +93,7 @@ export default function AppLayout() {
     const { openRepositoryDialog, activateRepoPath, isRepoLoading, isRepoBusy } = useRepoActivation();
     const [repoLoadingStartedAt, setRepoLoadingStartedAt] = useState<number | null>(null);
     const [repoLoadingNow, setRepoLoadingNow] = useState(() => Date.now());
+    const [uiSettings, setUiSettings] = useState(() => readGitGraphUiSettingsFromStorage());
 
     useEffect(() => {
         const platform = getPlatform();
@@ -100,16 +108,36 @@ export default function AppLayout() {
     }, []);
 
     useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const updateTheme = (e: MediaQueryList | MediaQueryListEvent) => {
-            document.documentElement.classList.toggle('dark', e.matches);
+        const handleStorage = (event: StorageEvent) => {
+            if (event.key === GIT_GRAPH_SETTINGS_STORAGE_KEY) {
+                setUiSettings(readGitGraphUiSettingsFromStorage());
+            }
+        };
+        const handleSettingsUpdate = () => {
+            setUiSettings(readGitGraphUiSettingsFromStorage());
         };
 
-        updateTheme(mediaQuery);
-        const handler = (e: MediaQueryListEvent) => updateTheme(e);
-        mediaQuery.addEventListener('change', handler);
-        return () => mediaQuery.removeEventListener('change', handler);
+        window.addEventListener('storage', handleStorage);
+        window.addEventListener(GIT_GRAPH_SETTINGS_UPDATED_EVENT, handleSettingsUpdate);
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+            window.removeEventListener(GIT_GRAPH_SETTINGS_UPDATED_EVENT, handleSettingsUpdate);
+        };
     }, []);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const applyUiTheme = () => {
+            const useDarkTheme =
+                uiSettings.theme === 'dark' || (uiSettings.theme === 'system' && mediaQuery.matches);
+            document.documentElement.classList.toggle('dark', useDarkTheme);
+            document.documentElement.classList.toggle('high-contrast', uiSettings.enhancedAccessibility);
+        };
+
+        applyUiTheme();
+        mediaQuery.addEventListener('change', applyUiTheme);
+        return () => { mediaQuery.removeEventListener('change', applyUiTheme); };
+    }, [uiSettings.enhancedAccessibility, uiSettings.theme]);
 
     const { data: repoList } = trpc.repo.list.useQuery();
     const { data: recentRepos } = trpc.repo.recent.useQuery();
@@ -140,7 +168,7 @@ export default function AppLayout() {
         const intervalId = window.setInterval(() => {
             setRepoLoadingNow(Date.now());
         }, 500);
-        return () => window.clearInterval(intervalId);
+        return () => { window.clearInterval(intervalId); };
     }, [repoLoading]);
 
     useEffect(() => {
@@ -306,7 +334,7 @@ export default function AppLayout() {
                                 <Button
                                     variant='ghost'
                                     size='sm'
-                                    onClick={() => setRepoNavMode('tabs')}
+                                    onClick={() => { setRepoNavMode('tabs'); }}
                                     className='h-9 w-9 p-0'
                                     title='Switch to tabbed repositories'
                                     aria-label='Switch to tabbed repositories'>
@@ -316,7 +344,7 @@ export default function AppLayout() {
                             <Button
                                 variant='ghost'
                                 size='sm'
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
+                                onClick={() => { setSidebarOpen(!sidebarOpen); }}
                                 className='h-9 w-9 p-0'
                                 aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                                 {sidebarOpen ? (
@@ -479,7 +507,7 @@ export default function AppLayout() {
                                 variant='ghost'
                                 size='sm'
                                 className='h-11 w-11 p-0'
-                                onClick={() => setSidebarOpen(true)}
+                                onClick={() => { setSidebarOpen(true); }}
                                 title='Expand sidebar'
                                 aria-label='Expand sidebar'>
                                 <ChevronRight className='h-4 w-4' />
@@ -508,7 +536,7 @@ export default function AppLayout() {
                                 variant='ghost'
                                 size='sm'
                                 className='h-11 w-11 p-0'
-                                onClick={() => setRepoNavMode('tabs')}
+                                onClick={() => { setRepoNavMode('tabs'); }}
                                 title='Switch to tabbed repositories'
                                 aria-label='Switch to tabbed repositories'>
                                 <PanelTop className='h-4 w-4' />
@@ -537,7 +565,7 @@ export default function AppLayout() {
                                 variant='outline'
                                 size='sm'
                                 className='ml-auto h-7'
-                                onClick={() => resetRepoLoadState(activeRepo ? 'ready' : 'idle')}>
+                                onClick={() => { resetRepoLoadState(activeRepo ? 'ready' : 'idle'); }}>
                                 Dismiss
                             </Button>
                             <Button variant='outline' size='sm' className='h-7' onClick={() => void handleOpenFolder()}>
@@ -551,7 +579,7 @@ export default function AppLayout() {
                         <div className='flex items-center gap-2 text-xs'>
                             <span className='font-medium text-red-500'>Unexpected runtime error.</span>
                             <span className='text-muted-foreground truncate'>{error}</span>
-                            <Button variant='outline' size='sm' className='ml-auto h-7' onClick={() => setError(null)}>
+                            <Button variant='outline' size='sm' className='ml-auto h-7' onClick={() => { setError(null); }}>
                                 Dismiss
                             </Button>
                         </div>

@@ -4,14 +4,10 @@
  * with abort/continue/skip buttons
  */
 
+import { CheckCheck, FileText, FolderOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { FileText, FolderOpen } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -22,13 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { trpc } from '@/trpc/client';
 
 interface GitOperationState {
     merging: boolean;
@@ -180,6 +181,11 @@ export function OperationStatusBar({
             handleMutationError('skip revert commit', error);
         },
     });
+    const resolveConflict = trpc.git.resolveConflict.useMutation({
+        onError: (error) => {
+            handleMutationError('resolve conflict', error);
+        },
+    });
 
     const [showAbortConfirm, setShowAbortConfirm] = useState(false);
     const [abortAction, setAbortAction] = useState<(() => void) | null>(null);
@@ -289,7 +295,8 @@ export function OperationStatusBar({
         cherryPickSkip.isPending ||
         revertAbort.isPending ||
         revertContinue.isPending ||
-        revertSkip.isPending;
+        revertSkip.isPending ||
+        resolveConflict.isPending;
 
     const handleOpenNextConflict = () => {
         if (!state.conflicts.length || !onOpenConflictFile) return;
@@ -299,6 +306,57 @@ export function OperationStatusBar({
         onOpenConflictFile(nextFile);
         setActiveConflictIndex((current) => Math.min(state.conflicts.length - 1, current + 1));
     };
+
+    const handleResolveConflictFile = async (filePath: string, resolution: 'ours' | 'theirs') => {
+        try {
+            const result = await resolveConflict.mutateAsync({ repo, path: filePath, resolution });
+            if (result.error) {
+                toast.error(`Failed to resolve ${filePath}: ${result.error}`);
+                return;
+            }
+            toast.success(`Resolved ${filePath} with ${resolution}`);
+            invalidateOperationState();
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : `Failed to resolve ${filePath}`);
+        }
+    };
+
+    const handleResolveAllConflicts = async (resolution: 'ours' | 'theirs') => {
+        const files = state.conflicts;
+        if (files.length === 0) return;
+
+        let resolvedCount = 0;
+        for (const file of files) {
+            // Keep this sequential to avoid clobbering index/stage state while conflicts resolve.
+            try {
+                const result = await resolveConflict.mutateAsync({ repo, path: file, resolution });
+                if (!result.error) {
+                    resolvedCount++;
+                }
+            } catch {
+                // keep processing other files
+            }
+        }
+
+        if (resolvedCount === files.length) {
+            toast.success(`Resolved ${resolvedCount} conflict files with ${resolution}`);
+        } else {
+            toast.error(`Resolved ${resolvedCount}/${files.length} conflicts with ${resolution}`);
+        }
+        invalidateOperationState();
+    };
+
+    const nextActionHint = hasConflicts
+        ? `Resolve ${state.conflicts.length} conflict${state.conflicts.length === 1 ? '' : 's'} to continue ${operationType}.`
+        : operationType === 'rebase'
+          ? 'Continue rebase when your working tree is ready.'
+          : operationType === 'cherry-pick'
+            ? 'Continue cherry-pick to apply the next commit.'
+            : operationType === 'revert'
+              ? 'Continue revert to complete this operation.'
+              : operationType === 'merge'
+                ? 'Continue merge to finalize the merge commit.'
+                : 'Finish the current operation to proceed.';
 
     return (
         <>
@@ -347,6 +405,24 @@ export function OperationStatusBar({
                                                             Open
                                                         </span>
                                                     </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
+                                                        onSelect={(event) => {
+                                                            event.preventDefault();
+                                                            void handleResolveConflictFile(file, 'ours');
+                                                        }}>
+                                                        <span className='truncate'>{`Resolve ${file} with ours`}</span>
+                                                        <CheckCheck className='h-3.5 w-3.5' />
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
+                                                        onSelect={(event) => {
+                                                            event.preventDefault();
+                                                            void handleResolveConflictFile(file, 'theirs');
+                                                        }}>
+                                                        <span className='truncate'>{`Resolve ${file} with theirs`}</span>
+                                                        <CheckCheck className='h-3.5 w-3.5' />
+                                                    </DropdownMenuItem>
                                                     {onRevealConflictFile ? (
                                                         <DropdownMenuItem
                                                             className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
@@ -368,9 +444,7 @@ export function OperationStatusBar({
 
                         {/* Actions */}
                         <div className='flex items-center gap-2'>
-                            {hasConflicts && (
-                                <span className='text-muted-foreground text-xs'>Resolve conflicts to continue</span>
-                            )}
+                            <span className='text-muted-foreground text-xs'>{nextActionHint}</span>
 
                             {hasConflicts && onOpenConflictFile && (
                                 <Button
@@ -384,6 +458,26 @@ export function OperationStatusBar({
                                         {state.conflicts.length}
                                     </span>
                                 </Button>
+                            )}
+                            {hasConflicts && (
+                                <>
+                                    <Button
+                                        variant='outline'
+                                        size='sm'
+                                        onClick={() => void handleResolveAllConflicts('ours')}
+                                        disabled={isLoading}>
+                                        <CheckCheck className='mr-2 h-3.5 w-3.5' />
+                                        Resolve all (ours)
+                                    </Button>
+                                    <Button
+                                        variant='outline'
+                                        size='sm'
+                                        onClick={() => void handleResolveAllConflicts('theirs')}
+                                        disabled={isLoading}>
+                                        <CheckCheck className='mr-2 h-3.5 w-3.5' />
+                                        Resolve all (theirs)
+                                    </Button>
+                                </>
                             )}
 
                             {canSkip && (

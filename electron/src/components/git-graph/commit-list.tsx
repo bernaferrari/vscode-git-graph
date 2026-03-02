@@ -5,6 +5,7 @@
 
 import type { GraphLayout } from '@/lib/graph/layout';
 import { getGravatarUrl } from '@/lib/gravatar';
+import { CIStatusMini } from './ci-status';
 
 // Minimal commit type for display
 interface DisplayCommit {
@@ -29,6 +30,7 @@ interface CommitListProps {
     onContextMenu?: (index: number, event: React.MouseEvent) => void;
     showAvatars?: boolean;
     hideRefs?: boolean;
+    repo?: string;
 }
 
 // Row height - must match graph grid Y spacing
@@ -76,6 +78,7 @@ export function CommitList({
     onContextMenu,
     showAvatars = false,
     hideRefs = false,
+    repo,
 }: CommitListProps) {
     return (
         <div className='commit-list'>
@@ -91,6 +94,7 @@ export function CommitList({
                     onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
                     showAvatar={showAvatars}
                     hideRefs={hideRefs}
+                    repo={repo}
                     {...(onContextMenu ? { onContextMenu: (e: React.MouseEvent) => onContextMenu(index, e) } : {})}
                 />
             ))}
@@ -109,6 +113,7 @@ interface CommitRowProps {
     onContextMenu?: (e: React.MouseEvent) => void;
     showAvatar?: boolean;
     hideRefs?: boolean;
+    repo?: string;
 }
 
 function CommitRow({
@@ -122,6 +127,7 @@ function CommitRow({
     onContextMenu,
     showAvatar = false,
     hideRefs = false,
+    repo,
 }: CommitRowProps) {
     const isUncommitted = commit.hash === '*';
 
@@ -213,6 +219,7 @@ function CommitRow({
                         isSelected ? 'opacity-100' : 'opacity-45 group-hover:opacity-85'
                     }`}>
                     <span className='w-24 truncate font-medium'>{commit.author}</span>
+                    <CIStatusMini commitHash={commit.hash} repo={repo} />
                     <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
                         {commit.hash.slice(0, 7)}
                     </span>

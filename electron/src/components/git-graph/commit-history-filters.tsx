@@ -3,20 +3,6 @@
  * Filter commits by author, date range, file path, message search
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
 import {
 	Search,
 	User,
@@ -26,6 +12,21 @@ import {
 	FileText,
 	RotateCcw,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 export interface CommitFilter {
 	author?: string;
@@ -73,7 +74,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 				<Input
 					placeholder="Search commits..."
 					value={localSearch}
-					onChange={(e) => setLocalSearch(e.target.value)}
+					onChange={(e) => { setLocalSearch(e.target.value); }}
 					onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
 					className="h-7 pl-7 pr-7 text-xs"
 				/>
@@ -111,7 +112,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 							variant="ghost"
 							size="sm"
 							className="w-full justify-start h-7 px-2"
-							onClick={() => onChange({ ...filters, author: undefined })}
+							onClick={() => { onChange({ ...filters, author: undefined }); }}
 						>
 							Any Author
 						</Button>
@@ -121,7 +122,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								variant={filters.author === author ? 'secondary' : 'ghost'}
 								size="sm"
 								className="w-full justify-start h-7 px-2"
-								onClick={() => onChange({ ...filters, author })}
+								onClick={() => { onChange({ ...filters, author }); }}
 							>
 								{author}
 							</Button>
@@ -146,7 +147,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								<Calendar
 									mode="single"
 									selected={filters.dateFrom}
-									onSelect={(date) => onChange({ ...filters, dateFrom: date })}
+									onSelect={(date) => { onChange({ ...filters, dateFrom: date }); }}
 									className="rounded-md border"
 								/>
 							</div>
@@ -155,7 +156,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								<Calendar
 									mode="single"
 									selected={filters.dateTo}
-									onSelect={(date) => onChange({ ...filters, dateTo: date })}
+									onSelect={(date) => { onChange({ ...filters, dateTo: date }); }}
 									className="rounded-md border"
 								/>
 							</div>
@@ -164,7 +165,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 							variant="ghost"
 							size="sm"
 							className="w-full h-7 text-xs"
-							onClick={() => onChange({ ...filters, dateFrom: undefined, dateTo: undefined })}
+							onClick={() => { onChange({ ...filters, dateFrom: undefined, dateTo: undefined }); }}
 						>
 							Clear Dates
 						</Button>
@@ -184,7 +185,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 					<Input
 						placeholder="src/components/..."
 						value={filters.filePath ?? ''}
-						onChange={(e) => onChange({ ...filters, filePath: e.target.value || undefined })}
+						onChange={(e) => { onChange({ ...filters, filePath: e.target.value || undefined }); }}
 						className="h-7 text-xs"
 					/>
 				</PopoverContent>

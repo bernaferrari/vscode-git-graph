@@ -5,6 +5,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BulkCommitOperations } from './bulk-commit-operations';
+import { useAppStore } from '@/lib/store';
+
+vi.mock('@/hooks/useGitOperations', () => ({
+	useGitOperations: () => ({
+		cherryPick: vi.fn(async () => ({ error: null })),
+		revert: vi.fn(async () => ({ error: null })),
+		createBranch: vi.fn(async () => ({ error: null })),
+	}),
+}));
 
 // Mock commits
 const mockCommits = [
@@ -16,6 +25,7 @@ const mockCommits = [
 describe('Bulk Commit Operations', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		useAppStore.setState({ activeRepo: '/tmp/repo-under-test' });
 	});
 
 	describe('Component Rendering', () => {

@@ -14,8 +14,45 @@ interface MutationResultShape {
     errors?: string[];
 }
 
+interface GitErrorGuidanceRule {
+    pattern: RegExp;
+    suggestion: string;
+}
+
 type LoggedOperation = Omit<OperationReceipt, 'id' | 'timestamp'>;
 let operationQueueTail: Promise<void> = Promise.resolve();
+
+const GIT_ERROR_GUIDANCE_RULES: readonly GitErrorGuidanceRule[] = [
+    {
+        pattern: /non-fast-forward|fetch first|rejected/i,
+        suggestion:
+            'Fetch and rebase/pull before pushing again, or use force push only if rewriting branch history intentionally.',
+    },
+    {
+        pattern: /conflict|merge conflict/i,
+        suggestion: 'Open the conflict editor, resolve all files, stage them, then continue the operation.',
+    },
+    {
+        pattern: /uncommitted changes|would be overwritten by/i,
+        suggestion: 'Commit, stash, or discard local changes before retrying this operation.',
+    },
+    {
+        pattern: /authentication failed|permission denied|publickey/i,
+        suggestion: 'Verify credentials/SSH keys and remote permissions for this repository.',
+    },
+    {
+        pattern: /could not resolve host|unable to access|failed to connect/i,
+        suggestion: 'Check network connectivity and confirm the remote URL is correct.',
+    },
+    {
+        pattern: /no upstream branch|set-upstream|has no tracking information/i,
+        suggestion: 'Set the upstream branch and retry the command.',
+    },
+    {
+        pattern: /detached head|not currently on a branch/i,
+        suggestion: 'Checkout a branch before retrying operations that require a branch context.',
+    },
+];
 
 export function useGitOperations() {
     const {
@@ -73,6 +110,31 @@ export function useGitOperations() {
     const safeInvalidateRepoAndRemotesData = useCallback(async () => {
         await Promise.allSettled([utils.git.remotes.invalidate(), safeInvalidateRepositoryData()]);
     }, [safeInvalidateRepositoryData, utils.git.remotes]);
+
+    const formatErrorWithGuidance = useCallback((message: string): string => {
+        const trimmed = message.trim();
+        if (trimmed.length === 0) {
+            return 'Operation failed';
+        }
+
+        const matchingSuggestions = GIT_ERROR_GUIDANCE_RULES.filter((rule) => rule.pattern.test(trimmed)).map(
+            (rule) => rule.suggestion
+        );
+        const uniqueSuggestions = [...new Set(matchingSuggestions)];
+
+        if (uniqueSuggestions.length === 0) {
+            return trimmed;
+        }
+
+        return `${trimmed}\n\nNext steps:\n- ${uniqueSuggestions.join('\n- ')}`;
+    }, []);
+
+    const notifyOperationError = useCallback(
+        (title: string, message: string) => {
+            toast.error(title, { description: formatErrorWithGuidance(message) });
+        },
+        [formatErrorWithGuidance]
+    );
 
     const runTrackedOperation = useCallback(
         async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
@@ -132,7 +194,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Failed to create branch', { description: error });
+                notifyOperationError('Failed to create branch', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -152,7 +214,7 @@ export function useGitOperations() {
             toast.success('Branch created');
         },
         onError: (error) => {
-            toast.error('Failed to create branch', { description: error.message });
+            notifyOperationError('Failed to create branch', error.message);
         },
     });
 
@@ -160,7 +222,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Failed to delete branch', { description: error });
+                notifyOperationError('Failed to delete branch', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -176,7 +238,7 @@ export function useGitOperations() {
             toast.success('Branch deleted');
         },
         onError: (error) => {
-            toast.error('Failed to delete branch', { description: error.message });
+            notifyOperationError('Failed to delete branch', error.message);
         },
     });
 
@@ -184,7 +246,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Checkout failed', { description: error });
+                notifyOperationError('Checkout failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -193,6 +255,14 @@ export function useGitOperations() {
                 description: `Checked out ${variables.ref}`,
                 details: variables.ref,
                 gitCommands: [`git checkout ${variables.ref}`],
+                ...(currentBranch && currentBranch !== variables.ref
+                    ? {
+                          undoAction: {
+                              type: 'checkout',
+                              command: currentBranch,
+                          },
+                      }
+                    : {}),
                 affectedBranches: [variables.ref],
                 affectedCommits: [],
                 status: 'success',
@@ -200,7 +270,7 @@ export function useGitOperations() {
             toast.success('Checked out');
         },
         onError: (error) => {
-            toast.error('Checkout failed', { description: error.message });
+            notifyOperationError('Checkout failed', error.message);
         },
     });
 
@@ -208,7 +278,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Reset failed', { description: error });
+                notifyOperationError('Reset failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -217,6 +287,10 @@ export function useGitOperations() {
                 description: `Reset ${variables.mode} to ${variables.commitHash.slice(0, 7)}`,
                 details: `${variables.mode}:${variables.commitHash}`,
                 gitCommands: [`git reset --${variables.mode} ${variables.commitHash}`],
+                undoAction: {
+                    type: 'hard-reset',
+                    command: 'ORIG_HEAD',
+                },
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [variables.commitHash],
                 status: 'success',
@@ -224,7 +298,7 @@ export function useGitOperations() {
             toast.success('Reset successful');
         },
         onError: (error) => {
-            toast.error('Reset failed', { description: error.message });
+            notifyOperationError('Reset failed', error.message);
         },
     });
 
@@ -232,7 +306,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Fetch failed', { description: error });
+                notifyOperationError('Fetch failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -250,7 +324,7 @@ export function useGitOperations() {
             toast.success('Fetched from remote');
         },
         onError: (error) => {
-            toast.error('Fetch failed', { description: error.message });
+            notifyOperationError('Fetch failed', error.message);
         },
     });
 
@@ -258,7 +332,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Pull failed', { description: error });
+                notifyOperationError('Pull failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -267,7 +341,7 @@ export function useGitOperations() {
                 description: `Pulled ${variables.remote}/${variables.branchName}`,
                 details: `${variables.remote}/${variables.branchName}`,
                 gitCommands: [
-                    `git pull ${variables.remote} ${variables.branchName}${variables.noFastForward ? ' --no-ff' : ''}`,
+                    `git pull${variables.fastForwardOnly ? ' --ff-only' : variables.noFastForward ? ' --no-ff' : ''} ${variables.remote} ${variables.branchName}`,
                 ],
                 affectedBranches: [variables.branchName],
                 affectedCommits: [],
@@ -276,7 +350,7 @@ export function useGitOperations() {
             toast.success('Pulled changes');
         },
         onError: (error) => {
-            toast.error('Pull failed', { description: error.message });
+            notifyOperationError('Pull failed', error.message);
         },
     });
 
@@ -284,7 +358,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Push failed', { description: error });
+                notifyOperationError('Push failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -302,7 +376,7 @@ export function useGitOperations() {
             toast.success('Pushed changes');
         },
         onError: (error) => {
-            toast.error('Push failed', { description: error.message });
+            notifyOperationError('Push failed', error.message);
         },
     });
 
@@ -310,14 +384,14 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Failed to create tag', { description: error });
+                notifyOperationError('Failed to create tag', error);
                 return;
             }
             void safeInvalidateRepositoryData();
             toast.success('Tag created');
         },
         onError: (error) => {
-            toast.error('Failed to create tag', { description: error.message });
+            notifyOperationError('Failed to create tag', error.message);
         },
     });
 
@@ -325,14 +399,14 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Failed to delete tag', { description: error });
+                notifyOperationError('Failed to delete tag', error);
                 return;
             }
             void safeInvalidateRepositoryData();
             toast.success('Tag deleted');
         },
         onError: (error) => {
-            toast.error('Failed to delete tag', { description: error.message });
+            notifyOperationError('Failed to delete tag', error.message);
         },
     });
 
@@ -340,7 +414,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Merge failed', { description: error });
+                notifyOperationError('Merge failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -358,7 +432,7 @@ export function useGitOperations() {
             toast.success('Merge successful');
         },
         onError: (error) => {
-            toast.error('Merge failed', { description: error.message });
+            notifyOperationError('Merge failed', error.message);
         },
     });
 
@@ -366,7 +440,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Rebase failed', { description: error });
+                notifyOperationError('Rebase failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -382,7 +456,7 @@ export function useGitOperations() {
             toast.success('Rebase successful');
         },
         onError: (error) => {
-            toast.error('Rebase failed', { description: error.message });
+            notifyOperationError('Rebase failed', error.message);
         },
     });
 
@@ -390,7 +464,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Cherry-pick failed', { description: error });
+                notifyOperationError('Cherry-pick failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -406,7 +480,7 @@ export function useGitOperations() {
             toast.success('Cherry-pick successful');
         },
         onError: (error) => {
-            toast.error('Cherry-pick failed', { description: error.message });
+            notifyOperationError('Cherry-pick failed', error.message);
         },
     });
 
@@ -414,7 +488,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Revert failed', { description: error });
+                notifyOperationError('Revert failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -430,7 +504,7 @@ export function useGitOperations() {
             toast.success('Revert successful');
         },
         onError: (error) => {
-            toast.error('Revert failed', { description: error.message });
+            notifyOperationError('Revert failed', error.message);
         },
     });
 
@@ -438,7 +512,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Commit failed', { description: error });
+                notifyOperationError('Commit failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -460,7 +534,7 @@ export function useGitOperations() {
             toast.success('Committed');
         },
         onError: (error) => {
-            toast.error('Commit failed', { description: error.message });
+            notifyOperationError('Commit failed', error.message);
         },
     });
 
@@ -468,13 +542,13 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Stage failed', { description: error });
+                notifyOperationError('Stage failed', error);
                 return;
             }
             void safeInvalidateWorkingTreeData();
         },
         onError: (error) => {
-            toast.error('Stage failed', { description: error.message });
+            notifyOperationError('Stage failed', error.message);
         },
     });
 
@@ -482,13 +556,13 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Unstage failed', { description: error });
+                notifyOperationError('Unstage failed', error);
                 return;
             }
             void safeInvalidateWorkingTreeData();
         },
         onError: (error) => {
-            toast.error('Unstage failed', { description: error.message });
+            notifyOperationError('Unstage failed', error.message);
         },
     });
 
@@ -496,14 +570,14 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Stash failed', { description: error });
+                notifyOperationError('Stash failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
             toast.success('Stashed changes');
         },
         onError: (error) => {
-            toast.error('Stash failed', { description: error.message });
+            notifyOperationError('Stash failed', error.message);
         },
     });
 
@@ -511,14 +585,14 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Stash pop failed', { description: error });
+                notifyOperationError('Stash pop failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
             toast.success('Stash applied');
         },
         onError: (error) => {
-            toast.error('Stash pop failed', { description: error.message });
+            notifyOperationError('Stash pop failed', error.message);
         },
     });
 
@@ -526,13 +600,13 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Stash apply failed', { description: error });
+                notifyOperationError('Stash apply failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
         },
         onError: (error) => {
-            toast.error('Stash apply failed', { description: error.message });
+            notifyOperationError('Stash apply failed', error.message);
         },
     });
 
@@ -540,13 +614,13 @@ export function useGitOperations() {
         onSuccess: (result) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Stash drop failed', { description: error });
+                notifyOperationError('Stash drop failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
         },
         onError: (error) => {
-            toast.error('Stash drop failed', { description: error.message });
+            notifyOperationError('Stash drop failed', error.message);
         },
     });
 
@@ -554,7 +628,7 @@ export function useGitOperations() {
         onSuccess: (result, variables) => {
             const error = getMutationError(result);
             if (error) {
-                toast.error('Undo failed', { description: error });
+                notifyOperationError('Undo failed', error);
                 return;
             }
             void safeInvalidateRepositoryData();
@@ -570,7 +644,7 @@ export function useGitOperations() {
             toast.success('Undid last commit');
         },
         onError: (error) => {
-            toast.error('Undo failed', { description: error.message });
+            notifyOperationError('Undo failed', error.message);
         },
     });
 
@@ -635,6 +709,12 @@ export function useGitOperations() {
     });
 
     const remoteRemove = trpc.git.remote.remove.useMutation({
+        onSuccess: () => {
+            void safeInvalidateRepoAndRemotesData();
+        },
+    });
+
+    const remoteUpdate = trpc.git.remote.update.useMutation({
         onSuccess: () => {
             void safeInvalidateRepoAndRemotesData();
         },
@@ -726,16 +806,26 @@ export function useGitOperations() {
     );
 
     const handlePull = useCallback(
-        async (branchName?: string, remote: string = 'origin', noFastForward: boolean = false) => {
+        async (
+            branchName?: string,
+            remote: string = 'origin',
+            noFastForward: boolean = false,
+            fastForwardOnly: boolean = false
+        ) => {
             if (!activeRepo) return { error: 'No active repository' };
             const resolvedBranch = branchName ?? currentBranch;
             if (!resolvedBranch) return { error: 'No current branch selected for pull' };
-            return runTrackedOperation(`Pulling ${remote}/${resolvedBranch}`, () =>
+            if (noFastForward && fastForwardOnly) {
+                return { error: 'Cannot combine no-fast-forward and fast-forward-only pull options' };
+            }
+
+            return runTrackedOperation(`Pulling ${remote}/${resolvedBranch}${fastForwardOnly ? ' (ff-only)' : ''}`, () =>
                 pull.mutateAsync({
                     repo: activeRepo,
                     branchName: resolvedBranch,
                     remote,
                     noFastForward,
+                    fastForwardOnly,
                 })
             );
         },
@@ -1103,6 +1193,21 @@ export function useGitOperations() {
         [activeRepo, remoteRemove, runTrackedOperation]
     );
 
+    const handleRemoteUpdate = useCallback(
+        async (name: string, url: string, pushUrl?: string) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Updating remote ${name}`, () =>
+                remoteUpdate.mutateAsync({
+                    repo: activeRepo,
+                    name,
+                    url,
+                    pushUrl,
+                })
+            );
+        },
+        [activeRepo, remoteUpdate, runTrackedOperation]
+    );
+
     const handleWorktreeCreate = useCallback(
         async (path: string, branch?: string, commit?: string) => {
             if (!activeRepo) return { error: 'No active repository' };
@@ -1176,6 +1281,7 @@ export function useGitOperations() {
             gitflowHotfixFinish.isPending ||
             remoteAdd.isPending ||
             remoteRemove.isPending ||
+            remoteUpdate.isPending ||
             worktreeCreate.isPending ||
             worktreeRemove.isPending,
 
@@ -1212,6 +1318,7 @@ export function useGitOperations() {
         gitFlowHotfixFinish: handleGitFlowHotfixFinish,
         remoteAdd: handleRemoteAdd,
         remoteRemove: handleRemoteRemove,
+        remoteUpdate: handleRemoteUpdate,
         worktreeCreate: handleWorktreeCreate,
         worktreeRemove: handleWorktreeRemove,
         copyToClipboard: handleCopyToClipboard,

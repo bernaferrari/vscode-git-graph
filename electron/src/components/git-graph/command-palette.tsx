@@ -57,6 +57,7 @@ interface CommandPaletteProps {
 	onCreateTag: () => void;
 	onFetch: () => void;
 	onPull: () => void;
+	onPullFfOnly?: () => void;
 	onPush: () => void;
 	onRefresh: () => void;
 	onSettings: () => void;
@@ -107,6 +108,19 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			shortcut: '',
 			action: actions.onPull,
 		},
+		...(actions.onPullFfOnly
+			? [
+					{
+						id: 'pull-ff-only',
+						label: 'Pull (Fast-forward only)',
+						description: 'Run git pull --ff-only',
+						icon: <Download className="h-4 w-4" />,
+						category: 'Git',
+						action: actions.onPullFfOnly,
+						keywords: ['ff-only', 'fast-forward', 'pull'],
+					},
+				]
+			: []),
 		{
 			id: 'push',
 			label: 'Push to Remote',

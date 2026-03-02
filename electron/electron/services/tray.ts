@@ -22,7 +22,7 @@ export class SystemTrayManager {
 
 	private setupTray() {
 		// Wait for app to be ready
-		app.whenReady().then(() => {
+		void app.whenReady().then(() => {
 			this.createTray();
 		});
 	}
@@ -61,12 +61,12 @@ export class SystemTrayManager {
 		const menu = Menu.buildFromTemplate([
 			{
 				label: 'Open Git Graph',
-				click: () => this.showWindow(),
+				click: () => { this.showWindow(); },
 			},
 			{ type: 'separator' },
 			{
 				label: 'Quick Clone...',
-				click: () => this.quickClone(),
+				click: () => { this.quickClone(); },
 			},
 			{ type: 'separator' },
 			{
@@ -76,38 +76,38 @@ export class SystemTrayManager {
 			{ type: 'separator' },
 			{
 				label: 'Fetch All',
-				click: () => this.fetchAll(),
+				click: () => { this.fetchAll(); },
 			},
 			{
 				label: 'Push Current Branch',
-				click: () => this.pushCurrent(),
+				click: () => { this.pushCurrent(); },
 			},
 			{ type: 'separator' },
 			{
 				label: 'Create Branch...',
 				accelerator: 'CmdOrCtrl+B',
-				click: () => this.showWindow('create-branch'),
+				click: () => { this.showWindow('create-branch'); },
 			},
 			{
 				label: 'Create Commit...',
 				accelerator: 'CmdOrCtrl+Return',
-				click: () => this.showWindow('commit'),
+				click: () => { this.showWindow('commit'); },
 			},
 			{ type: 'separator' },
 			{
 				label: 'Check for Updates',
-				click: () => this.checkForUpdates(),
+				click: () => { this.checkForUpdates(); },
 			},
 			{
 				label: 'Settings',
 				accelerator: 'CmdOrCtrl+,',
-				click: () => this.showWindow('settings'),
+				click: () => { this.showWindow('settings'); },
 			},
 			{ type: 'separator' },
 			{
 				label: 'Quit Git Graph',
 				accelerator: 'CmdOrCtrl+Q',
-				click: () => app.quit(),
+				click: () => { app.quit(); },
 			},
 		]);
 
@@ -129,8 +129,8 @@ export class SystemTrayManager {
 
 		return recentRepos.slice(0, 5).map((repo, index) => ({
 			label: repo.name,
-			accelerator: index < 9 ? `CmdOrCtrl+${index + 1}` : undefined,
-			click: () => this.openRepo(repo.path),
+			accelerator: index < 9 ? `CmdOrCtrl+${String(index + 1)}` : undefined,
+			click: () => { this.openRepo(repo.path); },
 		})) as Electron.MenuItem[];
 	}
 

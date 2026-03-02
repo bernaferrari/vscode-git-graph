@@ -105,7 +105,9 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 	};
 
 	const isInstalled = lfsStatus?.installed ?? false;
-	const trackingPatterns = lfsStatus?.tracking ?? [];
+	const trackingPatterns = lfsStatus?.trackingPatterns ?? lfsStatus?.tracking ?? [];
+	const trackedFiles = lfsStatus?.trackedFiles ?? [];
+	const summary = lfsStatus?.summary;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -143,9 +145,9 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 						</a>
 					</div>
 				) : (
-					<>
-						{/* LFS Actions */}
-						<div className="flex items-center gap-2 pb-4 border-b">
+						<>
+							{/* LFS Actions */}
+							<div className="flex items-center gap-2 pb-4 border-b">
 							<Button
 								variant="outline"
 								size="sm"
@@ -191,11 +193,31 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 								onClick={() => refetch()}
 							>
 								<RefreshCw className="h-4 w-4" />
-							</Button>
-						</div>
+								</Button>
+							</div>
 
-						{/* Add tracking pattern */}
-						<div className="flex items-center gap-2 py-3">
+							{/* LFS Summary */}
+							<div className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-4">
+								<div className="rounded-md border bg-muted/30 p-2">
+									<p className="text-[11px] text-muted-foreground">Patterns</p>
+									<p className="text-sm font-semibold">{summary?.trackedPatternCount ?? trackingPatterns.length}</p>
+								</div>
+								<div className="rounded-md border bg-muted/30 p-2">
+									<p className="text-[11px] text-muted-foreground">Tracked files</p>
+									<p className="text-sm font-semibold">{summary?.trackedFileCount ?? trackedFiles.length}</p>
+								</div>
+								<div className="rounded-md border bg-muted/30 p-2">
+									<p className="text-[11px] text-muted-foreground">Known size</p>
+									<p className="text-sm font-semibold">{summary?.totalSizeLabel ?? 'N/A'}</p>
+								</div>
+								<div className="rounded-md border bg-muted/30 p-2">
+									<p className="text-[11px] text-muted-foreground">Unknown size files</p>
+									<p className="text-sm font-semibold">{summary?.unknownSizeFileCount ?? 0}</p>
+								</div>
+							</div>
+
+							{/* Add tracking pattern */}
+							<div className="flex items-center gap-2 py-3">
 							<Input
 								placeholder="Add tracking pattern (e.g., *.psd)"
 								value={newPattern}
@@ -217,8 +239,8 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 						</div>
 
 						{/* Tracking patterns */}
-						<ScrollArea className="flex-1">
-							<h4 className="text-sm font-medium mb-3">Tracking Patterns</h4>
+							<ScrollArea className="flex-1">
+								<h4 className="text-sm font-medium mb-3">Tracking Patterns</h4>
 							{trackingPatterns.length === 0 ? (
 								<div className="text-center py-4 text-muted-foreground text-sm">
 									No LFS tracking patterns configured
@@ -243,10 +265,34 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 										</div>
 									))}
 								</div>
-							)}
+								)}
 
-							{/* Common patterns */}
-							<h4 className="text-sm font-medium mt-6 mb-3">Common Patterns</h4>
+								<h4 className="text-sm font-medium mt-6 mb-3">Tracked LFS Files</h4>
+								{trackedFiles.length === 0 ? (
+									<div className="text-center py-4 text-muted-foreground text-sm">
+										No tracked LFS files yet
+									</div>
+								) : (
+									<div className="space-y-2">
+										{trackedFiles.map((file) => (
+											<div
+												key={`${file.path}-${file.oid}`}
+												className="flex items-center justify-between gap-2 rounded-lg border bg-muted/20 px-2 py-1.5"
+											>
+												<div className="min-w-0">
+													<p className="truncate text-xs font-mono">{file.path}</p>
+													<p className="text-[11px] text-muted-foreground">
+														{file.sizeLabel ? file.sizeLabel : 'size unknown'}
+													</p>
+												</div>
+												<HardDrive className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+											</div>
+										))}
+									</div>
+								)}
+
+								{/* Common patterns */}
+								<h4 className="text-sm font-medium mt-6 mb-3">Common Patterns</h4>
 							<div className="grid grid-cols-2 gap-2">
 								{[
 									'*.psd',
@@ -276,11 +322,14 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 							</div>
 						</ScrollArea>
 
-						<div className="text-xs text-muted-foreground pt-2 border-t">
-							LFS stores large files outside the Git repository, improving clone and fetch performance.
-						</div>
-					</>
-				)}
+							<div className="text-xs text-muted-foreground pt-2 border-t">
+								<div className="flex items-center gap-1">
+									<Check className="h-3.5 w-3.5 text-emerald-600" />
+									<span>LFS stores large files outside the Git repository for faster clones and fetches.</span>
+								</div>
+							</div>
+						</>
+					)}
 			</DialogContent>
 		</Dialog>
 	);

@@ -5,6 +5,7 @@
 
 import { useLensMode, type LensMode } from './useLensMode';
 import { Button } from '../ui/button';
+import type { ElementType } from 'react';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const LENS_ICONS: Record<LensMode, React.ElementType> = {
+const LENS_ICONS: Record<LensMode, ElementType> = {
 	guided: Compass,
 	craft: Wand2,
 	control: Terminal,

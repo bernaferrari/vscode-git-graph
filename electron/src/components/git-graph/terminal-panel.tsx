@@ -25,6 +25,8 @@ interface TerminalPanelProps {
 export function TerminalPanel({ open, onOpenChange, cwd }: TerminalPanelProps) {
 	const { activeRepo } = useAppStore();
 	const [history, setHistory] = useState<Array<{ type: 'input' | 'output' | 'error'; text: string }>>([]);
+	const [commandHistory, setCommandHistory] = useState<string[]>([]);
+	const [historyIndex, setHistoryIndex] = useState<number>(-1);
 	const [input, setInput] = useState('');
 	const [maximized, setMaximized] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +73,13 @@ Any other command is executed by your system shell in the active repository.`,
 		}
 
 		setHistory((prev) => [...prev, { type: 'input', text: `$ ${cmd}` }]);
+		setCommandHistory((prev) => {
+			if (prev[prev.length - 1] === cmd) {
+				return prev;
+			}
+			return [...prev, cmd];
+		});
+		setHistoryIndex(-1);
 
 		if (!workingDir) {
 			setHistory((prev) => [...prev, { type: 'error', text: 'No active repository selected.' }]);
@@ -118,6 +127,29 @@ Any other command is executed by your system shell in the active repository.`,
 		if (e.key === 'Enter') {
 			executeCommand(input);
 			setInput('');
+			return;
+		}
+
+		if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			if (commandHistory.length === 0) return;
+			const nextIndex = historyIndex < 0 ? commandHistory.length - 1 : Math.max(0, historyIndex - 1);
+			setHistoryIndex(nextIndex);
+			setInput(commandHistory[nextIndex] ?? '');
+			return;
+		}
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			if (commandHistory.length === 0) return;
+			if (historyIndex <= 0) {
+				setHistoryIndex(-1);
+				setInput('');
+				return;
+			}
+			const nextIndex = historyIndex + 1;
+			setHistoryIndex(nextIndex);
+			setInput(commandHistory[nextIndex] ?? '');
 		}
 	};
 

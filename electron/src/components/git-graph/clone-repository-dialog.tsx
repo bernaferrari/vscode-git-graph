@@ -3,16 +3,18 @@
  * Supports cloning by URL or selecting from authenticated provider accounts.
  */
 
+import { Github, Gitlab, GitPullRequest, Loader2, FolderOpen, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { trpc } from '@/trpc/client';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Github, Gitlab, GitPullRequest, Loader2, FolderOpen, Download } from 'lucide-react';
-import { toast } from 'sonner';
+import { trpc } from '@/trpc/client';
+
 
 type RepoProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 
@@ -46,6 +48,8 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
     const [search, setSearch] = useState('');
     const [destinationParent, setDestinationParent] = useState('');
     const [directoryName, setDirectoryName] = useState('');
+    const [cloneBranch, setCloneBranch] = useState('');
+    const [cloneDepth, setCloneDepth] = useState('');
     const [authDraft, setAuthDraft] = useState({
         githubToken: '',
         gitlabToken: '',
@@ -137,10 +141,17 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
             toast.error('Repository folder name is required');
             return;
         }
+        const parsedDepth = cloneDepth.trim() ? parseInt(cloneDepth.trim(), 10) : null;
+        if (parsedDepth !== null && (!Number.isFinite(parsedDepth) || parsedDepth < 1)) {
+            toast.error('Clone depth must be a positive integer');
+            return;
+        }
 
         cloneMutation.mutate({
             url: cloneUrl,
             destination: destinationPath,
+            branch: cloneBranch.trim() || undefined,
+            depth: parsedDepth ?? undefined,
         });
     };
 
@@ -175,7 +186,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
 
                 <Tabs
                     value={activeTab}
-                    onValueChange={(value) => setActiveTab(value as 'url' | 'account')}
+                    onValueChange={(value) => { setActiveTab(value as 'url' | 'account'); }}
                     className='flex min-h-0 flex-1 flex-col'>
                     <TabsList className='grid w-full grid-cols-2'>
                         <TabsTrigger value='url'>From URL</TabsTrigger>
@@ -188,8 +199,28 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                             <Input
                                 placeholder='https://github.com/org/repo.git'
                                 value={url}
-                                onChange={(event) => setUrl(event.target.value)}
+                                onChange={(event) => { setUrl(event.target.value); }}
                             />
+                        </div>
+                        <div className='grid gap-4 md:grid-cols-2'>
+                            <div>
+                                <label className='mb-1.5 block text-sm font-medium'>Branch (optional)</label>
+                                <Input
+                                    placeholder='main'
+                                    value={cloneBranch}
+                                    onChange={(event) => { setCloneBranch(event.target.value); }}
+                                />
+                            </div>
+                            <div>
+                                <label className='mb-1.5 block text-sm font-medium'>Depth (optional)</label>
+                                <Input
+                                    type='number'
+                                    min={1}
+                                    placeholder='1'
+                                    value={cloneDepth}
+                                    onChange={(event) => { setCloneDepth(event.target.value); }}
+                                />
+                            </div>
                         </div>
                     </TabsContent>
 
@@ -198,7 +229,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                             <select
                                 className='bg-background h-9 rounded-md border px-2 text-sm'
                                 value={provider}
-                                onChange={(event) => setProvider(event.target.value as RepoProvider)}>
+                                onChange={(event) => { setProvider(event.target.value as RepoProvider); }}>
                                 <option value='github'>GitHub</option>
                                 <option value='gitlab'>GitLab</option>
                                 <option value='bitbucket'>Bitbucket</option>
@@ -206,7 +237,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                             </select>
                             <Input
                                 value={search}
-                                onChange={(event) => setSearch(event.target.value)}
+                                onChange={(event) => { setSearch(event.target.value); }}
                                 placeholder='Search repositories'
                                 className='max-w-xs'
                             />
@@ -233,7 +264,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                     placeholder='GitHub token'
                                     value={authDraft.githubToken}
                                     onChange={(event) =>
-                                        setAuthDraft((current) => ({ ...current, githubToken: event.target.value }))
+                                        { setAuthDraft((current) => ({ ...current, githubToken: event.target.value })); }
                                     }
                                 />
                             )}
@@ -243,7 +274,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                     placeholder='GitLab token'
                                     value={authDraft.gitlabToken}
                                     onChange={(event) =>
-                                        setAuthDraft((current) => ({ ...current, gitlabToken: event.target.value }))
+                                        { setAuthDraft((current) => ({ ...current, gitlabToken: event.target.value })); }
                                     }
                                 />
                             )}
@@ -254,10 +285,10 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                         placeholder='Bitbucket username'
                                         value={authDraft.bitbucketUsername}
                                         onChange={(event) =>
-                                            setAuthDraft((current) => ({
+                                            { setAuthDraft((current) => ({
                                                 ...current,
                                                 bitbucketUsername: event.target.value,
-                                            }))
+                                            })); }
                                         }
                                     />
                                     <Input
@@ -265,10 +296,10 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                         placeholder='Bitbucket token / app password'
                                         value={authDraft.bitbucketToken}
                                         onChange={(event) =>
-                                            setAuthDraft((current) => ({
+                                            { setAuthDraft((current) => ({
                                                 ...current,
                                                 bitbucketToken: event.target.value,
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </div>
@@ -279,7 +310,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                     placeholder='Azure DevOps PAT'
                                     value={authDraft.azureToken}
                                     onChange={(event) =>
-                                        setAuthDraft((current) => ({ ...current, azureToken: event.target.value }))
+                                        { setAuthDraft((current) => ({ ...current, azureToken: event.target.value })); }
                                     }
                                 />
                             )}
@@ -310,6 +341,8 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                                             onClick={() => {
                                                 setUrl(repository.cloneUrl || repository.sshUrl || repository.webUrl);
                                                 setDirectoryName(repository.name);
+                                                setCloneBranch(repository.defaultBranch || '');
+                                                setCloneDepth('');
                                                 setActiveTab('url');
                                             }}>
                                             <div>
@@ -345,7 +378,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                         <div className='flex items-center gap-2'>
                             <Input
                                 value={destinationParent}
-                                onChange={(event) => setDestinationParent(event.target.value)}
+                                onChange={(event) => { setDestinationParent(event.target.value); }}
                                 placeholder='/path/to/projects'
                             />
                             <Button variant='outline' onClick={() => void chooseDestinationParent()}>
@@ -357,14 +390,14 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
 
                     <div>
                         <label className='mb-1.5 block text-sm font-medium'>Folder Name</label>
-                        <Input value={directoryName} onChange={(event) => setDirectoryName(event.target.value)} placeholder='repository-name' />
+                        <Input value={directoryName} onChange={(event) => { setDirectoryName(event.target.value); }} placeholder='repository-name' />
                         {destinationPath ? (
                             <p className='text-muted-foreground mt-1 text-xs'>Will clone to: {destinationPath}</p>
                         ) : null}
                     </div>
 
                     <div className='flex justify-end gap-2'>
-                        <Button variant='outline' onClick={() => onOpenChange(false)}>
+                        <Button variant='outline' onClick={() => { onOpenChange(false); }}>
                             Cancel
                         </Button>
                         <Button onClick={handleClone} disabled={cloneMutation.isPending}>

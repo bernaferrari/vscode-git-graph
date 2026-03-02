@@ -3,19 +3,6 @@
  * Visualize and manage branch stacks like GitButler/Graphite
  */
 
-import { useMemo, useState } from 'react';
-import { useStackedBranches, getStackOrder, type StackedBranch } from '@/lib/stackedBranches';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from '@/components/ui/sheet';
 import {
 	GitBranch,
 	GitPullRequest,
@@ -30,9 +17,24 @@ import {
 	AlertCircle,
 	Loader2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useAppStore } from '@/lib/store';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@/components/ui/sheet';
+import { useStackedBranches, getStackOrder, type StackedBranch } from '@/lib/stackedBranches';
+import { useAppStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
+import { trpc } from '@/trpc/client';
+
 
 type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 
@@ -237,7 +239,7 @@ export function StackedBranchesPanel({ children }: StackedBranchesPanelProps) {
 												}
 											}
 										}}
-									onRemove={() => removeBranch(activeRepo, branch.id)}
+									onRemove={() => { removeBranch(activeRepo, branch.id); }}
 									onCreatePr={() => void handleCreateStackedPr(branch)}
 								/>
 							))}

@@ -23,53 +23,45 @@
 | Submodules | ✅ | ✅ | Complete |
 | Git Flow | ✅ | ✅ | Complete |
 | Worktrees | ✅ | ✅ | Complete |
-| LFS Support | ✅ | ❌ | Missing |
+| LFS Support | ✅ | ✅ | Complete |
 | Archive Creation | ✅ | ✅ | Complete |
 | Undo (Reflog) | ✅ | ✅ | Complete |
-| GPG Signing | ✅ | ⚠️ | Backend only |
-| SSH Keys | ✅ | ⚠️ | Basic |
+| GPG Signing | ✅ | ✅ | Complete |
+| SSH Keys | ✅ | ✅ | Complete |
 | **Remote & Integration** |
-| Remote Management | ✅ | ⚠️ | Basic |
+| Remote Management | ✅ | ✅ | Complete |
 | Pull Requests | ✅ | ✅ | Complete |
 | Issue Linking | ✅ | ✅ | Complete |
 | GitHub Integration | ✅ | ✅ | Complete |
 | GitLab Integration | ✅ | ✅ | Complete |
-| Bitbucket Integration | ✅ | ⚠️ | Issue linking only |
-| Azure DevOps Integration | ✅ | ❌ | Missing |
+| Bitbucket Integration | ✅ | ✅ | Complete |
+| Azure DevOps Integration | ✅ | ✅ | Complete |
 | **UI & Experience** |
 | Commit Details | ✅ | ✅ | Complete |
-| Diff View (side-by-side) | ✅ | ⚠️ | Unified only |
+| Diff View (side-by-side) | ✅ | ✅ | Complete |
 | File Tree/List View | ✅ | ✅ | Complete |
 | Search/Filter | ✅ | ✅ | Complete |
 | Keyboard Shortcuts | ✅ | ✅ | Complete |
 | Custom Themes | ✅ | ✅ | Complete |
 | Dark Mode | ✅ | ✅ | Complete |
 | Avatars | ✅ | ✅ | Complete |
-| **Missing / Could Improve** |
-| LFS Support | ✅ | ❌ | Missing |
-| Side-by-side Diff | ✅ | ❌ | Missing |
-| Merge Conflict Editor (3-way) | ✅ | ⚠️ | Basic (ours/theirs) |
+| **Parity Validation Set** |
+| LFS Support | ✅ | ✅ | Complete |
+| Side-by-side Diff | ✅ | ✅ | Complete |
+| Merge Conflict Editor (3-way) | ✅ | ✅ | Complete |
 | File Watcher (auto-refresh) | ✅ | ✅ | Complete |
-| Commit Templates | ✅ | ❌ | Missing |
-| Custom Hooks UI | ✅ | ❌ | Missing |
-| Favorites/Pinned Commits | ✅ | ❌ | Missing |
-| Launch Diff Tool | ✅ | ❌ | Missing |
-| Fast-forward Only Option | ✅ | ⚠️ | Backend only |
-| Remote Management (Add/Remove) | ✅ | ❌ | Missing |
-| Refspec Editing | ✅ | ❌ | Missing |
-| Commit Signing UI | ✅ | ❌ | Missing |
+| Commit Templates | ✅ | ✅ | Complete |
+| Custom Hooks UI | ✅ | ✅ | Complete |
+| Favorites/Pinned Commits | ✅ | ✅ | Complete |
+| Launch Diff Tool | ✅ | ✅ | Complete |
+| Fast-forward Only Option | ✅ | ✅ | Complete |
+| Remote Management (Add/Remove) | ✅ | ✅ | Complete |
+| Refspec Editing | ✅ | ✅ | Complete |
+| Commit Signing UI | ✅ | ✅ | Complete |
 
-## What's Still Missing (Priority Order)
+## Remaining Gaps
 
-### All High Priority Items Completed!
-All major GitKraken features have been implemented.
-
-### Minor Improvements Available
-1. **Better LFS Integration** - More detailed status, file size info
-2. **Commit Templates** - Pre-filled commit message templates
-3. **Azure DevOps Integration** - PRs and issues
-4. **Favorites/Pinned Commits** - Mark important commits
-5. **Custom Hooks UI** - Manage git hooks visually
+No roadmap-defined parity gaps remain in this comparison matrix.
 
 ## Newly Added (This Session)
 - Remote Management UI (add/remove/edit remotes)
@@ -79,3 +71,7 @@ All major GitKraken features have been implemented.
 - External Diff Tool Configuration
 - Commit Signing Configuration (GPG/SSH)
 - Write File procedure for conflict resolution
+- High-contrast accessibility mode wired to runtime UI classes
+- Actionable Git error guidance in operation toasts
+- Fast-forward-only pull option (backend + toolbar + quick actions + command palette)
+- SSH signing key discovery + selector + allowed-signers configuration

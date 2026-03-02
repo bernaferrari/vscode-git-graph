@@ -39,7 +39,9 @@ export function realpath(p: string, native: boolean = false): Promise<string> {
  */
 export function doesFileExist(p: string): Promise<boolean> {
 	return new Promise((resolve) => {
-		fs.access(p, fs.constants.R_OK, (err) => resolve(err === null));
+		fs.access(p, fs.constants.R_OK, (err) => {
+			resolve(err === null);
+		});
 	});
 }
 

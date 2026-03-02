@@ -3,14 +3,22 @@
  * Common git actions in a compact toolbar
  */
 
+import { Upload, Download, RefreshCw, GitBranch, Tag, Archive, Loader2, Check, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Upload, Download, RefreshCw, GitBranch, Tag, Archive, Loader2, Check } from 'lucide-react';
-import { useGitOperations } from '@/hooks/useGitOperations';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface QuickActionsToolbarProps {
     className?: string;
@@ -88,7 +96,20 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
             return;
         }
         try {
-            await gitOps.pull(currentBranch, 'origin', false);
+            await gitOps.pull(currentBranch, 'origin', false, false);
+            await Promise.allSettled([refetchAheadBehind(), refetchStatus()]);
+        } catch {
+            // Error is surfaced by the mutation toast.
+        }
+    };
+
+    const handleQuickPullFastForwardOnly = async () => {
+        if (!currentBranch) {
+            toast.error('No current branch to pull');
+            return;
+        }
+        try {
+            await gitOps.pull(currentBranch, 'origin', false, true);
             await Promise.allSettled([refetchAheadBehind(), refetchStatus()]);
         } catch {
             // Error is surfaced by the mutation toast.
@@ -111,7 +132,7 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
                 <Input
                     placeholder='Commit message...'
                     value={commitMessage}
-                    onChange={(e) => setCommitMessage(e.target.value)}
+                    onChange={(e) => { setCommitMessage(e.target.value); }}
                     onKeyDown={(e) => e.key === 'Enter' && handleQuickCommit()}
                     className='h-8 text-sm'
                     disabled={!activeRepo || stagedCount === 0}
@@ -143,17 +164,31 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
                     <RefreshCw className='h-4 w-4' />
                 </Button>
 
-                <Button
-                    variant='ghost'
-                    size='sm'
-                    className='h-8 px-2'
-                    onClick={handleQuickPull}
-                    disabled={!activeRepo || behind === 0}
-                    aria-label='Pull from remote'
-                    title={`Pull (${behind} behind)`}>
-                    <Download className='h-4 w-4' />
-                    {behind > 0 && <span className='ml-1 text-xs'>{behind}</span>}
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-8 px-2'
+                            disabled={!activeRepo || behind === 0}
+                            aria-label='Pull from remote'
+                            title={`Pull (${behind} behind)`}>
+                            <Download className='h-4 w-4' />
+                            {behind > 0 && <span className='ml-1 text-xs'>{behind}</span>}
+                            <ChevronDown className='ml-1 h-3 w-3' />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align='start'>
+                        <DropdownMenuItem onClick={handleQuickPull}>
+                            <Download className='mr-2 h-4 w-4' />
+                            Pull
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleQuickPullFastForwardOnly}>
+                            <Download className='mr-2 h-4 w-4 text-emerald-600' />
+                            Pull (Fast-forward only)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Button
                     variant='ghost'

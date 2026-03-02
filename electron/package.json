@@ -14,12 +14,14 @@
         "build:linux": "vite build && electron-builder --linux -c electron-builder.json5",
         "publish:generic": "tsx scripts/publish.ts",
         "typecheck": "tsr generate && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.node.json",
+        "typecheck:release": "tsc --noEmit -p tsconfig.release.json",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "test:release": "vitest run -c vitest.release.config.ts"
     },
     "dependencies": {
         "@base-ui/react": "^1.1.0",
@@ -59,7 +61,7 @@
         "zustand": "^5.0.11"
     },
     "devDependencies": {
-        "@eslint/js": "^10.0.1",
+        "@eslint/js": "^9.39.1",
         "@playwright/test": "^1.58.2",
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/vite": "^4.1.18",
@@ -83,7 +85,7 @@
         "electron": "^40.2.1",
         "electron-builder": "^26.7.0",
         "electron-updater": "^6.7.3",
-        "eslint": "^10.0.0",
+        "eslint": "^9.39.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-import-resolver-typescript": "^4.4.4",
         "eslint-plugin-import": "^2.32.0",

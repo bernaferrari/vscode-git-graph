@@ -3,7 +3,7 @@
  * Native menus for macOS, Windows, and Linux
  */
 
-import { app, Menu, MenuItem, BrowserWindow, shell, dialog } from 'electron';
+import { app, Menu, BrowserWindow, shell, dialog } from 'electron';
 
 export interface MenuState {
 	repoName: string | null;
@@ -24,7 +24,7 @@ class MenuManager {
 	};
 
 	constructor() {
-		app.whenReady().then(() => {
+		void app.whenReady().then(() => {
 			this.buildMenu();
 		});
 	}
@@ -81,7 +81,7 @@ class MenuManager {
 				{
 					label: 'Preferences...',
 					accelerator: 'CmdOrCtrl+,',
-					click: () => this.sendAction('open-settings'),
+					click: () => { this.sendAction('open-settings'); },
 				},
 				{ type: 'separator' },
 				{ role: 'services', submenu: [] },
@@ -99,19 +99,21 @@ class MenuManager {
 		return {
 			label: 'File',
 			submenu: [
-				{
-					label: 'Open Repository...',
-					accelerator: 'CmdOrCtrl+O',
-					click: () => this.openRepository(),
-				},
+					{
+						label: 'Open Repository...',
+						accelerator: 'CmdOrCtrl+O',
+						click: () => {
+							void this.openRepository();
+						},
+					},
 				{
 					label: 'Clone Repository...',
 					accelerator: 'CmdOrCtrl+Shift+O',
-					click: () => this.sendAction('clone-repo'),
+					click: () => { this.sendAction('clone-repo'); },
 				},
 				{
 					label: 'Init New Repository...',
-					click: () => this.sendAction('init-repo'),
+					click: () => { this.sendAction('init-repo'); },
 				},
 				{ type: 'separator' },
 				{
@@ -122,7 +124,7 @@ class MenuManager {
 				{
 					label: 'Close Repository',
 					accelerator: 'CmdOrCtrl+W',
-					click: () => this.sendAction('close-repo'),
+					click: () => { this.sendAction('close-repo'); },
 				},
 				...(process.platform === 'darwin' ? [] : [
 					{ type: 'separator' } as const,
@@ -149,12 +151,12 @@ class MenuManager {
 				{
 					label: 'Find...',
 					accelerator: 'CmdOrCtrl+F',
-					click: () => this.sendAction('find'),
+					click: () => { this.sendAction('find'); },
 				},
 				{
 					label: 'Search All Commits...',
 					accelerator: 'CmdOrCtrl+Shift+F',
-					click: () => this.sendAction('search-commits'),
+					click: () => { this.sendAction('search-commits'); },
 				},
 			],
 		};
@@ -167,19 +169,19 @@ class MenuManager {
 				{
 					label: 'Reload',
 					accelerator: 'CmdOrCtrl+R',
-					click: () => this.sendAction('refresh'),
+					click: () => { this.sendAction('refresh'); },
 				},
 				{ role: 'forceReload' },
 				{ type: 'separator' },
 				{
 					label: 'Toggle Sidebar',
 					accelerator: 'CmdOrCtrl+B',
-					click: () => this.sendAction('toggle-sidebar'),
+					click: () => { this.sendAction('toggle-sidebar'); },
 				},
 				{
 					label: 'Toggle Commit Details',
 					accelerator: 'CmdOrCtrl+D',
-					click: () => this.sendAction('toggle-commit-details'),
+					click: () => { this.sendAction('toggle-commit-details'); },
 				},
 				{ type: 'separator' },
 				{ role: 'resetZoom' },
@@ -204,47 +206,47 @@ class MenuManager {
 				{
 					label: 'Commit...',
 					accelerator: 'CmdOrCtrl+Return',
-					click: () => this.sendAction('commit'),
+					click: () => { this.sendAction('commit'); },
 				},
 				{
 					label: 'Stage All Changes',
 					accelerator: 'CmdOrCtrl+Shift+A',
-					click: () => this.sendAction('stage-all'),
+					click: () => { this.sendAction('stage-all'); },
 				},
 				{
 					label: 'Unstage All',
-					click: () => this.sendAction('unstage-all'),
+					click: () => { this.sendAction('unstage-all'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Stash Changes...',
-					click: () => this.sendAction('stash-save'),
+					click: () => { this.sendAction('stash-save'); },
 				},
 				{
 					label: 'Pop Stash',
-					click: () => this.sendAction('stash-pop'),
+					click: () => { this.sendAction('stash-pop'); },
 				},
 				{
 					label: 'Manage Stashes...',
-					click: () => this.sendAction('stash-manage'),
+					click: () => { this.sendAction('stash-manage'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Reset to HEAD...',
-					click: () => this.sendAction('reset-head'),
+					click: () => { this.sendAction('reset-head'); },
 				},
 				{
 					label: 'Undo Last Commit',
-					click: () => this.sendAction('undo-commit'),
+					click: () => { this.sendAction('undo-commit'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Statistics',
-					click: () => this.sendAction('statistics'),
+					click: () => { this.sendAction('statistics'); },
 				},
 				{
 					label: 'Health Check',
-					click: () => this.sendAction('health-check'),
+					click: () => { this.sendAction('health-check'); },
 				},
 			],
 		};
@@ -257,44 +259,44 @@ class MenuManager {
 				{
 					label: 'Create Branch...',
 					accelerator: 'CmdOrCtrl+N',
-					click: () => this.sendAction('create-branch'),
+					click: () => { this.sendAction('create-branch'); },
 				},
 				{
 					label: 'Delete Branch...',
-					click: () => this.sendAction('delete-branch'),
+					click: () => { this.sendAction('delete-branch'); },
 				},
 				{
 					label: 'Rename Branch...',
-					click: () => this.sendAction('rename-branch'),
+					click: () => { this.sendAction('rename-branch'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Checkout...',
 					accelerator: 'CmdOrCtrl+Shift+N',
-					click: () => this.sendAction('checkout-branch'),
+					click: () => { this.sendAction('checkout-branch'); },
 				},
 				{
 					label: 'Compare Branches...',
-					click: () => this.sendAction('compare-branches'),
+					click: () => { this.sendAction('compare-branches'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Merge into Current Branch...',
 					accelerator: 'CmdOrCtrl+M',
-					click: () => this.sendAction('merge-branch'),
+					click: () => { this.sendAction('merge-branch'); },
 				},
 				{
 					label: 'Rebase Current Branch...',
-					click: () => this.sendAction('rebase-branch'),
+					click: () => { this.sendAction('rebase-branch'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Create Tag...',
-					click: () => this.sendAction('create-tag'),
+					click: () => { this.sendAction('create-tag'); },
 				},
 				{
 					label: 'Delete Tag...',
-					click: () => this.sendAction('delete-tag'),
+					click: () => { this.sendAction('delete-tag'); },
 				},
 			],
 		};
@@ -307,32 +309,32 @@ class MenuManager {
 				{
 					label: 'Fetch',
 					accelerator: 'F5',
-					click: () => this.sendAction('fetch'),
+					click: () => { this.sendAction('fetch'); },
 				},
 				{
 					label: 'Pull',
 					accelerator: 'CmdOrCtrl+Shift+P',
-					click: () => this.sendAction('pull'),
+					click: () => { this.sendAction('pull'); },
 				},
 				{
 					label: 'Push',
 					accelerator: 'CmdOrCtrl+P',
-					click: () => this.sendAction('push'),
+					click: () => { this.sendAction('push'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Force Push',
-					click: () => this.sendAction('force-push'),
+					click: () => { this.sendAction('force-push'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Manage Remotes...',
-					click: () => this.sendAction('manage-remotes'),
+					click: () => { this.sendAction('manage-remotes'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Create Pull Request...',
-					click: () => this.sendAction('create-pr'),
+					click: () => { this.sendAction('create-pr'); },
 				},
 			],
 		};
@@ -345,46 +347,46 @@ class MenuManager {
 				{
 					label: 'Command Palette...',
 					accelerator: 'CmdOrCtrl+Shift+P',
-					click: () => this.sendAction('command-palette'),
+					click: () => { this.sendAction('command-palette'); },
 				},
 				{
 					label: 'Git Configuration...',
-					click: () => this.sendAction('git-config'),
+					click: () => { this.sendAction('git-config'); },
 				},
 				{
 					label: 'Git Ignore Editor...',
-					click: () => this.sendAction('gitignore'),
+					click: () => { this.sendAction('gitignore'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Terminal',
-					click: () => this.sendAction('terminal'),
+					click: () => { this.sendAction('terminal'); },
 				},
 				{
 					label: 'Open in Finder',
-					click: () => this.openInFinder(),
+					click: () => { this.openInFinder(); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Git Flow',
-					click: () => this.sendAction('gitflow'),
+					click: () => { this.sendAction('gitflow'); },
 				},
 				{
 					label: 'Git Bisect',
-					click: () => this.sendAction('bisect'),
+					click: () => { this.sendAction('bisect'); },
 				},
 				{ type: 'separator' },
 				{
 					label: 'Worktrees...',
-					click: () => this.sendAction('worktrees'),
+					click: () => { this.sendAction('worktrees'); },
 				},
 				{
 					label: 'Submodules...',
-					click: () => this.sendAction('submodules'),
+					click: () => { this.sendAction('submodules'); },
 				},
 				{
 					label: 'LFS Management...',
-					click: () => this.sendAction('lfs'),
+					click: () => { this.sendAction('lfs'); },
 				},
 			],
 		};
@@ -397,31 +399,37 @@ class MenuManager {
 				{
 					label: 'Keyboard Shortcuts',
 					accelerator: '?',
-					click: () => this.sendAction('keyboard-shortcuts'),
+					click: () => { this.sendAction('keyboard-shortcuts'); },
 				},
-				{
-					label: 'Documentation',
-					click: () => shell.openExternal('https://github.com/user/git-graph#readme'),
-				},
+					{
+						label: 'Documentation',
+						click: () => {
+							void shell.openExternal('https://github.com/user/git-graph#readme');
+						},
+					},
 				{ type: 'separator' },
-				{
-					label: 'Report Issue',
-					click: () => shell.openExternal('https://github.com/user/git-graph/issues'),
-				},
-				{
-					label: 'Release Notes',
-					click: () => shell.openExternal('https://github.com/user/git-graph/releases'),
-				},
+					{
+						label: 'Report Issue',
+						click: () => {
+							void shell.openExternal('https://github.com/user/git-graph/issues');
+						},
+					},
+					{
+						label: 'Release Notes',
+						click: () => {
+							void shell.openExternal('https://github.com/user/git-graph/releases');
+						},
+					},
 				{ type: 'separator' },
 				{
 					label: 'Check for Updates...',
-					click: () => this.sendAction('check-updates'),
+					click: () => { this.sendAction('check-updates'); },
 				},
 				...(process.platform === 'darwin' ? [] : [
 					{ type: 'separator' } as const,
 					{
 						label: 'About',
-						click: () => this.showAbout(),
+						click: () => { this.showAbout(); },
 					} as const,
 				]),
 			],
@@ -438,8 +446,8 @@ class MenuManager {
 
 		return recentRepos.map((repo, i) => ({
 			label: repo,
-			accelerator: i < 9 ? `CmdOrCtrl+${i + 1}` : undefined,
-			click: () => this.openRepo(repo),
+			accelerator: i < 9 ? `CmdOrCtrl+${String(i + 1)}` : undefined,
+			click: () => { this.openRepo(repo); },
 		}));
 	}
 
@@ -448,10 +456,16 @@ class MenuManager {
 	}
 
 	private async openRepository() {
-		const result = await dialog.showOpenDialog(this.mainWindow!, {
-			properties: ['openDirectory'],
-			title: 'Open Repository',
-		});
+		const window = this.mainWindow ?? BrowserWindow.getAllWindows()[0];
+		const result = window
+			? await dialog.showOpenDialog(window, {
+				properties: ['openDirectory'],
+				title: 'Open Repository',
+			})
+			: await dialog.showOpenDialog({
+				properties: ['openDirectory'],
+				title: 'Open Repository',
+			});
 
 		if (!result.canceled && result.filePaths[0]) {
 			this.sendAction('open-repo', result.filePaths[0]);
@@ -467,7 +481,8 @@ class MenuManager {
 	}
 
 	private showAbout() {
-		dialog.showMessageBox(this.mainWindow!, {
+		const window = this.mainWindow ?? BrowserWindow.getAllWindows()[0];
+		void dialog.showMessageBox(window, {
 			type: 'info',
 			title: 'About Git Graph',
 			message: 'Git Graph',

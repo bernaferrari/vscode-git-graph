@@ -17,7 +17,7 @@ import {
 	ChevronRight,
 	ChevronLeft,
 	GitBranch,
-	Commit,
+	GitCommit,
 	GitPullRequest,
 	Settings,
 	Keyboard,
@@ -95,7 +95,7 @@ export function OnboardingDialog({
 			id: 'commit',
 			title: 'Staging & Committing',
 			description: 'Stage and commit changes',
-			icon: <Commit className="h-8 w-8" />,
+			icon: <GitCommit className="h-8 w-8" />,
 			content: (
 				<div className="space-y-4">
 					<p>

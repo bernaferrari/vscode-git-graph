@@ -3,23 +3,28 @@
  * Exposes Git operations as tRPC procedures
  */
 
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { z } from 'zod';
-import { router, publicProcedure } from '../../init';
+
+import { appStore } from '@/app/backend/store';
+
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
 import {
+    addPullRequestComment as addRemotePullRequestComment,
     closePullRequest as closeRemotePullRequest,
     createPullRequest as createRemotePullRequest,
     getPullRequest as getRemotePullRequest,
+    listPullRequestComments as listRemotePullRequestComments,
     listPullRequests as listRemotePullRequests,
     mergePullRequest as mergeRemotePullRequest,
     parseRemoteUrl as parsePullRequestRemoteUrl,
     type ProviderAuthConfig,
     type PullRequestProvider,
 } from '../../../services/pullRequest';
-import { appStore } from '@/app/backend/store';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { router, publicProcedure } from '../../init';
 
 // Singleton Git service instance
 let gitService: GitService | null = null;
@@ -111,21 +116,455 @@ async function fileExists(filePath: string): Promise<boolean> {
     }
 }
 
+interface SshPublicKeyInfo {
+    path: string;
+    fileName: string;
+    algorithm: string;
+    comment: string | null;
+    fingerprint: string | null;
+}
+
+interface SigningStatusSnapshot {
+    enabled: boolean;
+    method: 'gpg' | 'ssh';
+    key: string | null;
+    gpgProgram: string | null;
+    gpgKeys: Array<{ id: string; userId: string }>;
+    sshKeys: SshPublicKeyInfo[];
+    allowedSignersFile: string | null;
+}
+
+interface SigningConfigUpdate {
+    repo: string;
+    enabled: boolean;
+    method?: 'gpg' | 'ssh';
+    key?: string;
+    gpgProgram?: string;
+    allowedSignersFile?: string;
+    global?: boolean;
+}
+
+function parseSshPublicKey(rawContent: string): { algorithm: string; comment: string | null } | null {
+    const trimmed = rawContent.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const [algorithm, keyData, ...commentParts] = trimmed.split(/\s+/);
+    if (!algorithm || !keyData) {
+        return null;
+    }
+
+    return {
+        algorithm,
+        comment: commentParts.length > 0 ? commentParts.join(' ') : null,
+    };
+}
+
+async function readSshKeyFingerprint(keyPath: string): Promise<string | null> {
+    try {
+        const { execFileSync } = await import('child_process');
+        const output = execFileSync('ssh-keygen', ['-lf', keyPath], { encoding: 'utf-8' }).trim();
+        const match = output.match(/^\d+\s+(\S+)/);
+        return match?.[1] ?? null;
+    } catch {
+        return null;
+    }
+}
+
+async function discoverSshPublicKeys(selectedSigningKeyPath: string | null): Promise<SshPublicKeyInfo[]> {
+    const sshDir = path.join(os.homedir(), '.ssh');
+    const keys: SshPublicKeyInfo[] = [];
+
+    try {
+        const entries = await fs.readdir(sshDir, { withFileTypes: true });
+        const pubEntries = entries
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.pub'))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        const discovered = await Promise.all(
+            pubEntries.map(async (entry): Promise<SshPublicKeyInfo | null> => {
+                const keyPath = path.join(sshDir, entry.name);
+
+                try {
+                    const content = await fs.readFile(keyPath, 'utf-8');
+                    const parsed = parseSshPublicKey(content);
+                    if (!parsed) {
+                        return null;
+                    }
+
+                    return {
+                        path: keyPath,
+                        fileName: entry.name,
+                        algorithm: parsed.algorithm,
+                        comment: parsed.comment,
+                        fingerprint: await readSshKeyFingerprint(keyPath),
+                    };
+                } catch {
+                    // Keep discovering other keys if one file is unreadable/corrupt.
+                    return null;
+                }
+            })
+        );
+
+        keys.push(...discovered.filter((key): key is SshPublicKeyInfo => key !== null));
+    } catch {
+        // SSH directory not available.
+    }
+
+    if (selectedSigningKeyPath && !keys.some((key) => key.path === selectedSigningKeyPath)) {
+        keys.unshift({
+            path: selectedSigningKeyPath,
+            fileName: path.basename(selectedSigningKeyPath),
+            algorithm: 'custom',
+            comment: 'Configured signing key',
+            fingerprint: await readSshKeyFingerprint(selectedSigningKeyPath),
+        });
+    }
+
+    return keys;
+}
+
+async function listGpgSecretKeys(): Promise<Array<{ id: string; userId: string }>> {
+    const gpgKeys: Array<{ id: string; userId: string }> = [];
+    try {
+        const { execFileSync } = await import('child_process');
+        const output = execFileSync('gpg', ['--list-secret-keys', '--keyid-format=LONG'], {
+            encoding: 'utf-8',
+        });
+
+        const keyRegex = /sec\s+\w+\/(\w+)\s+\d{4}-\d{2}-\d{2}\s+[^\n]+\n\s+([^\n]+)/g;
+        let match: RegExpExecArray | null;
+        while ((match = keyRegex.exec(output)) !== null) {
+            gpgKeys.push({
+                id: match[1] ?? '',
+                userId: match[2]?.trim() ?? '',
+            });
+        }
+    } catch {
+        // GPG is not available on this machine.
+    }
+
+    return gpgKeys;
+}
+
+async function readSigningStatusSnapshot(
+    repo: string,
+    options?: { includeGpgKeys?: boolean }
+): Promise<SigningStatusSnapshot> {
+    const gitService = getGitService();
+    const includeGpgKeys = options?.includeGpgKeys ?? true;
+    const [enabledRaw, methodRaw, keyRaw, gpgProgramRaw, allowedSignersFileRaw, gpgKeys] = await Promise.all([
+        gitService.runGitCommandWithOutput(['config', '--get', 'commit.gpgsign'], repo),
+        gitService.runGitCommandWithOutput(['config', '--get', 'gpg.format'], repo),
+        gitService.runGitCommandWithOutput(['config', '--get', 'user.signingkey'], repo),
+        gitService.runGitCommandWithOutput(['config', '--get', 'gpg.program'], repo),
+        gitService.runGitCommandWithOutput(['config', '--get', 'gpg.ssh.allowedSignersFile'], repo),
+        includeGpgKeys ? listGpgSecretKeys() : Promise.resolve([]),
+    ]);
+
+    const key = keyRaw?.trim() ?? null;
+    const sshKeys = await discoverSshPublicKeys(key);
+
+    return {
+        enabled: enabledRaw?.trim() === 'true',
+        method: methodRaw?.trim() === 'ssh' ? 'ssh' : 'gpg',
+        key,
+        gpgProgram: gpgProgramRaw?.trim() ?? null,
+        gpgKeys,
+        sshKeys,
+        allowedSignersFile: allowedSignersFileRaw?.trim() ?? null,
+    };
+}
+
+async function setOrUnsetGitConfig(
+    repo: string,
+    scope: '--global' | '--local',
+    configKey: string,
+    value: string | undefined
+): Promise<string | null> {
+    const gitService = getGitService();
+    const trimmed = value?.trim();
+
+    if (trimmed) {
+        return gitService.runGitCommand(['config', scope, '--replace-all', configKey, trimmed], repo);
+    }
+
+    const unsetError = await gitService.runGitCommand(['config', scope, '--unset-all', configKey], repo);
+    if (!unsetError) {
+        return null;
+    }
+
+    const normalized = unsetError.toLowerCase();
+    if (normalized.includes('no such section or key') || normalized.includes('no such key')) {
+        return null;
+    }
+
+    return unsetError;
+}
+
+async function applySigningConfig(update: SigningConfigUpdate): Promise<string | null> {
+    const gitService = getGitService();
+    const scope: '--global' | '--local' = update.global ? '--global' : '--local';
+
+    let error = await gitService.runGitCommand(
+        ['config', scope, 'commit.gpgsign', update.enabled.toString()],
+        update.repo
+    );
+    if (error || !update.enabled) {
+        return error;
+    }
+
+    const effectiveMethod =
+        update.method ??
+        ((await gitService.runGitCommandWithOutput(['config', '--get', 'gpg.format'], update.repo))?.trim() === 'ssh'
+            ? 'ssh'
+            : 'gpg');
+
+    error = await gitService.runGitCommand(['config', scope, 'gpg.format', effectiveMethod], update.repo);
+    if (error) {
+        return error;
+    }
+
+    error = await setOrUnsetGitConfig(update.repo, scope, 'user.signingkey', update.key);
+    if (error) {
+        return error;
+    }
+
+    error = await setOrUnsetGitConfig(
+        update.repo,
+        scope,
+        'gpg.program',
+        effectiveMethod === 'gpg' ? update.gpgProgram : undefined
+    );
+    if (error) {
+        return error;
+    }
+
+    return setOrUnsetGitConfig(
+        update.repo,
+        scope,
+        'gpg.ssh.allowedSignersFile',
+        effectiveMethod === 'ssh' ? update.allowedSignersFile : undefined
+    );
+}
+
+function parseConflictedFilesFromStatusOutput(statusOutput: string | null): string[] {
+    if (!statusOutput) {
+        return [];
+    }
+
+    const conflicted: string[] = [];
+    for (const line of statusOutput.split('\n').filter(Boolean)) {
+        const index = line[0];
+        const workTree = line[1];
+        if (
+            index === 'U' ||
+            workTree === 'U' ||
+            (index === 'A' && workTree === 'A') ||
+            (index === 'D' && workTree === 'D')
+        ) {
+            conflicted.push(line.slice(3));
+        }
+    }
+    return conflicted;
+}
+
+function parseLfsTrackPatterns(trackOutput: string | null): string[] {
+    if (!trackOutput) {
+        return [];
+    }
+
+    const patterns: string[] = [];
+    for (const rawLine of trackOutput.split('\n')) {
+        const line = rawLine.trim();
+        if (!line || line.toLowerCase().startsWith('listing ')) {
+            continue;
+        }
+
+        const match = line.match(/^"?(.*?)"?\s+\(.+\)$/);
+        const pattern = (match?.[1] ?? line).trim().replace(/^"|"$/g, '');
+        if (pattern) {
+            patterns.push(pattern);
+        }
+    }
+
+    return patterns;
+}
+
+function parseByteSizeToken(value: string): number | null {
+    const normalized = value.replace(/,/g, '').trim();
+    const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([kmgtp]?i?b?)?$/i);
+    if (!match?.[1]) {
+        return null;
+    }
+
+    const amount = Number.parseFloat(match[1]);
+    if (!Number.isFinite(amount)) {
+        return null;
+    }
+
+    const unit = (match[2] ?? 'b').toLowerCase();
+    const multipliers: Record<string, number> = {
+        b: 1,
+        kb: 1024,
+        kib: 1024,
+        mb: 1024 ** 2,
+        mib: 1024 ** 2,
+        gb: 1024 ** 3,
+        gib: 1024 ** 3,
+        tb: 1024 ** 4,
+        tib: 1024 ** 4,
+        pb: 1024 ** 5,
+        pib: 1024 ** 5,
+    };
+    const multiplier = multipliers[unit];
+    if (!multiplier) {
+        return null;
+    }
+
+    return Math.round(amount * multiplier);
+}
+
+function formatByteSize(value: number | null): string | null {
+    if (value === null || !Number.isFinite(value) || value < 0) {
+        return null;
+    }
+
+    if (value < 1024) {
+        return `${String(value)} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB', 'TB', 'PB'];
+    let size = value / 1024;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+
+    const unit = units[unitIndex] ?? 'PB';
+    return `${size.toFixed(size >= 10 ? 0 : 1)} ${unit}`;
+}
+
+function parseLfsTrackedFiles(lsFilesOutput: string | null): Array<{
+    oid: string;
+    path: string;
+    sizeBytes: number | null;
+    sizeLabel: string | null;
+}> {
+    if (!lsFilesOutput) {
+        return [];
+    }
+
+    const files: Array<{
+        oid: string;
+        path: string;
+        sizeBytes: number | null;
+        sizeLabel: string | null;
+    }> = [];
+
+    for (const rawLine of lsFilesOutput.split('\n')) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        const oidMatch = line.match(/^([0-9a-f]{6,64})\s+/i);
+        const oid = oidMatch?.[1] ?? '';
+
+        const sizeMatch = line.match(/\(([^)]+)\)\s*$/);
+        const sizeToken = sizeMatch?.[1]?.trim() ?? null;
+        const sizeBytes = sizeToken ? parseByteSizeToken(sizeToken) : null;
+
+        const pathWithPrefix = line
+            .replace(/^([0-9a-f]{6,64})\s+[*-]\s+/i, '')
+            .replace(/\s+\([^)]+\)\s*$/, '');
+        const filePath = pathWithPrefix.trim();
+
+        if (!filePath) continue;
+        files.push({
+            oid,
+            path: filePath,
+            sizeBytes,
+            sizeLabel: sizeToken ?? formatByteSize(sizeBytes),
+        });
+    }
+
+    return files;
+}
+
 const pullRequestProviderSchema = z.enum(['github', 'gitlab', 'bitbucket', 'azure']);
 
 function getStoredProviderAuthConfig(): ProviderAuthConfig {
     const storedAuth = appStore.get('providerAuth');
-    if (!storedAuth) {
-        return {};
-    }
+    const auth: ProviderAuthConfig = {};
+    if (storedAuth.githubToken.trim()) auth.githubToken = storedAuth.githubToken.trim();
+    if (storedAuth.gitlabToken.trim()) auth.gitlabToken = storedAuth.gitlabToken.trim();
+    if (storedAuth.bitbucketToken.trim()) auth.bitbucketToken = storedAuth.bitbucketToken.trim();
+    if (storedAuth.bitbucketUsername.trim()) auth.bitbucketUsername = storedAuth.bitbucketUsername.trim();
+    if (storedAuth.azureToken.trim()) auth.azureToken = storedAuth.azureToken.trim();
+    return auth;
+}
 
-    return {
-        githubToken: storedAuth.githubToken || undefined,
-        gitlabToken: storedAuth.gitlabToken || undefined,
-        bitbucketToken: storedAuth.bitbucketToken || undefined,
-        bitbucketUsername: storedAuth.bitbucketUsername || undefined,
-        azureToken: storedAuth.azureToken || undefined,
-    };
+function resolveGlobalGitConfigPath(): string {
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME?.trim();
+    if (xdgConfigHome) {
+        return path.join(xdgConfigHome, 'git', 'config');
+    }
+    return path.join(os.homedir(), '.gitconfig');
+}
+
+function mapCiStatusFromGitHub(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+    switch ((state ?? '').toLowerCase()) {
+        case 'success':
+            return 'success';
+        case 'failure':
+        case 'error':
+            return 'failure';
+        case 'pending':
+            return 'pending';
+        default:
+            return 'unknown';
+    }
+}
+
+function mapCiStatusFromGitLab(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+    switch ((state ?? '').toLowerCase()) {
+        case 'success':
+            return 'success';
+        case 'failed':
+            return 'failure';
+        case 'running':
+            return 'running';
+        case 'pending':
+            return 'pending';
+        case 'canceled':
+        case 'cancelled':
+        case 'skipped':
+        case 'manual':
+            return 'cancelled';
+        default:
+            return 'unknown';
+    }
+}
+
+function mapCiStatusFromBitbucket(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+    switch ((state ?? '').toLowerCase()) {
+        case 'successful':
+        case 'success':
+            return 'success';
+        case 'failed':
+        case 'error':
+            return 'failure';
+        case 'inprogress':
+        case 'running':
+            return 'running';
+        case 'pending':
+            return 'pending';
+        case 'stopped':
+            return 'cancelled';
+        default:
+            return 'unknown';
+    }
 }
 
 async function getPreferredRemoteUrlForPullRequests(repo: string): Promise<string | null> {
@@ -194,6 +633,7 @@ function validateRebaseTodoText(todos: string): string | null {
     if (!trimmed) return null;
 
     for (const [index, rawLine] of trimmed.split('\n').entries()) {
+        const lineNumber = String(index + 1);
         const trimmedLine = rawLine.trim();
         if (!trimmedLine || trimmedLine.startsWith('#')) {
             continue;
@@ -201,7 +641,7 @@ function validateRebaseTodoText(todos: string): string | null {
 
         const [rawAction, ...restParts] = trimmedLine.split(/\s+/);
         if (!rawAction) {
-            return `Invalid rebase todo at line ${index + 1}: empty command`;
+            return `Invalid rebase todo at line ${lineNumber}: empty command`;
         }
 
         const action = rawAction.toLowerCase();
@@ -209,7 +649,7 @@ function validateRebaseTodoText(todos: string): string | null {
 
         if (REBASE_TODO_ACTIONS_WITH_HASH.has(action)) {
             if (!hash || !HASH_LIKE.test(hash)) {
-                return `Invalid rebase todo at line ${index + 1}: "${action}" requires a valid commit hash`;
+                return `Invalid rebase todo at line ${lineNumber}: "${action}" requires a valid commit hash`;
             }
             continue;
         }
@@ -218,7 +658,7 @@ function validateRebaseTodoText(todos: string): string | null {
             continue;
         }
 
-        return `Invalid rebase todo at line ${index + 1}: unknown action "${rawAction}"`;
+        return `Invalid rebase todo at line ${lineNumber}: unknown action "${rawAction}"`;
     }
 
     return null;
@@ -234,17 +674,20 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
         /^(pick|reword|edit|squash|fixup|drop)\s+([0-9a-f]{7,40})(?:\s+(.*))?$/i
     );
     if (actionWithCommitMatch) {
+        const action = (actionWithCommitMatch[1] ?? '').toLowerCase() as RebaseTodoAction;
+        const hash = (actionWithCommitMatch[2] ?? '').toLowerCase();
         return {
-            action: actionWithCommitMatch[1]!.toLowerCase() as RebaseTodoAction,
-            hash: actionWithCommitMatch[2]!.toLowerCase(),
+            action,
+            hash,
             message: actionWithCommitMatch[3]?.trim() ?? '',
         };
     }
 
     const actionNoCommitMatch = trimmedLine.match(/^(exec|break)\s*(.*)$/i);
     if (actionNoCommitMatch) {
+        const action = (actionNoCommitMatch[1] ?? '').toLowerCase() as RebaseTodoAction;
         return {
-            action: actionNoCommitMatch[1]!.toLowerCase() as RebaseTodoAction,
+            action,
             hash: '',
             message: actionNoCommitMatch[2]?.trim() ?? '',
         };
@@ -252,10 +695,11 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
 
     const actionWithOptionalHashMatch = trimmedLine.match(/^(label|reset|merge|noop)\s+(.*)$/i);
     if (actionWithOptionalHashMatch) {
-        const [, action, body] = actionWithOptionalHashMatch;
+        const action = (actionWithOptionalHashMatch[1] ?? 'noop').toLowerCase() as RebaseTodoAction;
+        const body = actionWithOptionalHashMatch[2] ?? '';
         if (!body) {
             return {
-                action: action.toLowerCase() as RebaseTodoAction,
+                action,
                 hash: '',
                 message: '',
             };
@@ -263,15 +707,19 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
 
         const hashMatch = body.match(/^([0-9a-f]{7,40})(?:\s+(.*))?$/i);
         if (hashMatch) {
+            const hash = (hashMatch[1] ?? '').toLowerCase();
+            if (!hash) {
+                return null;
+            }
             return {
-                action: action.toLowerCase() as RebaseTodoAction,
-                hash: hashMatch[1]!.toLowerCase(),
+                action,
+                hash,
                 message: hashMatch[2]?.trim() ?? '',
             };
         }
 
         return {
-            action: action.toLowerCase() as RebaseTodoAction,
+            action,
             hash: '',
             message: body.trim(),
         };
@@ -279,8 +727,9 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
 
     const actionOnlyMatch = trimmedLine.match(/^(label|reset|merge|noop)\s*$/i);
     if (actionOnlyMatch) {
+        const action = (actionOnlyMatch[1] ?? 'noop').toLowerCase() as RebaseTodoAction;
         return {
-            action: actionOnlyMatch[1]!.toLowerCase() as RebaseTodoAction,
+            action,
             hash: '',
             message: '',
         };
@@ -664,7 +1113,10 @@ export const gitRouter = router({
                 for (const head of refs.heads) {
                     const idx = commitLookup.get(head.hash);
                     if (idx !== undefined) {
-                        annotatedCommits[idx]!.heads.push(head.name);
+                        const commit = annotatedCommits[idx];
+                        if (commit) {
+                            commit.heads.push(head.name);
+                        }
                     }
                 }
 
@@ -672,7 +1124,10 @@ export const gitRouter = router({
                     for (const tag of refs.tags) {
                         const idx = commitLookup.get(tag.hash);
                         if (idx !== undefined) {
-                            annotatedCommits[idx]!.tags.push(tag.name);
+                            const commit = annotatedCommits[idx];
+                            if (commit) {
+                                commit.tags.push(tag.name);
+                            }
                         }
                     }
                 }
@@ -1037,14 +1492,24 @@ export const gitRouter = router({
                 branchName: z.string(),
                 remote: z.string(),
                 noFastForward: z.boolean(),
+                fastForwardOnly: z.boolean().optional(),
             })
         )
         .mutation(async ({ input }) => {
             const initError = await ensureGitInitialized();
             if (initError) return { error: initError };
 
-            const args = ['pull', input.remote, input.branchName];
-            if (input.noFastForward) args.push('--no-ff');
+            if (input.noFastForward && input.fastForwardOnly) {
+                return { error: 'Cannot use both --no-ff and --ff-only for pull.' };
+            }
+
+            const args = ['pull'];
+            if (input.fastForwardOnly) {
+                args.push('--ff-only');
+            } else if (input.noFastForward) {
+                args.push('--no-ff');
+            }
+            args.push(input.remote, input.branchName);
 
             const error = await getGitService().runGitCommand(args, input.repo);
             return { error };
@@ -1302,14 +1767,14 @@ export const gitRouter = router({
 
             try {
                 // Check if merge is possible (dry run)
-                const mergeCheck = await getGitService().runGitCommandWithOutput(
+                await getGitService().runGitCommandWithOutput(
                     ['merge', '--no-commit', '--no-ff', input.source],
                     input.repo
                 );
 
                 // Get conflicts if any
-                const statusResult = await getGitService().getStatus(input.repo);
-                const conflicts = statusResult.conflicted || [];
+                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
+                const conflicts = parseConflictedFilesFromStatusOutput(statusOutput);
 
                 // Abort the dry-run merge
                 await getGitService().runGitCommand(['merge', '--abort'], input.repo);
@@ -1319,12 +1784,12 @@ export const gitRouter = router({
                     ['log', `${input.target}..${input.source}`, '--oneline'],
                     input.repo
                 );
-                const aheadCommits = logResult
+                const aheadCommits = (logResult ?? '')
                     .split('\n')
                     .filter(Boolean)
                     .map((line) => {
                         const [hash, ...msgParts] = line.split(' ');
-                        return { hash, message: msgParts.join(' ') };
+                        return { hash: hash ?? '', message: msgParts.join(' ') };
                     });
 
                 // Get files that would change
@@ -1332,13 +1797,13 @@ export const gitRouter = router({
                     ['diff', '--stat', `${input.target}...${input.source}`],
                     input.repo
                 );
-                const files = diffResult
+                const files = (diffResult ?? '')
                     .split('\n')
                     .filter(Boolean)
                     .map((line) => {
                         const match = line.match(/^(.+?)\s*\|\s*(\d+)/);
                         if (match) {
-                            return { path: match[1].trim(), changes: parseInt(match[2]) || 0 };
+                            return { path: match[1]?.trim() ?? '', changes: parseInt(match[2] ?? '0', 10) || 0 };
                         }
                         return { path: line.trim(), changes: 0 };
                     });
@@ -1350,14 +1815,14 @@ export const gitRouter = router({
                     files,
                     warnings: [],
                 };
-            } catch (error) {
+            } catch {
                 // Merge would have conflicts
-                const statusResult = await getGitService().getStatus(input.repo);
+                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
                 await getGitService().runGitCommand(['merge', '--abort'], input.repo);
 
                 return {
                     canMerge: false,
-                    conflicts: statusResult.conflicted || [],
+                    conflicts: parseConflictedFilesFromStatusOutput(statusOutput),
                     aheadCommits: [],
                     files: [],
                     warnings: ['Merge conflicts detected'],
@@ -1492,8 +1957,8 @@ export const gitRouter = router({
             return {
                 culprit: null,
                 nextCommit: null,
-                remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
-                steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                remaining: parseInt(remainingMatch?.[1] ?? '0', 10) || 0,
+                steps: parseInt(stepsMatch?.[1] ?? '0', 10) || 0,
             };
         }),
 
@@ -1534,8 +1999,8 @@ export const gitRouter = router({
             return {
                 culprit: null,
                 nextCommit: null,
-                remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
-                steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                remaining: parseInt(remainingMatch?.[1] ?? '0', 10) || 0,
+                steps: parseInt(stepsMatch?.[1] ?? '0', 10) || 0,
             };
         }),
 
@@ -1559,8 +2024,8 @@ export const gitRouter = router({
 
             return {
                 nextCommit: null,
-                remaining: remainingMatch ? parseInt(remainingMatch[1]) : 0,
-                steps: stepsMatch ? parseInt(stepsMatch[1]) : 0,
+                remaining: parseInt(remainingMatch?.[1] ?? '0', 10) || 0,
+                steps: parseInt(stepsMatch?.[1] ?? '0', 10) || 0,
             };
         }),
 
@@ -1707,6 +2172,13 @@ export const gitRouter = router({
             // Extract repo path
             const httpsMatch = url.match(/https?:\/\/[^/]+\/([^/]+\/[^/]+?)(?:\.git)?$/);
             const sshMatch = url.match(/git@[^:]+:([^/]+\/[^/]+?)(?:\.git)?$/);
+            const azureHttpsMatch = url.match(
+                /https?:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+?)(?:\.git)?$/i
+            );
+            const azureVisualStudioMatch = url.match(
+                /https?:\/\/([^/.]+)\.visualstudio\.com\/([^/]+)\/_git\/([^/]+?)(?:\.git)?$/i
+            );
+            const azureSshMatch = url.match(/git@ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
             const repoPath = httpsMatch?.[1] ?? sshMatch?.[1];
 
             if (repoPath) {
@@ -1726,6 +2198,27 @@ export const gitRouter = router({
                         url: `https://bitbucket.org/${repoPath}/issues/{issue}`,
                     };
                 }
+            } else if (azureHttpsMatch?.[1] && azureHttpsMatch[2]) {
+                const organization = azureHttpsMatch[1];
+                const project = azureHttpsMatch[2];
+                config = {
+                    issue: 'AB#(\\d+)|#(\\d+)',
+                    url: `https://dev.azure.com/${organization}/${project}/_workitems/edit/{issue}`,
+                };
+            } else if (azureVisualStudioMatch?.[1] && azureVisualStudioMatch[2]) {
+                const organization = azureVisualStudioMatch[1];
+                const project = azureVisualStudioMatch[2];
+                config = {
+                    issue: 'AB#(\\d+)|#(\\d+)',
+                    url: `https://dev.azure.com/${organization}/${project}/_workitems/edit/{issue}`,
+                };
+            } else if (azureSshMatch?.[1] && azureSshMatch[2]) {
+                const organization = azureSshMatch[1];
+                const project = azureSshMatch[2];
+                config = {
+                    issue: 'AB#(\\d+)|#(\\d+)',
+                    url: `https://dev.azure.com/${organization}/${project}/_workitems/edit/{issue}`,
+                };
             }
 
             return { config, error: null };
@@ -1865,6 +2358,88 @@ export const gitRouter = router({
 
                 const error = await getGitService().runGitCommand(['remote', 'prune', input.name], input.repo);
                 return { error };
+            }),
+
+        refspec: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    name: z.string(),
+                })
+            )
+            .query(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { fetch: [], push: [], error: initError };
+
+                try {
+                    const gitService = getGitService();
+                    const [fetchOutput, pushOutput] = await Promise.all([
+                        gitService.runGitCommandWithOutput(['config', '--get-all', `remote.${input.name}.fetch`], input.repo),
+                        gitService.runGitCommandWithOutput(['config', '--get-all', `remote.${input.name}.push`], input.repo),
+                    ]);
+
+                    const fetch = (fetchOutput ?? '')
+                        .split('\n')
+                        .map((entry) => entry.trim())
+                        .filter(Boolean);
+                    const push = (pushOutput ?? '')
+                        .split('\n')
+                        .map((entry) => entry.trim())
+                        .filter(Boolean);
+
+                    return { fetch, push, error: null };
+                } catch (error) {
+                    return { fetch: [], push: [], error: error instanceof Error ? error.message : 'Unknown error' };
+                }
+            }),
+
+        setRefspec: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    name: z.string(),
+                    fetch: z.array(z.string()).optional(),
+                    push: z.array(z.string()).optional(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { error: initError };
+
+                const gitService = getGitService();
+                const remote = input.name;
+
+                if (input.fetch !== undefined) {
+                    await gitService.runGitCommand(['config', '--unset-all', `remote.${remote}.fetch`], input.repo);
+                    for (const refspec of input.fetch) {
+                        const trimmed = refspec.trim();
+                        if (!trimmed) continue;
+                        const addError = await gitService.runGitCommand(
+                            ['config', '--add', `remote.${remote}.fetch`, trimmed],
+                            input.repo
+                        );
+                        if (addError) {
+                            return { error: addError };
+                        }
+                    }
+                }
+
+                if (input.push !== undefined) {
+                    await gitService.runGitCommand(['config', '--unset-all', `remote.${remote}.push`], input.repo);
+                    for (const refspec of input.push) {
+                        const trimmed = refspec.trim();
+                        if (!trimmed) continue;
+                        const addError = await gitService.runGitCommand(
+                            ['config', '--add', `remote.${remote}.push`, trimmed],
+                            input.repo
+                        );
+                        if (addError) {
+                            return { error: addError };
+                        }
+                    }
+                }
+
+                return { error: null };
             }),
     }),
 
@@ -2289,21 +2864,31 @@ export const gitRouter = router({
             if (initError) return { error: initError };
 
             const gitService = getGitService();
-
-            // Use git checkout to resolve
-            const args = ['checkout'];
             const safePath = validateGitPath(input.path);
-            if (input.resolution === 'ours') {
-                args.push('--ours');
-            } else if (input.resolution === 'theirs') {
-                args.push('--theirs');
-            }
-            args.push('--', safePath);
 
+            if (input.resolution === 'both') {
+                const [ours, theirs] = await Promise.all([
+                    gitService.runGitCommandWithOutput(['show', `:2:${safePath}`], input.repo),
+                    gitService.runGitCommandWithOutput(['show', `:3:${safePath}`], input.repo),
+                ]);
+
+                if (ours === null || theirs === null) {
+                    return { error: `Unable to read conflict stages for ${safePath}` };
+                }
+
+                const mergedContent = `${ours}${ours.endsWith('\n') || theirs.length === 0 ? '' : '\n'}${theirs}`;
+                const targetPath = resolveRepoPath(input.repo, safePath);
+                await fs.mkdir(path.dirname(targetPath), { recursive: true });
+                await fs.writeFile(targetPath, mergedContent, 'utf8');
+
+                const stageError = await gitService.runGitCommand(['add', '--', safePath], input.repo);
+                return { error: stageError };
+            }
+
+            const args = ['checkout', input.resolution === 'ours' ? '--ours' : '--theirs', '--', safePath];
             const error = await gitService.runGitCommand(args, input.repo);
 
             if (!error) {
-                // Stage the resolved file
                 await gitService.runGitCommand(['add', '--', safePath], input.repo);
             }
 
@@ -2321,7 +2906,7 @@ export const gitRouter = router({
             const gitService = getGitService();
             const output = await gitService.runGitCommandWithOutput(['config', '--get', 'rerere.enabled'], input.repo);
 
-            return { enabled: output.trim() === 'true', error: null };
+            return { enabled: (output ?? '').trim() === 'true', error: null };
         } catch {
             return { enabled: false, error: null };
         }
@@ -2361,7 +2946,6 @@ export const gitRouter = router({
         if (initError) return { recordings: [], error: initError };
 
         try {
-            const gitService = getGitService();
             // Get the git directory
             const gitDir = await getGitDir(input.repo);
             if (!gitDir) {
@@ -2372,7 +2956,7 @@ export const gitRouter = router({
             const rrPath = path.join(gitDir, 'rr-cache');
 
             try {
-                const entries = await rrCache.readdir(rrPath);
+                const entries = await rrCache.readdir(rrPath, { withFileTypes: true });
                 const recordings = entries
                     .filter((e) => e.isDirectory())
                     .map((e) => ({
@@ -3014,7 +3598,7 @@ export const gitRouter = router({
                 const gitService = getGitService();
                 const safePath = validateGitPath(input.path);
                 const fetchConflictVersion = (stage: number) =>
-                    gitService.runGitCommandWithOutput(['show', `:${stage}:${safePath}`], input.repo);
+                    gitService.runGitCommandWithOutput(['show', `:${String(stage)}:${safePath}`], input.repo);
                 const stageResults = await Promise.allSettled([
                     fetchConflictVersion(2),
                     fetchConflictVersion(1),
@@ -3094,16 +3678,77 @@ export const gitRouter = router({
     lfs: router({
         status: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
             const initError = await ensureGitInitialized();
-            if (initError) return { installed: false, tracking: [], error: initError };
+            if (initError) {
+                return {
+                    installed: false,
+                    tracking: [],
+                    trackingPatterns: [],
+                    trackedFiles: [],
+                    summary: {
+                        trackedPatternCount: 0,
+                        trackedFileCount: 0,
+                        knownSizeFileCount: 0,
+                        unknownSizeFileCount: 0,
+                        totalSizeBytes: null,
+                        totalSizeLabel: null,
+                    },
+                    error: initError,
+                };
+            }
 
             try {
                 const gitService = getGitService();
-                const output = await gitService.runGitCommandWithOutput(['lfs', 'ls-files'], input.repo);
+                await gitService.runGitCommandWithOutput(['lfs', 'version'], input.repo);
 
-                const files = (output ?? '').split('\n').filter(Boolean);
-                return { installed: true, tracking: files, error: null };
+                const trackOutput = await gitService.runGitCommandWithOutput(['lfs', 'track'], input.repo);
+                let lsFilesOutput: string | null;
+                try {
+                    lsFilesOutput = await gitService.runGitCommandWithOutput(
+                        ['lfs', 'ls-files', '--long', '--size'],
+                        input.repo
+                    );
+                } catch {
+                    lsFilesOutput = await gitService.runGitCommandWithOutput(['lfs', 'ls-files', '--long'], input.repo);
+                }
+
+                const trackingPatterns = parseLfsTrackPatterns(trackOutput);
+                const trackedFiles = parseLfsTrackedFiles(lsFilesOutput);
+                const knownSizes = trackedFiles
+                    .map((entry) => entry.sizeBytes)
+                    .filter((value): value is number => value !== null);
+                const totalSizeBytes = knownSizes.length ? knownSizes.reduce((sum, value) => sum + value, 0) : null;
+
+                return {
+                    installed: true,
+                    tracking: trackingPatterns,
+                    trackingPatterns,
+                    trackedFiles,
+                    summary: {
+                        trackedPatternCount: trackingPatterns.length,
+                        trackedFileCount: trackedFiles.length,
+                        knownSizeFileCount: knownSizes.length,
+                        unknownSizeFileCount: trackedFiles.length - knownSizes.length,
+                        totalSizeBytes,
+                        totalSizeLabel: formatByteSize(totalSizeBytes),
+                    },
+                    error: null,
+                };
             } catch {
-                return { installed: false, tracking: [], error: null };
+                return {
+                    installed: false,
+                    tracking: [],
+                    trackingPatterns: [],
+                    trackedFiles: [],
+                    summary: {
+                        trackedPatternCount: 0,
+                        trackedFileCount: 0,
+                        knownSizeFileCount: 0,
+                        unknownSizeFileCount: 0,
+                        totalSizeBytes: null,
+                        totalSizeLabel: null,
+                    },
+                    error: null,
+                };
             }
         }),
 
@@ -3273,47 +3918,16 @@ export const gitRouter = router({
                     key: null,
                     gpgProgram: null,
                     gpgKeys: [],
+                    sshKeys: [],
+                    allowedSignersFile: null,
                     error: initError,
                 };
 
             try {
-                const gitService = getGitService();
-
-                // Get signing config
-                const [enabledRaw, methodRaw, keyRaw, gpgProgramRaw] = await Promise.all([
-                    gitService.runGitCommandWithOutput(['config', '--get', 'commit.gpgsign'], input.repo),
-                    gitService.runGitCommandWithOutput(['config', '--get', 'gpg.format'], input.repo),
-                    gitService.runGitCommandWithOutput(['config', '--get', 'user.signingkey'], input.repo),
-                    gitService.runGitCommandWithOutput(['config', '--get', 'gpg.program'], input.repo),
-                ]);
-
-                // Get GPG keys
-                const gpgKeys: Array<{ id: string; userId: string }> = [];
-                try {
-                    const { execFileSync } = await import('child_process');
-                    const output = execFileSync('gpg', ['--list-secret-keys', '--keyid-format=LONG'], {
-                        encoding: 'utf-8',
-                    });
-
-                    // Parse GPG output
-                    const keyRegex = /sec\s+\w+\/(\w+)\s+\d{4}-\d{2}-\d{2}\s+[^\n]+\n\s+([^\n]+)/g;
-                    let match;
-                    while ((match = keyRegex.exec(output)) !== null) {
-                        gpgKeys.push({
-                            id: match[1] ?? '',
-                            userId: match[2]?.trim() ?? '',
-                        });
-                    }
-                } catch {
-                    // GPG not available
-                }
+                const snapshot = await readSigningStatusSnapshot(input.repo);
 
                 return {
-                    enabled: enabledRaw?.trim() === 'true',
-                    method: (methodRaw?.trim() as 'gpg' | 'ssh') ?? 'gpg',
-                    key: keyRaw?.trim() ?? null,
-                    gpgProgram: gpgProgramRaw?.trim() ?? null,
-                    gpgKeys,
+                    ...snapshot,
                     error: null,
                 };
             } catch (error) {
@@ -3323,6 +3937,8 @@ export const gitRouter = router({
                     key: null,
                     gpgProgram: null,
                     gpgKeys: [],
+                    sshKeys: [],
+                    allowedSignersFile: null,
                     error: error instanceof Error ? error.message : 'Unknown error',
                 };
             }
@@ -3336,6 +3952,7 @@ export const gitRouter = router({
                     method: z.enum(['gpg', 'ssh']).optional(),
                     key: z.string().optional(),
                     gpgProgram: z.string().optional(),
+                    allowedSignersFile: z.string().optional(),
                     global: z.boolean().optional(),
                 })
             )
@@ -3343,33 +3960,16 @@ export const gitRouter = router({
                 const initError = await ensureGitInitialized();
                 if (initError) return { error: initError };
 
-                const gitService = getGitService();
-                const scope = input.global ? '--global' : '--local';
-
-                // Set commit.gpgsign
-                await gitService.runGitCommand(
-                    ['config', scope, 'commit.gpgsign', input.enabled.toString()],
-                    input.repo
-                );
-
-                if (input.enabled) {
-                    // Set gpg.format
-                    if (input.method) {
-                        await gitService.runGitCommand(['config', scope, 'gpg.format', input.method], input.repo);
-                    }
-
-                    // Set user.signingkey
-                    if (input.key) {
-                        await gitService.runGitCommand(['config', scope, 'user.signingkey', input.key], input.repo);
-                    }
-
-                    // Set gpg.program
-                    if (input.gpgProgram) {
-                        await gitService.runGitCommand(['config', scope, 'gpg.program', input.gpgProgram], input.repo);
-                    }
-                }
-
-                return { error: null };
+                const error = await applySigningConfig({
+                    repo: input.repo,
+                    enabled: input.enabled,
+                    method: input.method,
+                    key: input.key,
+                    gpgProgram: input.gpgProgram,
+                    allowedSignersFile: input.allowedSignersFile,
+                    global: input.global,
+                });
+                return { error };
             }),
     }),
 
@@ -3394,7 +3994,11 @@ export const gitRouter = router({
 
                 const match = output?.match(/^(\d+)\s+(\d+)/);
                 if (match) {
-                    return { ahead: parseInt(match[1]!, 10), behind: parseInt(match[2]!, 10), error: null };
+                    return {
+                        ahead: parseInt(match[1] ?? '0', 10),
+                        behind: parseInt(match[2] ?? '0', 10),
+                        error: null,
+                    };
                 }
                 return { ahead: 0, behind: 0, error: null };
             } catch {
@@ -3433,8 +4037,8 @@ export const gitRouter = router({
                         const match = countOutput?.match(/^(\d+)\s+(\d+)/);
                         branches.push({
                             branch,
-                            ahead: match ? parseInt(match[1]!, 10) : 0,
-                            behind: match ? parseInt(match[2]!, 10) : 0,
+                            ahead: match ? parseInt(match[1] ?? '0', 10) : 0,
+                            behind: match ? parseInt(match[2] ?? '0', 10) : 0,
                             upstream,
                         });
                     } catch {
@@ -3562,7 +4166,7 @@ export const gitRouter = router({
             try {
                 const gitService = getGitService();
                 const output = await gitService.runGitCommandWithOutput(
-                    ['reflog', `--format=%H|%gd|%gs|%ci`, `-n=${input.limit}`],
+                    ['reflog', `--format=%H|%gd|%gs|%ci`, `-n=${String(input.limit)}`],
                     input.repo
                 );
 
@@ -3570,17 +4174,20 @@ export const gitRouter = router({
                     .split('\n')
                     .filter(Boolean)
                     .map((line) => {
-                        const [hash, ref, action, date] = line.split('|');
+                        const [hash = '', ref = '', action = '', date = ''] = line.split('|');
+                        const undoSupported =
+                            action.includes('checkout') ||
+                            action.includes('reset') ||
+                            action.includes('rebase') ||
+                            action.includes('cherry-pick');
                         return {
                             id: hash,
                             ref,
                             action,
                             date,
-                            canUndo:
-                                action.includes('checkout') ||
-                                action.includes('reset') ||
-                                action.includes('rebase') ||
-                                action.includes('cherry-pick'),
+                            canUndo: undoSupported,
+                            undoSupported,
+                            undoReason: undoSupported ? null : 'Operation type is not safely reversible from reflog.',
                         };
                     });
 
@@ -3647,9 +4254,9 @@ export const gitRouter = router({
                     .map((line) => {
                         const [additions, deletions, path] = line.split('\t');
                         return {
-                            path,
-                            additions: parseInt(additions) || 0,
-                            deletions: parseInt(deletions) || 0,
+                            path: path ?? '',
+                            additions: parseInt(additions ?? '0', 10) || 0,
+                            deletions: parseInt(deletions ?? '0', 10) || 0,
                         };
                     });
 
@@ -3834,7 +4441,7 @@ export const gitRouter = router({
                     .filter(Boolean)
                     .map((line) => {
                         const [hash, ...msgParts] = line.split(' ');
-                        return { hash: hash!, message: msgParts.join(' ') };
+                        return { hash: hash ?? '', message: msgParts.join(' ') };
                     });
 
                 // Get files changed
@@ -3848,7 +4455,7 @@ export const gitRouter = router({
                     .filter(Boolean)
                     .map((line) => {
                         const [status, ...pathParts] = line.split('\t');
-                        return { status: status!, path: pathParts.join('\t') };
+                        return { status: status ?? '', path: pathParts.join('\t') };
                     });
 
                 // Get stats
@@ -3861,7 +4468,7 @@ export const gitRouter = router({
                 let deletions = 0;
                 const statsMatch = statsOutput?.match(/(\d+) insertion[^,]*(?:,\s*(\d+) deletion)?/);
                 if (statsMatch) {
-                    additions = parseInt(statsMatch[1]!, 10);
+                    additions = parseInt(statsMatch[1] ?? '0', 10);
                     deletions = statsMatch[2] ? parseInt(statsMatch[2], 10) : 0;
                 }
 
@@ -3924,7 +4531,7 @@ export const gitRouter = router({
                         .filter(Boolean)
                         .map((line) => {
                             const [hash, ...msgParts] = line.split(' ');
-                            return { hash: hash!, message: msgParts.join(' '), date: '' };
+                            return { hash: hash ?? '', message: msgParts.join(' '), date: '' };
                         });
                 }
 
@@ -3970,12 +4577,12 @@ export const gitRouter = router({
                     .forEach((line) => {
                         const match = line.match(/^\s*(\d+)\s+(.+)\s+<(.+)>$/);
                         if (match) {
-                            const commits = parseInt(match[1]!, 10);
+                            const commits = parseInt(match[1] ?? '0', 10);
                             totalCommits += commits;
                             authors.push({
                                 commits,
-                                name: match[2]!.trim(),
-                                email: match[3]!,
+                                name: (match[2] ?? '').trim(),
+                                email: match[3] ?? '',
                             });
                         }
                     });
@@ -3996,25 +4603,37 @@ export const gitRouter = router({
     // ==================== Signing ====================
     getSigningConfig: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
         const initError = await ensureGitInitialized();
-        if (initError) return { enabled: false, method: null, key: null, error: initError };
+        if (initError)
+            return {
+                enabled: false,
+                method: null,
+                key: null,
+                gpgProgram: null,
+                sshKeys: [],
+                allowedSignersFile: null,
+                error: initError,
+            };
 
         try {
-            const service = getGitService();
-            const [signingKey, signingFormat] = await Promise.all([
-                service.runGitCommandWithOutput(['config', '--get', 'commit.gpgsign'], input.repo),
-                service.runGitCommandWithOutput(['config', '--get', 'gpg.format'], input.repo),
-            ]);
+            const snapshot = await readSigningStatusSnapshot(input.repo, { includeGpgKeys: false });
 
-            const enabled = signingKey?.trim() === 'true';
-            const method = signingFormat?.trim() === 'ssh' ? 'ssh' : 'gpg';
-            const key = await service.runGitCommandWithOutput(['config', '--get', 'user.signingkey'], input.repo);
-
-            return { enabled, method, key: key?.trim() || null, error: null };
+            return {
+                enabled: snapshot.enabled,
+                method: snapshot.method,
+                key: snapshot.key,
+                gpgProgram: snapshot.gpgProgram,
+                sshKeys: snapshot.sshKeys,
+                allowedSignersFile: snapshot.allowedSignersFile,
+                error: null,
+            };
         } catch (error) {
             return {
                 enabled: false,
                 method: null,
                 key: null,
+                gpgProgram: null,
+                sshKeys: [],
+                allowedSignersFile: null,
                 error: error instanceof Error ? error.message : 'Unknown error',
             };
         }
@@ -4027,6 +4646,9 @@ export const gitRouter = router({
                 enabled: z.boolean(),
                 method: z.enum(['gpg', 'ssh']),
                 key: z.string().optional(),
+                gpgProgram: z.string().optional(),
+                allowedSignersFile: z.string().optional(),
+                global: z.boolean().optional(),
             })
         )
         .mutation(async ({ input }) => {
@@ -4034,17 +4656,16 @@ export const gitRouter = router({
             if (initError) return { error: initError };
 
             try {
-                const service = getGitService();
-                await service.runGitCommand(['config', 'commit.gpgsign', input.enabled ? 'true' : 'false'], input.repo);
-
-                if (input.enabled) {
-                    await service.runGitCommand(['config', 'gpg.format', input.method], input.repo);
-                    if (input.key) {
-                        await service.runGitCommand(['config', 'user.signingkey', input.key], input.repo);
-                    }
-                }
-
-                return { error: null };
+                const error = await applySigningConfig({
+                    repo: input.repo,
+                    enabled: input.enabled,
+                    method: input.method,
+                    key: input.key,
+                    gpgProgram: input.gpgProgram,
+                    allowedSignersFile: input.allowedSignersFile,
+                    global: input.global,
+                });
+                return { error };
             } catch (error) {
                 return { error: error instanceof Error ? error.message : 'Unknown error' };
             }
@@ -4058,18 +4679,13 @@ export const gitRouter = router({
             if (initError) return { hooks: [], error: initError };
 
             try {
-                const gitService = getGitService();
-                const output = await gitService.runGitCommandWithOutput(['rev-parse', '--git-dir'], input.repo);
-                const gitDir = output?.trim();
+                const gitDir = await getGitDir(input.repo);
                 if (!gitDir) return { hooks: [], error: 'Could not find .git directory' };
+                const hooksDir = path.join(gitDir, 'hooks');
+                if (!(await fileExists(hooksDir))) {
+                    return { hooks: [], error: null };
+                }
 
-                // List hooks directory
-                const _hooksOutput = await gitService.runGitCommandWithOutput(
-                    ['ls-files', '--error-unmatch', 'hooks'],
-                    input.repo
-                );
-
-                // Common hook names
                 const hookNames = [
                     'pre-commit',
                     'prepare-commit-msg',
@@ -4088,23 +4704,75 @@ export const gitRouter = router({
                     'sendemail-validate',
                 ];
 
-                const hooks: Array<{ name: string; enabled: boolean }> = [];
-                for (const name of hookNames) {
-                    // Check if hook exists (with or without .sample)
-                    const checkOutput = await gitService.runGitCommandWithOutput(
-                        ['ls-files', '--error-unmatch', `hooks/${name}`],
-                        input.repo
-                    );
-                    const hasHook = !checkOutput?.includes('error');
-                    const hasSample = await gitService.runGitCommandWithOutput(
-                        ['ls-files', '--error-unmatch', `hooks/${name}.sample`],
-                        input.repo
-                    );
-                    const isSample = !hasSample?.includes('error');
+                const entries = await fs.readdir(hooksDir, { withFileTypes: true });
+                const discovered = new Map<
+                    string,
+                    { enabled: boolean; executable: boolean; source: 'hook' | 'sample' | 'generated'; path: string }
+                >();
 
-                    if (hasHook || isSample) {
-                        hooks.push({ name, enabled: hasHook });
+                for (const entry of entries) {
+                    if (!entry.isFile()) continue;
+                    if (entry.name.startsWith('.')) continue;
+
+                    const baseName = entry.name.endsWith('.sample')
+                        ? entry.name.slice(0, -'.sample'.length)
+                        : entry.name;
+                    if (!baseName) continue;
+
+                    const entryPath = path.join(hooksDir, entry.name);
+                    const stat = await fs.stat(entryPath);
+                    const executable = (stat.mode & 0o111) !== 0;
+
+                    if (entry.name.endsWith('.sample')) {
+                        if (!discovered.has(baseName)) {
+                            discovered.set(baseName, {
+                                enabled: false,
+                                executable,
+                                source: 'sample',
+                                path: entryPath,
+                            });
+                        }
+                        continue;
                     }
+
+                    discovered.set(baseName, {
+                        enabled: true,
+                        executable,
+                        source: 'hook',
+                        path: entryPath,
+                    });
+                }
+
+                const hooks: Array<{
+                    name: string;
+                    enabled: boolean;
+                    executable: boolean;
+                    source: 'hook' | 'sample' | 'generated';
+                    path: string;
+                }> = [];
+
+                for (const name of hookNames) {
+                    const existing = discovered.get(name);
+                    if (existing) {
+                        hooks.push({
+                            name,
+                            enabled: existing.enabled,
+                            executable: existing.executable,
+                            source: existing.source,
+                            path: existing.path,
+                        });
+                        discovered.delete(name);
+                    }
+                }
+
+                for (const [name, existing] of [...discovered.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+                    hooks.push({
+                        name,
+                        enabled: existing.enabled,
+                        executable: existing.executable,
+                        source: existing.source,
+                        path: existing.path,
+                    });
                 }
 
                 return { hooks, error: null };
@@ -4119,23 +4787,47 @@ export const gitRouter = router({
                 const initError = await ensureGitInitialized();
                 if (initError) return { error: initError };
 
-                const gitService = getGitService();
+                try {
+                    const gitDir = await getGitDir(input.repo);
+                    if (!gitDir) {
+                        return { error: 'Could not find .git directory' };
+                    }
+                    const hooksDir = path.join(gitDir, 'hooks');
+                    await fs.mkdir(hooksDir, { recursive: true });
 
-                if (input.enabled) {
-                    // Enable: rename from .sample or make executable
-                    await gitService.runGitCommand(
-                        ['mv', `hooks/${input.name}.sample`, `hooks/${input.name}`],
-                        input.repo
-                    );
-                } else {
-                    // Disable: rename to .sample
-                    await gitService.runGitCommand(
-                        ['mv', `hooks/${input.name}`, `hooks/${input.name}.sample`],
-                        input.repo
-                    );
+                    const hookPath = path.join(hooksDir, input.name);
+                    const samplePath = `${hookPath}.sample`;
+
+                    if (input.enabled) {
+                        if (await fileExists(samplePath)) {
+                            if (await fileExists(hookPath)) {
+                                await fs.unlink(hookPath);
+                            }
+                            await fs.rename(samplePath, hookPath);
+                        } else if (!(await fileExists(hookPath))) {
+                            await fs.writeFile(
+                                hookPath,
+                                '#!/usr/bin/env sh\n# Generated by Git Graph\nexit 0\n',
+                                'utf8'
+                            );
+                        }
+
+                        try {
+                            await fs.chmod(hookPath, 0o755);
+                        } catch {
+                            // chmod can fail on some platforms/filesystems, but the hook was still enabled.
+                        }
+                    } else if (await fileExists(hookPath)) {
+                        if (await fileExists(samplePath)) {
+                            await fs.unlink(samplePath);
+                        }
+                        await fs.rename(hookPath, samplePath);
+                    }
+
+                    return { error: null };
+                } catch (error) {
+                    return { error: error instanceof Error ? error.message : 'Unknown error' };
                 }
-
-                return { error: null };
             }),
     }),
 
@@ -4213,7 +4905,7 @@ export const gitRouter = router({
                 const { spawn } = await import('child_process');
 
                 // Apply the patch using git apply --cached with stdin
-                return new Promise((resolve) => {
+                const result = await new Promise<{ error: string | null }>((resolve) => {
                     const cmd = spawn(gitPath, ['apply', '--cached', '--recount', '--unidiff-zero', '-'], {
                         cwd: input.repo,
                     });
@@ -4230,7 +4922,7 @@ export const gitRouter = router({
                         if (code === 0) {
                             resolve({ error: null });
                         } else {
-                            resolve({ error: stderr || `Git apply failed with code ${code}` });
+                            resolve({ error: stderr || `Git apply failed with code ${String(code ?? 'unknown')}` });
                         }
                     });
 
@@ -4238,6 +4930,7 @@ export const gitRouter = router({
                         resolve({ error: err.message });
                     });
                 });
+                return result;
             } catch (error) {
                 return { error: error instanceof Error ? error.message : 'Unknown error' };
             }
@@ -4343,7 +5036,7 @@ export const gitRouter = router({
 
                         for (const line of lines) {
                             if (line.includes('|')) {
-                                const [hash, message, author, date] = line.split('|');
+                                const [hash = '', message = '', author = '', date = '0'] = line.split('|');
                                 currentCommit = { hash, message, author, date: parseInt(date, 10) };
                             } else if (
                                 line &&
@@ -4365,7 +5058,7 @@ export const gitRouter = router({
                             const detailArgs = ['log', '-1', '--format=%an|%ct', commit.hash];
                             const detailOutput = await gitService.runGitCommandWithOutput(detailArgs, input.repo);
                             if (detailOutput) {
-                                const [author, date] = detailOutput.split('|');
+                                const [author = '', date = '0'] = detailOutput.split('|');
                                 return { ...commit, author, date: parseInt(date, 10) };
                             }
                             return commit;
@@ -4382,7 +5075,7 @@ export const gitRouter = router({
         }),
 
     // ==================== Pull Request Integration ====================
-    getPullRequestAuth: publicProcedure.query(async () => {
+    getPullRequestAuth: publicProcedure.query(() => {
         const auth = getStoredProviderAuthConfig();
         return {
             auth: {
@@ -4411,14 +5104,8 @@ export const gitRouter = router({
                 azureToken: z.string().nullable().optional(),
             })
         )
-        .mutation(async ({ input }) => {
-            const current = appStore.get('providerAuth') ?? {
-                githubToken: '',
-                gitlabToken: '',
-                bitbucketToken: '',
-                bitbucketUsername: '',
-                azureToken: '',
-            };
+        .mutation(({ input }) => {
+            const current = appStore.get('providerAuth');
 
             const next = {
                 githubToken:
@@ -4470,6 +5157,248 @@ export const gitRouter = router({
                 return {
                     remoteUrl: null,
                     provider: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        }),
+
+    ciStatus: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                commitHash: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) {
+                return {
+                    status: 'unknown' as const,
+                    provider: 'unknown' as const,
+                    workflowName: null,
+                    runId: null,
+                    url: null,
+                    error: initError,
+                };
+            }
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return {
+                        status: 'unknown' as const,
+                        provider: 'unknown' as const,
+                        workflowName: null,
+                        runId: null,
+                        url: null,
+                        error: 'No remotes configured for this repository.',
+                    };
+                }
+
+                const target = parsePullRequestRemoteUrl(remoteUrl);
+                if (!target) {
+                    return {
+                        status: 'unknown' as const,
+                        provider: 'unknown' as const,
+                        workflowName: null,
+                        runId: null,
+                        url: null,
+                        error: 'Unable to detect provider from repository remotes.',
+                    };
+                }
+
+                const auth = getStoredProviderAuthConfig();
+
+                switch (target.provider) {
+                    case 'github': {
+                        if (!auth.githubToken) {
+                            return {
+                                status: 'unknown' as const,
+                                provider: 'github' as const,
+                                workflowName: null,
+                                runId: null,
+                                url: null,
+                                error: 'GitHub token is not configured.',
+                            };
+                        }
+                        const response = await fetch(
+                            `${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/commits/${encodeURIComponent(input.commitHash)}/status`,
+                            {
+                                headers: {
+                                    Accept: 'application/vnd.github+json',
+                                    Authorization: `Bearer ${auth.githubToken}`,
+                                    'User-Agent': 'vscode-git-graph-electron',
+                                },
+                            }
+                        );
+                        if (!response.ok) {
+                            const body = await response.text();
+                            throw new Error(body || response.statusText);
+                        }
+                        const payload = (await response.json()) as {
+                            state?: string;
+                            statuses?: Array<{ context?: string; target_url?: string; id?: number | string }>;
+                        };
+                        const firstStatus = Array.isArray(payload.statuses) ? payload.statuses[0] : undefined;
+                        return {
+                            status: mapCiStatusFromGitHub(payload.state),
+                            provider: 'github' as const,
+                            workflowName: firstStatus?.context ?? 'GitHub Checks',
+                            runId:
+                                typeof firstStatus?.id === 'number' || typeof firstStatus?.id === 'string'
+                                    ? String(firstStatus.id)
+                                    : null,
+                            url: firstStatus?.target_url ?? null,
+                            error: null,
+                        };
+                    }
+                    case 'gitlab': {
+                        if (!auth.gitlabToken) {
+                            return {
+                                status: 'unknown' as const,
+                                provider: 'gitlab' as const,
+                                workflowName: null,
+                                runId: null,
+                                url: null,
+                                error: 'GitLab token is not configured.',
+                            };
+                        }
+                        const projectId = encodeURIComponent(target.projectPath);
+                        const response = await fetch(
+                            `${target.apiBaseUrl}/projects/${projectId}/repository/commits/${encodeURIComponent(input.commitHash)}/statuses?per_page=1`,
+                            {
+                                headers: {
+                                    Accept: 'application/json',
+                                    'PRIVATE-TOKEN': auth.gitlabToken,
+                                    'User-Agent': 'vscode-git-graph-electron',
+                                },
+                            }
+                        );
+                        if (!response.ok) {
+                            const body = await response.text();
+                            throw new Error(body || response.statusText);
+                        }
+                        const statuses = (await response.json()) as Array<{
+                            status?: string;
+                            name?: string;
+                            id?: number | string;
+                            target_url?: string;
+                        }>;
+                        const firstStatus = statuses[0];
+                        return {
+                            status: mapCiStatusFromGitLab(firstStatus?.status),
+                            provider: 'gitlab' as const,
+                            workflowName: firstStatus?.name ?? 'GitLab CI',
+                            runId:
+                                typeof firstStatus?.id === 'number' || typeof firstStatus?.id === 'string'
+                                    ? String(firstStatus.id)
+                                    : null,
+                            url: firstStatus?.target_url ?? null,
+                            error: null,
+                        };
+                    }
+                    case 'bitbucket': {
+                        if (!auth.bitbucketToken) {
+                            return {
+                                status: 'unknown' as const,
+                                provider: 'bitbucket' as const,
+                                workflowName: null,
+                                runId: null,
+                                url: null,
+                                error: 'Bitbucket token is not configured.',
+                            };
+                        }
+                        const authHeader = auth.bitbucketUsername
+                            ? `Basic ${Buffer.from(`${auth.bitbucketUsername}:${auth.bitbucketToken}`).toString('base64')}`
+                            : `Bearer ${auth.bitbucketToken}`;
+
+                        const response = await fetch(
+                            `${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/commit/${encodeURIComponent(input.commitHash)}/statuses?pagelen=1&sort=-updated_on`,
+                            {
+                                headers: {
+                                    Accept: 'application/json',
+                                    Authorization: authHeader,
+                                    'User-Agent': 'vscode-git-graph-electron',
+                                },
+                            }
+                        );
+                        if (!response.ok) {
+                            const body = await response.text();
+                            throw new Error(body || response.statusText);
+                        }
+                        const payload = (await response.json()) as {
+                            values?: Array<{ state?: string; name?: string; key?: string; url?: string }>;
+                        };
+                        const firstStatus = Array.isArray(payload.values) ? payload.values[0] : undefined;
+                        return {
+                            status: mapCiStatusFromBitbucket(firstStatus?.state),
+                            provider: 'bitbucket' as const,
+                            workflowName: firstStatus?.name ?? firstStatus?.key ?? 'Bitbucket Pipelines',
+                            runId: firstStatus?.key ?? null,
+                            url: firstStatus?.url ?? null,
+                            error: null,
+                        };
+                    }
+                    case 'azure': {
+                        if (!auth.azureToken) {
+                            return {
+                                status: 'unknown' as const,
+                                provider: 'azure' as const,
+                                workflowName: null,
+                                runId: null,
+                                url: null,
+                                error: 'Azure DevOps token is not configured.',
+                            };
+                        }
+                        const response = await fetch(
+                            `${target.apiBaseUrl}/commits/${encodeURIComponent(input.commitHash)}/statuses?api-version=7.1`,
+                            {
+                                headers: {
+                                    Accept: 'application/json',
+                                    Authorization: `Basic ${Buffer.from(`:${auth.azureToken}`).toString('base64')}`,
+                                    'User-Agent': 'vscode-git-graph-electron',
+                                },
+                            }
+                        );
+                        if (!response.ok) {
+                            const body = await response.text();
+                            throw new Error(body || response.statusText);
+                        }
+                        const payload = (await response.json()) as {
+                            value?: Array<{
+                                state?: string;
+                                description?: string;
+                                context?: { genre?: string; name?: string };
+                                targetUrl?: string;
+                            }>;
+                        };
+                        const firstStatus = Array.isArray(payload.value) ? payload.value[0] : undefined;
+                        const normalizedState = (firstStatus?.state ?? '').toLowerCase();
+                        const status =
+                            normalizedState === 'succeeded'
+                                ? 'success'
+                                : normalizedState === 'failed' || normalizedState === 'error'
+                                  ? 'failure'
+                                  : normalizedState === 'notset' || normalizedState === 'pending'
+                                    ? 'pending'
+                                    : 'unknown';
+                        return {
+                            status,
+                            provider: 'azure' as const,
+                            workflowName: firstStatus?.context?.name ?? firstStatus?.description ?? 'Azure Pipelines',
+                            runId: firstStatus?.context?.genre ?? null,
+                            url: firstStatus?.targetUrl ?? null,
+                            error: null,
+                        };
+                    }
+                }
+            } catch (error) {
+                return {
+                    status: 'unknown' as const,
+                    provider: 'unknown' as const,
+                    workflowName: null,
+                    runId: null,
+                    url: null,
                     error: error instanceof Error ? error.message : 'Unknown error',
                 };
             }
@@ -4556,17 +5485,28 @@ export const gitRouter = router({
                 }
 
                 const auth = getStoredProviderAuthConfig();
+                const createPayload: {
+                    title: string;
+                    head: string;
+                    base: string;
+                    body?: string;
+                    draft?: boolean;
+                } = {
+                    title: input.title,
+                    head: input.head,
+                    base: input.base,
+                };
+                if (typeof input.body === 'string') {
+                    createPayload.body = input.body;
+                }
+                if (typeof input.draft === 'boolean') {
+                    createPayload.draft = input.draft;
+                }
                 const pullRequest = await createRemotePullRequest(
                     remoteUrl,
                     input.provider as PullRequestProvider,
                     auth,
-                    {
-                        title: input.title,
-                        body: input.body,
-                        head: input.head,
-                        base: input.base,
-                        draft: input.draft,
-                    }
+                    createPayload
                 );
                 return { pullRequest, error: null };
             } catch (error) {
@@ -4601,6 +5541,68 @@ export const gitRouter = router({
                 return { pullRequest, error: null };
             } catch (error) {
                 return { pullRequest: null, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+    listPullRequestComments: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                provider: pullRequestProviderSchema,
+                number: z.number(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { comments: [], error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { comments: [], error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                const comments = await listRemotePullRequestComments(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number
+                );
+                return { comments, error: null };
+            } catch (error) {
+                return { comments: [], error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+    addPullRequestComment: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                provider: pullRequestProviderSchema,
+                number: z.number(),
+                body: z.string().min(1),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { comment: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { comment: null, error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                const comment = await addRemotePullRequestComment(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number,
+                    input.body
+                );
+                return { comment, error: null };
+            } catch (error) {
+                return { comment: null, error: error instanceof Error ? error.message : 'Unknown error' };
             }
         }),
 
@@ -4687,9 +5689,9 @@ export const gitRouter = router({
                     const branchMatch = message?.match(/^WIP on ([^:]+):/);
 
                     return {
-                        index: indexMatch ? parseInt(indexMatch[1], 10) : 0,
+                        index: parseInt(indexMatch?.[1] ?? '0', 10) || 0,
                         message: message || '',
-                        branch: branchMatch ? branchMatch[1] : '',
+                        branch: branchMatch?.[1] ?? '',
                         hash: hash || '',
                         date: date || '',
                         files: [] as { path: string; additions: number; deletions: number }[],
@@ -4737,7 +5739,10 @@ export const gitRouter = router({
             const initError = await ensureGitInitialized();
             if (initError) return { error: initError };
 
-            const error = await getGitService().runGitCommand(['stash', 'apply', `stash@{${input.index}}`], input.repo);
+            const error = await getGitService().runGitCommand(
+                ['stash', 'apply', `stash@{${String(input.index)}}`],
+                input.repo
+            );
             return { error };
         }),
 
@@ -4752,7 +5757,10 @@ export const gitRouter = router({
             const initError = await ensureGitInitialized();
             if (initError) return { error: initError };
 
-            const error = await getGitService().runGitCommand(['stash', 'pop', `stash@{${input.index}}`], input.repo);
+            const error = await getGitService().runGitCommand(
+                ['stash', 'pop', `stash@{${String(input.index)}}`],
+                input.repo
+            );
             return { error };
         }),
 
@@ -4767,7 +5775,10 @@ export const gitRouter = router({
             const initError = await ensureGitInitialized();
             if (initError) return { error: initError };
 
-            const error = await getGitService().runGitCommand(['stash', 'drop', `stash@{${input.index}}`], input.repo);
+            const error = await getGitService().runGitCommand(
+                ['stash', 'drop', `stash@{${String(input.index)}}`],
+                input.repo
+            );
             return { error };
         }),
 
@@ -4846,16 +5857,16 @@ export const gitRouter = router({
     /**
      * Get raw git configuration file content.
      */
-    configRaw: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
+    configRaw: publicProcedure.input(z.object({ repo: z.string() })).query(async () => {
         const initError = await ensureGitInitialized();
         if (initError) return '';
 
         try {
-            const result = await getGitService().runGitCommandWithOutput(
-                ['config', '--global', '--list', '--show-origin'],
-                input.repo
-            );
-            return result || '';
+            const configPath = resolveGlobalGitConfigPath();
+            if (!(await fileExists(configPath))) {
+                return '';
+            }
+            return await fs.readFile(configPath, 'utf8');
         } catch {
             return '';
         }
@@ -4872,9 +5883,38 @@ export const gitRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            // This would need to write to the .gitconfig file directly
-            // For now, return an error indicating this is not implemented
-            return { error: 'Direct config file editing not implemented' };
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            try {
+                const configPath = resolveGlobalGitConfigPath();
+                const configDir = path.dirname(configPath);
+                await fs.mkdir(configDir, { recursive: true });
+
+                const now = Date.now().toString();
+                const tmpPath = `${configPath}.tmp-${now}`;
+                const backupPath = `${configPath}.bak-${now}`;
+
+                await fs.writeFile(tmpPath, input.content, 'utf8');
+
+                const validationError = await getGitService().runGitCommand(
+                    ['config', '--file', tmpPath, '--list'],
+                    input.repo
+                );
+                if (validationError) {
+                    await fs.unlink(tmpPath).catch(() => undefined);
+                    return { error: `Invalid git config content: ${validationError}` };
+                }
+
+                if (await fileExists(configPath)) {
+                    await fs.copyFile(configPath, backupPath);
+                }
+
+                await fs.rename(tmpPath, configPath);
+                return { error: null, backupPath: (await fileExists(backupPath)) ? backupPath : null };
+            } catch (error) {
+                return { error: error instanceof Error ? error.message : 'Unknown error' };
+            }
         }),
 
     /**
@@ -4889,7 +5929,7 @@ export const gitRouter = router({
         .mutation(async ({ input }) => {
             try {
                 const { spawn } = await import('child_process');
-                return new Promise<{ available: boolean }>((resolve) => {
+                const result = await new Promise<{ available: boolean }>((resolve) => {
                     const proc = spawn(input.command, ['--version'], { shell: true });
                     proc.on('close', (code) => {
                         resolve({ available: code === 0 });
@@ -4898,6 +5938,7 @@ export const gitRouter = router({
                         resolve({ available: false });
                     });
                 });
+                return result;
             } catch {
                 return { available: false };
             }
@@ -4991,11 +6032,11 @@ export const gitRouter = router({
                 const [hash, author, email, timestamp, subject, ...body] = result.split('\n');
 
                 return {
-                    hash,
-                    author,
-                    email,
-                    date: new Date(parseInt(timestamp) * 1000).toISOString(),
-                    message: subject,
+                    hash: hash ?? '',
+                    author: author ?? '',
+                    email: email ?? '',
+                    date: new Date((parseInt(timestamp ?? '0', 10) || 0) * 1000).toISOString(),
+                    message: subject ?? '',
                     body: body.join('\n').trim(),
                 };
             } catch {

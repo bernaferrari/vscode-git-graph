@@ -3,17 +3,19 @@
  * Create, manage, and switch between git worktrees
  */
 
+import { FolderGit2, Plus, Trash2, FolderOpen, Loader2, Check, GitBranch } from 'lucide-react';
 import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { useRepoActivation } from '@/hooks/useRepoActivation';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FolderGit2, Plus, Trash2, FolderOpen, Loader2, Check, GitBranch } from 'lucide-react';
-import { toast } from 'sonner';
+import { useRepoActivation } from '@/hooks/useRepoActivation';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface Worktree {
     path: string;
@@ -160,7 +162,7 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                             <Trash2 className='mr-1 h-4 w-4' />
                             Prune
                         </Button>
-                        <Button size='sm' onClick={() => setIsCreating(!isCreating)}>
+                        <Button size='sm' onClick={() => { setIsCreating(!isCreating); }}>
                             <Plus className='mr-1 h-4 w-4' />
                             New Worktree
                         </Button>
@@ -177,7 +179,7 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                                 <Input
                                     placeholder='../my-feature'
                                     value={newWorktree.path}
-                                    onChange={(e) => setNewWorktree((prev) => ({ ...prev, path: e.target.value }))}
+                                    onChange={(e) => { setNewWorktree((prev) => ({ ...prev, path: e.target.value })); }}
                                 />
                             </div>
                             <div className='flex items-end gap-2'>
@@ -186,7 +188,7 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                                     id='createBranch'
                                     checked={newWorktree.createBranch}
                                     onChange={(e) =>
-                                        setNewWorktree((prev) => ({ ...prev, createBranch: e.target.checked }))
+                                        { setNewWorktree((prev) => ({ ...prev, createBranch: e.target.checked })); }
                                     }
                                 />
                                 <label htmlFor='createBranch' className='text-sm'>
@@ -199,13 +201,13 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                             <Input
                                 placeholder='New branch name'
                                 value={newWorktree.newBranchName}
-                                onChange={(e) => setNewWorktree((prev) => ({ ...prev, newBranchName: e.target.value }))}
+                                onChange={(e) => { setNewWorktree((prev) => ({ ...prev, newBranchName: e.target.value })); }}
                             />
                         ) : (
                             <select
                                 className='h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm'
                                 value={newWorktree.branch}
-                                onChange={(e) => setNewWorktree((prev) => ({ ...prev, branch: e.target.value }))}>
+                                onChange={(e) => { setNewWorktree((prev) => ({ ...prev, branch: e.target.value })); }}>
                                 <option value=''>Select branch...</option>
                                 {branches.map((branchName: string) => (
                                     <option key={branchName} value={branchName}>
@@ -216,7 +218,7 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                         )}
 
                         <div className='flex justify-end gap-2'>
-                            <Button variant='outline' size='sm' onClick={() => setIsCreating(false)}>
+                            <Button variant='outline' size='sm' onClick={() => { setIsCreating(false); }}>
                                 Cancel
                             </Button>
                             <Button size='sm' onClick={handleCreateWorktree} disabled={createMutation.isPending}>
@@ -286,7 +288,7 @@ export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementPro
                                                     variant='ghost'
                                                     size='sm'
                                                     className='text-red-600'
-                                                    onClick={() => handleRemoveWorktree(wt.path)}
+                                                    onClick={() => { handleRemoveWorktree(wt.path); }}
                                                     disabled={removeMutation.isPending}>
                                                     <Trash2 className='h-4 w-4' />
                                                 </Button>

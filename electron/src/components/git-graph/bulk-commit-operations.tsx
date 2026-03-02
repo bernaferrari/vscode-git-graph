@@ -3,21 +3,6 @@
  * Select multiple commits and perform batch actions
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { useAppStore } from '@/lib/store';
-import { useGitOperations } from '@/hooks/useGitOperations';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     CheckSquare,
     X,
@@ -32,7 +17,24 @@ import {
     Plus,
     Minus,
 } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+
 
 interface Commit {
     hash: string;
@@ -264,7 +266,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                     Revert Selected
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setShowBranchInput(true)}>
+                                <DropdownMenuItem onClick={() => { setShowBranchInput(true); }}>
                                     <GitBranch className='mr-2 h-4 w-4' />
                                     Create Branch with Selected
                                 </DropdownMenuItem>
@@ -281,7 +283,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                             type='text'
                             placeholder='New branch name...'
                             value={targetBranch}
-                            onChange={(e) => setTargetBranch(e.target.value)}
+                            onChange={(e) => { setTargetBranch(e.target.value); }}
                             className='flex-1 border-none bg-transparent text-sm outline-none'
                             autoFocus
                         />
@@ -291,7 +293,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                             disabled={!targetBranch.trim() || isExecuting}>
                             {isExecuting ? <Loader2 className='h-4 w-4 animate-spin' /> : <Check className='h-4 w-4' />}
                         </Button>
-                        <Button variant='ghost' size='sm' onClick={() => setShowBranchInput(false)}>
+                        <Button variant='ghost' size='sm' onClick={() => { setShowBranchInput(false); }}>
                             <X className='h-4 w-4' />
                         </Button>
                     </div>
@@ -338,7 +340,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                         <AlertTriangle className='h-4 w-4' />
                         <span>Shift+Click to select range</span>
                     </div>
-                    <Button variant='ghost' onClick={() => handleOpenChange(false)}>
+                    <Button variant='ghost' onClick={() => { handleOpenChange(false); }}>
                         Close
                     </Button>
                 </div>

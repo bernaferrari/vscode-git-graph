@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { GIT_GRAPH_SETTINGS_STORAGE_KEY, GIT_GRAPH_SETTINGS_UPDATED_EVENT } from '@/lib/gitGraphSettings';
 
 export interface AppSettings {
     // General
@@ -18,6 +19,7 @@ export interface AppSettings {
     showAvatars: boolean;
     showRelativeDates: boolean;
     dateFormat: 'relative' | 'iso' | 'locale';
+    enhancedAccessibility: boolean;
 
     // Editor
     commitTemplate: string;
@@ -53,6 +55,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     showAvatars: true,
     showRelativeDates: true,
     dateFormat: 'relative',
+    enhancedAccessibility: false,
     commitTemplate: '',
     autoSignCommits: false,
     defaultBranch: 'main',
@@ -68,13 +71,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     crashReports: true,
 };
 
-const STORAGE_KEY = 'git-graph-settings';
-
 export function useSettings() {
     const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = localStorage.getItem(GIT_GRAPH_SETTINGS_STORAGE_KEY);
         if (stored) {
             try {
                 setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
@@ -85,7 +86,8 @@ export function useSettings() {
     }, []);
 
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        localStorage.setItem(GIT_GRAPH_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+        window.dispatchEvent(new CustomEvent(GIT_GRAPH_SETTINGS_UPDATED_EVENT));
     }, [settings]);
 
     const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
