@@ -25,6 +25,7 @@ import {
 	X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { trpc } from '@/trpc/client';
 
 interface ShortcutAction {
 	id: string;
@@ -77,8 +78,6 @@ const DEFAULT_SHORTCUTS: ShortcutAction[] = [
 	{ id: 'edit.paste', name: 'Paste', category: 'Edit', defaultKey: 'CmdOrCtrl+V' },
 ];
 
-const STORAGE_KEY = 'git-graph-keyboard-shortcuts';
-
 export function KeyboardShortcutsEditor({
 	open,
 	onOpenChange,
@@ -90,24 +89,21 @@ export function KeyboardShortcutsEditor({
 	const [searchQuery, setSearchQuery] = useState('');
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [conflicts, setConflicts] = useState<Set<string>>(new Set());
+	const keybindingQuery = trpc.config.keybindings.useQuery(undefined, { enabled: open });
+	const setKeybindings = trpc.config.setKeybindings.useMutation({
+		onError: (error) => {
+			toast.error('Failed to save shortcuts', { description: error.message });
+		},
+	});
 
 	// Load shortcuts
 	useEffect(() => {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			try {
-				const custom = JSON.parse(stored);
-				setShortcuts(DEFAULT_SHORTCUTS.map(s => ({
-					...s,
-					customKey: custom[s.id],
-				})));
-			} catch {
-				setShortcuts(DEFAULT_SHORTCUTS);
-			}
-		} else {
-			setShortcuts(DEFAULT_SHORTCUTS);
-		}
-	}, [open]);
+		const overrides = keybindingQuery.data?.overrides ?? {};
+		setShortcuts(DEFAULT_SHORTCUTS.map(s => ({
+			...s,
+			customKey: overrides[s.id],
+		})));
+	}, [keybindingQuery.data?.overrides]);
 
 	// Check for conflicts
 	useEffect(() => {
@@ -173,7 +169,7 @@ export function KeyboardShortcutsEditor({
 				custom[s.id] = s.customKey;
 			}
 		});
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
+		setKeybindings.mutate({ overrides: custom });
 		toast.success('Shortcuts saved');
 		onOpenChange(false);
 	};

@@ -20,8 +20,9 @@ import {
     GitMerge,
     Box,
     Ellipsis,
+    Pin,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ElementType, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,10 +36,11 @@ const SIDE_ITEM_CLASS =
     'group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
 
 interface SidePanelProps {
-    onBranchSelect?: ((branch: string) => void) | undefined;
-    onCreateBranch?: (() => void) | undefined;
-    onCreateTag?: (() => void) | undefined;
-    onMergeBranch?: ((branch: string) => void) | undefined;
+    onBranchSelect?: (branch: string) => void;
+    onCreateBranch?: () => void;
+    onCreateTag?: () => void;
+    onMergeBranch?: (branch: string) => void;
+    enableBranchPinning?: boolean;
 }
 
 interface AheadBehindEntry {
@@ -50,11 +52,121 @@ interface AheadBehindEntry {
 
 interface AheadBehindResult {
     branches: AheadBehindEntry[];
-    error: string | null;
+    error?: string | null;
 }
 
-export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMergeBranch }: SidePanelProps) {
+interface RepoInfoData {
+    branches: string[];
+    tags: string[];
+    stashes: Array<{ message?: string }>;
+    head: string | null;
+}
+
+interface WorktreeEntry {
+    path: string;
+    branch?: string;
+    isMain?: boolean;
+}
+
+interface WorktreesResult {
+    worktrees: WorktreeEntry[];
+}
+
+interface SubmoduleEntry {
+    path: string;
+    status: string;
+}
+
+interface SubmoduleListResult {
+    submodules: SubmoduleEntry[];
+}
+
+interface PinnedBranchesResult {
+    branches: string[];
+}
+
+interface SmartBranchEntry {
+    name: string;
+    pinned: boolean;
+    current: boolean;
+    ahead: number;
+    behind: number;
+    score: number;
+}
+
+interface SmartBranchesResult {
+    branches: SmartBranchEntry[];
+}
+
+interface QueryOptions {
+    enabled: boolean;
+}
+
+interface QueryResult<TData> {
+    data?: TData;
+}
+
+interface TrpcGitShape {
+    repoInfo: {
+        useQuery: (
+            input: {
+                repo: string;
+                showRemoteBranches: boolean;
+                showStashes: boolean;
+                hideRemotes: string[];
+            },
+            options: QueryOptions
+        ) => QueryResult<RepoInfoData>;
+    };
+    worktree: {
+        list: {
+            useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<WorktreesResult>;
+        };
+    };
+    branch: {
+        listPinned: {
+            useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<PinnedBranchesResult>;
+        };
+        pin: {
+            useMutation: () => {
+                mutate: (input: { repo: string; branch: string }) => void;
+                isPending: boolean;
+            };
+        };
+        unpin: {
+            useMutation: () => {
+                mutate: (input: { repo: string; branch: string }) => void;
+                isPending: boolean;
+            };
+        };
+        smartList: {
+            useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<SmartBranchesResult>;
+        };
+    };
+    aheadBehindAll: {
+        useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<AheadBehindResult>;
+    };
+    submodule: {
+        list: {
+            useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<SubmoduleListResult>;
+        };
+    };
+}
+
+interface TrpcClientShape {
+    git: TrpcGitShape;
+}
+
+export function SidePanel({
+    onBranchSelect,
+    onCreateBranch,
+    onCreateTag,
+    onMergeBranch,
+    enableBranchPinning = true,
+}: SidePanelProps) {
     const { activeRepo } = useAppStore();
+    const typedTrpc = trpc as unknown as TrpcClientShape;
+    const trpcUtils = trpc.useUtils();
     const gitOps = useGitOperations();
 
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -66,8 +178,9 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
         submodules: false,
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [branchChip, setBranchChip] = useState<'all' | 'pinned' | 'attention'>('all');
 
-    const { data: repoInfo } = trpc.git.repoInfo.useQuery(
+    const { data: repoInfo } = typedTrpc.git.repoInfo.useQuery(
         {
             repo: activeRepo ?? '',
             showRemoteBranches: true,
@@ -77,18 +190,40 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
         { enabled: !!activeRepo }
     );
 
-    const { data: worktreesData } = trpc.git.worktree.list.useQuery(
+    const { data: worktreesData } = typedTrpc.git.worktree.list.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo }
     );
 
-    const { data: aheadBehindRawData } = trpc.git.aheadBehindAll.useQuery(
+    const { data: aheadBehindRawData } = typedTrpc.git.aheadBehindAll.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo }
     );
-    const aheadBehindData = aheadBehindRawData as AheadBehindResult | undefined;
+    const aheadBehindData = aheadBehindRawData;
+    const { data: pinnedData } = trpc.git.branch.listPinned.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: !!activeRepo && enableBranchPinning }
+    );
+    const { data: smartBranchesData } = trpc.git.branch.smartList.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: !!activeRepo && enableBranchPinning }
+    );
+    const pinMutation = trpc.git.branch.pin.useMutation({
+        onSuccess: () => {
+            if (activeRepo) {
+                void trpcUtils.git.branch.listPinned.invalidate({ repo: activeRepo });
+            }
+        },
+    });
+    const unpinMutation = trpc.git.branch.unpin.useMutation({
+        onSuccess: () => {
+            if (activeRepo) {
+                void trpcUtils.git.branch.listPinned.invalidate({ repo: activeRepo });
+            }
+        },
+    });
 
-    const { data: submodulesData } = trpc.git.submodule.list.useQuery(
+    const { data: submodulesData } = typedTrpc.git.submodule.list.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo }
     );
@@ -99,8 +234,8 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
 
     if (!activeRepo) return null;
 
-    const localBranches = repoInfo?.branches?.filter((b) => !b.startsWith('remotes/')) ?? [];
-    const remoteBranches = repoInfo?.branches?.filter((b) => b.startsWith('remotes/') && !b.endsWith('/HEAD')) ?? [];
+    const localBranches = repoInfo?.branches.filter((b) => !b.startsWith('remotes/')) ?? [];
+    const remoteBranches = repoInfo?.branches.filter((b) => b.startsWith('remotes/') && !b.endsWith('/HEAD')) ?? [];
     const tags = repoInfo?.tags ?? [];
     const stashes = repoInfo?.stashes ?? [];
     const worktrees = worktreesData?.worktrees ?? [];
@@ -112,6 +247,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
     const filteredLocalBranches = filterBySearch(localBranches);
     const filteredRemoteBranches = filterBySearch(remoteBranches);
     const filteredTags = filterBySearch(tags);
+    const pinnedBranches = pinnedData?.branches ?? [];
     const aheadBehindLookup = useMemo(
         () =>
             new Map<string, AheadBehindEntry>(
@@ -119,6 +255,29 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
             ),
         [aheadBehindData?.branches]
     );
+    const smartBranchesLookup = useMemo(
+        () => new Map<string, SmartBranchEntry>((smartBranchesData?.branches ?? []).map((entry) => [entry.name, entry])),
+        [smartBranchesData?.branches]
+    );
+    const displayedLocalBranches = useMemo(() => {
+        const base = [...filteredLocalBranches];
+        base.sort((a, b) => {
+            const rankA = smartBranchesLookup.get(a)?.score ?? 0;
+            const rankB = smartBranchesLookup.get(b)?.score ?? 0;
+            return rankB - rankA || a.localeCompare(b);
+        });
+
+        if (branchChip === 'pinned') {
+            return base.filter((branch) => pinnedBranches.includes(branch));
+        }
+        if (branchChip === 'attention') {
+            return base.filter((branch) => {
+                const metrics = aheadBehindLookup.get(branch);
+                return (metrics?.ahead ?? 0) > 0 || (metrics?.behind ?? 0) > 0;
+            });
+        }
+        return base;
+    }, [aheadBehindLookup, branchChip, filteredLocalBranches, pinnedBranches, smartBranchesLookup]);
 
     return (
         <div className='ui-surface flex h-full w-64 shrink-0 flex-col rounded-none border-r-0'>
@@ -141,7 +300,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                     <Section
                         title='Branches'
                         icon={GitBranch}
-                        count={filteredLocalBranches.length}
+                        count={displayedLocalBranches.length}
                         expanded={!!expandedSections.branches}
                         onToggle={() => { toggleSection('branches'); }}
                         action={
@@ -156,23 +315,53 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                                 <Plus className='h-3 w-3' />
                             </Button>
                         }>
-                        {filteredLocalBranches.map((branch) => {
+                        <div className='mb-1 flex gap-1'>
+                            <FilterChip label='All' active={branchChip === 'all'} onClick={() => { setBranchChip('all'); }} />
+                                <FilterChip
+                                    label='Pinned'
+                                    active={branchChip === 'pinned'}
+                                    onClick={() => { setBranchChip('pinned'); }}
+                                    disabled={!enableBranchPinning}
+                                />
+                            <FilterChip
+                                label='Needs'
+                                active={branchChip === 'attention'}
+                                onClick={() => { setBranchChip('attention'); }}
+                            />
+                        </div>
+                        {displayedLocalBranches.map((branch) => {
                             const aheadBehind = aheadBehindLookup.get(branch);
+                            const pinned = pinnedBranches.includes(branch);
                             return (
                                 <BranchItem
                                     key={branch}
                                     branch={branch}
                                     isCurrent={branch === currentHead}
-                                    onCheckout={() => gitOps.checkout(branch)}
-                                    onDelete={() => gitOps.deleteBranch(branch, false)}
+                                    pinned={pinned}
+                                    onCheckout={() => {
+                                        void gitOps.checkout(branch);
+                                    }}
+                                    onDelete={() => {
+                                        void gitOps.deleteBranch(branch, false);
+                                    }}
                                     onSelect={onBranchSelect}
                                     onMerge={onMergeBranch ? () => { onMergeBranch(branch); } : undefined}
                                     ahead={aheadBehind?.ahead}
                                     behind={aheadBehind?.behind}
+                                    onPinToggle={() => {
+                                        if (!enableBranchPinning) {
+                                            return;
+                                        }
+                                        if (pinned) {
+                                            unpinMutation.mutate({ repo: activeRepo, branch });
+                                        } else {
+                                            pinMutation.mutate({ repo: activeRepo, branch });
+                                        }
+                                    }}
                                 />
                             );
                         })}
-                        {filteredLocalBranches.length === 0 && (
+                        {displayedLocalBranches.length === 0 && (
                             <div className='text-muted-foreground px-2 py-1 text-xs'>No local branches found</div>
                         )}
                     </Section>
@@ -190,19 +379,23 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                                     key={branch}
                                     branch={branch}
                                     onSelect={onBranchSelect}
-                                    onCheckout={() => gitOps.checkout(branch)}
+                                    onCheckout={() => {
+                                        void gitOps.checkout(branch);
+                                    }}
                                 />
                             ))}
                             {filteredRemoteBranches.length > 20 && (
                                 <MoreItems
-                                    label={`+${filteredRemoteBranches.length - 20} more`}
+                                    label={`+${String(filteredRemoteBranches.length - 20)} more`}
                                     count={filteredRemoteBranches.length - 20}>
                                     {filteredRemoteBranches.slice(20).map((branch) => (
                                         <RemoteBranchItem
                                             key={branch}
                                             branch={branch}
                                             onSelect={onBranchSelect}
-                                            onCheckout={() => gitOps.checkout(branch)}
+                                            onCheckout={() => {
+                                                void gitOps.checkout(branch);
+                                            }}
                                         />
                                     ))}
                                 </MoreItems>
@@ -234,12 +427,26 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                                 </Button>
                             }>
                             {filteredTags.slice(0, 30).map((tag) => (
-                                <TagItem key={tag} tag={tag} onDelete={() => gitOps.deleteTag(tag)} />
+                                <TagItem
+                                    key={tag}
+                                    tag={tag}
+                                    onDelete={() => {
+                                        void gitOps.deleteTag(tag);
+                                    }}
+                                />
                             ))}
                             {filteredTags.length > 30 && (
-                                <MoreItems label={`+${filteredTags.length - 30} more`} count={filteredTags.length - 30}>
+                                <MoreItems
+                                    label={`+${String(filteredTags.length - 30)} more`}
+                                    count={filteredTags.length - 30}>
                                     {filteredTags.slice(30).map((tag) => (
-                                        <TagItem key={tag} tag={tag} onDelete={() => gitOps.deleteTag(tag)} />
+                                        <TagItem
+                                            key={tag}
+                                            tag={tag}
+                                            onDelete={() => {
+                                                void gitOps.deleteTag(tag);
+                                            }}
+                                        />
                                     ))}
                                 </MoreItems>
                             )}
@@ -262,9 +469,15 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                                     key={index}
                                     stash={stash}
                                     index={index}
-                                    onApply={() => gitOps.stashApply(index)}
-                                    onPop={() => gitOps.stashPop(index)}
-                                    onDrop={() => gitOps.stashDrop(index)}
+                                    onApply={() => {
+                                        void gitOps.stashApply(index);
+                                    }}
+                                    onPop={() => {
+                                        void gitOps.stashPop(index);
+                                    }}
+                                    onDrop={() => {
+                                        void gitOps.stashDrop(index);
+                                    }}
                                 />
                             ))}
                         </Section>
@@ -278,7 +491,7 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             count={worktrees.length}
                             expanded={!!expandedSections.worktrees}
                             onToggle={() => { toggleSection('worktrees'); }}>
-                            {worktrees.map((wt: { path: string; branch?: string; isMain?: boolean }) => (
+                            {worktrees.map((wt) => (
                                 <WorktreeItem key={wt.path} worktree={wt} />
                             ))}
                         </Section>
@@ -292,14 +505,9 @@ export function SidePanel({ onBranchSelect, onCreateBranch, onCreateTag, onMerge
                             count={submodulesData.submodules.length}
                             expanded={!!expandedSections.submodules}
                             onToggle={() => { toggleSection('submodules'); }}>
-                            {submodulesData.submodules.flatMap((sm) => {
-                                if (!sm || typeof sm.path !== 'string' || typeof sm.status !== 'string') {
-                                    return [];
-                                }
-                                return [
-                                    <SubmoduleItem key={sm.path} submodule={{ path: sm.path, status: sm.status }} />,
-                                ];
-                            })}
+                            {submodulesData.submodules.map((sm) => (
+                                <SubmoduleItem key={sm.path} submodule={sm} />
+                            ))}
                         </Section>
                     )}
                 </div>
@@ -319,12 +527,12 @@ function Section({
     children,
 }: {
     title: string;
-    icon: React.ElementType;
+    icon: ElementType;
     count: number;
     expanded: boolean;
     onToggle: () => void;
-    action?: React.ReactNode;
-    children: React.ReactNode;
+    action?: ReactNode;
+    children: ReactNode;
 }) {
     return (
         <div className='mb-1'>
@@ -348,25 +556,51 @@ function Section({
     );
 }
 
+function FilterChip({
+    label,
+    active,
+    onClick,
+    disabled,
+}: {
+    label: string;
+    active: boolean;
+    onClick: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            type='button'
+            className={`rounded border px-1.5 py-0.5 text-[10px] ${active ? 'border-primary text-primary bg-primary/10' : 'text-muted-foreground border-border/60 hover:bg-accent'} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+            onClick={onClick}
+            disabled={disabled}>
+            {label}
+        </button>
+    );
+}
+
 // Branch item
 function BranchItem({
     branch,
     isCurrent,
+    pinned,
     ahead,
     behind,
     onSelect,
     onCheckout,
     onMerge,
     onDelete,
+    onPinToggle,
 }: {
     branch: string;
     isCurrent: boolean;
+    pinned?: boolean;
     ahead?: number;
     behind?: number;
-    onSelect?: ((branch: string) => void) | undefined;
-    onCheckout: () => void | Promise<unknown>;
-    onMerge?: () => void | Promise<unknown>;
-    onDelete: () => void | Promise<unknown>;
+    onSelect?: (branch: string) => void;
+    onCheckout: () => unknown;
+    onMerge?: () => unknown;
+    onDelete: () => unknown;
+    onPinToggle?: () => void;
 }) {
     const hasAheadBehind = (ahead ?? 0) > 0 || (behind ?? 0) > 0;
 
@@ -376,7 +610,9 @@ function BranchItem({
             onClick={() => {
                 onSelect?.(branch);
             }}
-            onDoubleClick={onCheckout}
+            onDoubleClick={() => {
+                void onCheckout();
+            }}
             role='button'
             tabIndex={0}
             onKeyDown={(e) => {
@@ -389,6 +625,7 @@ function BranchItem({
             <span className={`flex-1 truncate ${isCurrent ? 'text-primary font-semibold' : 'font-medium'}`}>
                 {branch}
             </span>
+            {pinned && <Pin className='h-3 w-3 shrink-0 text-amber-500' />}
             {hasAheadBehind && (
                 <span className='flex shrink-0 items-center gap-0.5 text-[10px]'>
                     {(ahead ?? 0) > 0 && (
@@ -408,12 +645,22 @@ function BranchItem({
             {isCurrent && <Check className='text-primary h-3 w-3 shrink-0' />}
             {!isCurrent && (
                 <ActionMenu>
+                    {onPinToggle && (
+                        <button
+                            className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onPinToggle();
+                            }}>
+                            <Pin className='h-3.5 w-3.5' /> {pinned ? 'Unpin' : 'Pin'}
+                        </button>
+                    )}
                     <button
                         className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
                         onClick={(e) => {
                             e.stopPropagation();
                             onSelect?.(branch);
-                            onCheckout();
+                            void onCheckout();
                         }}>
                         <Check className='h-3.5 w-3.5' /> Checkout
                     </button>
@@ -421,7 +668,9 @@ function BranchItem({
                         className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
                         onClick={(e) => {
                             e.stopPropagation();
-                            onMerge?.();
+                            if (onMerge) {
+                                void onMerge();
+                            }
                         }}>
                         <GitMerge className='h-3.5 w-3.5' /> Merge
                     </button>
@@ -430,7 +679,7 @@ function BranchItem({
                         className='flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
                         onClick={(e) => {
                             e.stopPropagation();
-                            onDelete();
+                            void onDelete();
                         }}>
                         <Trash2 className='h-3.5 w-3.5' /> Delete
                     </button>
@@ -449,8 +698,8 @@ function RemoteBranchItem({
 }: {
     branch: string;
     branchName?: string;
-    onSelect?: ((branch: string) => void) | undefined;
-    onCheckout: () => void | Promise<unknown>;
+    onSelect?: (branch: string) => void;
+    onCheckout: () => unknown;
 }) {
     const displayBranch = branch.replace('remotes/', '');
     const [remote, ...rest] = displayBranch.split('/');
@@ -463,7 +712,9 @@ function RemoteBranchItem({
             onClick={() => {
                 onSelect?.(branch);
             }}
-            onDoubleClick={onCheckout}
+            onDoubleClick={() => {
+                void onCheckout();
+            }}
             role='button'
             tabIndex={0}
             onKeyDown={(e) => {
@@ -513,7 +764,7 @@ function StashItem({
     return (
         <div className={`${SIDE_ITEM_CLASS} hover:bg-accent/45 active:bg-accent/60`}>
             <Archive className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-            <span className='flex-1 truncate font-medium'>{stash.message || `Stash ${index}`}</span>
+            <span className='flex-1 truncate font-medium'>{stash.message || `Stash ${String(index)}`}</span>
             <ActionMenu>
                 <button
                     className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
@@ -575,7 +826,7 @@ function SubmoduleItem({ submodule }: { submodule: { path: string; status: strin
 }
 
 // Action menu popover
-function ActionMenu({ children }: { children: React.ReactNode }) {
+function ActionMenu({ children }: { children: ReactNode }) {
     return (
         <Popover>
             <PopoverTrigger
@@ -591,7 +842,7 @@ function ActionMenu({ children }: { children: React.ReactNode }) {
 }
 
 // More items popover
-function MoreItems({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+function MoreItems({ label, count, children }: { label: string; count: number; children: ReactNode }) {
     return (
         <Popover>
             <PopoverTrigger className='text-primary hover:text-primary/85 w-full rounded px-2 py-1 text-left text-xs font-medium transition-colors hover:underline'>
@@ -599,7 +850,7 @@ function MoreItems({ label, count, children }: { label: string; count: number; c
             </PopoverTrigger>
             <PopoverContent className='ui-inline-menu w-80 p-0' align='start' side='right' sideOffset={5}>
                 <div className='bg-muted/30 flex items-center justify-between border-b px-3 py-2'>
-                    <span className='text-sm font-medium'>{count} items</span>
+                    <span className='text-sm font-medium'>{String(count)} items</span>
                 </div>
                 <ScrollArea className='h-[500px] max-h-[60vh]'>
                     <div className='py-1'>{children}</div>

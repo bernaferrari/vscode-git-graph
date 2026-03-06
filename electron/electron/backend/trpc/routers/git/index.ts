@@ -6,9 +6,10 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { appStore } from '@/app/backend/store';
+import { appStore, instanceStore } from '@/app/backend/store';
 
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
@@ -22,9 +23,11 @@ import {
     mergePullRequest as mergeRemotePullRequest,
     parseRemoteUrl as parsePullRequestRemoteUrl,
     type ProviderAuthConfig,
+    type PullRequestRecord,
     type PullRequestProvider,
 } from '../../../services/pullRequest';
 import { router, publicProcedure } from '../../init';
+import { parseWorktreePorcelainRecords } from './worktree';
 
 // Singleton Git service instance
 let gitService: GitService | null = null;
@@ -763,6 +766,205 @@ async function readRebaseTodo(
     }
 
     return null;
+}
+
+function normalizeBranchRef(branchRef: string | null): string | null {
+    if (!branchRef) return null;
+    if (branchRef.startsWith('refs/heads/')) {
+        return branchRef.slice('refs/heads/'.length);
+    }
+    return branchRef;
+}
+
+async function getWorktreeDirtyCount(worktreePath: string): Promise<number> {
+    try {
+        const status = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], worktreePath);
+        return (status ?? '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean).length;
+    } catch {
+        return 0;
+    }
+}
+
+async function getWorktreeLastCommitAt(worktreePath: string): Promise<number | null> {
+    try {
+        const output = await getGitService().runGitCommandWithOutput(['log', '-1', '--format=%ct'], worktreePath);
+        const timestamp = Number.parseInt((output ?? '').trim(), 10);
+        if (!Number.isFinite(timestamp) || timestamp <= 0) {
+            return null;
+        }
+        return timestamp * 1000;
+    } catch {
+        return null;
+    }
+}
+
+async function getWorktreeUpstream(branch: string, repo: string): Promise<string | null> {
+    try {
+        const upstream = await getGitService().runGitCommandWithOutput(
+            ['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`],
+            repo
+        );
+        return upstream?.trim() || null;
+    } catch {
+        return null;
+    }
+}
+
+async function getWorktreeAheadBehind(
+    branch: string,
+    upstream: string | null,
+    repo: string
+): Promise<{ ahead: number; behind: number }> {
+    if (!upstream) {
+        return { ahead: 0, behind: 0 };
+    }
+
+    try {
+        const output = await getGitService().runGitCommandWithOutput(
+            ['rev-list', '--left-right', '--count', `${branch}...${upstream}`],
+            repo
+        );
+        const match = output?.trim().match(/^(\d+)\s+(\d+)$/);
+        if (!match?.[1] || !match[2]) {
+            return { ahead: 0, behind: 0 };
+        }
+
+        return {
+            ahead: Number.parseInt(match[1], 10),
+            behind: Number.parseInt(match[2], 10),
+        };
+    } catch {
+        return { ahead: 0, behind: 0 };
+    }
+}
+
+async function commandExists(command: string): Promise<boolean> {
+    try {
+        const { spawnSync } = await import('node:child_process');
+        const checkCommand = process.platform === 'win32' ? 'where' : 'which';
+        const result = spawnSync(checkCommand, [command], { stdio: 'ignore' });
+        return result.status === 0;
+    } catch {
+        return false;
+    }
+}
+
+async function runExecutable(
+    command: string,
+    args: string[],
+    cwd: string
+): Promise<{ stdout: string; stderr: string; code: number | null; error: string | null }> {
+    const { spawn } = await import('node:child_process');
+
+    return await new Promise((resolve) => {
+        const child = spawn(command, args, { cwd });
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (chunk: Buffer) => {
+            stdout += chunk.toString();
+        });
+
+        child.stderr.on('data', (chunk: Buffer) => {
+            stderr += chunk.toString();
+        });
+
+        child.on('close', (code) => {
+            resolve({
+                stdout,
+                stderr,
+                code,
+                error: code === 0 ? null : stderr.trim() || `${command} exited with code ${String(code ?? 'unknown')}`,
+            });
+        });
+
+        child.on('error', (error) => {
+            resolve({
+                stdout,
+                stderr,
+                code: null,
+                error: error.message,
+            });
+        });
+    });
+}
+
+const workflowTriggerSchema = z.enum(['manual', 'onBranchChange', 'onCommit', 'onPush']);
+const workflowStepTypeSchema = z.enum([
+    'checkout',
+    'fetch',
+    'createBranch',
+    'merge',
+    'rebase',
+    'push',
+    'openPR',
+    'runHook',
+    'notify',
+]);
+
+const workflowStepSchema = z.object({
+    id: z.string().min(1),
+    type: workflowStepTypeSchema,
+    params: z.record(z.string(), z.unknown()).default({}),
+});
+
+const workflowGuardSchema = z.object({
+    type: z.string().min(1),
+    value: z.string().optional(),
+});
+
+const workflowInputSchema = z.object({
+    key: z.string().min(1),
+    label: z.string().min(1),
+    required: z.boolean().default(false),
+    defaultValue: z.string().optional(),
+});
+
+const workflowDefinitionSchema = z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    trigger: workflowTriggerSchema,
+    steps: z.array(workflowStepSchema).min(1),
+    inputs: z.array(workflowInputSchema).default([]),
+    guards: z.array(workflowGuardSchema).default([]),
+    onFailure: z.enum(['stop', 'continue', 'rollback']).default('stop'),
+    updatedAt: z.number(),
+    createdAt: z.number(),
+});
+
+type WorkflowDefinition = z.infer<typeof workflowDefinitionSchema>;
+type WorkflowStep = z.infer<typeof workflowStepSchema>;
+
+function getWorkflowDefinitions(): WorkflowDefinition[] {
+    const raw = instanceStore.get('workflowDefinitions');
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+    return raw
+        .map((entry) => workflowDefinitionSchema.safeParse(entry))
+        .filter((result): result is { success: true; data: WorkflowDefinition } => result.success)
+        .map((result) => result.data);
+}
+
+function setWorkflowDefinitions(definitions: WorkflowDefinition[]): void {
+    instanceStore.set('workflowDefinitions', definitions);
+}
+
+function addWorkflowRun(run: {
+    id: string;
+    workflowId: string;
+    startedAt: number;
+    finishedAt: number | null;
+    status: 'running' | 'success' | 'failed';
+    steps: Array<{ id: string; type: string; status: 'pending' | 'running' | 'success' | 'failed' | 'skipped'; message?: string }>;
+    error?: string;
+}): void {
+    const existing = instanceStore.get('workflowRuns');
+    const nextRuns = Array.isArray(existing) ? [...existing, run] : [run];
+    instanceStore.set('workflowRuns', nextRuns.slice(-500));
 }
 
 export const gitRouter = router({
@@ -3415,44 +3617,39 @@ export const gitRouter = router({
                     ['worktree', 'list', '--porcelain'],
                     input.repo
                 );
+                const repoRoot = (await gitService.getRepoRoot(input.repo)) ?? path.resolve(input.repo);
+                const parsedWorktrees = parseWorktreePorcelainRecords(output);
+                const worktrees = await Promise.all(
+                    parsedWorktrees.map(async (record, index) => {
+                        const branchName = normalizeBranchRef(record.branchRef);
+                        const upstream = branchName ? await getWorktreeUpstream(branchName, input.repo) : null;
+                        const aheadBehind = branchName
+                            ? await getWorktreeAheadBehind(branchName, upstream, input.repo)
+                            : { ahead: 0, behind: 0 };
+                        const dirtyCount = await getWorktreeDirtyCount(record.path);
+                        const lastCommitAt = await getWorktreeLastCommitAt(record.path);
+                        const isMain = path.resolve(record.path) === path.resolve(repoRoot) || index === 0;
 
-                const worktrees: Array<{
-                    path: string;
-                    branch: string;
-                    commit: string;
-                    isMain: boolean;
-                }> = [];
-
-                const lines = (output ?? '').split('\n');
-                let currentWorktree: Partial<(typeof worktrees)[0]> = {};
-
-                for (const line of lines) {
-                    if (line.startsWith('worktree ')) {
-                        if (currentWorktree.path) {
-                            worktrees.push({
-                                path: currentWorktree.path,
-                                branch: currentWorktree.branch ?? '',
-                                commit: currentWorktree.commit ?? '',
-                                isMain: worktrees.length === 0,
-                            });
-                        }
-                        currentWorktree = { path: line.replace('worktree ', '') };
-                    } else if (line.startsWith('HEAD ')) {
-                        currentWorktree.commit = line.replace('HEAD ', '');
-                    } else if (line.startsWith('branch ')) {
-                        currentWorktree.branch = line.replace('branch ', '');
-                    }
-                }
-
-                if (currentWorktree.path) {
-                    worktrees.push({
-                        path: currentWorktree.path,
-                        branch: currentWorktree.branch ?? '',
-                        commit: currentWorktree.commit ?? '',
-                        isMain: worktrees.length === 0,
-                    });
-                }
-
+                        return {
+                            path: record.path,
+                            branch: branchName ?? '',
+                            commit: record.headSha ?? '',
+                            isMain,
+                            locked: record.locked,
+                            lockReason: record.lockReason,
+                            detached: record.detached || !branchName,
+                            prunable: record.prunable,
+                            bare: record.bare,
+                            headRef: branchName,
+                            headSha: record.headSha,
+                            branchUpstream: upstream,
+                            dirtyCount,
+                            lastCommitAt,
+                            ahead: aheadBehind.ahead,
+                            behind: aheadBehind.behind,
+                        };
+                    })
+                );
                 return { worktrees, error: null };
             } catch (error) {
                 return { worktrees: [], error: error instanceof Error ? error.message : 'Unknown error' };
@@ -3464,18 +3661,61 @@ export const gitRouter = router({
                 z.object({
                     repo: z.string(),
                     path: z.string(),
-                    branch: z.string(),
+                    branch: z.string().optional(),
+                    mode: z.enum(['existing', 'new-branch', 'detached', 'ephemeral-review']).optional(),
+                    baseRef: z.string().optional(),
+                    newBranch: z.string().optional(),
+                    commit: z.string().optional(),
+                    detached: z.boolean().optional(),
                 })
             )
             .mutation(async ({ input }) => {
                 const initError = await ensureGitInitialized();
                 if (initError) return { error: initError };
 
-                const error = await getGitService().runGitCommand(
-                    ['worktree', 'add', input.path, input.branch],
-                    input.repo
-                );
-                return { error };
+                const gitService = getGitService();
+                const mode = input.mode ?? (input.branch ? 'existing' : 'new-branch');
+                const targetPath = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
+                const args = ['worktree', 'add'];
+                let branchCreated: string | null = null;
+
+                if (mode === 'existing') {
+                    const ref = input.branch ?? input.baseRef ?? input.commit;
+                    if (!ref) {
+                        return { error: 'A branch or ref is required for existing checkout mode.' };
+                    }
+                    args.push(targetPath, ref);
+                } else if (mode === 'new-branch') {
+                    const newBranchName = input.newBranch ?? input.branch;
+                    const baseRef = input.baseRef ?? input.commit ?? 'HEAD';
+                    if (!newBranchName) {
+                        return { error: 'A new branch name is required for new-branch mode.' };
+                    }
+                    branchCreated = newBranchName;
+                    args.push('-b', newBranchName, targetPath, baseRef);
+                } else if (mode === 'detached') {
+                    const detachedRef = input.commit ?? input.baseRef ?? 'HEAD';
+                    args.push('--detach', targetPath, detachedRef);
+                } else {
+                    const shouldDetach = input.detached ?? false;
+                    if (shouldDetach) {
+                        args.push('--detach', targetPath, input.commit ?? input.baseRef ?? 'HEAD');
+                    } else {
+                        const generatedBranch =
+                            input.newBranch ??
+                            `review/${new Date().toISOString().replace(/[:.]/g, '-').replace('T', '-').slice(0, 19)}`;
+                        branchCreated = generatedBranch;
+                        args.push('-b', generatedBranch, targetPath, input.baseRef ?? input.commit ?? 'HEAD');
+                    }
+                }
+
+                const error = await gitService.runGitCommand(args, input.repo);
+                return {
+                    error,
+                    mode,
+                    branchCreated,
+                    path: targetPath,
+                };
             }),
 
         remove: publicProcedure
@@ -3484,27 +3724,280 @@ export const gitRouter = router({
                     repo: z.string(),
                     path: z.string(),
                     force: z.boolean().optional(),
+                    forceReason: z.string().optional(),
                 })
             )
             .mutation(async ({ input }) => {
                 const initError = await ensureGitInitialized();
                 if (initError) return { error: initError };
 
-                const args = ['worktree', 'remove'];
-                if (input.force) args.push('--force');
-                args.push(input.path);
+                const gitService = getGitService();
+                const repoRoot = (await gitService.getRepoRoot(input.repo)) ?? path.resolve(input.repo);
+                const targetPath = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
 
+                if (path.resolve(targetPath) === path.resolve(repoRoot)) {
+                    return { error: 'Cannot remove the active/main worktree.' };
+                }
+
+                const dirtyCount = await getWorktreeDirtyCount(targetPath);
+                if (dirtyCount > 0 && !input.force) {
+                    return {
+                        error: `Worktree has ${String(dirtyCount)} uncommitted changes. Force removal requires a typed reason.`,
+                    };
+                }
+
+                if (input.force && (input.forceReason?.trim().length ?? 0) < 4) {
+                    return { error: 'Force removal requires a reason with at least 4 characters.' };
+                }
+
+                const args = ['worktree', 'remove'];
+                if (input.force) {
+                    args.push('--force');
+                }
+                args.push(targetPath);
+
+                const error = await gitService.runGitCommand(args, input.repo);
+                return { error, dirtyCount };
+            }),
+
+        prune: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    dryRun: z.boolean().optional(),
+                    verbose: z.boolean().optional(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { error: initError, entries: [] as string[] };
+
+                const args = ['worktree', 'prune'];
+                if (input.dryRun) {
+                    args.push('--dry-run');
+                }
+                if (input.verbose ?? true) {
+                    args.push('--verbose');
+                }
+
+                const output = await getGitService().runGitCommandWithOutput(args, input.repo);
+                const entries = (output ?? '')
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+                return { error: null, entries };
+            }),
+
+        prunePreview: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { entries: [] as string[], error: initError };
+
+            try {
+                const output = await getGitService().runGitCommandWithOutput(
+                    ['worktree', 'prune', '--dry-run', '--verbose'],
+                    input.repo
+                );
+                const entries = (output ?? '')
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+                return { entries, error: null };
+            } catch (error) {
+                return { entries: [], error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+        open: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    path: z.string(),
+                })
+            )
+            .query(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { valid: false, resolvedPath: null, error: initError };
+
+                const targetPath = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
+                const root = await getGitService().getRepoRoot(targetPath);
+                return {
+                    valid: Boolean(root),
+                    resolvedPath: root ?? targetPath,
+                    error: root ? null : 'Path is not a Git worktree.',
+                };
+            }),
+
+        validatePath: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    path: z.string(),
+                    allowNonEmpty: z.boolean().optional(),
+                })
+            )
+            .query(async ({ input }) => {
+                const candidate = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
+                try {
+                    const stat = await fs.stat(candidate);
+                    if (!stat.isDirectory()) {
+                        return {
+                            valid: false,
+                            path: candidate,
+                            exists: true,
+                            empty: false,
+                            error: 'Target path exists and is not a directory.',
+                        };
+                    }
+
+                    const entries = await fs.readdir(candidate);
+                    const empty = entries.length === 0;
+                    if (!empty && !input.allowNonEmpty) {
+                        return {
+                            valid: false,
+                            path: candidate,
+                            exists: true,
+                            empty,
+                            error: 'Target directory is not empty.',
+                        };
+                    }
+
+                    return {
+                        valid: true,
+                        path: candidate,
+                        exists: true,
+                        empty,
+                        error: null,
+                    };
+                } catch {
+                    return {
+                        valid: true,
+                        path: candidate,
+                        exists: false,
+                        empty: true,
+                        error: null,
+                    };
+                }
+            }),
+
+        lock: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    path: z.string(),
+                    reason: z.string().optional(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { error: initError };
+
+                const targetPath = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
+                const args = ['worktree', 'lock'];
+                if (input.reason?.trim()) {
+                    args.push('--reason', input.reason.trim());
+                }
+                args.push(targetPath);
                 const error = await getGitService().runGitCommand(args, input.repo);
                 return { error };
             }),
 
-        prune: publicProcedure.input(z.object({ repo: z.string() })).mutation(async ({ input }) => {
-            const initError = await ensureGitInitialized();
-            if (initError) return { error: initError };
+        unlock: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    path: z.string(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { error: initError };
 
-            const error = await getGitService().runGitCommand(['worktree', 'prune'], input.repo);
-            return { error };
+                const targetPath = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
+                const error = await getGitService().runGitCommand(['worktree', 'unlock', targetPath], input.repo);
+                return { error };
+            }),
+
+        repair: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    paths: z.array(z.string()).optional(),
+                    runPrune: z.boolean().optional(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { error: initError, repaired: [] as string[], pruned: [] as string[] };
+
+                const repairArgs = ['worktree', 'repair'];
+                if (input.paths?.length) {
+                    repairArgs.push(
+                        ...input.paths.map((entry) =>
+                            path.isAbsolute(entry) ? entry : path.resolve(input.repo, entry)
+                        )
+                    );
+                }
+
+                const repairedOutput = await getGitService().runGitCommandWithOutput(repairArgs, input.repo);
+                const repaired = (repairedOutput ?? '')
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+
+                let pruned: string[] = [];
+                if (input.runPrune ?? true) {
+                    const pruneOutput = await getGitService().runGitCommandWithOutput(
+                        ['worktree', 'prune', '--verbose'],
+                        input.repo
+                    );
+                    pruned = (pruneOutput ?? '')
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter(Boolean);
+                }
+
+                return {
+                    error: null,
+                    repaired,
+                    pruned,
+                };
+            }),
+
+        viewPrefs: publicProcedure.query(() => {
+            const current = instanceStore.get('worktreeViewPrefs');
+            return {
+                prefs: {
+                    showLocked: current?.showLocked ?? true,
+                    showPrunable: current?.showPrunable ?? true,
+                    defaultCreateMode: current?.defaultCreateMode ?? 'existing',
+                    pathPresetRoot: current?.pathPresetRoot ?? null,
+                    lastSelectedBranch: current?.lastSelectedBranch ?? null,
+                },
+                error: null as string | null,
+            };
         }),
+
+        setViewPrefs: publicProcedure
+            .input(
+                z.object({
+                    showLocked: z.boolean().optional(),
+                    showPrunable: z.boolean().optional(),
+                    defaultCreateMode: z.enum(['existing', 'new-branch', 'detached', 'ephemeral-review']).optional(),
+                    pathPresetRoot: z.string().nullable().optional(),
+                    lastSelectedBranch: z.string().nullable().optional(),
+                })
+            )
+            .mutation(({ input }) => {
+                const current = instanceStore.get('worktreeViewPrefs');
+                instanceStore.set('worktreeViewPrefs', {
+                    showLocked: input.showLocked ?? current?.showLocked ?? true,
+                    showPrunable: input.showPrunable ?? current?.showPrunable ?? true,
+                    defaultCreateMode: input.defaultCreateMode ?? current?.defaultCreateMode ?? 'existing',
+                    pathPresetRoot: input.pathPresetRoot ?? current?.pathPresetRoot ?? null,
+                    lastSelectedBranch: input.lastSelectedBranch ?? current?.lastSelectedBranch ?? null,
+                });
+                return { success: true };
+            }),
     }),
 
     /**
@@ -4831,54 +5324,846 @@ export const gitRouter = router({
             }),
     }),
 
-    // ==================== Worktree Management ====================
+    // ==================== Workflow Engine ====================
 
-    worktreeManage: router({
+    workflow: router({
+        list: publicProcedure.query(() => {
+            const definitions = getWorkflowDefinitions();
+            const runs = instanceStore.get('workflowRuns');
+            return {
+                definitions,
+                runs: Array.isArray(runs) ? runs : [],
+                error: null,
+            };
+        }),
+
         create: publicProcedure
             .input(
                 z.object({
-                    repo: z.string(),
-                    path: z.string(),
-                    branch: z.string().optional(),
-                    commit: z.string().optional(),
+                    name: z.string().min(1),
+                    trigger: workflowTriggerSchema.default('manual'),
+                    steps: z.array(workflowStepSchema).min(1),
+                    inputs: z.array(workflowInputSchema).optional(),
+                    guards: z.array(workflowGuardSchema).optional(),
+                    onFailure: z.enum(['stop', 'continue', 'rollback']).optional(),
                 })
             )
-            .mutation(async ({ input }) => {
-                const initError = await ensureGitInitialized();
-                if (initError) return { error: initError };
-
-                const gitService = getGitService();
-                const args = ['worktree', 'add', input.path];
-
-                if (input.branch) {
-                    args.push('-b', input.branch);
-                }
-                if (input.commit) {
-                    args.push(input.commit);
-                }
-
-                const error = await gitService.runGitCommand(args, input.repo);
-                return { error };
+            .mutation(({ input }) => {
+                const now = Date.now();
+                const definition: WorkflowDefinition = {
+                    id: `wf-${randomUUID()}`,
+                    name: input.name.trim(),
+                    trigger: input.trigger,
+                    steps: input.steps,
+                    inputs: input.inputs ?? [],
+                    guards: input.guards ?? [],
+                    onFailure: input.onFailure ?? 'stop',
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                const existing = getWorkflowDefinitions();
+                setWorkflowDefinitions([...existing, definition]);
+                return { workflow: definition, error: null };
             }),
 
-        remove: publicProcedure
+        update: publicProcedure
+            .input(
+                z.object({
+                    id: z.string().min(1),
+                    name: z.string().min(1).optional(),
+                    trigger: workflowTriggerSchema.optional(),
+                    steps: z.array(workflowStepSchema).optional(),
+                    inputs: z.array(workflowInputSchema).optional(),
+                    guards: z.array(workflowGuardSchema).optional(),
+                    onFailure: z.enum(['stop', 'continue', 'rollback']).optional(),
+                })
+            )
+            .mutation(({ input }) => {
+                const definitions = getWorkflowDefinitions();
+                const current = definitions.find((entry) => entry.id === input.id);
+                if (!current) {
+                    return { workflow: null, error: 'Workflow not found.' };
+                }
+
+                const updated: WorkflowDefinition = {
+                    ...current,
+                    ...input,
+                    id: current.id,
+                    createdAt: current.createdAt,
+                    updatedAt: Date.now(),
+                };
+
+                setWorkflowDefinitions(definitions.map((entry) => (entry.id === updated.id ? updated : entry)));
+                return { workflow: updated, error: null };
+            }),
+
+        delete: publicProcedure
+            .input(
+                z.object({
+                    id: z.string().min(1),
+                })
+            )
+            .mutation(({ input }) => {
+                const definitions = getWorkflowDefinitions();
+                const nextDefinitions = definitions.filter((entry) => entry.id !== input.id);
+                if (nextDefinitions.length === definitions.length) {
+                    return { success: false, error: 'Workflow not found.' };
+                }
+                setWorkflowDefinitions(nextDefinitions);
+                return { success: true, error: null };
+            }),
+
+        dryRun: publicProcedure
             .input(
                 z.object({
                     repo: z.string(),
-                    path: z.string(),
-                    force: z.boolean().optional(),
+                    workflowId: z.string().min(1),
+                    inputs: z.record(z.string(), z.string()).optional(),
+                })
+            )
+            .query(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { graph: { nodes: [], edges: [] }, warnings: [initError], error: initError };
+
+                const workflow = getWorkflowDefinitions().find((entry) => entry.id === input.workflowId);
+                if (!workflow) {
+                    return { graph: { nodes: [], edges: [] }, warnings: [], error: 'Workflow not found.' };
+                }
+
+                const warnings: string[] = [];
+                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
+                const currentBranch =
+                    (await getGitService().runGitCommandWithOutput(['branch', '--show-current'], input.repo))?.trim() ??
+                    '';
+
+                for (const guard of workflow.guards) {
+                    if (guard.type === 'cleanWorkingTree' && (statusOutput ?? '').trim().length > 0) {
+                        warnings.push('Guard `cleanWorkingTree` will fail because repository has local changes.');
+                    } else if (
+                        guard.type === 'branchMatches' &&
+                        guard.value &&
+                        currentBranch &&
+                        !new RegExp(guard.value).test(currentBranch)
+                    ) {
+                        warnings.push(
+                            `Guard \`branchMatches\` expects ${guard.value} but current branch is ${currentBranch}.`
+                        );
+                    } else if (guard.type === 'hasUpstream') {
+                        const upstream = await getGitService().runGitCommandWithOutput(
+                            ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+                            input.repo
+                        );
+                        if (!(upstream ?? '').trim()) {
+                            warnings.push('Guard `hasUpstream` will fail because no upstream is configured.');
+                        }
+                    }
+                }
+
+                const graph = {
+                    nodes: workflow.steps.map((step, index) => ({
+                        id: step.id,
+                        type: step.type,
+                        label: `${String(index + 1)}. ${step.type}`,
+                        params: step.params,
+                    })),
+                    edges: workflow.steps
+                        .slice(0, -1)
+                        .map((step, index) => ({
+                            from: step.id,
+                            to: workflow.steps[index + 1]?.id ?? step.id,
+                        })),
+                };
+
+                return {
+                    graph,
+                    warnings,
+                    error: null,
+                };
+            }),
+
+        execute: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    workflowId: z.string().min(1),
+                    inputs: z.record(z.string(), z.string()).optional(),
                 })
             )
             .mutation(async ({ input }) => {
                 const initError = await ensureGitInitialized();
-                if (initError) return { error: initError };
+                if (initError) {
+                    return {
+                        run: null,
+                        error: initError,
+                    };
+                }
+
+                const workflow = getWorkflowDefinitions().find((entry) => entry.id === input.workflowId);
+                if (!workflow) {
+                    return { run: null, error: 'Workflow not found.' };
+                }
+
+                const resolveTemplate = (value: string): string =>
+                    value
+                        .replace(/\$\{repo\}/g, input.repo)
+                        .replace(/\$\{inputs\.([a-zA-Z0-9_-]+)\}/g, (_match, key: string) => input.inputs?.[key] ?? '');
+
+                const run: {
+                    id: string;
+                    workflowId: string;
+                    startedAt: number;
+                    finishedAt: number | null;
+                    status: 'running' | 'success' | 'failed';
+                    steps: Array<{
+                        id: string;
+                        type: WorkflowStep['type'];
+                        status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+                        message?: string;
+                    }>;
+                    error?: string;
+                } = {
+                    id: `wfr-${randomUUID()}`,
+                    workflowId: workflow.id,
+                    startedAt: Date.now(),
+                    finishedAt: null,
+                    status: 'running',
+                    steps: workflow.steps.map((step) => ({
+                        id: step.id,
+                        type: step.type,
+                        status: 'pending',
+                        message: '',
+                    })),
+                };
+
+                const updateStep = (
+                    stepId: string,
+                    status: 'pending' | 'running' | 'success' | 'failed' | 'skipped',
+                    message?: string
+                ) => {
+                    run.steps = run.steps.map((entry) =>
+                        entry.id === stepId ? { ...entry, status, message: message ?? entry.message } : entry
+                    );
+                };
+
+                try {
+                    for (const step of workflow.steps) {
+                        updateStep(step.id, 'running');
+                        const params = step.params as Record<string, unknown>;
+                        const asString = (key: string, fallback: string = ''): string =>
+                            typeof params[key] === 'string' ? resolveTemplate(params[key] as string) : fallback;
+                        const asBool = (key: string, fallback: boolean = false): boolean =>
+                            typeof params[key] === 'boolean' ? (params[key] as boolean) : fallback;
+
+                        let stepError: string | null = null;
+
+                        if (step.type === 'checkout') {
+                            const ref = asString('ref');
+                            if (!ref) {
+                                stepError = 'checkout step requires params.ref';
+                            } else {
+                                stepError = await getGitService().runGitCommand(['checkout', ref], input.repo);
+                            }
+                        } else if (step.type === 'fetch') {
+                            const remote = asString('remote', '--all');
+                            const args = remote === '--all' ? ['fetch', '--all', '--prune'] : ['fetch', remote, '--prune'];
+                            stepError = await getGitService().runGitCommand(args, input.repo);
+                        } else if (step.type === 'createBranch') {
+                            const name = asString('name');
+                            const from = asString('from', 'HEAD');
+                            if (!name) {
+                                stepError = 'createBranch step requires params.name';
+                            } else {
+                                stepError = await getGitService().runGitCommand(['checkout', '-b', name, from], input.repo);
+                            }
+                        } else if (step.type === 'merge') {
+                            const branch = asString('branch');
+                            if (!branch) {
+                                stepError = 'merge step requires params.branch';
+                            } else {
+                                const args = ['merge'];
+                                if (asBool('noFF', true)) args.push('--no-ff');
+                                if (asBool('squash', false)) args.push('--squash');
+                                args.push(branch);
+                                stepError = await getGitService().runGitCommand(args, input.repo);
+                            }
+                        } else if (step.type === 'rebase') {
+                            const onto = asString('onto');
+                            if (!onto) {
+                                stepError = 'rebase step requires params.onto';
+                            } else {
+                                stepError = await getGitService().runGitCommand(['rebase', onto], input.repo);
+                            }
+                        } else if (step.type === 'push') {
+                            const remote = asString('remote', 'origin');
+                            const branch = asString('branch', 'HEAD');
+                            const args = ['push', remote, branch];
+                            if (asBool('force', false)) {
+                                args.push('--force-with-lease');
+                            }
+                            stepError = await getGitService().runGitCommand(args, input.repo);
+                        } else if (step.type === 'openPR') {
+                            const provider = asString('provider') as PullRequestProvider;
+                            const title = asString('title', `PR: ${asString('head', 'HEAD')}`);
+                            const body = asString('body', '');
+                            const head = asString('head', 'HEAD');
+                            const base = asString('base', 'main');
+                            const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                            if (!remoteUrl) {
+                                stepError = 'No repository remote configured for PR creation.';
+                            } else {
+                                try {
+                                    await createRemotePullRequest(remoteUrl, provider, getStoredProviderAuthConfig(), {
+                                        title,
+                                        body,
+                                        head,
+                                        base,
+                                        draft: asBool('draft', false),
+                                    });
+                                } catch (error) {
+                                    stepError = error instanceof Error ? error.message : 'Unable to create PR';
+                                }
+                            }
+                        } else if (step.type === 'runHook') {
+                            const command = asString('command');
+                            if (!command) {
+                                stepError = 'runHook step requires params.command';
+                            } else {
+                                const output = await getGitService().runGitCommandWithOutput(command.split(' '), input.repo);
+                                if (output === null) {
+                                    stepError = 'Hook command failed.';
+                                }
+                            }
+                        } else if (step.type === 'notify') {
+                            // Notifications are currently local-only metadata events.
+                            stepError = null;
+                        }
+
+                        if (stepError) {
+                            updateStep(step.id, 'failed', stepError);
+                            if (workflow.onFailure === 'continue') {
+                                continue;
+                            }
+                            if (workflow.onFailure === 'rollback') {
+                                const rollbackAttempts: Array<{ name: string; error: string | null }> = [];
+                                const rollbackSteps: Array<{ name: string; args: string[] }> = [
+                                    { name: 'rebase --abort', args: ['rebase', '--abort'] },
+                                    { name: 'merge --abort', args: ['merge', '--abort'] },
+                                    { name: 'cherry-pick --abort', args: ['cherry-pick', '--abort'] },
+                                    { name: 'reset --hard ORIG_HEAD', args: ['reset', '--hard', 'ORIG_HEAD'] },
+                                ];
+
+                                for (const rollbackStep of rollbackSteps) {
+                                    const rollbackError = await getGitService().runGitCommand(rollbackStep.args, input.repo);
+                                    rollbackAttempts.push({ name: rollbackStep.name, error: rollbackError });
+                                }
+
+                                const successful = rollbackAttempts.filter((entry) => !entry.error).map((entry) => entry.name);
+                                const failed = rollbackAttempts.filter((entry) => entry.error);
+                                const rollbackSummary = successful.length > 0
+                                    ? `Rollback attempted: ${successful.join(', ')}`
+                                    : 'Rollback attempt did not complete any recovery step';
+                                const rollbackFailures =
+                                    failed.length > 0
+                                        ? ` | rollback warnings: ${failed.map((entry) => `${entry.name}: ${entry.error}`).join(' ; ')}`
+                                        : '';
+
+                                run.error = `${stepError} | ${rollbackSummary}${rollbackFailures}`;
+                            } else {
+                                run.error = stepError;
+                            }
+                            run.status = 'failed';
+                            break;
+                        }
+
+                        updateStep(step.id, 'success');
+                    }
+
+                    if (run.status !== 'failed') {
+                        run.status = 'success';
+                    }
+                } catch (error) {
+                    run.status = 'failed';
+                    run.error = error instanceof Error ? error.message : 'Workflow execution failed';
+                }
+
+                run.finishedAt = Date.now();
+                addWorkflowRun(run);
+                return {
+                    run,
+                    error: run.error ?? null,
+                };
+            }),
+    }),
+
+    // ==================== Graphite / Stacked Interop ====================
+
+    graphite: router({
+        status: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
+            const available = await commandExists('gt');
+            if (!available) {
+                return {
+                    available: false,
+                    version: null,
+                    stack: [] as Array<{ branch: string; parent: string | null; prNumber: number | null }>,
+                    fallbackMode: 'local',
+                    error: null,
+                };
+            }
+
+            const versionRun = await runExecutable('gt', ['--version'], input.repo);
+            return {
+                available: true,
+                version: versionRun.stdout.trim() || null,
+                stack: [] as Array<{ branch: string; parent: string | null; prNumber: number | null }>,
+                fallbackMode: 'graphite',
+                error: versionRun.error,
+            };
+        }),
+
+        restack: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const available = await commandExists('gt');
+                if (!available) {
+                    return {
+                        success: false,
+                        fallbackMode: 'local',
+                        output: null,
+                        error: 'Graphite CLI not available. Local stack mode is active.',
+                    };
+                }
+
+                const run = await runExecutable('gt', ['restack'], input.repo);
+                return {
+                    success: !run.error,
+                    fallbackMode: 'graphite',
+                    output: run.stdout.trim() || null,
+                    error: run.error,
+                };
+            }),
+
+        importStack: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                })
+            )
+            .query(async ({ input }) => {
+                const available = await commandExists('gt');
+                if (!available) {
+                    return { stack: [] as Array<{ branch: string; parent: string | null }>, error: null, fallbackMode: 'local' };
+                }
+
+                const run = await runExecutable('gt', ['log', '--short'], input.repo);
+                const stack = run.stdout
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                    .map((line) => ({
+                        branch: line.replace(/^[*>\s-]+/, '').split(' ')[0] ?? line,
+                        parent: null as string | null,
+                    }));
+                return {
+                    stack,
+                    error: run.error,
+                    fallbackMode: 'graphite',
+                };
+            }),
+
+        exportStack: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    stack: z.array(z.object({ branch: z.string(), parent: z.string().nullable().optional() })),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const available = await commandExists('gt');
+                if (!available) {
+                    return {
+                        success: false,
+                        fallbackMode: 'local',
+                        error: 'Graphite CLI not available. Stack export skipped.',
+                    };
+                }
+
+                // Graphite does not provide a single command for importing arbitrary stack metadata.
+                // We currently verify branch presence and return success to keep interoperability explicit.
+                const missingBranches: string[] = [];
+                for (const item of input.stack) {
+                    const exists = await getGitService().runGitCommand(['show-ref', '--verify', `refs/heads/${item.branch}`], input.repo);
+                    if (exists) {
+                        missingBranches.push(item.branch);
+                    }
+                }
+
+                return {
+                    success: missingBranches.length === 0,
+                    fallbackMode: 'graphite',
+                    missingBranches,
+                    error:
+                        missingBranches.length === 0
+                            ? null
+                            : `Missing local branches: ${missingBranches.join(', ')}`,
+                };
+            }),
+
+        validateStack: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    stack: z.array(
+                        z.object({
+                            branch: z.string(),
+                            parent: z.string().nullable().optional(),
+                            baseBranch: z.string().nullable().optional(),
+                        })
+                    ),
+                })
+            )
+            .query(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) {
+                    return { valid: false, issues: [initError], branches: [], error: initError };
+                }
+
+                const branchSet = new Set(input.stack.map((entry) => entry.branch));
+                const issues: string[] = [];
+                const branches = await Promise.all(
+                    input.stack.map(async (entry) => {
+                        const existsError = await getGitService().runGitCommand(
+                            ['show-ref', '--verify', `refs/heads/${entry.branch}`],
+                            input.repo
+                        );
+                        const exists = !existsError;
+
+                        const expectedBase = entry.parent ?? entry.baseBranch ?? null;
+                        let baseDrift = false;
+                        if (exists && expectedBase) {
+                            const mergeBase = await getGitService().runGitCommandWithOutput(
+                                ['merge-base', entry.branch, expectedBase],
+                                input.repo
+                            );
+                            const expectedSha = await getGitService().runGitCommandWithOutput(
+                                ['rev-parse', expectedBase],
+                                input.repo
+                            );
+                            baseDrift = (mergeBase?.trim() ?? '') !== (expectedSha?.trim() ?? '');
+                        }
+
+                        if (entry.parent && !branchSet.has(entry.parent)) {
+                            issues.push(`${entry.branch} references missing parent ${entry.parent}`);
+                        }
+                        if (!exists) {
+                            issues.push(`Missing local branch ${entry.branch}`);
+                        }
+                        if (baseDrift) {
+                            issues.push(`${entry.branch} is drifted from expected base ${expectedBase}`);
+                        }
+
+                        return {
+                            branch: entry.branch,
+                            exists,
+                            parent: entry.parent ?? null,
+                            baseBranch: entry.baseBranch ?? null,
+                            baseDrift,
+                        };
+                    })
+                );
+
+                return {
+                    valid: issues.length === 0,
+                    issues,
+                    branches,
+                    error: null as string | null,
+                };
+            }),
+
+        syncStack: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    stack: z.array(
+                        z.object({
+                            branch: z.string(),
+                            parent: z.string().nullable().optional(),
+                            baseBranch: z.string().nullable().optional(),
+                        })
+                    ),
+                    push: z.boolean().optional().default(true),
+                    forceWithLease: z.boolean().optional().default(true),
+                    refreshPullRequests: z.boolean().optional().default(true),
+                })
+            )
+            .mutation(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) {
+                    return {
+                        success: false,
+                        mode: 'local' as const,
+                        warnings: [initError],
+                        branches: [] as Array<Record<string, unknown>>,
+                        error: initError,
+                    };
+                }
+
+                const warnings: string[] = [];
+                const graphiteAvailable = await commandExists('gt');
+                let mode: 'graphite' | 'local' = graphiteAvailable ? 'graphite' : 'local';
+
+                if (graphiteAvailable) {
+                    const restack = await runExecutable('gt', ['restack'], input.repo);
+                    if (restack.error) {
+                        warnings.push(`Graphite restack failed: ${restack.error}`);
+                        mode = 'local';
+                    }
+                } else {
+                    warnings.push('Graphite CLI unavailable, using local stack mode.');
+                }
+
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                const parsedRemote = remoteUrl ? parsePullRequestRemoteUrl(remoteUrl) : null;
+                let prsByHead = new Map<string, PullRequestRecord>();
+
+                if (input.refreshPullRequests) {
+                    if (!remoteUrl || !parsedRemote) {
+                        warnings.push('No PR provider remote configured; PR sync status unavailable.');
+                    } else {
+                        try {
+                            const prs = await listRemotePullRequests(
+                                remoteUrl,
+                                parsedRemote.provider,
+                                getStoredProviderAuthConfig(),
+                                'open'
+                            );
+                            prsByHead = new Map(prs.map((pr) => [pr.head.ref, pr]));
+                        } catch (error) {
+                            warnings.push(
+                                `Failed to refresh PRs: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            );
+                        }
+                    }
+                }
+
+                const stackBranchNames = new Set(input.stack.map((entry) => entry.branch));
+                const branches = await Promise.all(
+                    input.stack.map(async (entry) => {
+                        const branchRef = `refs/heads/${entry.branch}`;
+                        const existsError = await getGitService().runGitCommand(
+                            ['show-ref', '--verify', branchRef],
+                            input.repo
+                        );
+                        const exists = !existsError;
+
+                        const expectedBase = entry.parent ?? entry.baseBranch ?? null;
+                        let baseDrift = false;
+                        if (exists && expectedBase) {
+                            const mergeBase = await getGitService().runGitCommandWithOutput(
+                                ['merge-base', entry.branch, expectedBase],
+                                input.repo
+                            );
+                            const expectedSha = await getGitService().runGitCommandWithOutput(
+                                ['rev-parse', expectedBase],
+                                input.repo
+                            );
+                            baseDrift = (mergeBase?.trim() ?? '') !== (expectedSha?.trim() ?? '');
+                        }
+
+                        let pushError: string | null = null;
+                        if (input.push && exists) {
+                            const pushArgs = ['push', 'origin', entry.branch];
+                            if (input.forceWithLease) {
+                                pushArgs.push('--force-with-lease');
+                            }
+                            pushError = await getGitService().runGitCommand(pushArgs, input.repo);
+                        }
+
+                        const pr = prsByHead.get(entry.branch) ?? null;
+                        const parentMissing = entry.parent ? !stackBranchNames.has(entry.parent) : false;
+                        const needsAttention = Boolean(pushError || baseDrift || parentMissing || !exists);
+
+                        return {
+                            branch: entry.branch,
+                            parent: entry.parent ?? null,
+                            baseBranch: entry.baseBranch ?? null,
+                            exists,
+                            parentMissing,
+                            baseDrift,
+                            pushed: input.push && exists && !pushError,
+                            pushError,
+                            pr: pr
+                                ? {
+                                      number: pr.number,
+                                      url: pr.webUrl,
+                                      state: pr.state,
+                                      draft: pr.draft,
+                                  }
+                                : null,
+                            needsAttention,
+                        };
+                    })
+                );
+
+                return {
+                    success: branches.every((entry) => !entry.pushError && entry.exists),
+                    mode,
+                    warnings,
+                    summary: {
+                        total: branches.length,
+                        needsAttention: branches.filter((entry) => entry.needsAttention).length,
+                        withPr: branches.filter((entry) => Boolean(entry.pr)).length,
+                        pushed: branches.filter((entry) => entry.pushed).length,
+                    },
+                    branches,
+                    error: null as string | null,
+                };
+            }),
+    }),
+
+    // ==================== Branch Pinning ====================
+
+    branch: router({
+        listPinned: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                })
+            )
+            .query(({ input }) => {
+                const pinned = instanceStore.get('pinnedBranches');
+                const map = pinned ?? {};
+                return { branches: map[input.repo] ?? [], error: null };
+            }),
+
+        pin: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    branch: z.string().min(1),
+                })
+            )
+            .mutation(({ input }) => {
+                const current = instanceStore.get('pinnedBranches');
+                const next = { ...(current ?? {}) };
+                const existing = next[input.repo] ?? [];
+                if (!existing.includes(input.branch)) {
+                    next[input.repo] = [...existing, input.branch];
+                    instanceStore.set('pinnedBranches', next);
+                }
+                return { success: true, branches: next[input.repo] ?? [] };
+            }),
+
+        unpin: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    branch: z.string().min(1),
+                })
+            )
+            .mutation(({ input }) => {
+                const current = instanceStore.get('pinnedBranches');
+                const next = { ...(current ?? {}) };
+                next[input.repo] = (next[input.repo] ?? []).filter((entry) => entry !== input.branch);
+                instanceStore.set('pinnedBranches', next);
+                return { success: true, branches: next[input.repo] ?? [] };
+            }),
+
+        smartList: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                })
+            )
+            .query(async ({ input }) => {
+                const initError = await ensureGitInitialized();
+                if (initError) return { branches: [] as Array<{ name: string; score: number; pinned: boolean }>, error: initError };
 
                 const gitService = getGitService();
-                const args = ['worktree', 'remove', input.path];
-                if (input.force) args.push('--force');
+                const currentBranch =
+                    (await gitService.runGitCommandWithOutput(['branch', '--show-current'], input.repo))?.trim() ?? '';
+                const branchesOutput = await gitService.runGitCommandWithOutput(
+                    ['for-each-ref', '--format=%(refname:short)|%(committerdate:unix)', 'refs/heads'],
+                    input.repo
+                );
+                const aheadBehindOutput = await gitService.runGitCommandWithOutput(
+                    ['for-each-ref', '--format=%(refname:short)|%(upstream:short)', 'refs/heads'],
+                    input.repo
+                );
+                const pinned = instanceStore.get('pinnedBranches')?.[input.repo] ?? [];
 
-                const error = await gitService.runGitCommand(args, input.repo);
-                return { error };
+                const upstreamByBranch = new Map<string, string>();
+                for (const line of (aheadBehindOutput ?? '').split('\n').filter(Boolean)) {
+                    const [branch = '', upstream = ''] = line.split('|');
+                    if (branch && upstream) {
+                        upstreamByBranch.set(branch, upstream);
+                    }
+                }
+
+                const ranked = await Promise.all(
+                    (branchesOutput ?? '')
+                        .split('\n')
+                        .filter(Boolean)
+                        .map(async (line) => {
+                            const [name = '', commitDate = '0'] = line.split('|');
+                            const upstream = upstreamByBranch.get(name) ?? null;
+                            const aheadBehind = await getWorktreeAheadBehind(name, upstream, input.repo);
+                            const recentBoost = Math.max(0, 120 - Math.floor((Date.now() / 1000 - Number.parseInt(commitDate, 10)) / 3600));
+                            const score =
+                                (name === currentBranch ? 10_000 : 0) +
+                                (pinned.includes(name) ? 3_000 : 0) +
+                                Math.max(aheadBehind.ahead, aheadBehind.behind) * 20 +
+                                recentBoost;
+
+                            return {
+                                name,
+                                pinned: pinned.includes(name),
+                                current: name === currentBranch,
+                                ahead: aheadBehind.ahead,
+                                behind: aheadBehind.behind,
+                                score,
+                            };
+                        })
+                );
+
+                ranked.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+                return { branches: ranked, error: null };
+            }),
+    }),
+
+    // ==================== Launchpad Status Mapping ====================
+
+    launchpad: router({
+        setStatusMap: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                    map: z.record(z.string(), z.object({ label: z.string(), severity: z.enum(['info', 'warn', 'error']) })),
+                })
+            )
+            .mutation(({ input }) => {
+                const current = instanceStore.get('launchpadStatusMap');
+                const next = { ...(current ?? {}) };
+                next[input.repo] = input.map;
+                instanceStore.set('launchpadStatusMap', next);
+                return { success: true };
+            }),
+
+        getStatusMap: publicProcedure
+            .input(
+                z.object({
+                    repo: z.string(),
+                })
+            )
+            .query(({ input }) => {
+                const map = instanceStore.get('launchpadStatusMap');
+                return {
+                    map: map?.[input.repo] ?? {},
+                    error: null,
+                };
             }),
     }),
 

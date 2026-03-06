@@ -69,6 +69,22 @@ interface RemoteRepository {
 	defaultBranch: string;
 }
 
+const workspaceRepoSchema = z.object({
+	path: z.string().min(1),
+	name: z.string().min(1),
+	lastOpened: z.number().optional(),
+	isFavorite: z.boolean().optional(),
+});
+
+const workspaceSchema = z.object({
+	id: z.string().min(1),
+	name: z.string().min(1),
+	color: z.string().min(1),
+	repos: z.array(workspaceRepoSchema),
+	createdAt: z.number(),
+	updatedAt: z.number(),
+});
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
@@ -293,6 +309,61 @@ export const repoRouter = router({
 		}),
 
 	/**
+	 * Backend-managed workspace persistence.
+	 */
+	workspace: router({
+		list: publicProcedure.query(() => {
+			const workspaces = instanceStore.get('workspaces');
+			return {
+				workspaces: Array.isArray(workspaces) ? workspaces : [],
+				error: null as string | null,
+			};
+		}),
+
+		setAll: publicProcedure
+			.input(
+				z.object({
+					workspaces: z.array(workspaceSchema),
+				})
+			)
+			.mutation(({ input }) => {
+				instanceStore.set('workspaces', input.workspaces);
+				return { success: true };
+			}),
+
+		upsert: publicProcedure
+			.input(workspaceSchema)
+			.mutation(({ input }) => {
+				const current = instanceStore.get('workspaces');
+				const list = Array.isArray(current) ? [...current] : [];
+				const index = list.findIndex((entry) => entry.id === input.id);
+				if (index >= 0) {
+					list[index] = input;
+				} else {
+					list.push(input);
+				}
+				instanceStore.set('workspaces', list);
+				return { success: true, workspace: input };
+			}),
+
+		remove: publicProcedure
+			.input(
+				z.object({
+					id: z.string().min(1),
+				})
+			)
+			.mutation(({ input }) => {
+				const current = instanceStore.get('workspaces');
+				const list = Array.isArray(current) ? current : [];
+				instanceStore.set(
+					'workspaces',
+					list.filter((workspace) => workspace.id !== input.id)
+				);
+				return { success: true };
+			}),
+	}),
+
+	/**
 	 * Search for repositories in a directory.
 	 */
 	search: publicProcedure
@@ -328,6 +399,7 @@ export const repoRouter = router({
 		)
 		.query(async ({ input }) => {
 			const initError = await ensureGitInitialized();
+			const statusMapStore = instanceStore.get('launchpadStatusMap') ?? {};
 			if (initError !== null) {
 				return {
 					repos: input.repos.map((repoPath) => ({
@@ -340,6 +412,10 @@ export const repoRouter = router({
 						lastCommit: null,
 						provider: null,
 						openPullRequests: null,
+						needsAttention: false,
+						stale: false,
+						statusSignals: [] as string[],
+						mappedStatuses: [] as Array<{ key: string; label: string; severity: 'info' | 'warn' | 'error' }>,
 						error: initError,
 					})),
 					error: initError,
@@ -368,6 +444,10 @@ export const repoRouter = router({
 							} | null,
 							provider: null as string | null,
 							openPullRequests: null as number | null,
+							needsAttention: false,
+							stale: false,
+							statusSignals: [] as string[],
+							mappedStatuses: [] as Array<{ key: string; label: string; severity: 'info' | 'warn' | 'error' }>,
 							error: 'Repository path is empty.',
 						};
 					}
@@ -389,6 +469,10 @@ export const repoRouter = router({
 							} | null,
 							provider: null as string | null,
 							openPullRequests: null as number | null,
+							needsAttention: false,
+							stale: false,
+							statusSignals: [] as string[],
+							mappedStatuses: [] as Array<{ key: string; label: string; severity: 'info' | 'warn' | 'error' }>,
 							error: 'Not a Git repository.',
 						};
 					}
@@ -444,19 +528,45 @@ export const repoRouter = router({
 						}
 					}
 
+					const lastCommitAgeHours = lastCommit
+						? Math.floor((Date.now() - lastCommit.timestamp) / (1000 * 60 * 60))
+						: Number.POSITIVE_INFINITY;
+					const stale = Number.isFinite(lastCommitAgeHours) && lastCommitAgeHours > 24 * 7;
+					const statusSignals: string[] = [];
+					const dirtyCount = (statusRaw ?? '')
+						.split('\n')
+						.map((line) => line.trim())
+						.filter(Boolean).length;
+					if (dirtyCount > 0) statusSignals.push('dirty');
+					if (behind > 0) statusSignals.push('behind');
+					if ((openPullRequests ?? 0) > 0) statusSignals.push('openPullRequests');
+					if (stale) statusSignals.push('stale');
+					const needsAttention = statusSignals.length > 0;
+
+					const repoStatusMap = statusMapStore[root] ?? statusMapStore[normalizedPath] ?? {};
+					const mappedStatuses = statusSignals
+						.map((key) => ({ key, value: repoStatusMap[key] }))
+						.filter((entry): entry is { key: string; value: { label: string; severity: 'info' | 'warn' | 'error' } } => Boolean(entry.value))
+						.map((entry) => ({
+							key: entry.key,
+							label: entry.value.label,
+							severity: entry.value.severity,
+						}));
+
 					return {
 						path: root,
 						name: root.split('/').pop() ?? root,
 						head: headRaw?.trim() || null,
-						dirtyCount: (statusRaw ?? '')
-							.split('\n')
-							.map((line) => line.trim())
-							.filter(Boolean).length,
+						dirtyCount,
 						ahead,
 						behind,
 						lastCommit,
 						provider,
 						openPullRequests,
+						needsAttention,
+						stale,
+						statusSignals,
+						mappedStatuses,
 						error: null as string | null,
 					};
 				})

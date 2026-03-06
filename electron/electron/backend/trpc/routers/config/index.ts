@@ -151,11 +151,28 @@ export const configRouter = router({
 				enhancedAccessibility: z.boolean().optional(),
 				markdown: z.boolean().optional(),
 				tabIconColourTheme: z.enum(['colour', 'grey']).optional(),
+				featureFlags: z
+					.object({
+						worktreePro: z.boolean().optional(),
+						workflowEngine: z.boolean().optional(),
+						graphiteInterop: z.boolean().optional(),
+						aiProd: z.boolean().optional(),
+						deepLinks: z.boolean().optional(),
+						branchPinning: z.boolean().optional(),
+					})
+					.optional(),
 			})
 		)
 			.mutation(({ input }) => {
 			const current = configStore.get('ui');
-			configStore.set('ui', { ...current, ...input });
+			const nextFeatureFlags = input.featureFlags
+				? { ...current.featureFlags, ...input.featureFlags }
+				: current.featureFlags;
+			configStore.set('ui', {
+				...current,
+				...input,
+				featureFlags: nextFeatureFlags,
+			});
 			return { success: true };
 		}),
 
@@ -210,6 +227,26 @@ export const configRouter = router({
 			.mutation(({ input }) => {
 			const current = instanceStore.get('workspaceViewState');
 			instanceStore.set('workspaceViewState', { ...current, ...input });
+			return { success: true };
+		}),
+
+	/**
+	 * Keybinding overrides.
+	 */
+	keybindings: publicProcedure.query(() => {
+		return {
+			overrides: instanceStore.get('keybindingOverrides'),
+		};
+	}),
+
+	setKeybindings: publicProcedure
+		.input(
+			z.object({
+				overrides: z.record(z.string(), z.string()),
+			})
+		)
+		.mutation(({ input }) => {
+			instanceStore.set('keybindingOverrides', input.overrides);
 			return { success: true };
 		}),
 

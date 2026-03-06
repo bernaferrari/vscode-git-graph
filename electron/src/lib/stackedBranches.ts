@@ -13,6 +13,12 @@ export interface StackedBranch {
 	parentId: string | null; // ID of parent branch in stack
 	commitHash: string;
 	prUrl?: string;
+	prNumber?: number;
+	prState?: 'open' | 'closed' | 'merged';
+	syncState?: 'ok' | 'warning' | 'error';
+	syncMessage?: string;
+	baseDrift?: boolean;
+	needsAttention?: boolean;
 	status: 'draft' | 'ready' | 'merged' | 'stale';
 	lastUpdated: number;
 }

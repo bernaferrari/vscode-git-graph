@@ -9,15 +9,16 @@ import {
     ExternalLink,
     GitBranch,
     GitPullRequest,
-    Gitlab,
-    Github,
+    Globe,
     Loader2,
     MessageSquare,
     Plus,
     RefreshCw,
     Save,
     Send,
+    Server,
     Settings,
+    Wand2,
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -88,8 +89,157 @@ const DEFAULT_AUTH_FORM: PullRequestAuthForm = {
     azureToken: '',
 };
 
+interface RemoteEntry {
+    name: string;
+    url: string;
+}
+
+interface RemotesQueryData {
+    remotes: RemoteEntry[];
+}
+
+interface RepoInfoQueryData {
+    branches: string[];
+}
+
+interface PullRequestAuthQueryData {
+    auth: PullRequestAuthForm;
+}
+
+interface PullRequestsQueryData {
+    pullRequests: PullRequest[];
+    error?: string;
+}
+
+interface PullRequestCommentsQueryData {
+    comments: PullRequestComment[];
+}
+
+interface QueryOptions {
+    enabled?: boolean;
+    staleTime?: number;
+}
+
+interface QueryState<TData> {
+    data?: TData;
+    isFetching: boolean;
+    isLoading: boolean;
+    refetch: () => Promise<unknown>;
+}
+
+interface MutationCallbacks<TResult = unknown> {
+    onSuccess?: (result: TResult) => void | Promise<void>;
+    onError?: (error: unknown) => void;
+}
+
+interface MutationState<TInput> {
+    mutate: (input: TInput) => void;
+    isPending: boolean;
+}
+
+interface PullRequestMutationResult {
+    error?: string | null;
+}
+
+interface CreatePullRequestInput {
+    repo: string;
+    provider: PullRequestProvider;
+    title: string;
+    body?: string;
+    head: string;
+    base: string;
+    draft: boolean;
+}
+
+interface MergePullRequestInput {
+    repo: string;
+    provider: PullRequestProvider;
+    number: number;
+    mergeMethod: 'merge' | 'squash' | 'rebase';
+}
+
+interface ClosePullRequestInput {
+    repo: string;
+    provider: PullRequestProvider;
+    number: number;
+}
+
+interface AddPullRequestCommentInput {
+    repo: string;
+    provider: PullRequestProvider;
+    number: number;
+    body: string;
+}
+
+interface TrpcUtilsShape {
+    git: {
+        getPullRequest: {
+            invalidate: () => Promise<unknown>;
+        };
+    };
+}
+
+interface TrpcGitShape {
+    remotes: {
+        useQuery: (input: { repo: string }, options: QueryOptions) => QueryState<RemotesQueryData>;
+    };
+    repoInfo: {
+        useQuery: (
+            input: {
+                repo: string;
+                showRemoteBranches: boolean;
+                showStashes: boolean;
+                hideRemotes: string[];
+            },
+            options: QueryOptions
+        ) => QueryState<RepoInfoQueryData>;
+    };
+    getPullRequestAuth: {
+        useQuery: (input: undefined, options: QueryOptions) => QueryState<PullRequestAuthQueryData>;
+    };
+    listPullRequests: {
+        useQuery: (
+            input: { repo: string; provider: PullRequestProvider; state: PullRequestStateFilter },
+            options: QueryOptions
+        ) => QueryState<PullRequestsQueryData>;
+    };
+    listPullRequestComments: {
+        useQuery: (
+            input: { repo: string; provider: PullRequestProvider; number: number },
+            options: QueryOptions
+        ) => QueryState<PullRequestCommentsQueryData>;
+    };
+    setPullRequestAuth: {
+        useMutation: (callbacks: MutationCallbacks) => MutationState<PullRequestAuthForm>;
+    };
+    createPullRequest: {
+        useMutation: (callbacks: MutationCallbacks<PullRequestMutationResult>) => MutationState<CreatePullRequestInput>;
+    };
+    mergePullRequest: {
+        useMutation: (callbacks: MutationCallbacks<PullRequestMutationResult>) => MutationState<MergePullRequestInput>;
+    };
+    closePullRequest: {
+        useMutation: (callbacks: MutationCallbacks<PullRequestMutationResult>) => MutationState<ClosePullRequestInput>;
+    };
+    addPullRequestComment: {
+        useMutation: (
+            callbacks: MutationCallbacks<PullRequestMutationResult>
+        ) => MutationState<AddPullRequestCommentInput>;
+    };
+}
+
+interface TrpcClientShape {
+    useUtils: () => TrpcUtilsShape;
+    git: TrpcGitShape;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegrationProps) {
     const { activeRepo } = useAppStore();
+    const typedTrpc = trpc as unknown as TrpcClientShape;
     const [activeTab, setActiveTab] = useState<'list' | 'create' | 'settings'>('list');
     const [stateFilter, setStateFilter] = useState<PullRequestStateFilter>('open');
 
@@ -106,13 +256,17 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const [authForm, setAuthForm] = useState<PullRequestAuthForm>(DEFAULT_AUTH_FORM);
     const [didSeedAuthForm, setDidSeedAuthForm] = useState(false);
 
-    const utils = trpc.useUtils();
+    const utils = typedTrpc.useUtils();
+    const configAllQuery = trpc.config.getAll.useQuery(undefined, { enabled: open, staleTime: 10_000 });
+    const aiProdEnabled = Boolean(
+        (configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
+    );
 
-    const { data: remoteData } = trpc.git.remotes.useQuery(
+    const { data: remoteData } = typedTrpc.git.remotes.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo && open }
     );
-    const { data: repoInfoData } = trpc.git.repoInfo.useQuery(
+    const { data: repoInfoData } = typedTrpc.git.repoInfo.useQuery(
         {
             repo: activeRepo ?? '',
             showRemoteBranches: false,
@@ -122,7 +276,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         { enabled: !!activeRepo && open }
     );
 
-    const authQuery = trpc.git.getPullRequestAuth.useQuery(undefined, { enabled: open });
+    const authQuery = typedTrpc.git.getPullRequestAuth.useQuery(undefined, { enabled: open });
 
     useEffect(() => {
         if (!authQuery.data?.auth || didSeedAuthForm) {
@@ -133,7 +287,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     }, [authQuery.data?.auth, didSeedAuthForm]);
 
     const detectedProvider = useMemo(
-        () => detectProvider(remoteData?.remotes?.find((remote) => remote.name === 'origin')?.url),
+        () => detectProvider(remoteData?.remotes.find((remote) => remote.name === 'origin')?.url),
         [remoteData?.remotes]
     );
     const provider = detectedProvider?.name ?? 'github';
@@ -153,7 +307,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         }
     }, [authForm.azureToken, authForm.bitbucketToken, authForm.githubToken, authForm.gitlabToken, provider]);
 
-    const pullRequestQuery = trpc.git.listPullRequests.useQuery(
+    const pullRequestQuery = typedTrpc.git.listPullRequests.useQuery(
         {
             repo: activeRepo ?? '',
             provider,
@@ -161,7 +315,18 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         },
         { enabled: !!activeRepo && open && activeTab === 'list' }
     );
-    const commentsQuery = trpc.git.listPullRequestComments.useQuery(
+    const compareBranchesQuery = trpc.git.compareBranches.useQuery(
+        {
+            repo: activeRepo ?? '',
+            from: prBase || 'main',
+            to: prHead || 'HEAD',
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'create' && !!prHead.trim() && !!prBase.trim(),
+            staleTime: 10_000,
+        }
+    );
+    const commentsQuery = typedTrpc.git.listPullRequestComments.useQuery(
         {
             repo: activeRepo ?? '',
             provider,
@@ -173,17 +338,19 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         }
     );
 
-    const saveAuthMutation = trpc.git.setPullRequestAuth.useMutation({
+    const saveAuthMutation = typedTrpc.git.setPullRequestAuth.useMutation({
         onSuccess: () => {
             toast.success('Pull request provider authentication updated');
             void authQuery.refetch();
         },
-        onError: (error) => {
-            toast.error('Failed to save provider authentication', { description: error.message });
+        onError: (error: unknown) => {
+            toast.error('Failed to save provider authentication', {
+                description: getErrorMessage(error, 'Unable to save provider authentication'),
+            });
         },
     });
 
-    const createPRMutation = trpc.git.createPullRequest.useMutation({
+    const createPRMutation = typedTrpc.git.createPullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
                 toast.error('Failed to create pull request', { description: result.error });
@@ -194,12 +361,14 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             setActiveTab('list');
             await pullRequestQuery.refetch();
         },
-        onError: (error) => {
-            toast.error('Failed to create pull request', { description: error.message });
+        onError: (error: unknown) => {
+            toast.error('Failed to create pull request', {
+                description: getErrorMessage(error, 'Unable to create pull request'),
+            });
         },
     });
 
-    const mergePRMutation = trpc.git.mergePullRequest.useMutation({
+    const mergePRMutation = typedTrpc.git.mergePullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
                 toast.error('Merge failed', { description: result.error });
@@ -210,12 +379,12 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             await utils.git.getPullRequest.invalidate();
             setSelectedPR(null);
         },
-        onError: (error) => {
-            toast.error('Merge failed', { description: error.message });
+        onError: (error: unknown) => {
+            toast.error('Merge failed', { description: getErrorMessage(error, 'Unable to merge pull request') });
         },
     });
 
-    const closePRMutation = trpc.git.closePullRequest.useMutation({
+    const closePRMutation = typedTrpc.git.closePullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
                 toast.error('Close failed', { description: result.error });
@@ -225,11 +394,11 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             await pullRequestQuery.refetch();
             setSelectedPR(null);
         },
-        onError: (error) => {
-            toast.error('Close failed', { description: error.message });
+        onError: (error: unknown) => {
+            toast.error('Close failed', { description: getErrorMessage(error, 'Unable to close pull request') });
         },
     });
-    const addCommentMutation = trpc.git.addPullRequestComment.useMutation({
+    const addCommentMutation = typedTrpc.git.addPullRequestComment.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
                 toast.error('Failed to add comment', { description: result.error });
@@ -239,8 +408,28 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             await commentsQuery.refetch();
             toast.success('Comment posted');
         },
-        onError: (error) => {
-            toast.error('Failed to add comment', { description: error.message });
+        onError: (error: unknown) => {
+            toast.error('Failed to add comment', { description: getErrorMessage(error, 'Unable to add comment') });
+        },
+    });
+    const generateAIPRMutation = trpc.ai.generatePullRequest.useMutation({
+        onSuccess: (result) => {
+            if (result.title) {
+                setPrTitle(result.title);
+            }
+            if (result.body) {
+                setPrBody(result.body);
+            }
+            if (result.error) {
+                toast.warning('AI pull request draft used fallback', { description: result.error });
+                return;
+            }
+            toast.success('AI pull request draft generated');
+        },
+        onError: (error: unknown) => {
+            toast.error('Unable to generate AI pull request draft', {
+                description: getErrorMessage(error, 'AI provider request failed'),
+            });
         },
     });
 
@@ -276,6 +465,50 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         });
     };
 
+    const handleGenerateWithAI = async () => {
+        if (!activeRepo) {
+            toast.error('No repository selected');
+            return;
+        }
+        if (!prHead.trim() || !prBase.trim()) {
+            toast.error('Select source and target branches first');
+            return;
+        }
+
+        let compareData = compareBranchesQuery.data;
+        if (!compareData || compareData.error) {
+            const fetched = await compareBranchesQuery.refetch();
+            compareData = fetched.data;
+        }
+        if (!compareData || compareData.error) {
+            toast.error(compareData?.error ?? 'Unable to gather branch comparison for AI draft');
+            return;
+        }
+
+        const commits = (compareData.commits ?? []).slice(0, 50).map((commit) => ({
+            hash: commit.hash,
+            subject: commit.message,
+            body: '',
+        }));
+        const changedFiles = (compareData.files ?? []).slice(0, 200).map((file) => `${file.status}\t${file.path}`);
+        const diffSummary = [
+            `Branch compare: ${prHead.trim()} -> ${prBase.trim()}`,
+            `Commits: ${String(compareData.commits.length)}`,
+            `Files changed: ${String(compareData.files.length)}`,
+            `Additions: ${String(compareData.additions ?? 0)}`,
+            `Deletions: ${String(compareData.deletions ?? 0)}`,
+            'Changed files:',
+            ...changedFiles,
+        ].join('\n');
+
+        generateAIPRMutation.mutate({
+            head: prHead.trim(),
+            base: prBase.trim(),
+            commits,
+            diff: diffSummary,
+        });
+    };
+
     const handleMergePR = (pr: PullRequest) => {
         if (!activeRepo) return;
         mergePRMutation.mutate({
@@ -295,10 +528,10 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         });
     };
 
-    const branches = (repoInfoData?.branches ?? []) as string[];
+    const branches = repoInfoData?.branches ?? [];
     const pullRequests = pullRequestQuery.data?.pullRequests ?? [];
     const queryError = pullRequestQuery.data?.error;
-    const comments = (commentsQuery.data?.comments ?? []) as PullRequestComment[];
+    const comments = commentsQuery.data?.comments ?? [];
 
     const handleAddComment = () => {
         if (!activeRepo || !selectedPR) return;
@@ -418,7 +651,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                     <div className='space-y-2 p-2'>
                                         {pullRequests.map((pr) => (
                                             <button
-                                                key={`${pr.id}-${pr.number}`}
+                                                key={`${String(pr.id)}-${String(pr.number)}`}
                                                 type='button'
                                                 className={`w-full rounded-lg border p-3 text-left transition-colors ${
                                                     selectedPR?.id === pr.id ? 'bg-accent border-primary/50' : 'hover:bg-accent/50'
@@ -575,6 +808,27 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             </div>
                         ) : (
                             <div className='space-y-4 rounded-lg border p-4'>
+                                {aiProdEnabled && (
+                                    <div className='flex justify-end'>
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            onClick={() => { void handleGenerateWithAI(); }}
+                                            disabled={
+                                                !prHead.trim() ||
+                                                !prBase.trim() ||
+                                                generateAIPRMutation.isPending ||
+                                                compareBranchesQuery.isFetching
+                                            }>
+                                            {generateAIPRMutation.isPending || compareBranchesQuery.isFetching ? (
+                                                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                            ) : (
+                                                <Wand2 className='mr-2 h-4 w-4' />
+                                            )}
+                                            Generate with AI
+                                        </Button>
+                                    </div>
+                                )}
                                 <div className='grid grid-cols-2 gap-4'>
                                     <div>
                                         <label className='mb-1.5 block text-sm font-medium'>Source Branch</label>
@@ -741,9 +995,9 @@ function AuthField({
 function getProviderIcon(provider: PullRequestProvider) {
     switch (provider) {
         case 'github':
-            return <Github className='h-4 w-4' />;
+            return <Globe className='h-4 w-4' />;
         case 'gitlab':
-            return <Gitlab className='h-4 w-4' />;
+            return <Server className='h-4 w-4' />;
         case 'azure':
             return <GitBranch className='h-4 w-4' />;
         default:

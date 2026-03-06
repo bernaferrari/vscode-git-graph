@@ -33,17 +33,178 @@ interface SettingsDialogProps {
 	onOpenChange: (open: boolean) => void;
 }
 
+type GraphStyle = 'rounded' | 'angular';
+type DateFormat = 'dateAndTime' | 'dateOnly' | 'relative' | 'isoDateAndTime' | 'isoDateOnly';
+type DateType = 'author' | 'commit';
+type ResetCommitMode = 'soft' | 'mixed' | 'hard';
+type AddTagType = 'annotated' | 'lightweight';
+
+interface ConfigAllData {
+	graph?: unknown;
+	date?: unknown;
+	repository?: unknown;
+	dialog?: unknown;
+	ui?: unknown;
+}
+
+interface QueryOptions {
+	enabled: boolean;
+}
+
+interface QueryState<TData> {
+	data?: TData;
+}
+
+interface MutationCallbacks {
+	onSuccess?: () => void;
+}
+
+interface MutationState<TInput> {
+	mutate: (input: TInput) => void;
+	isPending: boolean;
+}
+
+interface InvalidateTarget {
+	invalidate: () => Promise<unknown>;
+}
+
+interface TrpcUtilsShape {
+	config: {
+		getAll: InvalidateTarget;
+	};
+}
+
+interface TrpcConfigShape {
+	getAll: {
+		useQuery: (input: undefined, options: QueryOptions) => QueryState<ConfigAllData>;
+	};
+	setGraph: {
+		useMutation: (callbacks: MutationCallbacks) => MutationState<{ colours: string[]; style: GraphStyle }>;
+	};
+	setDate: {
+		useMutation: (callbacks: MutationCallbacks) => MutationState<{ format: DateFormat; type: DateType }>;
+	};
+	setRepository: {
+		useMutation: (callbacks: MutationCallbacks) => MutationState<{
+			initialLoadCommits: number;
+			showRemoteBranches: boolean;
+			showStashes: boolean;
+			showTags: boolean;
+			showUncommittedChanges: boolean;
+			muteMergeCommits: boolean;
+			onlyFollowFirstParent: boolean;
+		}>;
+	};
+	setDialog: {
+		useMutation: (callbacks: MutationCallbacks) => MutationState<{
+			resetCommitMode: ResetCommitMode;
+			createBranchCheckout: boolean;
+			mergeNoFastForward: boolean;
+			rebaseInteractive: boolean;
+			addTagType: AddTagType;
+		}>;
+	};
+	setUi: {
+		useMutation: (callbacks: MutationCallbacks) => MutationState<{
+			enhancedAccessibility: boolean;
+			markdown: boolean;
+		}>;
+	};
+}
+
+interface TrpcClientShape {
+	useUtils: () => TrpcUtilsShape;
+	config: TrpcConfigShape;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+	return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function readString(record: Record<string, unknown> | null, key: string, fallback: string): string {
+	if (!record) return fallback;
+	const value = record[key];
+	return typeof value === 'string' ? value : fallback;
+}
+
+function readBoolean(record: Record<string, unknown> | null, key: string, fallback: boolean): boolean {
+	if (!record) return fallback;
+	const value = record[key];
+	return typeof value === 'boolean' ? value : fallback;
+}
+
+function readNumber(record: Record<string, unknown> | null, key: string, fallback: number): number {
+	if (!record) return fallback;
+	const value = record[key];
+	return typeof value === 'number' ? value : fallback;
+}
+
+function readColours(record: Record<string, unknown> | null): string[] {
+	if (!record) return [];
+	const colours = record.colours;
+	if (!Array.isArray(colours)) return [];
+	return colours.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function readGraphStyle(record: Record<string, unknown> | null, fallback: GraphStyle): GraphStyle {
+	const value = readString(record, 'style', fallback);
+	return value === 'rounded' || value === 'angular' ? value : fallback;
+}
+
+function readResetCommitMode(record: Record<string, unknown> | null, fallback: ResetCommitMode): ResetCommitMode {
+	const value = readString(record, 'resetCommitMode', fallback);
+	return value === 'soft' || value === 'mixed' || value === 'hard' ? value : fallback;
+}
+
+function readAddTagType(record: Record<string, unknown> | null, fallback: AddTagType): AddTagType {
+	const value = readString(record, 'addTagType', fallback);
+	return value === 'annotated' || value === 'lightweight' ? value : fallback;
+}
+
+function toDateFormat(value: string): DateFormat {
+	if (
+		value === 'dateAndTime' ||
+		value === 'dateOnly' ||
+		value === 'relative' ||
+		value === 'isoDateAndTime' ||
+		value === 'isoDateOnly'
+	) {
+		return value;
+	}
+	return 'dateAndTime';
+}
+
+function toDateType(value: string): DateType {
+	return value === 'commit' ? 'commit' : 'author';
+}
+
+function toGraphStyle(value: string): GraphStyle {
+	return value === 'angular' ? 'angular' : 'rounded';
+}
+
+function toResetCommitMode(value: string): ResetCommitMode {
+	if (value === 'soft' || value === 'mixed' || value === 'hard') {
+		return value;
+	}
+	return 'mixed';
+}
+
+function toAddTagType(value: string): AddTagType {
+	return value === 'lightweight' ? 'lightweight' : 'annotated';
+}
+
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-	const utils = trpc.useUtils();
-	const { data: config } = trpc.config.getAll.useQuery(undefined, { enabled: open });
+	const typedTrpc = trpc as unknown as TrpcClientShape;
+	const utils = typedTrpc.useUtils();
+	const { data: config } = typedTrpc.config.getAll.useQuery(undefined, { enabled: open });
 
 	// Graph settings
 	const [graphColors, setGraphColors] = useState<string>('');
-	const [graphStyle, setGraphStyle] = useState<'rounded' | 'angular'>('rounded');
+	const [graphStyle, setGraphStyle] = useState<GraphStyle>('rounded');
 
 	// Date settings
-	const [dateFormat, setDateFormat] = useState<string>('dateAndTime');
-	const [dateType, setDateType] = useState<string>('author');
+	const [dateFormat, setDateFormat] = useState<DateFormat>('dateAndTime');
+	const [dateType, setDateType] = useState<DateType>('author');
 
 	// Repository settings
 	const [initialLoadCommits, setInitialLoadCommits] = useState(300);
@@ -55,11 +216,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 	const [onlyFollowFirstParent, setOnlyFollowFirstParent] = useState(false);
 
 	// Dialog settings
-	const [resetCommitMode, setResetCommitMode] = useState<'soft' | 'mixed' | 'hard'>('mixed');
+	const [resetCommitMode, setResetCommitMode] = useState<ResetCommitMode>('mixed');
 	const [createBranchCheckout, setCreateBranchCheckout] = useState(false);
 	const [mergeNoFastForward, setMergeNoFastForward] = useState(true);
 	const [rebaseInteractive, setRebaseInteractive] = useState(false);
-	const [addTagType, setAddTagType] = useState<'annotated' | 'lightweight'>('annotated');
+	const [addTagType, setAddTagType] = useState<AddTagType>('annotated');
 
 	// UI settings
 	const [enhancedAccessibility, setEnhancedAccessibility] = useState(false);
@@ -68,52 +229,61 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 	// Load config into state
 	useEffect(() => {
 		if (config) {
-			const graphConfig = config.graph as Record<string, unknown> | undefined;
-			const dateConfig = config.date as Record<string, unknown> | undefined;
-			const repoConfig = config.repository as Record<string, unknown> | undefined;
-			const dialogConfig = config.dialog as Record<string, unknown> | undefined;
-			const uiConfig = config.ui as Record<string, unknown> | undefined;
+			const graphConfig = toRecord(config.graph);
+			const dateConfig = toRecord(config.date);
+			const repoConfig = toRecord(config.repository);
+			const dialogConfig = toRecord(config.dialog);
+			const uiConfig = toRecord(config.ui);
 			
-			const colours = graphConfig?.colours;
-			setGraphColors(Array.isArray(colours) ? colours.join('\n') : '');
-			setGraphStyle((graphConfig?.style as 'rounded' | 'angular') ?? 'rounded');
-			setDateFormat((dateConfig?.format as string) ?? 'dateAndTime');
-			setDateType((dateConfig?.type as string) ?? 'author');
-			setInitialLoadCommits((repoConfig?.initialLoadCommits as number) ?? 300);
-			setShowRemoteBranches((repoConfig?.showRemoteBranches as boolean) ?? true);
-			setShowStashes((repoConfig?.showStashes as boolean) ?? true);
-			setShowTags((repoConfig?.showTags as boolean) ?? true);
-			setShowUncommittedChanges((repoConfig?.showUncommittedChanges as boolean) ?? true);
-			setMuteMergeCommits((repoConfig?.muteMergeCommits as boolean) ?? true);
-			setOnlyFollowFirstParent((repoConfig?.onlyFollowFirstParent as boolean) ?? false);
-			setResetCommitMode((dialogConfig?.resetCommitMode as 'soft' | 'mixed' | 'hard') ?? 'mixed');
-			setCreateBranchCheckout((dialogConfig?.createBranchCheckout as boolean) ?? false);
-			setMergeNoFastForward((dialogConfig?.mergeNoFastForward as boolean) ?? true);
-			setRebaseInteractive((dialogConfig?.rebaseInteractive as boolean) ?? false);
-			setAddTagType((dialogConfig?.addTagType as 'annotated' | 'lightweight') ?? 'annotated');
-			setEnhancedAccessibility((uiConfig?.enhancedAccessibility as boolean) ?? false);
-			setMarkdown((uiConfig?.markdown as boolean) ?? true);
+			setGraphColors(readColours(graphConfig).join('\n'));
+			setGraphStyle(readGraphStyle(graphConfig, 'rounded'));
+			setDateFormat(toDateFormat(readString(dateConfig, 'format', 'dateAndTime')));
+			setDateType(toDateType(readString(dateConfig, 'type', 'author')));
+			setInitialLoadCommits(readNumber(repoConfig, 'initialLoadCommits', 300));
+			setShowRemoteBranches(readBoolean(repoConfig, 'showRemoteBranches', true));
+			setShowStashes(readBoolean(repoConfig, 'showStashes', true));
+			setShowTags(readBoolean(repoConfig, 'showTags', true));
+			setShowUncommittedChanges(readBoolean(repoConfig, 'showUncommittedChanges', true));
+			setMuteMergeCommits(readBoolean(repoConfig, 'muteMergeCommits', true));
+			setOnlyFollowFirstParent(readBoolean(repoConfig, 'onlyFollowFirstParent', false));
+			setResetCommitMode(readResetCommitMode(dialogConfig, 'mixed'));
+			setCreateBranchCheckout(readBoolean(dialogConfig, 'createBranchCheckout', false));
+			setMergeNoFastForward(readBoolean(dialogConfig, 'mergeNoFastForward', true));
+			setRebaseInteractive(readBoolean(dialogConfig, 'rebaseInteractive', false));
+			setAddTagType(readAddTagType(dialogConfig, 'annotated'));
+			setEnhancedAccessibility(readBoolean(uiConfig, 'enhancedAccessibility', false));
+			setMarkdown(readBoolean(uiConfig, 'markdown', true));
 		}
 	}, [config]);
 
-	const saveGraphMutation = trpc.config.setGraph.useMutation({
-		onSuccess: () => utils.config.getAll.invalidate(),
+	const saveGraphMutation = typedTrpc.config.setGraph.useMutation({
+		onSuccess: () => {
+			void utils.config.getAll.invalidate();
+		},
 	});
 
-	const saveDateMutation = trpc.config.setDate.useMutation({
-		onSuccess: () => utils.config.getAll.invalidate(),
+	const saveDateMutation = typedTrpc.config.setDate.useMutation({
+		onSuccess: () => {
+			void utils.config.getAll.invalidate();
+		},
 	});
 
-	const saveRepositoryMutation = trpc.config.setRepository.useMutation({
-		onSuccess: () => utils.config.getAll.invalidate(),
+	const saveRepositoryMutation = typedTrpc.config.setRepository.useMutation({
+		onSuccess: () => {
+			void utils.config.getAll.invalidate();
+		},
 	});
 
-	const saveDialogMutation = trpc.config.setDialog.useMutation({
-		onSuccess: () => utils.config.getAll.invalidate(),
+	const saveDialogMutation = typedTrpc.config.setDialog.useMutation({
+		onSuccess: () => {
+			void utils.config.getAll.invalidate();
+		},
 	});
 
-	const saveUiMutation = trpc.config.setUi.useMutation({
-		onSuccess: () => utils.config.getAll.invalidate(),
+	const saveUiMutation = typedTrpc.config.setUi.useMutation({
+		onSuccess: () => {
+			void utils.config.getAll.invalidate();
+		},
 	});
 
 	const handleSaveGraph = () => {
@@ -125,8 +295,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
 	const handleSaveDate = () => {
 		saveDateMutation.mutate({
-			format: dateFormat as 'dateAndTime' | 'dateOnly' | 'relative' | 'isoDateAndTime' | 'isoDateOnly',
-			type: dateType as 'author' | 'commit',
+			format: dateFormat,
+			type: dateType,
 		});
 	};
 
@@ -185,7 +355,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 									<div className="grid grid-cols-2 gap-4">
 										<div className="space-y-2">
 											<Label>Format</Label>
-											<Select value={dateFormat} onValueChange={(v) => v && setDateFormat(v)}>
+											<Select
+												value={dateFormat}
+												onValueChange={(value) => {
+													setDateFormat(toDateFormat(value));
+												}}>
 												<SelectTrigger>
 													<SelectValue />
 												</SelectTrigger>
@@ -200,7 +374,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 										</div>
 										<div className="space-y-2">
 											<Label>Date Type</Label>
-											<Select value={dateType} onValueChange={(v) => v && setDateType(v)}>
+											<Select
+												value={dateType}
+												onValueChange={(value) => {
+													setDateType(toDateType(value));
+												}}>
 												<SelectTrigger>
 													<SelectValue />
 												</SelectTrigger>
@@ -254,7 +432,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 								<CardContent className="space-y-4">
 									<div className="space-y-2">
 										<Label>Graph Style</Label>
-										<Select value={graphStyle} onValueChange={(v) => { setGraphStyle(v as 'rounded' | 'angular'); }}>
+										<Select
+											value={graphStyle}
+											onValueChange={(value) => {
+												setGraphStyle(toGraphStyle(value));
+											}}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>
@@ -345,7 +527,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 								<CardContent className="space-y-4">
 									<div className="space-y-2">
 										<Label>Reset Mode</Label>
-										<Select value={resetCommitMode} onValueChange={(v) => { setResetCommitMode(v as 'soft' | 'mixed' | 'hard'); }}>
+										<Select
+											value={resetCommitMode}
+											onValueChange={(value) => {
+												setResetCommitMode(toResetCommitMode(value));
+											}}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>
@@ -359,7 +545,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
 									<div className="space-y-2">
 										<Label>Add Tag Type</Label>
-										<Select value={addTagType} onValueChange={(v) => { setAddTagType(v as 'annotated' | 'lightweight'); }}>
+										<Select
+											value={addTagType}
+											onValueChange={(value) => {
+												setAddTagType(toAddTagType(value));
+											}}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>

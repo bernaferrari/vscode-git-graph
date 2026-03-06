@@ -61,4 +61,30 @@ describe('CommandPalette', () => {
 
         expect(screen.queryByText('Pull (Fast-forward only)')).toBeNull();
     });
+
+    it('does not render optional worktree/workflow commands when callbacks are omitted', () => {
+        const onOpenChange = vi.fn();
+        const actions = createActions({ onWorktrees: undefined, onWorkflows: undefined, onCopyDeepLink: undefined });
+
+        render(<CommandPalette open={true} onOpenChange={onOpenChange} actions={actions} />);
+
+        expect(screen.queryByText('Worktrees')).toBeNull();
+        expect(screen.queryByText('Workflow Engine')).toBeNull();
+        expect(screen.queryByText('Copy Deep Link')).toBeNull();
+    });
+
+    it('renders and executes optional copy deep link command when provided', async () => {
+        const onOpenChange = vi.fn();
+        const actions = createActions({ onCopyDeepLink: vi.fn() });
+
+        render(<CommandPalette open={true} onOpenChange={onOpenChange} actions={actions} />);
+
+        const deepLinkCommand = screen.getByText('Copy Deep Link');
+        fireEvent.click(deepLinkCommand);
+
+        await waitFor(() => {
+            expect(actions.onCopyDeepLink).toHaveBeenCalledTimes(1);
+        });
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
 });

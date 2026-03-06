@@ -24,6 +24,30 @@ const isDev = !!VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
 let ipcHandler: ReturnType<typeof createIPCHandler> | null = null;
+let pendingDeepLink: string | null = null;
+
+function getDeepLinkFromArgv(argv: string[]): string | null {
+    const match = argv.find((arg) => arg.startsWith('gitgraph://'));
+    return match ?? null;
+}
+
+function dispatchDeepLinkToRenderer(url: string): void {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        pendingDeepLink = url;
+        return;
+    }
+
+    pendingDeepLink = url;
+    const payload = JSON.stringify(url);
+    void mainWindow.webContents
+        .executeJavaScript(
+            `window.__gitGraphPendingDeepLink = ${payload}; window.dispatchEvent(new CustomEvent('git-graph:deeplink', { detail: ${payload} }));`,
+            true
+        )
+        .catch((error) => {
+            logUnhandledError(error, 'deeplink.dispatch');
+        });
+}
 
 function logUnhandledError(error: unknown, source: string): void {
     const normalized = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -105,6 +129,9 @@ function createWindow(): BrowserWindow {
         if (!win.isVisible()) {
             win.show();
         }
+        if (pendingDeepLink) {
+            dispatchDeepLinkToRenderer(pendingDeepLink);
+        }
     });
 
     // Security: intercept target="_blank" and window.open() to use OS browser
@@ -140,6 +167,24 @@ function createWindow(): BrowserWindow {
     });
 
     return win;
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (_event, argv) => {
+        const deepLink = getDeepLinkFromArgv(argv);
+        if (deepLink) {
+            dispatchDeepLinkToRenderer(deepLink);
+        }
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) {
+                mainWindow.restore();
+            }
+            mainWindow.focus();
+        }
+    });
 }
 
 /**
@@ -178,6 +223,9 @@ function setupContentSecurityPolicy(): void {
 void app
     .whenReady()
     .then(() => {
+        app.setAsDefaultProtocolClient('gitgraph');
+        pendingDeepLink = pendingDeepLink ?? getDeepLinkFromArgv(process.argv);
+
         // Remove default menu bar (File, Edit, View, Help)
         Menu.setApplicationMenu(null);
 
@@ -203,6 +251,14 @@ void app
     .catch((error) => {
         logUnhandledError(error, 'app.whenReady');
     });
+
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    dispatchDeepLinkToRenderer(url);
+    if (mainWindow) {
+        mainWindow.focus();
+    }
+});
 
 // Standard quit behavior: exit when all windows closed (except macOS)
 app.on('window-all-closed', () => {

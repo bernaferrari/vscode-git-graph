@@ -35,6 +35,24 @@ export const appStore = new Store<{
 		cacheKey: string;
 		timestamp: number;
 	}>;
+
+	// AI provider configuration (non-secret metadata)
+	aiProviderConfig: {
+		enabled: boolean;
+		provider: 'openai-compatible' | 'self-host';
+		baseUrl: string;
+		model: string;
+		timeoutMs: number;
+		maxTokens: number;
+		retries: number;
+		redactSensitivePaths: boolean;
+		featureToggles: {
+			commitMessage: boolean;
+			pullRequest: boolean;
+			conflictExplain: boolean;
+			explainCommit: boolean;
+		};
+	};
 }>({
 	name: 'git-graph-config',
 	defaults: {
@@ -52,6 +70,22 @@ export const appStore = new Store<{
 			pushTagSkipRemoteCheck: false,
 		},
 		avatarCache: {},
+		aiProviderConfig: {
+			enabled: false,
+			provider: 'openai-compatible',
+			baseUrl: '',
+			model: 'gpt-4o-mini',
+			timeoutMs: 20_000,
+			maxTokens: 600,
+			retries: 1,
+			redactSensitivePaths: true,
+			featureToggles: {
+				commitMessage: true,
+				pullRequest: true,
+				conflictExplain: true,
+				explainCommit: true,
+			},
+		},
 	},
 });
 
@@ -102,6 +136,64 @@ export const instanceStore = new Store<{
 
 	// Recently opened repositories (for quick access)
 	recentRepos: string[];
+
+	// User-defined workflow engine definitions and run history
+	workflowDefinitions: Array<{
+		id: string;
+		name: string;
+		trigger: 'manual' | 'onBranchChange' | 'onCommit' | 'onPush';
+		inputs: Array<{ key: string; label: string; required: boolean; defaultValue?: string }>;
+		guards: Array<{ type: string; value?: string }>;
+		steps: Array<{ id: string; type: string; params: Record<string, unknown> }>;
+		onFailure: 'stop' | 'continue' | 'rollback';
+		updatedAt: number;
+		createdAt: number;
+	}>;
+	workflowRuns: Array<{
+		id: string;
+		workflowId: string;
+		startedAt: number;
+		finishedAt: number | null;
+		status: 'running' | 'success' | 'failed';
+		steps: Array<{
+			id: string;
+			type: string;
+			status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+			message?: string;
+		}>;
+		error?: string;
+	}>;
+
+	// Branch pinning and launchpad metadata customization
+	pinnedBranches: Record<string, string[]>;
+	launchpadStatusMap: Record<string, Record<string, { label: string; severity: 'info' | 'warn' | 'error' }>>;
+
+	// Worktree UX view preferences
+	worktreeViewPrefs: {
+		showLocked: boolean;
+		showPrunable: boolean;
+		defaultCreateMode: 'existing' | 'new-branch' | 'detached' | 'ephemeral-review';
+		pathPresetRoot: string | null;
+		lastSelectedBranch: string | null;
+	};
+
+	// Workspace persistence (migrated from renderer localStorage)
+	workspaces: Array<{
+		id: string;
+		name: string;
+		color: string;
+		repos: Array<{
+			path: string;
+			name: string;
+			lastOpened?: number;
+			isFavorite?: boolean;
+		}>;
+		createdAt: number;
+		updatedAt: number;
+	}>;
+
+	// User keybinding overrides by action id
+	keybindingOverrides: Record<string, string>;
 }>({
 	name: 'git-graph-instance',
 	defaults: {
@@ -115,6 +207,19 @@ export const instanceStore = new Store<{
 			findOpenCommitDetailsView: false,
 		},
 		recentRepos: [],
+		workflowDefinitions: [],
+		workflowRuns: [],
+		pinnedBranches: {},
+		launchpadStatusMap: {},
+		worktreeViewPrefs: {
+			showLocked: true,
+			showPrunable: true,
+			defaultCreateMode: 'existing',
+			pathPresetRoot: null,
+			lastSelectedBranch: null,
+		},
+		workspaces: [],
+		keybindingOverrides: {},
 	},
 });
 
@@ -168,6 +273,14 @@ export const configStore = new Store<{
 		enhancedAccessibility: boolean;
 		markdown: boolean;
 		tabIconColourTheme: 'colour' | 'grey';
+		featureFlags: {
+			worktreePro: boolean;
+			workflowEngine: boolean;
+			graphiteInterop: boolean;
+			aiProd: boolean;
+			deepLinks: boolean;
+			branchPinning: boolean;
+		};
 	};
 
 	// File encoding
@@ -214,6 +327,14 @@ export const configStore = new Store<{
 			enhancedAccessibility: false,
 			markdown: true,
 			tabIconColourTheme: 'colour',
+			featureFlags: {
+				worktreePro: true,
+				workflowEngine: true,
+				graphiteInterop: false,
+				aiProd: false,
+				deepLinks: true,
+				branchPinning: true,
+			},
 		},
 		fileEncoding: 'utf8',
 	},

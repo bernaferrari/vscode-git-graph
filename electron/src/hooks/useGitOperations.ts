@@ -720,13 +720,13 @@ export function useGitOperations() {
         },
     });
 
-    const worktreeCreate = trpc.git.worktreeManage.create.useMutation({
+    const worktreeCreate = trpc.git.worktree.add.useMutation({
         onSuccess: () => {
             void Promise.allSettled([utils.git.worktree.list.invalidate(), safeInvalidateRepositoryData()]);
         },
     });
 
-    const worktreeRemove = trpc.git.worktreeManage.remove.useMutation({
+    const worktreeRemove = trpc.git.worktree.remove.useMutation({
         onSuccess: () => {
             void Promise.allSettled([utils.git.worktree.list.invalidate(), safeInvalidateRepositoryData()]);
         },
@@ -1215,8 +1215,9 @@ export function useGitOperations() {
                 worktreeCreate.mutateAsync({
                     repo: activeRepo,
                     path,
-                    branch,
-                    commit,
+                    mode: branch ? 'new-branch' : 'existing',
+                    newBranch: branch,
+                    baseRef: commit ?? 'HEAD',
                 })
             );
         },
@@ -1231,6 +1232,7 @@ export function useGitOperations() {
                     repo: activeRepo,
                     path,
                     force,
+                    forceReason: force ? 'legacy force remove request' : undefined,
                 })
             );
         },

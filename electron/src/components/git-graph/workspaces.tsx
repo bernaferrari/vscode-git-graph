@@ -55,8 +55,6 @@ export interface WorkspaceRepo {
     isFavorite?: boolean;
 }
 
-const STORAGE_KEY = 'git-graph-workspaces';
-
 const COLORS = [
     'bg-blue-500',
     'bg-green-500',
@@ -84,6 +82,10 @@ interface LaunchpadRepoStatus {
     } | null;
     provider: string | null;
     openPullRequests: number | null;
+    needsAttention: boolean;
+    stale: boolean;
+    statusSignals: string[];
+    mappedStatuses: Array<{ key: string; label: string; severity: 'info' | 'warn' | 'error' }>;
     error: string | null;
 }
 
@@ -108,6 +110,16 @@ export function WorkspacesManager({
     const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
+    const trpcUtils = trpc.useUtils();
+    const workspaceListQuery = trpc.repo.workspace.list.useQuery(undefined, { enabled: open });
+    const setAllWorkspacesMutation = trpc.repo.workspace.setAll.useMutation({
+        onError: (error) => {
+            toast.error('Failed to persist workspaces', { description: error.message });
+        },
+        onSuccess: async () => {
+            await trpcUtils.repo.workspace.list.invalidate();
+        },
+    });
     const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
     const fetchManyMutation = trpc.repo.fetchMany.useMutation({
         onSuccess: (result) => {
@@ -127,6 +139,15 @@ export function WorkspacesManager({
         () => selectedWorkspace?.repos.map((repo) => repo.path) ?? [],
         [selectedWorkspace]
     );
+    const setLaunchpadStatusMap = trpc.git.launchpad.setStatusMap.useMutation({
+        onSuccess: () => {
+            toast.success('Launchpad status mapping saved');
+            void launchpadQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error('Failed to save status mapping', { description: error.message });
+        },
+    });
     const launchpadQuery = trpc.repo.launchpad.useQuery(
         {
             repos: selectedWorkspaceRepoPaths,
@@ -143,24 +164,24 @@ export function WorkspacesManager({
         const entries = launchpadData?.repos ?? [];
         return new Map<string, LaunchpadRepoStatus>(entries.map((entry) => [entry.path, entry]));
     }, [launchpadData?.repos]);
+    const defaultStatusMap = useMemo(
+        () => ({
+            dirty: { label: 'Local changes', severity: 'warn' as const },
+            behind: { label: 'Behind upstream', severity: 'error' as const },
+            openPullRequests: { label: 'Open PRs', severity: 'info' as const },
+            stale: { label: 'Stale activity', severity: 'warn' as const },
+        }),
+        []
+    );
 
-    // Load workspaces
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                setWorkspaces(JSON.parse(stored));
-            } catch {
-                setWorkspaces([]);
-            }
-        }
-    }, [open]);
+        setWorkspaces(workspaceListQuery.data?.workspaces ?? []);
+    }, [workspaceListQuery.data?.workspaces]);
 
-    // Save workspaces
     const saveWorkspaces = useCallback((ws: Workspace[]) => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(ws));
         setWorkspaces(ws);
-    }, []);
+        setAllWorkspacesMutation.mutate({ workspaces: ws });
+    }, [setAllWorkspacesMutation]);
 
     // Create workspace
     const handleCreateWorkspace = () => {
@@ -290,6 +311,15 @@ export function WorkspacesManager({
         fetchManyMutation.mutate({
             repos: workspace.repos.map((repo) => repo.path),
             prune: true,
+        });
+    };
+
+    const handleApplyStatusMap = (workspace: Workspace) => {
+        workspace.repos.forEach((repo) => {
+            setLaunchpadStatusMap.mutate({
+                repo: repo.path,
+                map: defaultStatusMap,
+            });
         });
     };
 
@@ -459,9 +489,17 @@ export function WorkspacesManager({
                                                             'Fetch all'
                                                         )}
                                                     </Button>
+                                                    <Button
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        className='h-5 px-1.5 text-[10px]'
+                                                        onClick={() => { handleApplyStatusMap(selectedWorkspace); }}
+                                                        disabled={setLaunchpadStatusMap.isPending}>
+                                                        Map statuses
+                                                    </Button>
                                                 </div>
                                             </div>
-                                            <div className='grid grid-cols-3 gap-2 text-xs'>
+                                            <div className='grid grid-cols-4 gap-2 text-xs'>
                                                 <div className='rounded border px-2 py-1'>
                                                     <p className='text-muted-foreground'>Dirty</p>
                                                     <p className='font-semibold'>
@@ -483,6 +521,13 @@ export function WorkspacesManager({
                                                             (sum, repo) => sum + (repo.openPullRequests ?? 0),
                                                             0
                                                         )}
+                                                    </p>
+                                                </div>
+                                                <div className='rounded border px-2 py-1'>
+                                                    <p className='text-muted-foreground'>Needs attention</p>
+                                                    <p className='font-semibold'>
+                                                        {Array.from(launchpadByPath.values()).filter((repo) => repo.needsAttention)
+                                                            .length}
                                                     </p>
                                                 </div>
                                             </div>
@@ -540,6 +585,24 @@ export function WorkspacesManager({
                                                                                 {launchpad.openPullRequests}
                                                                             </span>
                                                                         )}
+                                                                        {launchpad.stale && (
+                                                                            <span className='rounded bg-slate-100 px-1.5 py-0.5 text-slate-700'>
+                                                                                stale
+                                                                            </span>
+                                                                        )}
+                                                                        {launchpad.mappedStatuses.map((status) => (
+                                                                            <span
+                                                                                key={status.key}
+                                                                                className={`rounded px-1.5 py-0.5 ${
+                                                                                    status.severity === 'error'
+                                                                                        ? 'bg-red-100 text-red-700'
+                                                                                        : status.severity === 'warn'
+                                                                                            ? 'bg-amber-100 text-amber-700'
+                                                                                            : 'bg-sky-100 text-sky-700'
+                                                                                }`}>
+                                                                                {status.label}
+                                                                            </span>
+                                                                        ))}
                                                                     </>
                                                                 )}
                                                             </div>

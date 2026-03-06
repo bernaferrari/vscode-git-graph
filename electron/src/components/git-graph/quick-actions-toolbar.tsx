@@ -3,7 +3,7 @@
  * Common git actions in a compact toolbar
  */
 
-import { Upload, Download, RefreshCw, GitBranch, Tag, Archive, Loader2, Check, ChevronDown } from 'lucide-react';
+import { Upload, Download, RefreshCw, GitBranch, Tag, Archive, Loader2, Check, ChevronDown, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { useAIFeatures } from '@/hooks/useAIFeatures';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
@@ -30,6 +31,8 @@ interface QuickActionsToolbarProps {
 export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, onStash }: QuickActionsToolbarProps) {
     const { activeRepo } = useAppStore();
     const gitOps = useGitOperations();
+    const trpcUtils = trpc.useUtils();
+    const { generateCommitMessage, isGeneratingMessage, isAIEnabled } = useAIFeatures();
     const [commitMessage, setCommitMessage] = useState('');
     const [isCommitting, setIsCommitting] = useState(false);
 
@@ -48,6 +51,10 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
         { enabled: !!activeRepo }
     );
     const currentBranch = repoInfo?.head ?? undefined;
+    const configAllQuery = trpc.config.getAll.useQuery(undefined, { staleTime: 10_000 });
+    const aiProdEnabled = Boolean(
+        (configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
+    );
 
     // Get ahead/behind
     const { data: aheadBehindData, refetch: refetchAheadBehind } = trpc.git.aheadBehind.useQuery(
@@ -75,6 +82,47 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
         } finally {
             setIsCommitting(false);
         }
+    };
+
+    const handleGenerateCommitMessage = async () => {
+        if (!activeRepo) {
+            toast.error('No active repository');
+            return;
+        }
+        if (!aiProdEnabled) {
+            toast.info('AI production features are disabled by feature flag');
+            return;
+        }
+        if (!isAIEnabled) {
+            toast.info('Enable AI provider in Settings first');
+            return;
+        }
+        const stagedFiles = (statusData?.staged ?? []).map((entry) => entry.file).filter((entry): entry is string => Boolean(entry));
+        if (stagedFiles.length === 0) {
+            toast.info('Stage files before generating a commit message');
+            return;
+        }
+
+        const diffParts = await Promise.all(
+            stagedFiles.map(async (filePath) => {
+                const result = await trpcUtils.git.workingTreeFileDiff.fetch({
+                    repo: activeRepo,
+                    filePath,
+                    staged: true,
+                });
+                if (result.error) {
+                    return `# ${filePath}\n(diff unavailable: ${result.error})`;
+                }
+                return `# ${filePath}\n${result.diff}`;
+            })
+        );
+        const suggestion = await generateCommitMessage(stagedFiles, diffParts.join('\n\n'));
+        if (!suggestion?.message) {
+            toast.error('Unable to generate commit message');
+            return;
+        }
+        setCommitMessage(suggestion.message);
+        toast.success('Commit message generated');
     };
 
     const handleQuickPush = async () => {
@@ -137,6 +185,18 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
                     className='h-8 text-sm'
                     disabled={!activeRepo || stagedCount === 0}
                 />
+                <Button
+                    size='sm'
+                    variant='outline'
+                    className='h-8'
+                    onClick={() => {
+                        void handleGenerateCommitMessage();
+                    }}
+                    disabled={!activeRepo || stagedCount === 0 || isGeneratingMessage || !aiProdEnabled}
+                    aria-label='Generate commit message with AI'
+                    title='Generate commit message with AI'>
+                    {isGeneratingMessage ? <Loader2 className='h-4 w-4 animate-spin' /> : <Wand2 className='h-4 w-4' />}
+                </Button>
                 <Button
                     size='sm'
                     className='h-8'

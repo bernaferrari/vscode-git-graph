@@ -4,9 +4,11 @@
  */
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 import {
 	Dialog,
 	DialogContent,
@@ -23,6 +25,8 @@ import {
 	Copy,
 	AlertTriangle,
 	BookOpen,
+	Wand2,
+	Loader2,
 } from 'lucide-react';
 
 interface ConflictFile {
@@ -67,10 +71,36 @@ export function MergeConflictEditor({
 	const [resolved, setResolved] = useState<string>('');
 	const [viewMode, setViewMode] = useState<'unified' | 'split'>('split');
 	const [activeConflictIndex, setActiveConflictIndex] = useState<number>(0);
+	const [aiSummary, setAiSummary] = useState<string | null>(null);
+	const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+	const configAllQuery = trpc.config.getAll.useQuery(undefined, { staleTime: 10_000 });
+	const aiProdEnabled = Boolean(
+		(configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
+	);
+	const explainConflictMutation = trpc.ai.explainConflict.useMutation({
+		onSuccess: (result) => {
+			if (!result.explanation) {
+				toast.warning(result.error ?? 'No explanation available');
+				return;
+			}
+			setAiSummary(result.explanation);
+			setAiSuggestions(result.suggestions ?? []);
+			if (result.error) {
+				toast.warning('AI explanation used fallback', { description: result.error });
+			} else {
+				toast.success('Conflict explanation ready');
+			}
+		},
+		onError: (error) => {
+			toast.error(error instanceof Error ? error.message : 'Unable to explain conflict');
+		},
+	});
 
 	useEffect(() => {
 		setResolved('');
 		setActiveConflictIndex(0);
+		setAiSummary(null);
+		setAiSuggestions([]);
 	}, [conflict?.path]);
 
 	if (!conflict) return null;
@@ -322,6 +352,17 @@ export function MergeConflictEditor({
 	const goToPreviousConflict = () => setActiveConflictIndex((current) => Math.max(0, current - 1));
 	const goToNextConflict = () => setActiveConflictIndex((current) => Math.min(unresolvedConflicts.length - 1, current + 1));
 	const goToFirstConflict = () => setActiveConflictIndex(0);
+	const handleExplainConflict = () => {
+		if (!aiProdEnabled) {
+			toast.info('AI production features are disabled by feature flag');
+			return;
+		}
+		const snippet = activeConflict?.raw ?? editableContent;
+		explainConflictMutation.mutate({
+			filePath: conflict.path,
+			conflictContent: snippet,
+		});
+	};
 	const handleClose = (nextOpen: boolean) => {
 		if (!nextOpen && (manualOverride || hasUnresolvedConflicts)) {
 			const message = hasUnresolvedConflicts
@@ -442,6 +483,21 @@ export function MergeConflictEditor({
 							? `${resolvedConflictCount}/${totalConflictCount} resolved`
 							: 'No conflict markers'}
 					</Badge>
+					{aiProdEnabled && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={handleExplainConflict}
+							disabled={explainConflictMutation.isPending}
+						>
+							{explainConflictMutation.isPending ? (
+								<Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+							) : (
+								<Wand2 className="h-3.5 w-3.5 mr-1" />
+							)}
+							Explain (AI)
+						</Button>
+					)}
 					<div className="flex-1" />
 						<Button
 							variant={viewMode === 'split' ? 'secondary' : 'ghost'}
@@ -467,7 +523,7 @@ export function MergeConflictEditor({
 						</div>
 					) : null}
 
-					{hasUnresolvedConflicts && (
+				{hasUnresolvedConflicts && (
 					<div className="flex items-center gap-2 px-2 py-1.5 text-xs text-amber-600">
 						<AlertTriangle className="h-3.5 w-3.5" />
 						<span>
@@ -475,6 +531,25 @@ export function MergeConflictEditor({
 							{unresolvedConflicts.length !== 1 ? 's' : ''} remain.
 							Resolve them before marking this file as resolved.
 						</span>
+					</div>
+				)}
+
+				{aiProdEnabled && aiSummary && (
+					<div className="border-b px-2 py-2 text-xs">
+						<div className="rounded-md border border-emerald-500/35 bg-emerald-500/10 p-2">
+							<p className="font-semibold text-emerald-700 dark:text-emerald-300">AI Summary</p>
+							<p className="mt-1 whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{aiSummary}</p>
+							{aiSuggestions.length > 0 && (
+								<div className="mt-2 space-y-1">
+									<p className="font-semibold text-amber-700 dark:text-amber-300">Suggestions</p>
+									{aiSuggestions.map((item) => (
+										<p key={item} className="text-amber-900 dark:text-amber-100">
+											- {item}
+										</p>
+									))}
+								</div>
+							)}
+						</div>
 					</div>
 				)}
 

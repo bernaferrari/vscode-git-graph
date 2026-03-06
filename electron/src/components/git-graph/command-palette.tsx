@@ -36,6 +36,7 @@ import {
 	Command,
 	FileCode,
 	GitCommit,
+	Link,
 } from 'lucide-react';
 
 interface Command {
@@ -64,8 +65,9 @@ interface CommandPaletteProps {
 	onSearch: () => void;
 	onTerminal: () => void;
 	onClone?: () => void;
-	onOpenInFinder?: () => void;
-	onStash: () => void;
+		onOpenInFinder?: () => void;
+		onCopyDeepLink?: () => void;
+		onStash: () => void;
 	onCommitSigning: () => void;
 	onReflog: () => void;
 		onTemplates: () => void;
@@ -73,7 +75,8 @@ interface CommandPaletteProps {
 		onCustomCommands: () => void;
 		onLFS: () => void;
 		onPRIntegration: () => void;
-		onWorktrees: () => void;
+		onWorktrees?: () => void;
+		onWorkflows?: () => void;
 		onSubmodules: () => void;
 		onStatistics: () => void;
 		onRemotes: () => void;
@@ -82,6 +85,7 @@ interface CommandPaletteProps {
 		onLineStaging?: () => void;
 		onWorkspaces?: () => void;
 		onKeyboardHelp: () => void;
+		onKeyboardCustomize?: () => void;
 		onHealthCheck: () => void;
 		onFuzzyFinder: () => void;
 		onUndoStack?: () => void;
@@ -197,6 +201,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Tools',
 			action: actions.onOpenInFinder ?? (() => {}),
 		},
+		...(actions.onCopyDeepLink ? [{
+			id: 'copy-deeplink',
+			label: 'Copy Deep Link',
+			icon: <Link className="h-4 w-4" />,
+			category: 'Tools',
+			action: actions.onCopyDeepLink,
+		}] : []),
 		...(actions.onClone ? [{
 			id: 'clone',
 			label: 'Clone Repository',
@@ -294,13 +305,20 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Integrations',
 			action: actions.onLFS,
 		},
-		{
+		...(actions.onWorktrees ? [{
 			id: 'worktrees',
 			label: 'Worktrees',
 			icon: <FolderGit2 className="h-4 w-4" />,
 			category: 'Integrations',
 			action: actions.onWorktrees,
-		},
+		}] : []),
+		...(actions.onWorkflows ? [{
+			id: 'workflows',
+			label: 'Workflow Engine',
+			icon: <Activity className="h-4 w-4" />,
+			category: 'Integrations',
+			action: actions.onWorkflows,
+		}] : []),
 		{
 			id: 'submodules',
 			label: 'Submodules',
@@ -374,6 +392,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			shortcut: '?',
 			action: actions.onKeyboardHelp,
 		},
+		...(actions.onKeyboardCustomize ? [{
+			id: 'keyboard-customize',
+			label: 'Customize Keybindings',
+			icon: <Keyboard className="h-4 w-4" />,
+			category: 'Help',
+			action: actions.onKeyboardCustomize,
+		}] : []),
 		{
 			id: 'health-check',
 			label: 'Repository Health Check',

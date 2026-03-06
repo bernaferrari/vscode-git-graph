@@ -5,7 +5,7 @@
  */
 
 import { CheckCheck, FileText, FolderOpen } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -40,6 +40,117 @@ interface GitOperationState {
     conflicts: string[];
 }
 
+interface RecordLike {
+    [key: string]: unknown;
+}
+
+interface GitMutationResult {
+    error?: string | null;
+}
+
+interface InvalidateTarget {
+    invalidate: () => Promise<unknown>;
+}
+
+interface TrpcUtilsShape {
+    git: {
+        operationState: InvalidateTarget;
+        commits: InvalidateTarget;
+        repoInfo: InvalidateTarget;
+        workingDirectoryStatus: InvalidateTarget;
+    };
+}
+
+interface RepoMutation {
+    mutate: (input: { repo: string }) => void;
+    isPending: boolean;
+}
+
+interface ResolveConflictMutation {
+    mutateAsync: (input: { repo: string; path: string; resolution: 'ours' | 'theirs' }) => Promise<GitMutationResult>;
+    isPending: boolean;
+}
+
+interface MutationCallbacks {
+    onSuccess?: (result: unknown) => void;
+    onError?: (error: unknown) => void;
+}
+
+interface QueryOptions {
+    enabled: boolean;
+}
+
+interface OperationStateQuery {
+    data?: unknown;
+}
+
+interface TrpcGitShape {
+    operationState: {
+        useQuery: (input: { repo: string }, options: QueryOptions) => OperationStateQuery;
+    };
+    mergeAbort: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    mergeContinue: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    rebaseAbort: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    rebaseContinue: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    rebaseSkip: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    cherryPickAbort: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    cherryPickContinue: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    cherryPickSkip: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    revertAbort: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    revertContinue: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    revertSkip: { useMutation: (callbacks: MutationCallbacks) => RepoMutation };
+    resolveConflict: { useMutation: (callbacks: MutationCallbacks) => ResolveConflictMutation };
+}
+
+interface TrpcClientShape {
+    useUtils: () => TrpcUtilsShape;
+    git: TrpcGitShape;
+}
+
+function isRecordLike(value: unknown): value is RecordLike {
+    return typeof value === 'object' && value !== null;
+}
+
+function readBoolean(value: unknown): boolean {
+    return typeof value === 'boolean' ? value : false;
+}
+
+function readStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function parseOperationState(value: unknown): GitOperationState | null {
+    if (!isRecordLike(value)) {
+        return null;
+    }
+    const stateValue = value.state;
+    if (!isRecordLike(stateValue)) {
+        return null;
+    }
+    return {
+        merging: readBoolean(stateValue.merging),
+        rebasing: readBoolean(stateValue.rebasing),
+        cherryPicking: readBoolean(stateValue.cherryPicking),
+        reverting: readBoolean(stateValue.reverting),
+        bisecting: readBoolean(stateValue.bisecting),
+        conflicts: readStringArray(stateValue.conflicts),
+    };
+}
+
+function getMutationError(result: unknown): string | null {
+    if (!isRecordLike(result)) {
+        return null;
+    }
+    const maybeError = result.error;
+    if (typeof maybeError === 'string' && maybeError.trim().length > 0) {
+        return maybeError;
+    }
+    return null;
+}
+
 interface OperationStatusBarProps {
     repo: string;
     onOpenRebaseTodo?: () => void;
@@ -55,8 +166,10 @@ export function OperationStatusBar({
     onRevealConflictFile,
     onOperationStateChange,
 }: OperationStatusBarProps) {
-    const utils = trpc.useUtils();
-    const { data: opState } = trpc.git.operationState.useQuery({ repo }, { enabled: !!repo });
+    const typedTrpc = trpc as unknown as TrpcClientShape;
+    const utils = typedTrpc.useUtils();
+    const operationStateQuery = typedTrpc.git.operationState.useQuery({ repo }, { enabled: !!repo });
+    const state = useMemo(() => parseOperationState(operationStateQuery.data), [operationStateQuery.data]);
 
     const invalidateOperationState = () => {
         void Promise.allSettled([
@@ -64,14 +177,15 @@ export function OperationStatusBar({
             utils.git.commits.invalidate(),
             utils.git.repoInfo.invalidate(),
             utils.git.workingDirectoryStatus.invalidate(),
-        ]).catch((error) => {
+        ]).catch((error: unknown) => {
             console.error('[operation-status] Failed to refresh operation state:', error);
         });
     };
 
-    const handleMutationSuccess = (result: { error?: string | null } | undefined, actionLabel: string) => {
-        if (result?.error) {
-            toast.error(`${actionLabel} failed: ${result.error}`);
+    const handleMutationSuccess = (result: unknown, actionLabel: string) => {
+        const mutationError = getMutationError(result);
+        if (mutationError) {
+            toast.error(`${actionLabel} failed: ${mutationError}`);
             return;
         }
         invalidateOperationState();
@@ -83,106 +197,106 @@ export function OperationStatusBar({
     };
 
     // Mutations
-    const mergeAbort = trpc.git.mergeAbort.useMutation({
-        onSuccess: (result) => {
+    const mergeAbort = typedTrpc.git.mergeAbort.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Abort merge');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('abort merge', error);
         },
     });
 
-    const mergeContinue = trpc.git.mergeContinue.useMutation({
-        onSuccess: (result) => {
+    const mergeContinue = typedTrpc.git.mergeContinue.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Continue merge');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('continue merge', error);
         },
     });
 
-    const rebaseAbort = trpc.git.rebaseAbort.useMutation({
-        onSuccess: (result) => {
+    const rebaseAbort = typedTrpc.git.rebaseAbort.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Abort rebase');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('abort rebase', error);
         },
     });
 
-    const rebaseContinue = trpc.git.rebaseContinue.useMutation({
-        onSuccess: (result) => {
+    const rebaseContinue = typedTrpc.git.rebaseContinue.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Continue rebase');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('continue rebase', error);
         },
     });
 
-    const rebaseSkip = trpc.git.rebaseSkip.useMutation({
-        onSuccess: (result) => {
+    const rebaseSkip = typedTrpc.git.rebaseSkip.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Skip rebase commit');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('skip rebase commit', error);
         },
     });
 
-    const cherryPickAbort = trpc.git.cherryPickAbort.useMutation({
-        onSuccess: (result) => {
+    const cherryPickAbort = typedTrpc.git.cherryPickAbort.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Abort cherry-pick');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('abort cherry-pick', error);
         },
     });
 
-    const cherryPickContinue = trpc.git.cherryPickContinue.useMutation({
-        onSuccess: (result) => {
+    const cherryPickContinue = typedTrpc.git.cherryPickContinue.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Continue cherry-pick');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('continue cherry-pick', error);
         },
     });
 
-    const cherryPickSkip = trpc.git.cherryPickSkip.useMutation({
-        onSuccess: (result) => {
+    const cherryPickSkip = typedTrpc.git.cherryPickSkip.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Skip cherry-pick commit');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('skip cherry-pick commit', error);
         },
     });
 
-    const revertAbort = trpc.git.revertAbort.useMutation({
-        onSuccess: (result) => {
+    const revertAbort = typedTrpc.git.revertAbort.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Abort revert');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('abort revert', error);
         },
     });
 
-    const revertContinue = trpc.git.revertContinue.useMutation({
-        onSuccess: (result) => {
+    const revertContinue = typedTrpc.git.revertContinue.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Continue revert');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('continue revert', error);
         },
     });
 
-    const revertSkip = trpc.git.revertSkip.useMutation({
-        onSuccess: (result) => {
+    const revertSkip = typedTrpc.git.revertSkip.useMutation({
+        onSuccess: (result: unknown) => {
             handleMutationSuccess(result, 'Skip revert commit');
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
             handleMutationError('skip revert commit', error);
         },
     });
-    const resolveConflict = trpc.git.resolveConflict.useMutation({
-        onError: (error) => {
+    const resolveConflict = typedTrpc.git.resolveConflict.useMutation({
+        onError: (error: unknown) => {
             handleMutationError('resolve conflict', error);
         },
     });
@@ -191,13 +305,12 @@ export function OperationStatusBar({
     const [abortAction, setAbortAction] = useState<(() => void) | null>(null);
     const [activeConflictIndex, setActiveConflictIndex] = useState(0);
 
-    const state = opState?.state ?? null;
     useEffect(() => {
         onOperationStateChange?.(state);
     }, [state, onOperationStateChange]);
 
     useEffect(() => {
-        if (!state?.conflicts?.length) {
+        if (!state?.conflicts.length) {
             setActiveConflictIndex(0);
             return;
         }
@@ -231,16 +344,24 @@ export function OperationStatusBar({
     const handleAbort = () => {
         switch (operationType) {
             case 'merge':
-                setAbortAction(() => () => mergeAbort.mutate({ repo }));
+                setAbortAction(() => () => {
+                    mergeAbort.mutate({ repo });
+                });
                 break;
             case 'rebase':
-                setAbortAction(() => () => rebaseAbort.mutate({ repo }));
+                setAbortAction(() => () => {
+                    rebaseAbort.mutate({ repo });
+                });
                 break;
             case 'cherry-pick':
-                setAbortAction(() => () => cherryPickAbort.mutate({ repo }));
+                setAbortAction(() => () => {
+                    cherryPickAbort.mutate({ repo });
+                });
                 break;
             case 'revert':
-                setAbortAction(() => () => revertAbort.mutate({ repo }));
+                setAbortAction(() => () => {
+                    revertAbort.mutate({ repo });
+                });
                 break;
         }
         setShowAbortConfirm(true);
@@ -310,8 +431,9 @@ export function OperationStatusBar({
     const handleResolveConflictFile = async (filePath: string, resolution: 'ours' | 'theirs') => {
         try {
             const result = await resolveConflict.mutateAsync({ repo, path: filePath, resolution });
-            if (result.error) {
-                toast.error(`Failed to resolve ${filePath}: ${result.error}`);
+            const mutationError = getMutationError(result);
+            if (mutationError) {
+                toast.error(`Failed to resolve ${filePath}: ${mutationError}`);
                 return;
             }
             toast.success(`Resolved ${filePath} with ${resolution}`);
@@ -330,7 +452,7 @@ export function OperationStatusBar({
             // Keep this sequential to avoid clobbering index/stage state while conflicts resolve.
             try {
                 const result = await resolveConflict.mutateAsync({ repo, path: file, resolution });
-                if (!result.error) {
+                if (!getMutationError(result)) {
                     resolvedCount++;
                 }
             } catch {
@@ -339,15 +461,17 @@ export function OperationStatusBar({
         }
 
         if (resolvedCount === files.length) {
-            toast.success(`Resolved ${resolvedCount} conflict files with ${resolution}`);
+            toast.success(`Resolved ${String(resolvedCount)} conflict files with ${resolution}`);
         } else {
-            toast.error(`Resolved ${resolvedCount}/${files.length} conflicts with ${resolution}`);
+            toast.error(`Resolved ${String(resolvedCount)}/${String(files.length)} conflicts with ${resolution}`);
         }
         invalidateOperationState();
     };
 
     const nextActionHint = hasConflicts
-        ? `Resolve ${state.conflicts.length} conflict${state.conflicts.length === 1 ? '' : 's'} to continue ${operationType}.`
+        ? `Resolve ${String(state.conflicts.length)} conflict${
+              state.conflicts.length === 1 ? '' : 's'
+          } to continue ${operationType}.`
         : operationType === 'rebase'
           ? 'Continue rebase when your working tree is ready.'
           : operationType === 'cherry-pick'

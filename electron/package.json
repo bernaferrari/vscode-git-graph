@@ -6,6 +6,9 @@
     "author": "",
     "type": "module",
     "main": "dist-electron/main.js",
+    "bin": {
+        "gg": "scripts/gg.mjs"
+    },
     "scripts": {
         "dev": "vite",
         "build": "vite build",
@@ -21,7 +24,9 @@
         "format:check": "prettier --check .",
         "test": "vitest run",
         "test:watch": "vitest",
-        "test:release": "vitest run -c vitest.release.config.ts"
+        "test:release": "vitest run -c vitest.release.config.ts",
+        "release:hardening": "pnpm run typecheck:release && pnpm test && pnpm run test:release && pnpm run build",
+        "gg": "node scripts/gg.mjs"
     },
     "dependencies": {
         "@base-ui/react": "^1.1.0",

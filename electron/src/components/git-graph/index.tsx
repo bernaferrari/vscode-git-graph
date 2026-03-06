@@ -53,6 +53,7 @@ import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
 import { OperationStatusBar } from './operation-status-bar';
 import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
+import { QuickActionsToolbar } from './quick-actions-toolbar';
 import { SidePanel } from './side-panel';
 
 import { useCommitTemplates } from './useCommitTemplates';
@@ -164,6 +165,14 @@ const PERF_WATCH_DELTA_PCT = 20;
 const PERF_REGRESSION_DELTA_PCT = 45;
 const PERF_IMPROVING_DELTA_PCT = -25;
 const COMMIT_FILTERS_STORAGE_PREFIX = 'git-graph:commit-filters:';
+const DEFAULT_RELEASE_FEATURE_FLAGS = {
+    worktreePro: true,
+    workflowEngine: true,
+    graphiteInterop: false,
+    aiProd: false,
+    deepLinks: true,
+    branchPinning: true,
+} as const;
 
 function createEmptyPerfHistory(): PerfHistoryWindow {
     return {
@@ -307,6 +316,9 @@ const SearchAllCommits = lazy(() => import('./search-commits').then((mod) => ({ 
 const WorktreeManagement = lazy(() =>
     import('./worktree-management').then((mod) => ({ default: mod.WorktreeManagement }))
 );
+const WorkflowEngineDialog = lazy(() =>
+    import('./workflow-engine').then((mod) => ({ default: mod.WorkflowEngineDialog }))
+);
 const SubmoduleManagement = lazy(() =>
     import('./submodule-management').then((mod) => ({ default: mod.SubmoduleManagement }))
 );
@@ -347,6 +359,9 @@ const PullRequestIntegration = lazy(() =>
 );
 const KeyboardShortcutsHelp = lazy(() =>
     import('./keyboard-shortcuts-help').then((mod) => ({ default: mod.KeyboardShortcutsHelp }))
+);
+const KeyboardShortcutsEditor = lazy(() =>
+    import('./keyboard-shortcuts-editor').then((mod) => ({ default: mod.KeyboardShortcutsEditor }))
 );
 const OnboardingDialog = lazy(() => import('./onboarding').then((mod) => ({ default: mod.OnboardingDialog })));
 const RecentRepositories = lazy(() =>
@@ -493,8 +508,10 @@ export function GitGraph() {
     const [inlineBlameEnabled, setInlineBlameEnabled] = useState(false);
     const [prIntegrationOpen, setPrIntegrationOpen] = useState(false);
     const [worktreeOpen, setWorktreeOpen] = useState(false);
+    const [workflowOpen, setWorkflowOpen] = useState(false);
     const [submoduleOpen, setSubmoduleOpen] = useState(false);
     const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
+    const [keyboardEditorOpen, setKeyboardEditorOpen] = useState(false);
     const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [recentReposOpen, setRecentReposOpen] = useState(false);
     const [workspacesOpen, setWorkspacesOpen] = useState(false);
@@ -568,6 +585,18 @@ export function GitGraph() {
     // Git operations hook
     const gitOps = useGitOperations();
     const gitUtils = trpc.useUtils();
+    const configAllQuery = trpc.config.getAll.useQuery(undefined, { staleTime: 10_000 });
+    const featureFlags = useMemo(() => {
+        const ui = configAllQuery.data?.ui as
+            | {
+                  featureFlags?: Partial<typeof DEFAULT_RELEASE_FEATURE_FLAGS>;
+              }
+            | undefined;
+        return {
+            ...DEFAULT_RELEASE_FEATURE_FLAGS,
+            ...(ui?.featureFlags ?? {}),
+        };
+    }, [configAllQuery.data?.ui]);
 
     const maxCommitsLimit = useMemo(() => {
         if (!Number.isFinite(settings.maxCommits)) {
@@ -868,6 +897,7 @@ export function GitGraph() {
 
     const { mutateAsync: revealInFinder } = trpc.system.revealInFinder.useMutation();
     const { mutateAsync: openTerminalInRepo } = trpc.system.openTerminal.useMutation();
+    const createDeepLinkMutation = trpc.app.deeplink.create.useMutation();
 
     const handleRefreshAll = useCallback(() => {
         void gitUtils.git.invalidate().catch((error) => {
@@ -1363,6 +1393,93 @@ export function GitGraph() {
         [baselineInitialMaxCommits]
     );
 
+    useEffect(() => {
+        if (!featureFlags.deepLinks) {
+            return;
+        }
+
+        let cancelled = false;
+        let lastHandledLink: string | null = null;
+
+        const handleDeepLink = async (link: string) => {
+            if (!link || cancelled || link === lastHandledLink) {
+                return;
+            }
+
+            lastHandledLink = link;
+            const resolved = await gitUtils.app.deeplink.resolve.fetch({ link });
+            if (!resolved.valid || !resolved.target) {
+                toast.error('Invalid deep link', { description: resolved.error ?? 'Unable to parse deep link.' });
+                return;
+            }
+
+            if (resolved.target.repo) {
+                await activateRepoPath(resolved.target.repo, {
+                    ensureRegistered: true,
+                    errorTitle: 'Unable to open deep linked repository',
+                });
+            }
+
+            if (resolved.target.branch) {
+                handleBranchFilter(resolved.target.branch);
+            }
+
+            if (resolved.target.commit) {
+                setSelectedCommit(resolved.target.commit);
+                handleNavigateToCommit(resolved.target.commit);
+            }
+
+            if (resolved.target.file) {
+                toast.info(`Deep link selected file context: ${resolved.target.file}`);
+            }
+
+            if (resolved.target.panel === 'worktree') {
+                if (!featureFlags.worktreePro) {
+                    toast.info('Worktree panel is disabled by feature flag');
+                    return;
+                }
+                setWorktreeOpen(true);
+            } else if (resolved.target.panel === 'blame' && resolved.target.file) {
+                setAnnotationsFile(resolved.target.file);
+                setFileAnnotationsOpen(true);
+            } else if (resolved.target.panel === 'diff' && resolved.target.commit) {
+                setSelectedCommit(resolved.target.commit);
+                setCommitDetailsOpen(true);
+            }
+        };
+
+        const onDeepLinkEvent = (event: Event) => {
+            const custom = event as CustomEvent<string>;
+            if (typeof custom.detail === 'string') {
+                void handleDeepLink(custom.detail);
+            }
+        };
+
+        window.addEventListener('git-graph:deeplink', onDeepLinkEvent as EventListener);
+        const pending = (window as unknown as { __gitGraphPendingDeepLink?: string }).__gitGraphPendingDeepLink;
+        if (typeof pending === 'string' && pending) {
+            void handleDeepLink(pending);
+            (window as unknown as { __gitGraphPendingDeepLink?: string }).__gitGraphPendingDeepLink = '';
+        }
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('git-graph:deeplink', onDeepLinkEvent as EventListener);
+        };
+    }, [
+        activateRepoPath,
+        featureFlags.deepLinks,
+        featureFlags.worktreePro,
+        gitUtils.app.deeplink.resolve,
+        handleBranchFilter,
+        handleNavigateToCommit,
+        setAnnotationsFile,
+        setFileAnnotationsOpen,
+        setCommitDetailsOpen,
+        setSelectedCommit,
+        setWorktreeOpen,
+    ]);
+
     const handleSelectedBranchesChange = useCallback(
         (branches: string[]) => {
             setSelectedBranches(branches);
@@ -1396,6 +1513,48 @@ export function GitGraph() {
                 toast.error(error instanceof Error ? error.message : 'Failed to open repository in finder');
             });
     }, [activeRepo, revealInFinder]);
+
+    const handleCopyDeepLink = useCallback(async () => {
+        if (!activeRepo) {
+            toast.error('Open a repository first.');
+            return;
+        }
+
+        const target: {
+            repo: string;
+            branch?: string;
+            commit?: string;
+            file?: string;
+            panel?: 'worktree' | 'diff' | 'blame';
+        } = {
+            repo: activeRepo,
+            branch: repoInfo?.head ?? undefined,
+            commit: selectedCommit || undefined,
+        };
+
+        if (featureFlags.worktreePro && worktreeOpen) {
+            target.panel = 'worktree';
+        } else if (fileAnnotationsOpen && annotationsFile) {
+            target.panel = 'blame';
+            target.file = annotationsFile;
+        } else if (commitDetailsOpen && selectedCommit) {
+            target.panel = 'diff';
+        }
+
+        const result = await createDeepLinkMutation.mutateAsync(target);
+        await navigator.clipboard.writeText(result.link);
+        toast.success('Deep link copied');
+    }, [
+        activeRepo,
+        annotationsFile,
+        commitDetailsOpen,
+        createDeepLinkMutation,
+        featureFlags.worktreePro,
+        fileAnnotationsOpen,
+        repoInfo?.head,
+        selectedCommit,
+        worktreeOpen,
+    ]);
 
     const handleOpenInTerminal = useCallback(() => {
         if (!activeRepo) {
@@ -2198,7 +2357,7 @@ export function GitGraph() {
                         {/* Stacked Branches */}
                         <div className='ml-1 shrink-0'>
                             <Suspense fallback={<div className='h-8 w-8' />}>
-                                <StackedBranchesPanel />
+                                <StackedBranchesPanel enableGraphiteInterop={featureFlags.graphiteInterop} />
                             </Suspense>
                         </div>
 
@@ -2376,10 +2535,18 @@ export function GitGraph() {
                                     <GitPullRequest className='mr-2 h-4 w-4' />
                                     Pull Requests
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setWorktreeOpen(true); }}>
-                                    <FolderGit2 className='mr-2 h-4 w-4' />
-                                    Worktrees
-                                </DropdownMenuItem>
+                                {featureFlags.worktreePro && (
+                                    <DropdownMenuItem onClick={() => { setWorktreeOpen(true); }}>
+                                        <FolderGit2 className='mr-2 h-4 w-4' />
+                                        Worktrees
+                                    </DropdownMenuItem>
+                                )}
+                                {featureFlags.workflowEngine && (
+                                    <DropdownMenuItem onClick={() => { setWorkflowOpen(true); }}>
+                                        <Activity className='mr-2 h-4 w-4' />
+                                        Workflow Engine
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => { setSubmoduleOpen(true); }}>
                                     <Package className='mr-2 h-4 w-4' />
                                     Submodules
@@ -2476,6 +2643,21 @@ export function GitGraph() {
                         </DropdownMenu>
                     </div>
 
+                    <QuickActionsToolbar
+                        className='border-border/60 border-t'
+                        onCreateBranch={() => {
+                            setTargetCommit(selectedCommit ?? 'HEAD');
+                            setCreateBranchOpen(true);
+                        }}
+                        onCreateTag={() => {
+                            setTargetCommit(selectedCommit ?? 'HEAD');
+                            setAddTagOpen(true);
+                        }}
+                        onStash={() => {
+                            setStashManageOpen(true);
+                        }}
+                    />
+
                     {/* Find Widget */}
                     {findWidgetOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
@@ -2509,6 +2691,7 @@ export function GitGraph() {
                                     setTargetBranch(branch);
                                     setMergeOpen(true);
                                 }}
+                                enableBranchPinning={featureFlags.branchPinning}
                             />
                         )}
 
@@ -3135,9 +3318,16 @@ export function GitGraph() {
                     )}
 
                     {/* Worktree Management */}
-                    {worktreeOpen && (
+                    {featureFlags.worktreePro && worktreeOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
                             <WorktreeManagement open={worktreeOpen} onOpenChange={setWorktreeOpen} />
+                        </Suspense>
+                    )}
+
+                    {/* Workflow Engine */}
+                    {featureFlags.workflowEngine && workflowOpen && (
+                        <Suspense fallback={<DialogLoadingFallback />}>
+                            <WorkflowEngineDialog open={workflowOpen} onOpenChange={setWorkflowOpen} />
                         </Suspense>
                     )}
 
@@ -3152,6 +3342,13 @@ export function GitGraph() {
                     {keyboardHelpOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
                             <KeyboardShortcutsHelp open={keyboardHelpOpen} onOpenChange={setKeyboardHelpOpen} />
+                        </Suspense>
+                    )}
+
+                    {/* Keyboard Shortcuts Editor */}
+                    {keyboardEditorOpen && (
+                        <Suspense fallback={<DialogLoadingFallback />}>
+                            <KeyboardShortcutsEditor open={keyboardEditorOpen} onOpenChange={setKeyboardEditorOpen} />
                         </Suspense>
                     )}
 
@@ -3340,6 +3537,7 @@ export function GitGraph() {
                                     onTerminal: () => { setTerminalOpen(!terminalOpen); },
                                     onClone: () => { setCloneDialogOpen(true); },
                                     onOpenInFinder: () => { handleOpenInFinder(); },
+                                    ...(featureFlags.deepLinks ? { onCopyDeepLink: () => { void handleCopyDeepLink(); } } : {}),
                                     onStash: () => { setStashManageOpen(true); },
                                     onCommitSigning: () => { setCommitSigningOpen(true); },
                                     onReflog: () => { setReflogOpen(true); },
@@ -3348,7 +3546,8 @@ export function GitGraph() {
                                     onCustomCommands: () => { setCustomCommandsOpen(true); },
                                     onLFS: () => { setLfsOpen(true); },
                                     onPRIntegration: () => { setPrIntegrationOpen(true); },
-                                    onWorktrees: () => { setWorktreeOpen(true); },
+                                    ...(featureFlags.worktreePro ? { onWorktrees: () => { setWorktreeOpen(true); } } : {}),
+                                    ...(featureFlags.workflowEngine ? { onWorkflows: () => { setWorkflowOpen(true); } } : {}),
                                     onSubmodules: () => { setSubmoduleOpen(true); },
                                     onStatistics: () => { setStatisticsOpen(true); },
                                     onRemotes: () => { setRemoteManageOpen(true); },
@@ -3366,6 +3565,7 @@ export function GitGraph() {
                                     },
                                     onWorkspaces: () => { setWorkspacesOpen(true); },
                                     onKeyboardHelp: () => { setKeyboardHelpOpen(true); },
+                                    onKeyboardCustomize: () => { setKeyboardEditorOpen(true); },
                                     onHealthCheck: () => { setHealthCheckOpen(true); },
                                     onFuzzyFinder: () => { setFuzzyFinderOpen(true); },
                                     onUndoStack: () => { setUndoStackOpen(true); },

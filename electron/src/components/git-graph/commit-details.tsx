@@ -17,8 +17,11 @@ import {
     Minus,
     RotateCcw,
     History,
+    Wand2,
+    AlertTriangle,
 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
+import { toast } from 'sonner';
 
 import { CIStatusPanel } from './ci-status';
 import { FileHistory } from './file-history';
@@ -70,6 +73,8 @@ export function CommitDetailsPanel({
     const [showDiff, setShowDiff] = useState(false);
     const [showFileHistory, setShowFileHistory] = useState(false);
     const [historyFile, setHistoryFile] = useState<string | null>(null);
+    const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+    const [aiRiskAreas, setAiRiskAreas] = useState<string[]>([]);
 
     const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
         {
@@ -78,6 +83,28 @@ export function CommitDetailsPanel({
         },
         { enabled: !!commitHash && !!activeRepo }
     );
+    const configAllQuery = trpc.config.getAll.useQuery(undefined, { staleTime: 10_000 });
+    const aiProdEnabled = Boolean(
+        (configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
+    );
+    const explainCommitMutation = trpc.ai.explainCommit.useMutation({
+        onSuccess: (result) => {
+            if (!result.explanation) {
+                toast.warning(result.error ?? 'No AI explanation available');
+                return;
+            }
+            setAiExplanation(result.explanation);
+            setAiRiskAreas(result.riskAreas ?? []);
+            if (result.error) {
+                toast.warning('AI explanation used fallback', { description: result.error });
+            } else {
+                toast.success('Commit explanation generated');
+            }
+        },
+        onError: (error) => {
+            toast.error(error instanceof Error ? error.message : 'Failed to explain commit');
+        },
+    });
 
     // Get selected file info
     const selectedFileInfo = commitDetails?.details?.fileChanges.find(
@@ -117,6 +144,27 @@ export function CommitDetailsPanel({
         if (commitHash) {
             onReset?.(commitHash, 'mixed');
         }
+    };
+
+    const handleExplainCommit = () => {
+        if (!commitHash || !commitDetails?.details) {
+            return;
+        }
+        const details = commitDetails.details;
+        const diffSummary = details.fileChanges
+            .slice(0, 250)
+            .map(
+                (file: FileChange) =>
+                    `${file.type}\t${file.newFilePath}\t+${String(file.additions ?? 0)}\t-${String(file.deletions ?? 0)}`
+            )
+            .join('\n');
+
+        explainCommitMutation.mutate({
+            commitHash: details.hash,
+            subject: details.body.split('\n')[0] ?? details.hash,
+            body: details.body,
+            diff: `Files changed: ${String(details.fileChanges.length)}\n${diffSummary}`,
+        });
     };
 
     if (!commitHash) {
@@ -218,13 +266,56 @@ export function CommitDetailsPanel({
 
                     {/* Message */}
                     <div className='border-border/70 bg-background/55 space-y-1 rounded-lg border p-2.5'>
-                        <p className='text-[14px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
+                        <div className='mb-1 flex items-center justify-between gap-2'>
+                            <p className='text-[14px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
+                            {aiProdEnabled && (
+                                <Button
+                                    type='button'
+                                    variant='outline'
+                                    size='sm'
+                                    className='h-7 shrink-0 text-xs'
+                                    onClick={handleExplainCommit}
+                                    disabled={explainCommitMutation.isPending}>
+                                    {explainCommitMutation.isPending ? (
+                                        <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
+                                    ) : (
+                                        <Wand2 className='mr-1 h-3.5 w-3.5' />
+                                    )}
+                                    Explain
+                                </Button>
+                            )}
+                        </div>
                         {commitBody && (
                             <p className='text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap'>
                                 {commitBody}
                             </p>
                         )}
                         {!commitBody && <p className='text-muted-foreground text-xs'>Single-line commit message</p>}
+                        {aiProdEnabled && aiExplanation && (
+                            <div className='mt-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 p-2'>
+                                <p className='text-xs font-semibold text-emerald-700 dark:text-emerald-300'>
+                                    AI Explanation
+                                </p>
+                                <p className='mt-1 text-xs whitespace-pre-wrap text-emerald-900 dark:text-emerald-100'>
+                                    {aiExplanation}
+                                </p>
+                                {aiRiskAreas.length > 0 && (
+                                    <div className='mt-2'>
+                                        <p className='mb-1 flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                            <AlertTriangle className='h-3.5 w-3.5' />
+                                            Risk Areas
+                                        </p>
+                                        <div className='space-y-1'>
+                                            {aiRiskAreas.map((risk) => (
+                                                <p key={risk} className='text-xs text-amber-900 dark:text-amber-100'>
+                                                    - {risk}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Parents */}
