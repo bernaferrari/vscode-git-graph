@@ -24,19 +24,6 @@ export interface GitProfile {
 	confirmBeforePush: boolean;
 }
 
-export interface RepoPolicy {
-	repoPath: string;
-	// Branch protection
-	requireSignedCommits: boolean;
-	allowedMergeStrategies: ('merge' | 'rebase' | 'squash')[];
-	requireUpToDate: boolean;
-	// Stacking
-	enableStacking: boolean;
-	defaultStackBase: string;
-	// Custom
-	customWorkflow: string;
-}
-
 const DEFAULT_PROFILES: GitProfile[] = [
 	{
 		id: 'default',
@@ -57,7 +44,6 @@ const DEFAULT_PROFILES: GitProfile[] = [
 interface ProfilesState {
 	profiles: GitProfile[];
 	activeProfileId: string;
-	repoPolicies: Record<string, RepoPolicy>;
 
 	// Actions
 	addProfile: (profile: Omit<GitProfile, 'id'>) => void;
@@ -66,10 +52,6 @@ interface ProfilesState {
 	setActiveProfile: (id: string) => void;
 
 	getActiveProfile: () => GitProfile | undefined;
-
-	// Repo policies
-	setRepoPolicy: (repoPath: string, policy: Partial<RepoPolicy>) => void;
-	getRepoPolicy: (repoPath: string) => RepoPolicy | undefined;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -77,7 +59,6 @@ export const useProfiles = create<ProfilesState>()(
 		(set, get) => ({
 			profiles: DEFAULT_PROFILES,
 			activeProfileId: 'default',
-			repoPolicies: {},
 
 			addProfile: (profile) => {
 				const id = `profile-${String(Date.now())}`;
@@ -114,28 +95,6 @@ export const useProfiles = create<ProfilesState>()(
 			getActiveProfile: () => {
 				const state = get();
 				return state.profiles.find((p) => p.id === state.activeProfileId);
-			},
-
-			setRepoPolicy: (repoPath, policy) => {
-				set((state) => ({
-					repoPolicies: {
-						...state.repoPolicies,
-						[repoPath]: {
-							repoPath,
-							requireSignedCommits: false,
-							allowedMergeStrategies: ['merge', 'rebase', 'squash'],
-							enableStacking: false,
-							defaultStackBase: 'main',
-							customWorkflow: '',
-							...state.repoPolicies[repoPath],
-							...policy,
-						},
-					},
-				}));
-			},
-
-			getRepoPolicy: (repoPath) => {
-				return get().repoPolicies[repoPath];
 			},
 		}),
 		{

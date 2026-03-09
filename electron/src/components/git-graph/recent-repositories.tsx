@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { FolderGit2, Clock, X, Pin, GitBranch, Plus, Loader2 } from 'lucide-react';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface RecentRepo {
     path: string;
@@ -25,50 +26,45 @@ interface RecentRepositoriesProps {
     onOpenChange: (open: boolean) => void;
 }
 
-const STORAGE_KEY = 'git-graph-recent-repos';
-
 export function useRecentRepos() {
     const [recentRepos, setRecentRepos] = useState<RecentRepo[]>([]);
-    const [isHydrated, setIsHydrated] = useState(false);
+    const utils = trpc.useUtils();
+    const recentReposQuery = trpc.repo.recentRepoDetails.useQuery(undefined, { staleTime: 10_000 });
+    const setRecentReposMutation = trpc.repo.setRecentRepoDetails.useMutation({
+        onSuccess: async () => {
+            await utils.repo.recentRepoDetails.invalidate();
+        },
+    });
 
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                setRecentRepos(JSON.parse(stored));
-            } catch {
-                setRecentRepos([]);
-            }
-        }
-        setIsHydrated(true);
-    }, []);
+        setRecentRepos(recentReposQuery.data?.repos ?? []);
+    }, [recentReposQuery.data?.repos]);
 
-    useEffect(() => {
-        if (!isHydrated) {
-            return;
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentRepos));
-    }, [recentRepos, isHydrated]);
+    const persistRecentRepos = (nextRepos: RecentRepo[]) => {
+        setRecentRepos(nextRepos);
+        setRecentReposMutation.mutate({ repos: nextRepos });
+    };
 
     const addRecentRepo = (path: string, branch?: string) => {
-        setRecentRepos((prev) => {
-            const existing = prev.find((r) => r.path === path);
-            const name = path.split('/').pop() || path;
-            const branchPatch = branch ? { currentBranch: branch } : {};
+        const existing = recentRepos.find((r) => r.path === path);
+        const name = path.split('/').pop() || path;
+        const branchPatch = branch ? { currentBranch: branch } : {};
 
-            if (existing) {
-                return [
-                    {
-                        ...existing,
-                        lastOpened: Date.now(),
-                        openCount: existing.openCount + 1,
-                        ...branchPatch,
-                    },
-                    ...prev.filter((r) => r.path !== path),
-                ];
-            }
+        if (existing) {
+            persistRecentRepos([
+                {
+                    ...existing,
+                    lastOpened: Date.now(),
+                    openCount: existing.openCount + 1,
+                    ...branchPatch,
+                },
+                ...recentRepos.filter((r) => r.path !== path),
+            ]);
+            return;
+        }
 
-            return [
+        persistRecentRepos(
+            [
                 {
                     path,
                     name,
@@ -77,21 +73,21 @@ export function useRecentRepos() {
                     pinned: false,
                     ...branchPatch,
                 },
-                ...prev,
-            ].slice(0, 20); // Keep max 20
-        });
+                ...recentRepos,
+            ].slice(0, 20)
+        );
     };
 
     const removeRecentRepo = (path: string) => {
-        setRecentRepos((prev) => prev.filter((r) => r.path !== path));
+        persistRecentRepos(recentRepos.filter((r) => r.path !== path));
     };
 
     const togglePin = (path: string) => {
-        setRecentRepos((prev) => prev.map((r) => (r.path === path ? { ...r, pinned: !r.pinned } : r)));
+        persistRecentRepos(recentRepos.map((r) => (r.path === path ? { ...r, pinned: !r.pinned } : r)));
     };
 
     const clearRecentRepos = () => {
-        setRecentRepos([]);
+        persistRecentRepos([]);
     };
 
     return {

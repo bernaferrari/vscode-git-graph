@@ -3,4 +3,4 @@
  */
 
 export { ProfileSwitcher } from './ProfileSwitcher';
-export { useProfiles, type GitProfile, type RepoPolicy } from '@/lib/profiles';
+export { useProfiles, type GitProfile } from '@/lib/profiles';

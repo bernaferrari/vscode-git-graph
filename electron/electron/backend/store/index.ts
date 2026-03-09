@@ -53,6 +53,67 @@ export const appStore = new Store<{
 			explainCommit: boolean;
 		};
 	};
+
+	commitTemplates: Array<{
+		id: string;
+		name: string;
+		description?: string;
+		content: string;
+		isDefault?: boolean;
+	}>;
+	externalDiffConfig: {
+		tools: Array<{
+			id: string;
+			name: string;
+			command: string;
+			args: string;
+			supports3Way: boolean;
+			supportsDirDiff: boolean;
+			icon?: string;
+		}>;
+		selectedTool: string;
+		useForMergeConflicts: boolean;
+	};
+	issueTrackerConfig: {
+		providers: Record<string, {
+			enabled: boolean;
+			apiKey?: string;
+			domain?: string;
+			projectKey?: string;
+		}>;
+		autoDetect: boolean;
+		patterns: string[];
+	};
+	gitGraphSettings: {
+		confirmDestructiveActions: boolean;
+		autoFetchInterval: number;
+		checkForUpdates: boolean;
+		launchAtStartup: boolean;
+		lensMode: 'guided' | 'craft' | 'control';
+		theme: 'light' | 'dark' | 'system';
+		graphTheme: 'default' | 'colorful' | 'minimal';
+		commitMessageLength: number;
+		showAvatars: boolean;
+		showRelativeDates: boolean;
+		dateFormat: 'relative' | 'iso' | 'locale';
+		enhancedAccessibility: boolean;
+		commitTemplate: string;
+		autoSignCommits: boolean;
+		defaultBranch: string;
+		mergeTool: string;
+		notifyOnPush: boolean;
+		notifyOnPull: boolean;
+		notifyOnMerge: boolean;
+		soundEnabled: boolean;
+		maxCommits: number;
+		enableVirtualization: boolean;
+		lazyLoadImages: boolean;
+		telemetryEnabled: boolean;
+		crashReports: boolean;
+	};
+	onboardingState: {
+		gitGraphCompleted: boolean;
+	};
 }>({
 	name: 'git-graph-config',
 	defaults: {
@@ -85,6 +146,47 @@ export const appStore = new Store<{
 				conflictExplain: true,
 				explainCommit: true,
 			},
+		},
+		commitTemplates: [],
+		externalDiffConfig: {
+			tools: [],
+			selectedTool: 'vscode',
+			useForMergeConflicts: false,
+		},
+		issueTrackerConfig: {
+			providers: {},
+			autoDetect: true,
+			patterns: [],
+		},
+		gitGraphSettings: {
+			confirmDestructiveActions: true,
+			autoFetchInterval: 5,
+			checkForUpdates: true,
+			launchAtStartup: false,
+			lensMode: 'craft',
+			theme: 'system',
+			graphTheme: 'default',
+			commitMessageLength: 72,
+			showAvatars: true,
+			showRelativeDates: true,
+			dateFormat: 'relative',
+			enhancedAccessibility: false,
+			commitTemplate: '',
+			autoSignCommits: false,
+			defaultBranch: 'main',
+			mergeTool: '',
+			notifyOnPush: true,
+			notifyOnPull: true,
+			notifyOnMerge: true,
+			soundEnabled: false,
+			maxCommits: 1000,
+			enableVirtualization: true,
+			lazyLoadImages: true,
+			telemetryEnabled: false,
+			crashReports: true,
+		},
+		onboardingState: {
+			gitGraphCompleted: false,
 		},
 	},
 });
@@ -127,6 +229,30 @@ export const instanceStore = new Store<{
 		remainingFiles: string[];
 	}>>;
 
+	// Repository policy controls for guardrails and workflow guidance
+	repoPolicies: Record<string, {
+		repoPath: string;
+		requireSignedCommits: boolean;
+		allowedMergeStrategies: Array<'merge' | 'rebase' | 'squash'>;
+		requireUpToDate: boolean;
+		enableStacking: boolean;
+		defaultStackBase: string;
+		customWorkflow: string;
+	}>;
+
+	// Persistent audit timeline for high-risk and collaborative actions
+	auditLog: Array<{
+		id: string;
+		timestamp: number;
+		scope: 'git' | 'review' | 'system' | 'policy';
+		action: string;
+		repo: string | null;
+		status: 'success' | 'failed' | 'info';
+		summary: string;
+		details?: string;
+		metadata?: Record<string, unknown>;
+	}>;
+
 	// Workspace view state
 	workspaceViewState: {
 		findIsCaseSensitive: boolean;
@@ -167,6 +293,30 @@ export const instanceStore = new Store<{
 	// Branch pinning and launchpad metadata customization
 	pinnedBranches: Record<string, string[]>;
 	launchpadStatusMap: Record<string, Record<string, { label: string; severity: 'info' | 'warn' | 'error' }>>;
+	commitFiltersByRepo: Record<string, {
+		author?: string;
+		filePath?: string;
+		search?: string;
+		dateFrom?: string;
+		dateTo?: string;
+	}>;
+	pinnedCommitsByRepo: Record<string, Array<{
+		hash: string;
+		message: string;
+		author: string;
+		date: string;
+		branch?: string;
+		pinnedAt: number;
+		note?: string;
+	}>>;
+	recentRepoDetails: Array<{
+		path: string;
+		name: string;
+		lastOpened: number;
+		openCount: number;
+		pinned: boolean;
+		currentBranch?: string;
+	}>;
 
 	// Worktree UX view preferences
 	worktreeViewPrefs: {
@@ -201,6 +351,8 @@ export const instanceStore = new Store<{
 		ignoredRepos: [],
 		lastActiveRepo: null,
 		codeReviews: {},
+		repoPolicies: {},
+		auditLog: [],
 		workspaceViewState: {
 			findIsCaseSensitive: false,
 			findIsRegex: false,
@@ -211,6 +363,9 @@ export const instanceStore = new Store<{
 		workflowRuns: [],
 		pinnedBranches: {},
 		launchpadStatusMap: {},
+		commitFiltersByRepo: {},
+		pinnedCommitsByRepo: {},
+		recentRepoDetails: [],
 		worktreeViewPrefs: {
 			showLocked: true,
 			showPrunable: true,

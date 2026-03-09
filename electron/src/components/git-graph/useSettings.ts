@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { GIT_GRAPH_SETTINGS_STORAGE_KEY, GIT_GRAPH_SETTINGS_UPDATED_EVENT } from '@/lib/gitGraphSettings';
+import { trpc } from '@/trpc/client';
 
 export interface AppSettings {
     // General
@@ -73,29 +73,32 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 export function useSettings() {
     const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+    const utils = trpc.useUtils();
+    const settingsQuery = trpc.config.settings.useQuery(undefined, { staleTime: 10_000 });
+    const setSettingsMutation = trpc.config.setSettings.useMutation({
+        onSuccess: async () => {
+            await utils.config.settings.invalidate();
+        },
+    });
 
     useEffect(() => {
-        const stored = localStorage.getItem(GIT_GRAPH_SETTINGS_STORAGE_KEY);
+        const stored = settingsQuery.data?.settings;
         if (stored) {
-            try {
-                setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
-            } catch {
-                setSettings(DEFAULT_SETTINGS);
-            }
+            setSettings({ ...DEFAULT_SETTINGS, ...stored });
         }
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem(GIT_GRAPH_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-        window.dispatchEvent(new CustomEvent(GIT_GRAPH_SETTINGS_UPDATED_EVENT));
-    }, [settings]);
+    }, [settingsQuery.data?.settings]);
 
     const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-        setSettings((prev) => ({ ...prev, [key]: value }));
+        setSettings((prev) => {
+            const next = { ...prev, [key]: value };
+            setSettingsMutation.mutate(next);
+            return next;
+        });
     };
 
     const resetSettings = () => {
         setSettings(DEFAULT_SETTINGS);
+        setSettingsMutation.mutate(DEFAULT_SETTINGS);
         toast.success('Settings reset to defaults');
     };
 

@@ -4,7 +4,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { UndoStackProvider, useUndoStack, UndoStackDialog, UndoRedoButtons } from './undo-stack';
+import { UndoStackProvider, useUndoStack } from './undo-stack-provider';
+import { UndoRedoButtons, UndoStackDialog } from './undo-stack';
 import { useAppStore } from '@/lib/store';
 
 function Harness() {

@@ -37,6 +37,9 @@ import {
 	FileCode,
 	GitCommit,
 	Link,
+	Shield,
+	Bell,
+	Siren,
 } from 'lucide-react';
 
 interface Command {
@@ -50,10 +53,7 @@ interface Command {
 	keywords?: string[];
 }
 
-interface CommandPaletteProps {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
-	actions: {
+export interface CommandPaletteActions {
 		onCreateBranch: () => void;
 	onCreateTag: () => void;
 	onFetch: () => void;
@@ -95,7 +95,15 @@ interface CommandPaletteProps {
 		onBulkOps?: () => void;
 		onFileAnnotations?: () => void;
 		onActivityHeatmap?: () => void;
-	};
+		onRepoPolicy?: () => void;
+		onAuditLog?: () => void;
+		onDiagnostics?: () => void;
+}
+
+interface CommandPaletteProps {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	actions: CommandPaletteActions;
 }
 
 export function CommandPalette({ open, onOpenChange, actions }: CommandPaletteProps) {
@@ -294,8 +302,10 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 		{
 			id: 'pr-integration',
 			label: 'Pull Requests',
+			description: 'Open the PR list, review workspace, comments, and merge actions',
 			icon: <GitPullRequest className="h-4 w-4" />,
 			category: 'Integrations',
+			keywords: ['pull requests', 'review', 'merge', 'comments'],
 			action: actions.onPRIntegration,
 		},
 		{
@@ -308,15 +318,19 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 		...(actions.onWorktrees ? [{
 			id: 'worktrees',
 			label: 'Worktrees',
+			description: 'Create, prune, repair, and inspect linked working trees',
 			icon: <FolderGit2 className="h-4 w-4" />,
 			category: 'Integrations',
+			keywords: ['worktree', 'cleanup', 'review checkout'],
 			action: actions.onWorktrees,
 		}] : []),
 		...(actions.onWorkflows ? [{
 			id: 'workflows',
 			label: 'Workflow Engine',
+			description: 'Run and edit reusable Git workflow automations',
 			icon: <Activity className="h-4 w-4" />,
 			category: 'Integrations',
+			keywords: ['workflow', 'automation', 'templates', 'dry run'],
 			action: actions.onWorkflows,
 		}] : []),
 		{
@@ -329,9 +343,38 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 		...(actions.onWorkspaces ? [{
 			id: 'workspaces',
 			label: 'Workspaces Launchpad',
+			description: 'Open saved workspace collections and launchpad context',
 			icon: <FolderGit2 className="h-4 w-4" />,
 			category: 'Integrations',
+			keywords: ['workspace', 'launchpad', 'repos'],
 			action: actions.onWorkspaces,
+		}] : []),
+		...(actions.onRepoPolicy ? [{
+			id: 'repo-policy',
+			label: 'Repo Policy',
+			description: 'Open repository rules for signing, merge strategy, and stacking',
+			icon: <Shield className="h-4 w-4" />,
+			category: 'Integrations',
+			keywords: ['policy', 'guardrails', 'signed commits', 'merge rules'],
+			action: actions.onRepoPolicy,
+		}] : []),
+		...(actions.onAuditLog ? [{
+			id: 'audit-log',
+			label: 'Audit Log',
+			description: 'Inspect recent Git, review, and policy events for this repository',
+			icon: <Bell className="h-4 w-4" />,
+			category: 'Integrations',
+			keywords: ['audit', 'history', 'events', 'activity'],
+			action: actions.onAuditLog,
+		}] : []),
+		...(actions.onDiagnostics ? [{
+			id: 'diagnostics',
+			label: 'Diagnostics',
+			description: 'Check app protocol, packaging, and CLI helper health',
+			icon: <Siren className="h-4 w-4" />,
+			category: 'Integrations',
+			keywords: ['diagnostics', 'protocol', 'deep link', 'gg cli'],
+			action: actions.onDiagnostics,
 		}] : []),
 		// Advanced
 		...(actions.onUndoStack ? [{
@@ -513,7 +556,12 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 												<div className="text-muted-foreground">
 													{cmd.icon}
 												</div>
-												<span className="flex-1 text-sm">{cmd.label}</span>
+												<div className="flex-1 min-w-0">
+													<div className="text-sm">{cmd.label}</div>
+													{cmd.description && (
+														<div className="text-muted-foreground truncate text-xs">{cmd.description}</div>
+													)}
+												</div>
 												{cmd.shortcut && (
 													<kbd className="ui-kbd">
 														{cmd.shortcut}

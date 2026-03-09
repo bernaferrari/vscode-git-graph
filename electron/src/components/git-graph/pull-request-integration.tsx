@@ -73,6 +73,18 @@ interface PullRequestIntegrationProps {
     onOpenChange: (open: boolean) => void;
 }
 
+interface ReviewSummaryData {
+    files: string[];
+    progress: {
+        lastActive: number;
+        lastViewedFile: string | null;
+        remainingFiles: string[];
+        reviewedCount: number;
+        totalFiles: number;
+    } | null;
+    error?: string | null;
+}
+
 interface PullRequestAuthForm {
     githubToken: string;
     gitlabToken: string;
@@ -240,7 +252,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegrationProps) {
     const { activeRepo } = useAppStore();
     const typedTrpc = trpc as unknown as TrpcClientShape;
-    const [activeTab, setActiveTab] = useState<'list' | 'create' | 'settings'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'review' | 'create' | 'settings'>('list');
     const [stateFilter, setStateFilter] = useState<PullRequestStateFilter>('open');
 
     const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
@@ -313,7 +325,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             provider,
             state: stateFilter,
         },
-        { enabled: !!activeRepo && open && activeTab === 'list' }
+        { enabled: !!activeRepo && open && (activeTab === 'list' || activeTab === 'review') }
     );
     const compareBranchesQuery = trpc.git.compareBranches.useQuery(
         {
@@ -337,10 +349,36 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             staleTime: 5_000,
         }
     );
+    const reviewSummaryQuery = trpc.repo.review.summary.useQuery(
+        {
+            repo: activeRepo ?? '',
+            reviewId: selectedPR ? `${provider}:${String(selectedPR.number)}` : '',
+            baseRef: selectedPR?.base.ref ?? 'main',
+            headRef: selectedPR?.head.ref ?? 'HEAD',
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'review' && !!selectedPR,
+            staleTime: 5_000,
+        }
+    );
+    const repoPolicyQuery = trpc.repo.policy.get.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: !!activeRepo && open, staleTime: 10_000 }
+    );
+    const reviewUpdateMutation = trpc.repo.review.update.useMutation();
+    const reviewResetMutation = trpc.repo.review.reset.useMutation();
+    const auditLogMutation = trpc.system.audit.log.useMutation();
 
     const saveAuthMutation = typedTrpc.git.setPullRequestAuth.useMutation({
         onSuccess: () => {
             toast.success('Pull request provider authentication updated');
+            auditLogMutation.mutate({
+                scope: 'system',
+                action: 'pr-auth-save',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Updated pull request authentication for ${provider}`,
+            });
             void authQuery.refetch();
         },
         onError: (error: unknown) => {
@@ -357,6 +395,18 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 return;
             }
             toast.success('Pull request created');
+            auditLogMutation.mutate({
+                scope: 'review',
+                action: 'pr-create',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Created pull request from ${prHead.trim()} to ${prBase.trim()}`,
+                metadata: {
+                    provider,
+                    head: prHead.trim(),
+                    base: prBase.trim(),
+                },
+            });
             resetCreateForm();
             setActiveTab('list');
             await pullRequestQuery.refetch();
@@ -375,6 +425,17 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 return;
             }
             toast.success('Pull request merged');
+            auditLogMutation.mutate({
+                scope: 'review',
+                action: 'pr-merge',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Merged pull request #${String(selectedPR?.number ?? '')}`.trim(),
+                metadata: {
+                    provider,
+                    mergeMethod,
+                },
+            });
             await pullRequestQuery.refetch();
             await utils.git.getPullRequest.invalidate();
             setSelectedPR(null);
@@ -391,6 +452,16 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 return;
             }
             toast.success('Pull request closed');
+            auditLogMutation.mutate({
+                scope: 'review',
+                action: 'pr-close',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Closed pull request #${String(selectedPR?.number ?? '')}`.trim(),
+                metadata: {
+                    provider,
+                },
+            });
             await pullRequestQuery.refetch();
             setSelectedPR(null);
         },
@@ -406,6 +477,16 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             }
             setCommentDraft('');
             await commentsQuery.refetch();
+            auditLogMutation.mutate({
+                scope: 'review',
+                action: 'pr-comment',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Commented on pull request #${String(selectedPR?.number ?? '')}`.trim(),
+                metadata: {
+                    provider,
+                },
+            });
             toast.success('Comment posted');
         },
         onError: (error: unknown) => {
@@ -532,6 +613,9 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const pullRequests = pullRequestQuery.data?.pullRequests ?? [];
     const queryError = pullRequestQuery.data?.error;
     const comments = commentsQuery.data?.comments ?? [];
+    const reviewSummary = reviewSummaryQuery.data as ReviewSummaryData | undefined;
+    const reviewProgress = reviewSummary?.progress;
+    const reviewFiles = reviewSummary?.files ?? [];
 
     const handleAddComment = () => {
         if (!activeRepo || !selectedPR) return;
@@ -545,6 +629,87 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             number: selectedPR.number,
             body: commentDraft.trim(),
         });
+    };
+
+    const handleMarkReviewFile = (filePath: string) => {
+        if (!activeRepo || !selectedPR || !reviewProgress) return;
+        const remainingFiles = reviewProgress.remainingFiles.filter((entry) => entry !== filePath);
+        reviewUpdateMutation.mutate(
+            {
+                repo: activeRepo,
+                reviewId: `${provider}:${String(selectedPR.number)}`,
+                lastViewedFile: filePath,
+                remainingFiles,
+            },
+            {
+                onSuccess: async () => {
+                    auditLogMutation.mutate({
+                        scope: 'review',
+                        action: 'review-file',
+                        repo: activeRepo,
+                        status: 'success',
+                        summary: `Reviewed ${filePath} in PR #${String(selectedPR.number)}`,
+                        metadata: {
+                            provider,
+                        },
+                    });
+                    await reviewSummaryQuery.refetch();
+                },
+            }
+        );
+    };
+
+    const handleResetReview = () => {
+        if (!activeRepo || !selectedPR) return;
+        reviewResetMutation.mutate(
+            {
+                repo: activeRepo,
+                reviewId: `${provider}:${String(selectedPR.number)}`,
+            },
+            {
+                onSuccess: async () => {
+                    auditLogMutation.mutate({
+                        scope: 'review',
+                        action: 'review-reset',
+                        repo: activeRepo,
+                        status: 'info',
+                        summary: `Reset review progress for PR #${String(selectedPR.number)}`,
+                        metadata: {
+                            provider,
+                        },
+                    });
+                    await reviewSummaryQuery.refetch();
+                },
+            }
+        );
+    };
+
+    const handleMarkAllReviewed = () => {
+        if (!activeRepo || !selectedPR) return;
+        reviewUpdateMutation.mutate(
+            {
+                repo: activeRepo,
+                reviewId: `${provider}:${String(selectedPR.number)}`,
+                lastViewedFile: reviewFiles[reviewFiles.length - 1] ?? null,
+                remainingFiles: [],
+            },
+            {
+                onSuccess: async () => {
+                    auditLogMutation.mutate({
+                        scope: 'review',
+                        action: 'review-complete',
+                        repo: activeRepo,
+                        status: 'success',
+                        summary: `Completed review for PR #${String(selectedPR.number)}`,
+                        metadata: {
+                            provider,
+                            files: reviewFiles.length,
+                        },
+                    });
+                    await reviewSummaryQuery.refetch();
+                },
+            }
+        );
     };
 
     return (
@@ -565,10 +730,11 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
 
                 <Tabs
                     value={activeTab}
-                    onValueChange={(value) => { setActiveTab(value as 'list' | 'create' | 'settings'); }}
+                    onValueChange={(value) => { setActiveTab(value as 'list' | 'review' | 'create' | 'settings'); }}
                     className='flex min-h-0 flex-1 flex-col'>
-                    <TabsList className='grid w-full grid-cols-3'>
+                    <TabsList className='grid w-full grid-cols-4'>
                         <TabsTrigger value='list'>Pull Requests</TabsTrigger>
+                        <TabsTrigger value='review'>Review</TabsTrigger>
                         <TabsTrigger value='create'>Create</TabsTrigger>
                         <TabsTrigger value='settings'>Settings</TabsTrigger>
                     </TabsList>
@@ -695,6 +861,23 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                             <p>Branch: {selectedPR.head.ref} → {selectedPR.base.ref}</p>
                                             <p>State: {selectedPR.draft ? 'draft' : selectedPR.state}</p>
                                         </div>
+                                        {repoPolicyQuery.data?.policy && (
+                                            <div className='rounded border border-amber-500/30 bg-amber-500/8 p-2 text-xs'>
+                                                <p className='font-medium text-foreground'>Repo policy guidance</p>
+                                                <p className='text-muted-foreground mt-1'>
+                                                    Allowed merge methods: {repoPolicyQuery.data.policy.allowedMergeStrategies.join(', ')}
+                                                </p>
+                                                {repoPolicyQuery.data.policy.requireUpToDate && (
+                                                    <p className='text-muted-foreground mt-1'>Branch should be up to date before merge.</p>
+                                                )}
+                                                {repoPolicyQuery.data.policy.requireSignedCommits && (
+                                                    <p className='text-muted-foreground mt-1'>Signed commits are expected for this repository.</p>
+                                                )}
+                                                {repoPolicyQuery.data.policy.customWorkflow && (
+                                                    <p className='text-muted-foreground mt-1'>{repoPolicyQuery.data.policy.customWorkflow}</p>
+                                                )}
+                                            </div>
+                                        )}
                                         {selectedPR.state === 'open' && (
                                             <div>
                                                 <label className='mb-1 block text-xs font-medium text-muted-foreground'>
@@ -710,6 +893,12 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                     <option value='squash'>Squash</option>
                                                     <option value='rebase'>Rebase</option>
                                                 </select>
+                                                {repoPolicyQuery.data?.policy &&
+                                                    !repoPolicyQuery.data.policy.allowedMergeStrategies.includes(mergeMethod) && (
+                                                        <p className='mt-1 text-xs text-amber-600'>
+                                                            Current merge method is outside repo policy guidance.
+                                                        </p>
+                                                    )}
                                             </div>
                                         )}
                                         <div className='space-y-2 rounded border p-2'>
@@ -796,6 +985,131 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                             </>
                                         )}
                                     </div>
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value='review' className='mt-4 flex min-h-0 flex-1 gap-4'>
+                        <div className='flex min-h-0 w-[280px] flex-col rounded-lg border'>
+                            <div className='bg-muted/40 flex items-center justify-between border-b px-3 py-2'>
+                                <p className='text-sm font-medium'>Open Reviews</p>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    onClick={() => void pullRequestQuery.refetch()}
+                                    disabled={pullRequestQuery.isFetching}>
+                                    {pullRequestQuery.isFetching ? <Loader2 className='h-4 w-4 animate-spin' /> : <RefreshCw className='h-4 w-4' />}
+                                </Button>
+                            </div>
+                            <ScrollArea className='flex-1'>
+                                <div className='space-y-2 p-2'>
+                                    {pullRequests
+                                        .filter((pr) => pr.state === 'open')
+                                        .map((pr) => (
+                                            <button
+                                                key={`review-${String(pr.id)}-${String(pr.number)}`}
+                                                type='button'
+                                                className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                                                    selectedPR?.id === pr.id ? 'bg-accent border-primary/50' : 'hover:bg-accent/50'
+                                                }`}
+                                                onClick={() => {
+                                                    setSelectedPR(pr);
+                                                }}>
+                                                <p className='truncate text-sm font-medium'>#{pr.number} {pr.title}</p>
+                                                <p className='text-muted-foreground mt-1 text-xs'>{pr.head.ref} → {pr.base.ref}</p>
+                                            </button>
+                                        ))}
+                                    {pullRequests.filter((pr) => pr.state === 'open').length === 0 && (
+                                        <p className='text-muted-foreground p-3 text-sm'>No open pull requests to review.</p>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+
+                        <div className='flex min-h-0 flex-1 flex-col rounded-lg border'>
+                            {!selectedPR ? (
+                                <div className='text-muted-foreground flex flex-1 items-center justify-center p-6 text-center text-sm'>
+                                    Select an open pull request to track review progress.
+                                </div>
+                            ) : reviewSummaryQuery.isFetching ? (
+                                <div className='flex flex-1 items-center justify-center'>
+                                    <Loader2 className='h-6 w-6 animate-spin' />
+                                </div>
+                            ) : reviewSummary?.error ? (
+                                <div className='text-muted-foreground flex flex-1 items-center justify-center p-6 text-center text-sm'>
+                                    {reviewSummary.error}
+                                </div>
+                            ) : (
+                                <div className='flex min-h-0 flex-1 flex-col'>
+                                    <div className='border-b px-4 py-3'>
+                                        <div className='flex items-center justify-between gap-3'>
+                                            <div>
+                                                <p className='text-sm font-semibold'>#{selectedPR.number} {selectedPR.title}</p>
+                                                <p className='text-muted-foreground text-xs'>{selectedPR.head.ref} → {selectedPR.base.ref}</p>
+                                            </div>
+                                            <div className='flex gap-2'>
+                                                <Button variant='outline' size='sm' onClick={handleResetReview} disabled={reviewResetMutation.isPending}>
+                                                    Reset
+                                                </Button>
+                                                <Button size='sm' onClick={handleMarkAllReviewed} disabled={reviewUpdateMutation.isPending || reviewFiles.length === 0}>
+                                                    Mark All Reviewed
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className='mt-3 grid grid-cols-4 gap-2 text-xs'>
+                                            <div className='rounded border p-2'>
+                                                <p className='text-muted-foreground'>Files</p>
+                                                <p className='text-sm font-semibold'>{reviewProgress?.totalFiles ?? reviewFiles.length}</p>
+                                            </div>
+                                            <div className='rounded border p-2'>
+                                                <p className='text-muted-foreground'>Reviewed</p>
+                                                <p className='text-sm font-semibold'>{reviewProgress?.reviewedCount ?? 0}</p>
+                                            </div>
+                                            <div className='rounded border p-2'>
+                                                <p className='text-muted-foreground'>Remaining</p>
+                                                <p className='text-sm font-semibold'>{reviewProgress?.remainingFiles.length ?? reviewFiles.length}</p>
+                                            </div>
+                                            <div className='rounded border p-2'>
+                                                <p className='text-muted-foreground'>Last Viewed</p>
+                                                <p className='truncate text-sm font-semibold'>{reviewProgress?.lastViewedFile ?? 'None'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <ScrollArea className='flex-1'>
+                                        <div className='space-y-2 p-4'>
+                                            {reviewFiles.map((filePath) => {
+                                                const reviewed = !(reviewProgress?.remainingFiles ?? reviewFiles).includes(filePath);
+                                                return (
+                                                    <div key={filePath} className='flex items-center justify-between gap-3 rounded-lg border p-3'>
+                                                        <div className='min-w-0'>
+                                                            <p className='truncate text-sm font-medium'>{filePath}</p>
+                                                            <p className='text-muted-foreground text-xs'>{reviewed ? 'Reviewed' : 'Needs review'}</p>
+                                                        </div>
+                                                        <Button
+                                                            size='sm'
+                                                            variant={reviewed ? 'outline' : 'default'}
+                                                            onClick={() => {
+                                                                handleMarkReviewFile(filePath);
+                                                            }}
+                                                            disabled={reviewed || reviewUpdateMutation.isPending}>
+                                                            {reviewed ? (
+                                                                <>
+                                                                    <Check className='mr-2 h-4 w-4' />
+                                                                    Reviewed
+                                                                </>
+                                                            ) : (
+                                                                'Mark Reviewed'
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })}
+                                            {reviewFiles.length === 0 && (
+                                                <p className='text-muted-foreground text-sm'>No changed files detected for this pull request.</p>
+                                            )}
+                                        </div>
+                                    </ScrollArea>
                                 </div>
                             )}
                         </div>

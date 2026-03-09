@@ -151,12 +151,47 @@ const PREDEFINED_TOOLS: DiffTool[] = [
 	},
 ];
 
-const STORAGE_KEY = 'git-graph-diff-tools';
-
 interface DiffToolConfig {
 	tools: DiffTool[];
 	selectedTool: string;
 	useForMergeConflicts: boolean;
+}
+
+const DEFAULT_DIFF_TOOL_CONFIG: DiffToolConfig = {
+    tools: PREDEFINED_TOOLS,
+    selectedTool: 'vscode',
+    useForMergeConflicts: false,
+};
+
+function useExternalDiffConfigState() {
+    const [config, setConfig] = useState<DiffToolConfig>(DEFAULT_DIFF_TOOL_CONFIG);
+    const utils = trpc.useUtils();
+    const configQuery = trpc.config.externalDiffConfig.useQuery(undefined, { staleTime: 10_000 });
+    const setConfigMutation = trpc.config.setExternalDiffConfig.useMutation({
+        onSuccess: async () => {
+            await utils.config.externalDiffConfig.invalidate();
+        },
+    });
+
+    useEffect(() => {
+        const stored = configQuery.data?.config;
+        if (!stored) {
+            return;
+        }
+
+        setConfig({
+            tools: stored.tools.length > 0 ? stored.tools : PREDEFINED_TOOLS,
+            selectedTool: stored.selectedTool || 'vscode',
+            useForMergeConflicts: stored.useForMergeConflicts,
+        });
+    }, [configQuery.data?.config]);
+
+    const persistConfig = (nextConfig: DiffToolConfig) => {
+        setConfig(nextConfig);
+        setConfigMutation.mutate(nextConfig);
+    };
+
+    return { config, persistConfig };
 }
 
 export function ExternalDiffConfig({
@@ -166,21 +201,7 @@ export function ExternalDiffConfig({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const [config, setConfig] = useState<DiffToolConfig>(() => {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			try {
-				return JSON.parse(stored);
-			} catch {
-				// Use defaults
-			}
-		}
-		return {
-			tools: PREDEFINED_TOOLS,
-			selectedTool: 'vscode',
-			useForMergeConflicts: false,
-		};
-	});
+	const { config, persistConfig } = useExternalDiffConfigState();
 
 	const [editingTool, setEditingTool] = useState<DiffTool | null>(null);
 	const [isAddingCustom, setIsAddingCustom] = useState(false);
@@ -190,21 +211,16 @@ export function ExternalDiffConfig({
 		args: '$LOCAL $REMOTE',
 	});
 
-	// Save config
-	useEffect(() => {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-	}, [config]);
-
 	const selectedToolInfo = useMemo(() => {
 		return config.tools.find(t => t.id === config.selectedTool);
 	}, [config.tools, config.selectedTool]);
 
 	const handleSelectTool = (toolId: string) => {
-		setConfig(prev => ({ ...prev, selectedTool: toolId }));
+		persistConfig({ ...config, selectedTool: toolId });
 	};
 
 	const handleToggleMergeConflicts = (enabled: boolean) => {
-		setConfig(prev => ({ ...prev, useForMergeConflicts: enabled }));
+		persistConfig({ ...config, useForMergeConflicts: enabled });
 	};
 
 	const handleAddCustomTool = () => {
@@ -222,10 +238,10 @@ export function ExternalDiffConfig({
 			supportsDirDiff: false,
 		};
 
-		setConfig(prev => ({
-			...prev,
-			tools: [...prev.tools, newTool],
-		}));
+		persistConfig({
+            ...config,
+            tools: [...config.tools, newTool],
+        });
 
 		setCustomTool({ name: '', command: '', args: '$LOCAL $REMOTE' });
 		setIsAddingCustom(false);
@@ -234,11 +250,11 @@ export function ExternalDiffConfig({
 
 	const handleDeleteTool = (toolId: string) => {
 		if (toolId.startsWith('custom-')) {
-			setConfig(prev => ({
-				...prev,
-				tools: prev.tools.filter(t => t.id !== toolId),
-				selectedTool: prev.selectedTool === toolId ? 'vscode' : prev.selectedTool,
-			}));
+			persistConfig({
+                ...config,
+                tools: config.tools.filter(t => t.id !== toolId),
+                selectedTool: config.selectedTool === toolId ? 'vscode' : config.selectedTool,
+            });
 		} else {
 			toast.error('Cannot delete predefined tools');
 		}
@@ -445,16 +461,20 @@ export function OpenInExternalDiffButton({
 	variant?: 'ghost' | 'outline' | 'default';
 }) {
 	const { activeRepo } = useAppStore();
-	const [isOpen, setIsOpen] = useState(false);
+    const configQuery = trpc.config.externalDiffConfig.useQuery(undefined, { staleTime: 10_000 });
 
 	const handleOpen = async () => {
-		// Get diff tool config
-		const config: DiffToolConfig = JSON.parse(
-			localStorage.getItem(STORAGE_KEY) || '{"selectedTool":"vscode"}'
-		);
+		const config = configQuery.data?.config;
+        const resolvedConfig: DiffToolConfig = config
+            ? {
+                  tools: config.tools.length > 0 ? config.tools : PREDEFINED_TOOLS,
+                  selectedTool: config.selectedTool || 'vscode',
+                  useForMergeConflicts: config.useForMergeConflicts,
+              }
+            : DEFAULT_DIFF_TOOL_CONFIG;
 
-		const tool = PREDEFINED_TOOLS.find(t => t.id === config.selectedTool) ||
-			config.tools.find(t => t.id === config.selectedTool);
+		const tool = PREDEFINED_TOOLS.find(t => t.id === resolvedConfig.selectedTool) ||
+			resolvedConfig.tools.find(t => t.id === resolvedConfig.selectedTool);
 
 		if (!tool) {
 			toast.error('No diff tool configured');
@@ -487,14 +507,20 @@ export function OpenInExternalDiffButton({
 
 // Hook to get current diff tool
 export function useDiffTool() {
+    const configQuery = trpc.config.externalDiffConfig.useQuery(undefined, { staleTime: 10_000 });
 	return useMemo(() => {
-		const config: DiffToolConfig = JSON.parse(
-			localStorage.getItem(STORAGE_KEY) || '{"selectedTool":"vscode"}'
-		);
-		return PREDEFINED_TOOLS.find(t => t.id === config.selectedTool) ||
-			config.tools.find(t => t.id === config.selectedTool) ||
+        const config = configQuery.data?.config;
+        const resolvedConfig: DiffToolConfig = config
+            ? {
+                  tools: config.tools.length > 0 ? config.tools : PREDEFINED_TOOLS,
+                  selectedTool: config.selectedTool || 'vscode',
+                  useForMergeConflicts: config.useForMergeConflicts,
+              }
+            : DEFAULT_DIFF_TOOL_CONFIG;
+		return PREDEFINED_TOOLS.find(t => t.id === resolvedConfig.selectedTool) ||
+			resolvedConfig.tools.find(t => t.id === resolvedConfig.selectedTool) ||
 			PREDEFINED_TOOLS[0];
-	}, []);
+	}, [configQuery.data?.config]);
 }
 
 export default ExternalDiffConfig;

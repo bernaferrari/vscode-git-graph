@@ -9,6 +9,68 @@ import { configStore, appStore, instanceStore } from '@/app/backend/store';
 
 import { router, publicProcedure } from '../../init';
 
+const commitTemplateSchema = z.object({
+	id: z.string().min(1),
+	name: z.string().min(1),
+	description: z.string().optional(),
+	content: z.string().min(1),
+	isDefault: z.boolean().optional(),
+});
+const diffToolSchema = z.object({
+	id: z.string().min(1),
+	name: z.string().min(1),
+	command: z.string().min(1),
+	args: z.string().min(1),
+	supports3Way: z.boolean(),
+	supportsDirDiff: z.boolean(),
+	icon: z.string().optional(),
+});
+const externalDiffConfigSchema = z.object({
+	tools: z.array(diffToolSchema),
+	selectedTool: z.string().min(1),
+	useForMergeConflicts: z.boolean(),
+});
+const issueTrackerConfigSchema = z.object({
+	providers: z.record(
+		z.string(),
+		z.object({
+			enabled: z.boolean(),
+			apiKey: z.string().optional(),
+			domain: z.string().optional(),
+			projectKey: z.string().optional(),
+		})
+	),
+	autoDetect: z.boolean(),
+	patterns: z.array(z.string()),
+});
+const gitGraphSettingsSchema = z.object({
+	confirmDestructiveActions: z.boolean(),
+	autoFetchInterval: z.number(),
+	checkForUpdates: z.boolean(),
+	launchAtStartup: z.boolean(),
+	lensMode: z.enum(['guided', 'craft', 'control']),
+	theme: z.enum(['light', 'dark', 'system']),
+	graphTheme: z.enum(['default', 'colorful', 'minimal']),
+	commitMessageLength: z.number(),
+	showAvatars: z.boolean(),
+	showRelativeDates: z.boolean(),
+	dateFormat: z.enum(['relative', 'iso', 'locale']),
+	enhancedAccessibility: z.boolean(),
+	commitTemplate: z.string(),
+	autoSignCommits: z.boolean(),
+	defaultBranch: z.string(),
+	mergeTool: z.string(),
+	notifyOnPush: z.boolean(),
+	notifyOnPull: z.boolean(),
+	notifyOnMerge: z.boolean(),
+	soundEnabled: z.boolean(),
+	maxCommits: z.number(),
+	enableVirtualization: z.boolean(),
+	lazyLoadImages: z.boolean(),
+	telemetryEnabled: z.boolean(),
+	crashReports: z.boolean(),
+});
+
 export const configRouter = router({
 	/**
 	 * Get all configuration.
@@ -238,6 +300,80 @@ export const configRouter = router({
 			overrides: instanceStore.get('keybindingOverrides'),
 		};
 	}),
+
+	commitTemplates: publicProcedure.query(() => {
+		return {
+			templates: appStore.get('commitTemplates'),
+		};
+	}),
+
+	setCommitTemplates: publicProcedure
+		.input(
+			z.object({
+				templates: z.array(commitTemplateSchema),
+			})
+		)
+		.mutation(({ input }) => {
+			appStore.set('commitTemplates', input.templates);
+			return { success: true };
+		}),
+
+	externalDiffConfig: publicProcedure.query(() => {
+		return {
+			config: appStore.get('externalDiffConfig'),
+		};
+	}),
+
+	setExternalDiffConfig: publicProcedure
+		.input(externalDiffConfigSchema)
+		.mutation(({ input }) => {
+			appStore.set('externalDiffConfig', input);
+			return { success: true };
+		}),
+
+	issueTrackerConfig: publicProcedure.query(() => {
+		return {
+			config: appStore.get('issueTrackerConfig'),
+		};
+	}),
+
+	setIssueTrackerConfig: publicProcedure
+		.input(issueTrackerConfigSchema)
+		.mutation(({ input }) => {
+			appStore.set('issueTrackerConfig', input);
+			return { success: true };
+		}),
+
+	settings: publicProcedure.query(() => {
+		return {
+			settings: appStore.get('gitGraphSettings'),
+		};
+	}),
+
+	setSettings: publicProcedure
+		.input(gitGraphSettingsSchema)
+		.mutation(({ input }) => {
+			appStore.set('gitGraphSettings', input);
+			return { success: true };
+		}),
+
+	onboardingState: publicProcedure.query(() => {
+		return {
+			state: appStore.get('onboardingState'),
+		};
+	}),
+
+	setOnboardingState: publicProcedure
+		.input(
+			z.object({
+				gitGraphCompleted: z.boolean().optional(),
+			})
+		)
+		.mutation(({ input }) => {
+			const current = appStore.get('onboardingState');
+			appStore.set('onboardingState', { ...current, ...input });
+			return { success: true };
+		}),
 
 	setKeybindings: publicProcedure
 		.input(

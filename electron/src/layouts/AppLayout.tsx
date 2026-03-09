@@ -16,11 +16,6 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
-import {
-    GIT_GRAPH_SETTINGS_STORAGE_KEY,
-    GIT_GRAPH_SETTINGS_UPDATED_EVENT,
-    readGitGraphUiSettingsFromStorage,
-} from '@/lib/gitGraphSettings';
 import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
@@ -93,8 +88,6 @@ export default function AppLayout() {
     const { openRepositoryDialog, activateRepoPath, isRepoLoading, isRepoBusy } = useRepoActivation();
     const [repoLoadingStartedAt, setRepoLoadingStartedAt] = useState<number | null>(null);
     const [repoLoadingNow, setRepoLoadingNow] = useState(() => Date.now());
-    const [uiSettings, setUiSettings] = useState(() => readGitGraphUiSettingsFromStorage());
-
     useEffect(() => {
         const platform = getPlatform();
         document.documentElement.classList.add(`platform-${platform}`);
@@ -107,23 +100,14 @@ export default function AppLayout() {
         return scheduleGitGraphPreload({ delayMs: 1200 });
     }, []);
 
-    useEffect(() => {
-        const handleStorage = (event: StorageEvent) => {
-            if (event.key === GIT_GRAPH_SETTINGS_STORAGE_KEY) {
-                setUiSettings(readGitGraphUiSettingsFromStorage());
-            }
-        };
-        const handleSettingsUpdate = () => {
-            setUiSettings(readGitGraphUiSettingsFromStorage());
-        };
-
-        window.addEventListener('storage', handleStorage);
-        window.addEventListener(GIT_GRAPH_SETTINGS_UPDATED_EVENT, handleSettingsUpdate);
-        return () => {
-            window.removeEventListener('storage', handleStorage);
-            window.removeEventListener(GIT_GRAPH_SETTINGS_UPDATED_EVENT, handleSettingsUpdate);
-        };
-    }, []);
+    const settingsQuery = trpc.config.settings.useQuery(undefined, { staleTime: 10_000 });
+    const uiSettings = useMemo(
+        () => ({
+            theme: settingsQuery.data?.settings.theme ?? 'system',
+            enhancedAccessibility: settingsQuery.data?.settings.enhancedAccessibility ?? false,
+        }),
+        [settingsQuery.data?.settings.enhancedAccessibility, settingsQuery.data?.settings.theme]
+    );
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

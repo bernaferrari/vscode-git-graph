@@ -27,6 +27,7 @@ import {
 	Sparkles,
 	X,
 } from 'lucide-react';
+import { trpc } from '@/trpc/client';
 
 interface OnboardingStep {
 	id: string;
@@ -36,8 +37,6 @@ interface OnboardingStep {
 	content: React.ReactNode;
 }
 
-const ONBOARDING_KEY = 'git-graph-onboarding-complete';
-
 export function OnboardingDialog({
 	open,
 	onOpenChange,
@@ -46,6 +45,12 @@ export function OnboardingDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const [currentStep, setCurrentStep] = useState(0);
+    const utils = trpc.useUtils();
+    const setOnboardingStateMutation = trpc.config.setOnboardingState.useMutation({
+        onSuccess: async () => {
+            await utils.config.onboardingState.invalidate();
+        },
+    });
 
 	const steps: OnboardingStep[] = [
 		{
@@ -232,7 +237,7 @@ export function OnboardingDialog({
 	};
 
 	const completeOnboarding = () => {
-		localStorage.setItem(ONBOARDING_KEY, 'true');
+		setOnboardingStateMutation.mutate({ gitGraphCompleted: true });
 		onOpenChange(false);
 	};
 
@@ -297,14 +302,20 @@ export function OnboardingDialog({
 // Hook to check if onboarding should be shown
 export function useOnboarding() {
 	const [shouldShow, setShouldShow] = useState(false);
+    const onboardingQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
+    const utils = trpc.useUtils();
+    const setOnboardingStateMutation = trpc.config.setOnboardingState.useMutation({
+        onSuccess: async () => {
+            await utils.config.onboardingState.invalidate();
+        },
+    });
 
 	useEffect(() => {
-		const completed = localStorage.getItem(ONBOARDING_KEY);
-		setShouldShow(!completed);
-	}, []);
+		setShouldShow(!onboardingQuery.data?.state.gitGraphCompleted);
+	}, [onboardingQuery.data?.state.gitGraphCompleted]);
 
 	const completeOnboarding = () => {
-		localStorage.setItem(ONBOARDING_KEY, 'true');
+		setOnboardingStateMutation.mutate({ gitGraphCompleted: true });
 		setShouldShow(false);
 	};
 

@@ -65,9 +65,26 @@ export function useGitOperations() {
         removeOperation,
     } = useAppStore();
     const utils = trpc.useUtils();
-    const logOperation = useCallback((operation: LoggedOperation) => {
-        useOperationLog.getState().addOperation(operation);
-    }, []);
+    const auditLogMutation = trpc.system.audit.log.useMutation();
+    const logOperation = useCallback(
+        (operation: LoggedOperation) => {
+            useOperationLog.getState().addOperation(operation);
+            auditLogMutation.mutate({
+                scope: 'git',
+                action: operation.type,
+                repo: activeRepo ?? null,
+                status: operation.status === 'failed' ? 'failed' : 'success',
+                summary: operation.description,
+                details: operation.details,
+                metadata: {
+                    gitCommands: operation.gitCommands,
+                    affectedBranches: operation.affectedBranches,
+                    affectedCommits: operation.affectedCommits,
+                },
+            });
+        },
+        [activeRepo, auditLogMutation]
+    );
     const { data: repoInfo } = trpc.git.repoInfo.useQuery(
         {
             repo: activeRepo ?? '',

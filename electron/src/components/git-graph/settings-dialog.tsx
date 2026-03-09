@@ -25,10 +25,12 @@ import {
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 import { useSettings } from './useSettings';
+import { useAppStore } from '@/lib/store';
 
 interface SettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    initialTab?: 'general' | 'appearance' | 'editor' | 'notifications' | 'performance' | 'integrations' | 'privacy';
 }
 
 interface FeatureFlagsState {
@@ -57,6 +59,15 @@ interface AIConfigState {
     };
 }
 
+interface RepoPolicyState {
+    requireSignedCommits: boolean;
+    allowedMergeStrategies: Array<'merge' | 'rebase' | 'squash'>;
+    requireUpToDate: boolean;
+    enableStacking: boolean;
+    defaultStackBase: string;
+    customWorkflow: string;
+}
+
 const DEFAULT_FEATURE_FLAGS: FeatureFlagsState = {
     worktreePro: true,
     workflowEngine: true,
@@ -83,12 +94,31 @@ const DEFAULT_AI_CONFIG: AIConfigState = {
     },
 };
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+const DEFAULT_REPO_POLICY: RepoPolicyState = {
+    requireSignedCommits: false,
+    allowedMergeStrategies: ['merge', 'rebase', 'squash'],
+    requireUpToDate: false,
+    enableStacking: false,
+    defaultStackBase: 'main',
+    customWorkflow: '',
+};
+
+export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: SettingsDialogProps) {
+    const { activeRepo } = useAppStore();
     const { settings, updateSetting, resetSettings } = useSettings();
-    const [activeTab, setActiveTab] = useState('general');
+    const [activeTab, setActiveTab] = useState(initialTab);
     const utils = trpc.useUtils();
     const configQuery = trpc.config.getAll.useQuery(undefined, { enabled: open, staleTime: 10_000 });
     const aiConfigQuery = trpc.ai.getConfig.useQuery(undefined, { enabled: open, staleTime: 10_000 });
+    const diagnosticsQuery = trpc.system.diagnostics.useQuery(undefined, { enabled: open, staleTime: 10_000 });
+    const auditLogQuery = trpc.system.audit.list.useQuery(
+        { repo: activeRepo ?? null, limit: 20 },
+        { enabled: open, staleTime: 5_000 }
+    );
+    const repoPolicyQuery = trpc.repo.policy.get.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: open && !!activeRepo, staleTime: 10_000 }
+    );
     const saveFeatureFlagsMutation = trpc.config.setUi.useMutation({
         onSuccess: () => {
             toast.success('Feature flags saved');
@@ -117,9 +147,33 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             toast.error(error.message);
         },
     });
+    const auditLogMutation = trpc.system.audit.log.useMutation();
+    const saveRepoPolicyMutation = trpc.repo.policy.set.useMutation({
+        onSuccess: () => {
+            toast.success('Repo policy saved');
+            auditLogMutation.mutate({
+                scope: 'policy',
+                action: 'repo-policy-save',
+                repo: activeRepo ?? null,
+                status: 'success',
+                summary: `Updated repo policy for ${activeRepo ?? 'repository'}`,
+            });
+            void repoPolicyQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
     const [featureFlags, setFeatureFlags] = useState<FeatureFlagsState>(DEFAULT_FEATURE_FLAGS);
     const [aiConfig, setAiConfig] = useState<AIConfigState>(DEFAULT_AI_CONFIG);
+    const [repoPolicy, setRepoPolicy] = useState<RepoPolicyState>(DEFAULT_REPO_POLICY);
     const [runtimeApiKey, setRuntimeApiKey] = useState('');
+
+    useEffect(() => {
+        if (open) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab, open]);
 
     useEffect(() => {
         const ui = configQuery.data?.ui;
@@ -156,6 +210,24 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         });
     }, [aiConfigQuery.data]);
 
+    useEffect(() => {
+        const policy = repoPolicyQuery.data?.policy;
+        if (!policy) {
+            setRepoPolicy(DEFAULT_REPO_POLICY);
+            return;
+        }
+        setRepoPolicy({
+            requireSignedCommits: Boolean(policy.requireSignedCommits),
+            allowedMergeStrategies: Array.isArray(policy.allowedMergeStrategies) && policy.allowedMergeStrategies.length > 0
+                ? policy.allowedMergeStrategies
+                : DEFAULT_REPO_POLICY.allowedMergeStrategies,
+            requireUpToDate: Boolean(policy.requireUpToDate),
+            enableStacking: Boolean(policy.enableStacking),
+            defaultStackBase: policy.defaultStackBase || 'main',
+            customWorkflow: policy.customWorkflow || '',
+        });
+    }, [repoPolicyQuery.data?.policy]);
+
     const handleSaveFeatureFlags = () => {
         saveFeatureFlagsMutation.mutate({
             featureFlags,
@@ -177,6 +249,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             return;
         }
         saveRuntimeApiKeyMutation.mutate({ apiKey: runtimeApiKey.trim() });
+    };
+
+    const handleSaveRepoPolicy = () => {
+        if (!activeRepo) {
+            toast.error('No active repository');
+            return;
+        }
+        saveRepoPolicyMutation.mutate({
+            repo: activeRepo,
+            policy: repoPolicy,
+        });
     };
 
     return (
@@ -717,6 +800,156 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                         {saveAIConfigMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
                                         Save AI Settings
                                     </Button>
+                                </div>
+                            </SettingsSection>
+
+                            <SettingsSection title='Repo Policy' icon={<Shield className='h-4 w-4' />}>
+                                {!activeRepo ? (
+                                    <p className='text-muted-foreground text-sm'>Open a repository to configure repo-specific policy guidance.</p>
+                                ) : (
+                                    <>
+                                        <SettingRow
+                                            label='Require signed commits'
+                                            description='Surface policy guidance when commit signing is expected for this repository'>
+                                            <Switch
+                                                checked={repoPolicy.requireSignedCommits}
+                                                onCheckedChange={(value) =>
+                                                    setRepoPolicy((previous) => ({ ...previous, requireSignedCommits: value }))
+                                                }
+                                            />
+                                        </SettingRow>
+                                        <SettingRow
+                                            label='Require up-to-date branch'
+                                            description='Guide merges and reviews toward rebasing or updating before integration'>
+                                            <Switch
+                                                checked={repoPolicy.requireUpToDate}
+                                                onCheckedChange={(value) =>
+                                                    setRepoPolicy((previous) => ({ ...previous, requireUpToDate: value }))
+                                                }
+                                            />
+                                        </SettingRow>
+                                        <SettingRow
+                                            label='Enable stacking guidance'
+                                            description='Mark this repository as stack-friendly for stacked branch workflows'>
+                                            <Switch
+                                                checked={repoPolicy.enableStacking}
+                                                onCheckedChange={(value) =>
+                                                    setRepoPolicy((previous) => ({ ...previous, enableStacking: value }))
+                                                }
+                                            />
+                                        </SettingRow>
+                                        <SettingRow
+                                            label='Default stack base'
+                                            description='Base branch used for stack-aware workflows and review guidance'>
+                                            <Input
+                                                className='w-32'
+                                                value={repoPolicy.defaultStackBase}
+                                                onChange={(event) =>
+                                                    setRepoPolicy((previous) => ({ ...previous, defaultStackBase: event.target.value }))
+                                                }
+                                            />
+                                        </SettingRow>
+                                        <SettingRow
+                                            label='Allowed merge strategies'
+                                            description='Restrict preferred integration strategies for pull requests'>
+                                            <div className='flex gap-4 text-sm'>
+                                                {(['merge', 'rebase', 'squash'] as const).map((strategy) => {
+                                                    const checked = repoPolicy.allowedMergeStrategies.includes(strategy);
+                                                    return (
+                                                        <label key={strategy} className='flex items-center gap-2'>
+                                                            <input
+                                                                type='checkbox'
+                                                                checked={checked}
+                                                                onChange={(event) => {
+                                                                    setRepoPolicy((previous) => {
+                                                                        const next = event.target.checked
+                                                                            ? [...previous.allowedMergeStrategies, strategy]
+                                                                            : previous.allowedMergeStrategies.filter((entry) => entry !== strategy);
+                                                                        return {
+                                                                            ...previous,
+                                                                            allowedMergeStrategies: next.length > 0 ? next : previous.allowedMergeStrategies,
+                                                                        };
+                                                                    });
+                                                                }}
+                                                            />
+                                                            <span className='capitalize'>{strategy}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </SettingRow>
+                                        <SettingRow
+                                            label='Workflow guidance'
+                                            description='Freeform policy note shown to operators and reviewers'>
+                                            <Input
+                                                className='w-80'
+                                                placeholder='Example: Rebase stacks onto main before merge.'
+                                                value={repoPolicy.customWorkflow}
+                                                onChange={(event) =>
+                                                    setRepoPolicy((previous) => ({ ...previous, customWorkflow: event.target.value }))
+                                                }
+                                            />
+                                        </SettingRow>
+                                        <div className='flex justify-end pt-2'>
+                                            <Button onClick={handleSaveRepoPolicy} disabled={saveRepoPolicyMutation.isPending}>
+                                                {saveRepoPolicyMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+                                                Save Repo Policy
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </SettingsSection>
+
+                            <SettingsSection title='Diagnostics' icon={<HardDrive className='h-4 w-4' />}>
+                                <SettingRow
+                                    label='Protocol registration'
+                                    description='Desktop deep links require the app to own the `gitgraph://` protocol'>
+                                    <span className='text-sm'>
+                                        {diagnosticsQuery.data?.protocolRegistered ? 'Registered' : 'Not registered'}
+                                    </span>
+                                </SettingRow>
+                                <SettingRow
+                                    label='App version'
+                                    description='Current packaged or development build identity'>
+                                    <span className='text-sm'>
+                                        {diagnosticsQuery.data?.appVersion ?? 'Unknown'} ({diagnosticsQuery.data?.platform ?? 'unknown'}/{diagnosticsQuery.data?.arch ?? 'unknown'})
+                                    </span>
+                                </SettingRow>
+                                <SettingRow
+                                    label='Packaging mode'
+                                    description='Use this to confirm protocol/update behavior in dev versus packaged builds'>
+                                    <span className='text-sm'>
+                                        {diagnosticsQuery.data?.isPackaged ? 'Packaged build' : 'Development build'}
+                                    </span>
+                                </SettingRow>
+                                <SettingRow
+                                    label='CLI helper'
+                                    description='Installed wrapper path used for `gg open`, `gg diff`, and related entrypoints'>
+                                    <span className='max-w-[320px] truncate text-sm'>{diagnosticsQuery.data?.ggScriptPath ?? 'Unavailable'}</span>
+                                </SettingRow>
+                            </SettingsSection>
+
+                            <SettingsSection title='Audit Log' icon={<Bell className='h-4 w-4' />}>
+                                <div className='space-y-2'>
+                                    {(auditLogQuery.data?.entries ?? []).map((entry) => (
+                                        <div key={entry.id} className='rounded-lg border px-3 py-2'>
+                                            <div className='flex items-center justify-between gap-3'>
+                                                <p className='text-sm font-medium'>{entry.summary}</p>
+                                                <span className='text-muted-foreground text-xs'>
+                                                    {new Date(entry.timestamp).toLocaleString()}
+                                                </span>
+                                            </div>
+                                            <p className='text-muted-foreground mt-1 text-xs'>
+                                                {entry.scope} · {entry.status}{entry.repo ? ` · ${entry.repo}` : ''}
+                                            </p>
+                                            {entry.details && (
+                                                <p className='text-muted-foreground mt-1 text-xs'>{entry.details}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {(auditLogQuery.data?.entries ?? []).length === 0 && (
+                                        <p className='text-muted-foreground text-sm'>No audit entries yet for this scope.</p>
+                                    )}
                                 </div>
                             </SettingsSection>
                         </TabsContent>

@@ -10,6 +10,13 @@ import { z } from 'zod';
 import type { GitRepoState } from '@/web/lib/types';
 
 import { appStore, instanceStore } from '@/app/backend/store';
+import { listAuditEntries } from '@/app/backend/store/audit';
+import {
+	getCodeReviewProgress,
+	resetCodeReviewProgress,
+	updateCodeReviewProgress,
+} from '@/app/backend/store/codeReviews';
+import { getRepoPolicy, repoPolicySchema, upsertRepoPolicy } from '@/app/backend/store/repoPolicies';
 
 import { findGit } from '../../../services/gitExecutable';
 import { getGitService } from '../../../services/gitService';
@@ -83,6 +90,33 @@ const workspaceSchema = z.object({
 	repos: z.array(workspaceRepoSchema),
 	createdAt: z.number(),
 	updatedAt: z.number(),
+});
+
+const commitFilterStateSchema = z.object({
+	repo: z.string().min(1),
+	author: z.string().optional(),
+	filePath: z.string().optional(),
+	search: z.string().optional(),
+	dateFrom: z.string().optional(),
+	dateTo: z.string().optional(),
+});
+
+const pinnedCommitSchema = z.object({
+	hash: z.string().min(1),
+	message: z.string().min(1),
+	author: z.string().min(1),
+	date: z.string().min(1),
+	branch: z.string().optional(),
+	pinnedAt: z.number(),
+	note: z.string().optional(),
+});
+const recentRepoSchema = z.object({
+	path: z.string().min(1),
+	name: z.string().min(1),
+	lastOpened: z.number(),
+	openCount: z.number(),
+	pinned: z.boolean(),
+	currentBranch: z.string().optional(),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -360,6 +394,216 @@ export const repoRouter = router({
 					list.filter((workspace) => workspace.id !== input.id)
 				);
 				return { success: true };
+		}),
+	}),
+
+	commitFilters: publicProcedure
+		.input(
+			z.object({
+				repo: z.string().min(1),
+			})
+		)
+		.query(({ input }) => {
+			const current = instanceStore.get('commitFiltersByRepo');
+			return {
+				filters: current?.[input.repo] ?? {},
+			};
+		}),
+
+	setCommitFilters: publicProcedure
+		.input(commitFilterStateSchema)
+		.mutation(({ input }) => {
+			const current = instanceStore.get('commitFiltersByRepo') ?? {};
+			const { repo, ...filters } = input;
+			const nextFilters = Object.fromEntries(
+				Object.entries(filters).filter(([, value]) => typeof value === 'string' && value.length > 0)
+			);
+			instanceStore.set('commitFiltersByRepo', {
+				...current,
+				[repo]: nextFilters,
+			});
+			return {
+				success: true,
+				filters: nextFilters,
+			};
+		}),
+
+	pinnedCommits: publicProcedure
+		.input(
+			z.object({
+				repo: z.string().min(1),
+			})
+		)
+		.query(({ input }) => {
+			const current = instanceStore.get('pinnedCommitsByRepo') ?? {};
+			return {
+				commits: current[input.repo] ?? [],
+			};
+		}),
+
+	setPinnedCommits: publicProcedure
+		.input(
+			z.object({
+				repo: z.string().min(1),
+				commits: z.array(pinnedCommitSchema),
+			})
+		)
+		.mutation(({ input }) => {
+			const current = instanceStore.get('pinnedCommitsByRepo') ?? {};
+			instanceStore.set('pinnedCommitsByRepo', {
+				...current,
+				[input.repo]: input.commits,
+			});
+			return {
+				success: true,
+				commits: input.commits,
+			};
+		}),
+
+	recentRepoDetails: publicProcedure.query(() => {
+		return {
+			repos: instanceStore.get('recentRepoDetails') ?? [],
+		};
+	}),
+
+	setRecentRepoDetails: publicProcedure
+		.input(
+			z.object({
+				repos: z.array(recentRepoSchema),
+			})
+		)
+		.mutation(({ input }) => {
+			instanceStore.set('recentRepoDetails', input.repos);
+			return {
+				success: true,
+				repos: input.repos,
+			};
+		}),
+
+	policy: router({
+		get: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().min(1),
+				})
+			)
+			.query(({ input }) => {
+				const policy = getRepoPolicy(input.repo);
+				return { policy, error: null as string | null };
+			}),
+
+		set: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().min(1),
+					policy: repoPolicySchema.partial(),
+				})
+			)
+			.mutation(({ input }) => {
+				const nextPolicy = upsertRepoPolicy(input.repo, input.policy);
+				return { success: true, policy: nextPolicy };
+			}),
+	}),
+
+	review: router({
+		summary: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().min(1),
+					reviewId: z.string().min(1),
+					baseRef: z.string().min(1),
+					headRef: z.string().min(1),
+				})
+			)
+			.query(async ({ input }) => {
+				const initError = await ensureGitInitialized();
+				if (initError !== null) {
+					return {
+						files: [] as string[],
+						progress: null,
+						error: initError,
+					};
+				}
+
+				const root = await getGitService().getRepoRoot(input.repo);
+				if (!root) {
+					return {
+						files: [] as string[],
+						progress: null,
+						error: 'Not a Git repository.',
+					};
+				}
+
+				const diffOutput = await getGitService().runGitCommandWithOutput(
+					['diff', '--name-only', `${input.baseRef}...${input.headRef}`],
+					root
+				);
+				const files = (diffOutput ?? '')
+					.split('\n')
+					.map((file) => file.trim())
+					.filter(Boolean);
+				const progress = getCodeReviewProgress(root, input.reviewId) ?? {
+					lastActive: 0,
+					lastViewedFile: null,
+					remainingFiles: files,
+				};
+				const normalizedRemaining = progress.remainingFiles.filter((file) => files.includes(file));
+				const effectiveRemaining = normalizedRemaining.length > 0 || files.length === 0 ? normalizedRemaining : files;
+
+				return {
+					files,
+					progress: {
+						lastActive: progress.lastActive,
+						lastViewedFile: progress.lastViewedFile,
+						remainingFiles: effectiveRemaining,
+						reviewedCount: Math.max(0, files.length - effectiveRemaining.length),
+						totalFiles: files.length,
+					},
+					error: null as string | null,
+				};
+			}),
+
+		update: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().min(1),
+					reviewId: z.string().min(1),
+					lastViewedFile: z.string().nullable().optional(),
+					remainingFiles: z.array(z.string()).optional(),
+				})
+			)
+			.mutation(({ input }) => {
+				const next = updateCodeReviewProgress(input.repo, input.reviewId, {
+					...(input.lastViewedFile !== undefined ? { lastViewedFile: input.lastViewedFile } : {}),
+					...(input.remainingFiles ? { remainingFiles: input.remainingFiles } : {}),
+				});
+				return { success: true, progress: next };
+			}),
+
+		reset: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().min(1),
+					reviewId: z.string().min(1),
+				})
+			)
+			.mutation(({ input }) => {
+				resetCodeReviewProgress(input.repo, input.reviewId);
+				return { success: true };
+			}),
+	}),
+
+	audit: router({
+		list: publicProcedure
+			.input(
+				z.object({
+					repo: z.string().nullable().optional(),
+					limit: z.number().int().min(1).max(500).optional().default(100),
+				})
+			)
+			.query(({ input }) => {
+				const entries = listAuditEntries(input.repo, input.limit);
+				return { entries, error: null as string | null };
 			}),
 	}),
 

@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -207,48 +206,48 @@ export function PinnedCommitsDialog({
 	);
 }
 
-// Hook for managing pinned commits (persisted to localStorage)
+// Hook for managing pinned commits (persisted in backend store)
 export function usePinnedCommits(repoId: string | null) {
-	const storageKey = repoId ? `pinned-commits:${repoId}` : null;
-
 	const [pinnedCommits, setPinnedCommits] = useState<PinnedCommit[]>([]);
+    const utils = trpc.useUtils();
+    const pinnedCommitsQuery = trpc.repo.pinnedCommits.useQuery(
+        { repo: repoId ?? '' },
+        { enabled: !!repoId, staleTime: 10_000 }
+    );
+    const setPinnedCommitsMutation = trpc.repo.setPinnedCommits.useMutation({
+        onSuccess: async (_, variables) => {
+            await utils.repo.pinnedCommits.invalidate({ repo: variables.repo });
+        },
+    });
 
 	useEffect(() => {
-		if (storageKey) {
-			const stored = localStorage.getItem(storageKey);
-			if (stored) {
-				try {
-					setPinnedCommits(JSON.parse(stored));
-				} catch {
-					setPinnedCommits([]);
-				}
-			}
-		}
-	}, [storageKey]);
+		if (!repoId) {
+            setPinnedCommits([]);
+            return;
+        }
+        setPinnedCommits(pinnedCommitsQuery.data?.commits ?? []);
+	}, [pinnedCommitsQuery.data?.commits, repoId]);
 
-	useEffect(() => {
-		if (storageKey) {
-			localStorage.setItem(storageKey, JSON.stringify(pinnedCommits));
-		}
-	}, [storageKey, pinnedCommits]);
+    const persistCommits = (nextCommits: PinnedCommit[]) => {
+        setPinnedCommits(nextCommits);
+        if (repoId) {
+            setPinnedCommitsMutation.mutate({ repo: repoId, commits: nextCommits });
+        }
+    };
 
 	const pinCommit = (commit: Omit<PinnedCommit, 'pinnedAt'>) => {
-		setPinnedCommits((prev) => {
-			if (prev.find((c) => c.hash === commit.hash)) {
-				return prev; // Already pinned
-			}
-			return [{ ...commit, pinnedAt: Date.now() }, ...prev];
-		});
+        if (pinnedCommits.find((c) => c.hash === commit.hash)) {
+            return;
+        }
+        persistCommits([{ ...commit, pinnedAt: Date.now() }, ...pinnedCommits]);
 	};
 
 	const unpinCommit = (hash: string) => {
-		setPinnedCommits((prev) => prev.filter((c) => c.hash !== hash));
+		persistCommits(pinnedCommits.filter((c) => c.hash !== hash));
 	};
 
 	const updateNote = (hash: string, note: string) => {
-		setPinnedCommits((prev) =>
-			prev.map((c) => (c.hash === hash ? { ...c, note } : c))
-		);
+		persistCommits(pinnedCommits.map((c) => (c.hash === hash ? { ...c, note } : c)));
 	};
 
 	const isPinned = (hash: string) => {

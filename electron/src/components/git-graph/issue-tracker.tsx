@@ -91,8 +91,50 @@ export const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React
 	closed: { color: 'text-green-600 bg-green-100 dark:bg-green-900/30', icon: <CheckCircle2 className="h-3 w-3" /> },
 	done: { color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30', icon: <CheckCircle2 className="h-3 w-3" /> },
 };
+const DEFAULT_ISSUE_TRACKER_CONFIG: IssueTrackerConfig = {
+    providers: {
+        github: { enabled: true },
+        jira: { enabled: false },
+        linear: { enabled: false },
+    },
+    autoDetect: true,
+    patterns: [
+        '[A-Z]{2,10}-[0-9]+',
+        '#\\d+',
+        '[A-Z]{2,4}[0-9]+',
+    ],
+};
 
-const STORAGE_KEY = 'git-graph-issue-tracker';
+function useIssueTrackerConfigState() {
+    const [config, setConfig] = useState<IssueTrackerConfig>(DEFAULT_ISSUE_TRACKER_CONFIG);
+    const utils = trpc.useUtils();
+    const configQuery = trpc.config.issueTrackerConfig.useQuery(undefined, { staleTime: 10_000 });
+    const setConfigMutation = trpc.config.setIssueTrackerConfig.useMutation({
+        onSuccess: async () => {
+            await utils.config.issueTrackerConfig.invalidate();
+        },
+    });
+
+    useEffect(() => {
+        const stored = configQuery.data?.config;
+        if (!stored) {
+            return;
+        }
+
+        setConfig({
+            providers: Object.keys(stored.providers).length > 0 ? stored.providers : DEFAULT_ISSUE_TRACKER_CONFIG.providers,
+            autoDetect: stored.autoDetect,
+            patterns: stored.patterns.length > 0 ? stored.patterns : DEFAULT_ISSUE_TRACKER_CONFIG.patterns,
+        });
+    }, [configQuery.data?.config]);
+
+    const persistConfig = (nextConfig: IssueTrackerConfig) => {
+        setConfig(nextConfig);
+        setConfigMutation.mutate(nextConfig);
+    };
+
+    return { config, persistConfig };
+}
 
 // Mock issue fetcher (in production, would call actual APIs)
 function fetchIssues(provider: IssueProvider, query: string): Promise<Issue[]> {
@@ -147,38 +189,13 @@ export function IssueTrackerPanel({
 	commitMessage: string;
 }) {
 	const { activeRepo } = useAppStore();
-	const [config, setConfig] = useState<IssueTrackerConfig>(() => {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			try {
-				return JSON.parse(stored);
-			} catch {}
-		}
-		return {
-			providers: {
-				github: { enabled: true },
-				jira: { enabled: false },
-				linear: { enabled: false },
-			},
-			autoDetect: true,
-			patterns: [
-				'[A-Z]{2,10}-[0-9]+', // Jira style: PROJ-123
-				'#\\d+', // GitHub style: #123
-				'[A-Z]{2,4}[0-9]+', // Linear style: ENG123
-			],
-		};
-	});
+	const { config } = useIssueTrackerConfigState();
 
 	const [searchQuery, setSearchQuery] = useState('');
 	const [searchResults, setSearchResults] = useState<Issue[]>([]);
 	const [isSearching, setIsSearching] = useState(false);
 	const [linkedIssues, setLinkedIssues] = useState<IssueLink[]>([]);
 	const [showSearch, setShowSearch] = useState(false);
-
-	// Save config
-	useEffect(() => {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-	}, [config]);
 
 	// Auto-detect issues from commit message
 	const detectedKeys = useMemo(() => {
@@ -389,39 +406,22 @@ export function IssueTrackerSettings({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const [config, setConfig] = useState<IssueTrackerConfig>(() => {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			try {
-				return JSON.parse(stored);
-			} catch {}
-		}
-		return {
-			providers: {
-				github: { enabled: true },
-				jira: { enabled: false },
-				linear: { enabled: false },
-			},
-			autoDetect: true,
-			patterns: ['[A-Z]{2,10}-[0-9]+', '#\\d+'],
-		};
-	});
+	const { config, persistConfig } = useIssueTrackerConfigState();
 
 	const handleToggleProvider = (provider: IssueProvider) => {
-		setConfig(prev => ({
-			...prev,
-			providers: {
-				...prev.providers,
-				[provider]: {
-					...prev.providers[provider],
-					enabled: !prev.providers[provider]?.enabled,
-				},
-			},
-		}));
+		persistConfig({
+            ...config,
+            providers: {
+                ...config.providers,
+                [provider]: {
+                    ...config.providers[provider],
+                    enabled: !config.providers[provider]?.enabled,
+                },
+            },
+        });
 	};
 
 	const handleSave = () => {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 		toast.success('Settings saved');
 		onOpenChange(false);
 	};
@@ -475,7 +475,7 @@ export function IssueTrackerSettings({
 						<Button
 							variant={config.autoDetect ? 'default' : 'outline'}
 							size="sm"
-							onClick={() => { setConfig(prev => ({ ...prev, autoDetect: !prev.autoDetect })); }}
+							onClick={() => { persistConfig({ ...config, autoDetect: !config.autoDetect }); }}
 						>
 							{config.autoDetect ? 'On' : 'Off'}
 						</Button>

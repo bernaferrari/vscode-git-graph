@@ -6,41 +6,19 @@
 import {
     Loader2,
     GitBranch,
-    Upload,
     Download,
-    Terminal,
     Search,
     Plus,
-    RefreshCw,
     ChevronDown,
     Tag,
     GitCommit,
-    Archive,
-    MoreHorizontal,
     X,
-    FileCode,
-    User,
     Globe,
-    PanelLeft,
-    BarChart3,
-    Settings,
-    Undo,
-    Key,
     Filter,
-    Pin,
-    History,
-    FileText,
-    Package,
-    GitPullRequest,
-    FolderGit2,
-    Keyboard,
     ArrowUp,
     ArrowDown,
-    Info,
     Activity,
-    Bug,
     Copy,
-    ListPlus,
 } from 'lucide-react';
 import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef, startTransition } from 'react';
 import { toast } from 'sonner';
@@ -48,19 +26,30 @@ import { toast } from 'sonner';
 import { BranchDropdown } from './branch-dropdown';
 import { CommitGraph } from './commit-graph';
 import { CommitGraphLegend } from './commit-graph-legend';
+import { CommitContextMenuOverlay } from './commit-context-menu-overlay';
+import { CommitFiltersDialog } from './commit-filters-dialog';
 import { DragCommitHandler } from './drag-commit-to-branch';
 import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
+import { FeatureHubStrip } from './feature-hub-strip';
+import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
+import { GitGraphToolbar } from './git-graph-toolbar';
 import { OperationStatusBar } from './operation-status-bar';
+import { OverflowMenu } from './overflow-menu';
 import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
 import { QuickActionsToolbar } from './quick-actions-toolbar';
+import { RepoBranchSwitcher } from './repo-branch-switcher';
 import { SidePanel } from './side-panel';
+import { useCommandPaletteActions } from './use-command-palette-actions';
+import { useFeatureHubData } from './use-feature-hub-data';
+import { useGitGraphShellPanels } from './use-git-graph-shell-panels';
+import { useRepoCommitFilters } from './use-repo-commit-filters';
 
 import { useCommitTemplates } from './useCommitTemplates';
 import { useSettings } from './useSettings';
 import { VirtualizedCommitList } from './virtualized-commit-list';
-import { UndoStackProvider, UndoStackDialog } from './undo-stack';
 import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
+import { UndoStackProvider } from './undo-stack-provider';
 import { useActionPreview, type ActionPreview } from '@/components/action-preview';
 import { LensSwitcher, useLensMode } from '@/components/lens';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +65,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useAppStore } from '@/lib/store';
@@ -139,14 +127,6 @@ interface PerfTrend {
     deltaPct: number | null;
 }
 
-interface PersistedCommitFilters {
-    author?: string;
-    filePath?: string;
-    search?: string;
-    dateFrom?: string;
-    dateTo?: string;
-}
-
 // Graph configuration
 const GRAPH_CONFIG = DEFAULT_GRAPH_CONFIG;
 const GRAPH_MUTE_CONFIG = {
@@ -164,7 +144,6 @@ const PERF_TREND_MIN_SAMPLES = 5;
 const PERF_WATCH_DELTA_PCT = 20;
 const PERF_REGRESSION_DELTA_PCT = 45;
 const PERF_IMPROVING_DELTA_PCT = -25;
-const COMMIT_FILTERS_STORAGE_PREFIX = 'git-graph:commit-filters:';
 const DEFAULT_RELEASE_FEATURE_FLAGS = {
     worktreePro: true,
     workflowEngine: true,
@@ -311,66 +290,12 @@ const HooksManageDialog = lazy(() =>
     import('./hooks-manage-dialog').then((mod) => ({ default: mod.HooksManageDialog }))
 );
 const TerminalPanel = lazy(() => import('./terminal-panel').then((mod) => ({ default: mod.TerminalPanel })));
-const ReflogViewer = lazy(() => import('./reflog-viewer').then((mod) => ({ default: mod.ReflogViewer })));
-const SearchAllCommits = lazy(() => import('./search-commits').then((mod) => ({ default: mod.SearchAllCommits })));
-const WorktreeManagement = lazy(() =>
-    import('./worktree-management').then((mod) => ({ default: mod.WorktreeManagement }))
-);
-const WorkflowEngineDialog = lazy(() =>
-    import('./workflow-engine').then((mod) => ({ default: mod.WorkflowEngineDialog }))
-);
-const SubmoduleManagement = lazy(() =>
-    import('./submodule-management').then((mod) => ({ default: mod.SubmoduleManagement }))
-);
-const RepoHealthCheck = lazy(() => import('./repo-health-check').then((mod) => ({ default: mod.RepoHealthCheck })));
-const GitFlowAutomation = lazy(() =>
-    import('./gitflow-automation').then((mod) => ({ default: mod.GitFlowAutomation }))
-);
-const GitBisectUI = lazy(() => import('./git-bisect-ui').then((mod) => ({ default: mod.GitBisectUI })));
-const ExternalDiffConfig = lazy(() =>
-    import('./external-diff-tool').then((mod) => ({ default: mod.ExternalDiffConfig }))
-);
-const GitConfigEditor = lazy(() => import('./git-config-editor').then((mod) => ({ default: mod.GitConfigEditor })));
-const IssueTrackerSettings = lazy(() =>
-    import('./issue-tracker').then((mod) => ({ default: mod.IssueTrackerSettings }))
-);
-const BulkCommitOperations = lazy(() =>
-    import('./bulk-commit-operations').then((mod) => ({ default: mod.BulkCommitOperations }))
-);
-const FileAnnotationsPanel = lazy(() =>
-    import('./file-annotations-panel').then((mod) => ({ default: mod.FileAnnotationsPanel }))
-);
-const ActivityHeatmap = lazy(() => import('./activity-heatmap').then((mod) => ({ default: mod.ActivityHeatmap })));
 const VisualRebaseTodoEditor = lazy(() =>
     import('./visual-rebase-todo').then((mod) => ({ default: mod.VisualRebaseTodoEditor }))
 );
 const CommitSigningDialog = lazy(() =>
     import('./commit-signing-dialog').then((mod) => ({ default: mod.CommitSigningDialog }))
 );
-const LineStaging = lazy(() => import('./line-staging').then((mod) => ({ default: mod.LineStaging })));
-const CommitTemplatesDialog = lazy(() =>
-    import('./commit-templates').then((mod) => ({ default: mod.CommitTemplatesDialog }))
-);
-const GitignoreManager = lazy(() => import('./gitignore-manager').then((mod) => ({ default: mod.GitignoreManager })));
-const CustomCommands = lazy(() => import('./custom-commands').then((mod) => ({ default: mod.CustomCommands })));
-const LFSSupport = lazy(() => import('./lfs-support').then((mod) => ({ default: mod.LFSSupport })));
-const PullRequestIntegration = lazy(() =>
-    import('./pull-request-integration').then((mod) => ({ default: mod.PullRequestIntegration }))
-);
-const KeyboardShortcutsHelp = lazy(() =>
-    import('./keyboard-shortcuts-help').then((mod) => ({ default: mod.KeyboardShortcutsHelp }))
-);
-const KeyboardShortcutsEditor = lazy(() =>
-    import('./keyboard-shortcuts-editor').then((mod) => ({ default: mod.KeyboardShortcutsEditor }))
-);
-const OnboardingDialog = lazy(() => import('./onboarding').then((mod) => ({ default: mod.OnboardingDialog })));
-const RecentRepositories = lazy(() =>
-    import('./recent-repositories').then((mod) => ({ default: mod.RecentRepositories }))
-);
-const WorkspacesManager = lazy(() => import('./workspaces').then((mod) => ({ default: mod.WorkspacesManager })));
-const StashManagement = lazy(() => import('./stash-management').then((mod) => ({ default: mod.StashManagement })));
-const SettingsDialog = lazy(() => import('./settings-dialog').then((mod) => ({ default: mod.SettingsDialog })));
-const CommandPalette = lazy(() => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })));
 const ProfileSwitcher = lazy(() => import('@/components/profile').then((mod) => ({ default: mod.ProfileSwitcher })));
 const OperationTimeline = lazy(() =>
     import('@/components/operation-timeline').then((mod) => ({ default: mod.OperationTimeline }))
@@ -380,12 +305,6 @@ const StackedBranchesPanel = lazy(() =>
 );
 const FindWidget = lazy(() => import('./find-widget').then((mod) => ({ default: mod.FindWidget })));
 const FuzzyFinder = lazy(() => import('./fuzzy-finder').then((mod) => ({ default: mod.FuzzyFinder })));
-const CommitContextMenu = lazy(() =>
-    import('./commit-context-menu').then((mod) => ({ default: mod.CommitContextMenu }))
-);
-const CommitHistoryFilters = lazy(() =>
-    import('./commit-history-filters').then((mod) => ({ default: mod.CommitHistoryFilters }))
-);
 const CreateBranchDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.CreateBranchDialog })));
 const AddTagDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.AddTagDialog })));
 const ResetDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.ResetDialog })));
@@ -394,41 +313,6 @@ const MergeDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod
 const RebaseDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.RebaseDialog })));
 const CherryPickDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.CherryPickDialog })));
 const RevertDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.RevertDialog })));
-
-// Toolbar button component
-function ToolbarButton({
-    icon: Icon,
-    label,
-    shortcut,
-    onClick,
-    variant = 'ghost',
-    disabled,
-}: {
-    icon: React.ElementType;
-    label: string;
-    shortcut?: string;
-    onClick: () => void;
-    variant?: 'ghost' | 'default' | 'outline';
-    disabled?: boolean;
-}) {
-    const title = shortcut ? `${label} (${shortcut})` : label;
-    const sharedControlClass =
-        'rounded-md border border-transparent px-2.5 text-[12px] font-medium text-muted-foreground transition-all duration-150 hover:border-border/70 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.98] disabled:opacity-40';
-
-    return (
-        <Button
-            variant={variant}
-            size='sm'
-            className={`h-8 gap-1.5 ${sharedControlClass}`}
-            onClick={onClick}
-            disabled={disabled}
-            title={title}
-            aria-label={label}>
-            <Icon className='h-4 w-4' />
-            <span className='hidden sm:inline'>{label}</span>
-        </Button>
-    );
-}
 
 function DialogLoadingFallback() {
     return (
@@ -493,7 +377,6 @@ export function GitGraph() {
     // Additional feature states
     const [commitSigningOpen, setCommitSigningOpen] = useState(false);
     const [pinnedCommitsOpen, setPinnedCommitsOpen] = useState(false);
-    const [commitFilters, setCommitFilters] = useState<CommitFilter>({});
     const [contextMenuOpen, setContextMenuOpen] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
     const [showFiltersDialog, setShowFiltersDialog] = useState(false);
@@ -506,42 +389,64 @@ export function GitGraph() {
     const [searchCommitsOpen, setSearchCommitsOpen] = useState(false);
     const [lfsOpen, setLfsOpen] = useState(false);
     const [inlineBlameEnabled, setInlineBlameEnabled] = useState(false);
-    const [prIntegrationOpen, setPrIntegrationOpen] = useState(false);
-    const [worktreeOpen, setWorktreeOpen] = useState(false);
-    const [workflowOpen, setWorkflowOpen] = useState(false);
-    const [submoduleOpen, setSubmoduleOpen] = useState(false);
-    const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
-    const [keyboardEditorOpen, setKeyboardEditorOpen] = useState(false);
-    const [onboardingOpen, setOnboardingOpen] = useState(false);
-    const [recentReposOpen, setRecentReposOpen] = useState(false);
-    const [workspacesOpen, setWorkspacesOpen] = useState(false);
-    const [stashManageOpen, setStashManageOpen] = useState(false);
     const [graphLegendOpen, setGraphLegendOpen] = useState(false);
     const [cherryPickDialogOpen, setCherryPickDialogOpen] = useState(false);
     const [cherryPickCommit] = useState<{ hash: string; message: string; author: string } | null>(null);
-    const [settingsOpen, setSettingsOpen] = useState(false);
     const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
     const [perfPanelOpen, setPerfPanelOpen] = useState(false);
     const [copyingPerfDiagnostics, setCopyingPerfDiagnostics] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-    const [gitFlowOpen, setGitFlowOpen] = useState(false);
-    const [healthCheckOpen, setHealthCheckOpen] = useState(false);
-    const [bisectOpen, setBisectOpen] = useState(false);
-
-    // New advanced features
-    const [undoStackOpen, setUndoStackOpen] = useState(false);
-    const [configEditorOpen, setConfigEditorOpen] = useState(false);
-    const [externalDiffOpen, setExternalDiffOpen] = useState(false);
-    const [issueTrackerOpen, setIssueTrackerOpen] = useState(false);
-    const [bulkOpsOpen, setBulkOpsOpen] = useState(false);
-
-    // Additional advanced features
-    const [fileAnnotationsOpen, setFileAnnotationsOpen] = useState(false);
     const [annotationsFile, setAnnotationsFile] = useState<string>('');
-    const [activityHeatmapOpen, setActivityHeatmapOpen] = useState(false);
     const [dragCherryPickOpen, setDragCherryPickOpen] = useState(false);
     const [dragCommit] = useState<{ hash: string; message: string } | null>(null);
     const [dragTargetBranch] = useState('');
+    const {
+        prIntegrationOpen,
+        setPrIntegrationOpen,
+        worktreeOpen,
+        setWorktreeOpen,
+        workflowOpen,
+        setWorkflowOpen,
+        submoduleOpen,
+        setSubmoduleOpen,
+        keyboardHelpOpen,
+        setKeyboardHelpOpen,
+        keyboardEditorOpen,
+        setKeyboardEditorOpen,
+        onboardingOpen,
+        setOnboardingOpen,
+        recentReposOpen,
+        setRecentReposOpen,
+        workspacesOpen,
+        setWorkspacesOpen,
+        stashManageOpen,
+        setStashManageOpen,
+        settingsOpen,
+        setSettingsOpen,
+        settingsInitialTab,
+        gitFlowOpen,
+        setGitFlowOpen,
+        healthCheckOpen,
+        setHealthCheckOpen,
+        bisectOpen,
+        setBisectOpen,
+        undoStackOpen,
+        setUndoStackOpen,
+        configEditorOpen,
+        setConfigEditorOpen,
+        externalDiffOpen,
+        setExternalDiffOpen,
+        issueTrackerOpen,
+        setIssueTrackerOpen,
+        bulkOpsOpen,
+        setBulkOpsOpen,
+        fileAnnotationsOpen,
+        setFileAnnotationsOpen,
+        activityHeatmapOpen,
+        setActivityHeatmapOpen,
+        openSettingsAt,
+        restartOnboarding,
+    } = useGitGraphShellPanels();
 
     // Quick Look hook
     useQuickLookKeyboard();
@@ -549,13 +454,14 @@ export function GitGraph() {
     // Settings hook
     const { settings } = useSettings();
     const showPerfDebug = settings.telemetryEnabled;
+    const onboardingStateQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
 
     useEffect(() => {
         if (!activeRepo) return;
-        if (!localStorage.getItem('git-graph-onboarding-complete')) {
+        if (!onboardingStateQuery.data?.state.gitGraphCompleted) {
             setOnboardingOpen(true);
         }
-    }, [activeRepo]);
+    }, [activeRepo, onboardingStateQuery.data?.state.gitGraphCompleted, setOnboardingOpen]);
 
     // Lens mode hook
     const { setLensMode, isGuided } = useLensMode();
@@ -565,6 +471,7 @@ export function GitGraph() {
 
     // Commit templates hook
     const { templates, setTemplates } = useCommitTemplates();
+    const { commitFilters, setCommitFilters } = useRepoCommitFilters(activeRepo);
     const actionPreview = useActionPreview();
 
     // Refs
@@ -609,53 +516,6 @@ export function GitGraph() {
     // Commit and layout limit state
     const [maxCommits, setMaxCommits] = useState(INITIAL_MAX_COMMITS);
     const [layoutCommitLimit, setLayoutCommitLimit] = useState(INITIAL_LAYOUT_COMMIT_WINDOW);
-
-    useEffect(() => {
-        if (!activeRepo) {
-            setCommitFilters({});
-            return;
-        }
-
-        const storageKey = `${COMMIT_FILTERS_STORAGE_PREFIX}${activeRepo}`;
-        const saved = localStorage.getItem(storageKey);
-        if (!saved) {
-            setCommitFilters({});
-            return;
-        }
-
-        try {
-            const parsed = JSON.parse(saved) as PersistedCommitFilters;
-            setCommitFilters({
-                ...(parsed.author ? { author: parsed.author } : {}),
-                ...(parsed.filePath ? { filePath: parsed.filePath } : {}),
-                ...(parsed.search ? { search: parsed.search } : {}),
-                ...(parsed.dateFrom ? { dateFrom: new Date(parsed.dateFrom) } : {}),
-                ...(parsed.dateTo ? { dateTo: new Date(parsed.dateTo) } : {}),
-            });
-        } catch {
-            setCommitFilters({});
-        }
-    }, [activeRepo]);
-
-    useEffect(() => {
-        if (!activeRepo) return;
-
-        const storageKey = `${COMMIT_FILTERS_STORAGE_PREFIX}${activeRepo}`;
-        const persisted: PersistedCommitFilters = {
-            ...(commitFilters.author ? { author: commitFilters.author } : {}),
-            ...(commitFilters.filePath ? { filePath: commitFilters.filePath } : {}),
-            ...(commitFilters.search ? { search: commitFilters.search } : {}),
-            ...(commitFilters.dateFrom ? { dateFrom: commitFilters.dateFrom.toISOString() } : {}),
-            ...(commitFilters.dateTo ? { dateTo: commitFilters.dateTo.toISOString() } : {}),
-        };
-
-        if (Object.keys(persisted).length === 0) {
-            localStorage.removeItem(storageKey);
-            return;
-        }
-
-        localStorage.setItem(storageKey, JSON.stringify(persisted));
-    }, [activeRepo, commitFilters]);
 
     const conflictFileContent = trpc.git.readFile.useQuery(
         { repo: activeRepo ?? '', path: conflictFilePath ?? '' },
@@ -869,6 +729,7 @@ export function GitGraph() {
         },
         { enabled: !!activeRepo && !!repoInfo?.head, staleTime: 5000, refetchOnWindowFocus: false }
     );
+    const currentHead = repoInfo?.head ?? 'main';
     const { data: workingTreeStatus } = trpc.git.workingTreeStatus.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo, staleTime: 5000, refetchOnWindowFocus: false }
@@ -1076,6 +937,11 @@ export function GitGraph() {
             setCopyingPerfDiagnostics(false);
         }
     }, [copyingPerfDiagnostics, perfDiagnosticsPayload]);
+
+    const featureHubData = useFeatureHubData(activeRepo, {
+        worktreePro: featureFlags.worktreePro,
+        workflowEngine: featureFlags.workflowEngine,
+    });
 
     const totalLoadedCommits = commitsData?.commits?.length ?? 0;
     const refsLookup = useMemo(() => {
@@ -1556,6 +1422,55 @@ export function GitGraph() {
         worktreeOpen,
     ]);
 
+    const commandPaletteActions = useCommandPaletteActions({
+        currentHead,
+        gitOps,
+        terminalOpen,
+        featureFlags,
+        workingTreeStatus,
+        openSettingsAt,
+        handleRefreshAll,
+        openers: {
+            setCreateBranchOpen,
+            setAddTagOpen,
+            setSearchCommitsOpen,
+            setTerminalOpen,
+            setCloneDialogOpen,
+            handleOpenInFinder,
+            handleCopyDeepLink,
+            setStashManageOpen,
+            setCommitSigningOpen,
+            setReflogOpen,
+            setTemplatesOpen,
+            setGitignoreOpen,
+            setCustomCommandsOpen,
+            setLfsOpen,
+            setPrIntegrationOpen,
+            setWorktreeOpen,
+            setWorkflowOpen,
+            setSubmoduleOpen,
+            setStatisticsOpen,
+            setRemoteManageOpen,
+            setShowFiltersDialog,
+            setPinnedCommitsOpen,
+            setStagingFile,
+            setLineStagingOpen,
+            setWorkspacesOpen,
+            setKeyboardHelpOpen,
+            setKeyboardEditorOpen,
+            setHealthCheckOpen,
+            setFuzzyFinderOpen,
+            setUndoStackOpen,
+            setConfigEditorOpen,
+            setExternalDiffOpen,
+            setIssueTrackerOpen,
+            setBulkOpsOpen,
+            setAnnotationsFile,
+            setFileAnnotationsOpen,
+            setActivityHeatmapOpen,
+        },
+    });
+
     const handleOpenInTerminal = useCallback(() => {
         if (!activeRepo) {
             toast('Open a repository first.');
@@ -1876,7 +1791,6 @@ export function GitGraph() {
         );
     }
 
-    const currentHead = repoInfo?.head ?? 'main';
     const handlePreviewedPush = useCallback(
         (force: boolean) => {
             if (!currentHead) {
@@ -2144,505 +2058,158 @@ export function GitGraph() {
             <TooltipProvider>
                 <div className='flex h-full flex-1 flex-col overflow-hidden'>
                     {/* Top Toolbar */}
-                    <div className='ui-toolbar flex items-center gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-                        {/* Repo info */}
-                        <div className='mr-2 flex shrink-0 items-center gap-2'>
-                            <div className='from-background/80 to-muted/40 border-border/70 inline-flex items-center gap-1.5 rounded-md border bg-gradient-to-b px-2.5 py-1'>
-                                <GitBranch className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-                                <span className='max-w-44 truncate text-sm font-semibold tracking-tight'>
-                                    {activeRepo.split('/').pop()}
-                                </span>
-                            </div>
-                            {/* Current branch - clickable to show branches */}
-                            <DropdownMenu open={branchMenuOpen} onOpenChange={setBranchMenuOpen}>
-                                <DropdownMenuTrigger className='bg-primary/10 text-primary border-primary/30 hover:bg-primary/15 focus-visible:ring-primary/40 inline-flex h-7 items-center gap-1 rounded-md border px-2 font-mono text-xs font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
-                                    <GitBranch className='h-3.5 w-3.5' />
-                                    {currentHead}
-                                    <ChevronDown className='h-3 w-3' />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align='start' className='max-h-96 w-72 overflow-y-auto p-0'>
-                                    <div className='bg-popover sticky top-0 z-10 border-b p-2'>
-                                        <Input
-                                            value={branchSearch}
-                                            onChange={(event) => { setBranchSearch(event.target.value); }}
-                                            onKeyDown={(event) => {
-                                                if (event.key === 'Enter') {
-                                                    event.preventDefault();
-                                                    const firstResult = branchResults[0];
-                                                    if (firstResult) {
-                                                        handleCheckoutBranch(firstResult);
-                                                    }
-                                                }
-                                            }}
-                                            placeholder='Checkout branch...'
-                                            className='border-border/70 bg-background/80 focus-visible:ring-primary/30 h-8 text-sm focus-visible:ring-2'
-                                        />
-                                    </div>
-                                    <div className='text-muted-foreground bg-popover sticky top-[49px] px-2 py-1.5 text-xs font-medium'>
-                                        Local Branches ({filteredLocalBranches.length})
-                                    </div>
-                                    {filteredLocalBranches.map((branch) => (
-                                        <DropdownMenuItem
-                                            key={branch}
-                                            className={branch === currentHead ? 'bg-accent font-medium' : ''}
-                                            onClick={() => {
-                                                handleCheckoutBranch(branch);
-                                            }}>
-                                            <GitBranch
-                                                className={`mr-2 h-4 w-4 ${branch === currentHead ? 'text-primary' : 'text-muted-foreground'}`}
-                                            />
-                                            <span className='flex-1'>{branch}</span>
-                                            {branch === currentHead && (
-                                                <span className='text-primary text-xs font-medium'>current</span>
-                                            )}
-                                        </DropdownMenuItem>
-                                    ))}
-                                    {filteredLocalBranches.length === 0 && (
-                                        <div className='text-muted-foreground px-3 py-2 text-sm'>
-                                            No local branches found
-                                        </div>
-                                    )}
-
-                                    {/* Remote branches */}
-                                    {filteredRemoteBranches.length > 0 && (
-                                        <>
-                                            <div className='text-muted-foreground bg-popover sticky top-[49px] mt-1 border-t px-2 py-1.5 text-xs font-medium'>
-                                                Remote Branches ({filteredRemoteBranches.length})
-                                            </div>
-                                            {filteredRemoteBranches.map((branch) => (
-                                                <DropdownMenuItem
-                                                    key={branch}
-                                                    onClick={() => {
-                                                        handleCheckoutBranch(branch);
-                                                    }}>
-                                                    <Globe className='text-muted-foreground mr-2 h-4 w-4' />
-                                                    <span className='flex-1'>{branch.replace('remotes/', '')}</span>
-                                                </DropdownMenuItem>
-                                            ))}
-                                        </>
-                                    )}
-                                    {branchResults.length === 0 && (
-                                        <div className='text-muted-foreground px-3 py-3 text-center text-sm'>
-                                            No branches match "{branchSearch}"
-                                        </div>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <div className='bg-border mx-1 h-5 w-px shrink-0' />
-
-                        {/* Main actions - adaptive based on lens mode */}
-                        {isGuided ? (
-                            // Guided mode: Simple "Sync" button
-                            <ToolbarButton
-                                icon={RefreshCw}
-                                label='Sync'
-                                onClick={async () => {
-                                    await gitOps.fetch();
-                                    await gitOps.pull(currentHead, 'origin', false, false);
-                                }}
-                            />
-                        ) : (
-                            // Craft/Control mode: Individual buttons
-                            <>
-                                <ToolbarButton
-                                    icon={Download}
-                                    label={isGuided ? 'Check for updates' : 'Fetch'}
-                                    onClick={() => gitOps.fetch()}
-                                />
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
-                                        <Upload className='h-4 w-4' />
-                                        <span className='hidden sm:inline'>{isGuided ? 'Share' : 'Push'}</span>
-                                        <ChevronDown className='h-3 w-3' />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align='start'>
-                                        <DropdownMenuItem onClick={() => { handlePreviewedPush(false); }}>
-                                            <Upload className='mr-2 h-4 w-4' />
-                                            Push
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => { handlePreviewedPush(true); }}>
-                                            <Upload className='mr-2 h-4 w-4 text-amber-600' />
-                                            Force Push
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
-                                        <Download className='h-4 w-4' />
-                                        <span className='hidden sm:inline'>Pull</span>
-                                        <ChevronDown className='h-3 w-3' />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align='start'>
-                                        <DropdownMenuItem onClick={() => gitOps.pull(currentHead, 'origin', false, false)}>
-                                            <Download className='mr-2 h-4 w-4' />
-                                            Pull
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => gitOps.pull(currentHead, 'origin', false, true)}>
-                                            <Download className='mr-2 h-4 w-4 text-emerald-600' />
-                                            Pull (Fast-forward only)
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </>
+                    <GitGraphToolbar
+                        isGuided={isGuided}
+                        hasFilters={Boolean(
+                            commitFilters.author ||
+                                commitFilters.search ||
+                                commitFilters.dateFrom ||
+                                commitFilters.dateTo ||
+                                commitFilters.filePath
                         )}
-
-                        <div className='bg-border mx-1 h-5 w-px shrink-0' />
-
-                        {/* Branch/Tag creation */}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
-                                <Plus className='h-4 w-4' />
-                                <span className='hidden sm:inline'>New</span>
-                                <ChevronDown className='h-3 w-3' />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align='start'>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setTargetCommit(selectedCommit ?? 'HEAD');
-                                        setCreateBranchOpen(true);
-                                    }}>
-                                    <GitBranch className='mr-2 h-4 w-4' />
-                                    Branch...
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setTargetCommit(selectedCommit ?? 'HEAD');
-                                        setAddTagOpen(true);
-                                    }}>
-                                    <Tag className='mr-2 h-4 w-4' />
-                                    Tag...
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setStashManageOpen(true);
-                                    }}>
-                                    <Archive className='mr-2 h-4 w-4' />
-                                    Stash
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        {/* Branch filter */}
-                        <div className='ml-1 w-44 shrink-0'>
+                        pinnedCommitCount={pinnedCommits.length}
+                        leftSlots={
+                            <RepoBranchSwitcher
+                                repoLabel={activeRepo.split('/').pop() ?? activeRepo}
+                                currentHead={currentHead}
+                                branchMenuOpen={branchMenuOpen}
+                                onBranchMenuOpenChange={setBranchMenuOpen}
+                                branchSearch={branchSearch}
+                                onBranchSearchChange={setBranchSearch}
+                                onBranchSearchSubmit={() => {
+                                    const firstResult = branchResults[0];
+                                    if (firstResult) {
+                                        handleCheckoutBranch(firstResult);
+                                    }
+                                }}
+                                filteredLocalBranches={filteredLocalBranches}
+                                filteredRemoteBranches={filteredRemoteBranches}
+                                branchResultsEmpty={branchResults.length === 0}
+                                onCheckoutBranch={handleCheckoutBranch}
+                            />
+                        }
+                        branchFilter={
                             <BranchDropdown
                                 branches={branchOptions}
                                 selectedBranches={selectedBranches}
                                 multiple
                                 onChange={handleSelectedBranchesChange}
                             />
-                        </div>
-
-                        {/* Lens Mode Switcher */}
-                        <div className='ml-1 shrink-0'>
-                            <LensSwitcher variant='toolbar' showLabel={false} />
-                        </div>
-
-                        {/* Profile Switcher */}
-                        <div className='ml-1 shrink-0'>
+                        }
+                        lensSwitcher={<LensSwitcher variant='toolbar' showLabel={false} />}
+                        profileSwitcher={
                             <Suspense fallback={<div className='h-8 w-8' />}>
                                 <ProfileSwitcher />
                             </Suspense>
-                        </div>
-
-                        {/* Operation Timeline */}
-                        <div className='ml-1 shrink-0'>
+                        }
+                        operationTimeline={
                             <Suspense fallback={<div className='h-8 w-8' />}>
                                 <OperationTimeline />
                             </Suspense>
-                        </div>
-
-                        {/* Stacked Branches */}
-                        <div className='ml-1 shrink-0'>
+                        }
+                        stackedBranches={
                             <Suspense fallback={<div className='h-8 w-8' />}>
                                 <StackedBranchesPanel enableGraphiteInterop={featureFlags.graphiteInterop} />
                             </Suspense>
-                        </div>
-
-                        {/* Workspaces Launchpad */}
-                        <div className='ml-1 shrink-0'>
-                            <ToolbarButton icon={FolderGit2} label='Workspaces' onClick={() => { setWorkspacesOpen(true); }} />
-                        </div>
-
-                        {/* Commit History Filters */}
-                        {(commitFilters.author ||
-                            commitFilters.search ||
-                            commitFilters.dateFrom ||
-                            commitFilters.dateTo ||
-                            commitFilters.filePath) && (
-                            <Badge variant='secondary' className='ml-2 shrink-0 gap-1'>
-                                <Filter className='h-3 w-3' />
-                                <span className='text-xs'>Filtered</span>
-                                <Button
-                                    variant='ghost'
-                                    size='sm'
-                                    className='ml-1 h-4 w-4 p-0'
-                                    onClick={() => {
-                                        setCommitFilters({});
-                                        setMaxCommits(baselineInitialMaxCommits);
-                                        setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-                                    }}>
-                                    <X className='h-3 w-3' />
-                                </Button>
-                            </Badge>
-                        )}
-
-                        {/* Right side */}
-                        <div className='flex-1 shrink-0' />
-
-                        {/* Search */}
-                        <ToolbarButton
-                            icon={Search}
-                            label='Find'
-                            shortcut='⌘F'
-                            onClick={() => { setFindWidgetOpen(true); }}
-                        />
-
-                        {/* Refresh */}
-                        <ToolbarButton icon={RefreshCw} label='Refresh' shortcut='⌘R' onClick={handleRefreshAll} />
-
-                        {/* Toggle Side Panel */}
-                        <ToolbarButton
-                            icon={PanelLeft}
-                            label='Toggle Panel'
-                            onClick={() => { setShowSidePanel(!showSidePanel); }}
-                        />
-
-                        {/* Pinned Commits */}
-                        <Button
-                            variant='ghost'
-                            size='sm'
-                            className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 relative h-8 w-8 rounded-md border border-transparent p-0 transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'
-                            onClick={() => { setPinnedCommitsOpen(true); }}
-                            title='Pinned Commits'>
-                            <Pin className='h-4 w-4' />
-                            {pinnedCommits.length > 0 && (
-                                <span className='bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]'>
-                                    {pinnedCommits.length}
-                                </span>
-                            )}
-                        </Button>
-
-                        {/* More options */}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
-                                <MoreHorizontal className='h-4 w-4' />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align='end'>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        handleOpenInTerminal();
-                                    }}>
-                                    <Terminal className='mr-2 h-4 w-4' />
-                                    Open in Terminal
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        handleOpenInFinder();
-                                    }}>
-                                    <FileCode className='mr-2 h-4 w-4' />
-                                    Open in Finder
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCloneDialogOpen(true); }}>
-                                    <Download className='mr-2 h-4 w-4' />
-                                    Clone Repository
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setFuzzyFinderOpen(true); }}>
-                                    <Search className='mr-2 h-4 w-4' />
-                                    Quick Switch...
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘K</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setShowFiltersDialog(true); }}>
-                                    <Filter className='mr-2 h-4 w-4' />
-                                    Filter Commits...
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        const fileForLineStaging =
-                                            workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file;
-                                        if (!fileForLineStaging) {
-                                            toast.info('No changed files available for line staging');
-                                            return;
-                                        }
-                                        setStagingFile(fileForLineStaging);
-                                        setLineStagingOpen(true);
-                                    }}>
-                                    <ListPlus className='mr-2 h-4 w-4' />
-                                    Line Staging...
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setTerminalOpen(!terminalOpen); }}>
-                                    <Terminal className='mr-2 h-4 w-4' />
-                                    Toggle Terminal
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘P</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setStatisticsOpen(true); }}>
-                                    <BarChart3 className='mr-2 h-4 w-4' />
-                                    Statistics
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setRemoteManageOpen(true); }}>
-                                    <Globe className='mr-2 h-4 w-4' />
-                                    Manage Remotes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setBranchCompareOpen(true); }}>
-                                    <GitBranch className='mr-2 h-4 w-4' />
-                                    Compare Branches
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setHooksManageOpen(true); }}>
-                                    <Settings className='mr-2 h-4 w-4' />
-                                    Hooks
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCommitSigningOpen(true); }}>
-                                    <Key className='mr-2 h-4 w-4' />
-                                    Commit Signing
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setReflogOpen(true); }}>
-                                    <History className='mr-2 h-4 w-4' />
-                                    Reflog
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setTemplatesOpen(true); }}>
-                                    <FileText className='mr-2 h-4 w-4' />
-                                    Commit Templates
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setGitignoreOpen(true); }}>
-                                    <FileText className='mr-2 h-4 w-4' />
-                                    Edit .gitignore
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCustomCommandsOpen(true); }}>
-                                    <Terminal className='mr-2 h-4 w-4' />
-                                    Custom Commands
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setSearchCommitsOpen(true); }}>
-                                    <Search className='mr-2 h-4 w-4' />
-                                    Search Commits
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘⇧F</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setLfsOpen(true); }}>
-                                    <Package className='mr-2 h-4 w-4' />
-                                    LFS Management
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setInlineBlameEnabled(!inlineBlameEnabled); }}>
-                                    <User className='mr-2 h-4 w-4' />
-                                    {inlineBlameEnabled ? 'Disable' : 'Enable'} Inline Blame
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setPrIntegrationOpen(true); }}>
-                                    <GitPullRequest className='mr-2 h-4 w-4' />
-                                    Pull Requests
-                                </DropdownMenuItem>
-                                {featureFlags.worktreePro && (
-                                    <DropdownMenuItem onClick={() => { setWorktreeOpen(true); }}>
-                                        <FolderGit2 className='mr-2 h-4 w-4' />
-                                        Worktrees
-                                    </DropdownMenuItem>
-                                )}
-                                {featureFlags.workflowEngine && (
-                                    <DropdownMenuItem onClick={() => { setWorkflowOpen(true); }}>
-                                        <Activity className='mr-2 h-4 w-4' />
-                                        Workflow Engine
-                                    </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem onClick={() => { setSubmoduleOpen(true); }}>
-                                    <Package className='mr-2 h-4 w-4' />
-                                    Submodules
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setRecentReposOpen(true); }}>
-                                    <FolderGit2 className='mr-2 h-4 w-4' />
-                                    Recent Repositories
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setWorkspacesOpen(true); }}>
-                                    <FolderGit2 className='mr-2 h-4 w-4' />
-                                    Workspaces Launchpad
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setKeyboardHelpOpen(true); }}>
-                                    <Keyboard className='mr-2 h-4 w-4' />
-                                    Keyboard Shortcuts
-                                    <span className='text-muted-foreground ml-auto text-xs'>?</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        localStorage.removeItem('git-graph-onboarding-complete');
-                                        setOnboardingOpen(true);
-                                    }}>
-                                    <Info className='mr-2 h-4 w-4' />
-                                    Start Onboarding Tour
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setStashManageOpen(true); }}>
-                                    <Archive className='mr-2 h-4 w-4' />
-                                    Manage Stashes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setGraphLegendOpen(true); }}>
-                                    <Info className='mr-2 h-4 w-4' />
-                                    Graph Legend
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setGitFlowOpen(true); }}>
-                                    <GitBranch className='mr-2 h-4 w-4' />
-                                    Git Flow
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setHealthCheckOpen(true); }}>
-                                    <Activity className='mr-2 h-4 w-4' />
-                                    Health Check
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setBisectOpen(true); }}>
-                                    <Bug className='mr-2 h-4 w-4' />
-                                    Git Bisect
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setUndoStackOpen(true); }}>
-                                    <History className='mr-2 h-4 w-4' />
-                                    Undo History
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘Z</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setConfigEditorOpen(true); }}>
-                                    <Settings className='mr-2 h-4 w-4' />
-                                    Git Configuration
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setExternalDiffOpen(true); }}>
-                                    <FileCode className='mr-2 h-4 w-4' />
-                                    External Diff Settings
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setIssueTrackerOpen(true); }}>
-                                    <GitPullRequest className='mr-2 h-4 w-4' />
-                                    Issue Tracker Settings
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setBulkOpsOpen(true); }}>
-                                    <GitCommit className='mr-2 h-4 w-4' />
-                                    Bulk Operations
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setFileAnnotationsOpen(true); }}>
-                                    <FileCode className='mr-2 h-4 w-4' />
-                                    File Annotations
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setActivityHeatmapOpen(true); }}>
-                                    <BarChart3 className='mr-2 h-4 w-4' />
-                                    Activity Heatmap
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => { setSettingsOpen(true); }}>
-                                    <Settings className='mr-2 h-4 w-4' />
-                                    Settings
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘,</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCommandPaletteOpen(true); }}>
-                                    <Search className='mr-2 h-4 w-4' />
-                                    Command Palette
-                                    <span className='text-muted-foreground ml-auto text-xs'>⌘⇧P</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => gitOps.undoLastCommit()}>
-                                    <Undo className='mr-2 h-4 w-4' />
-                                    Undo Last Commit
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-
+                        }
+                        overflowMenu={
+                            <OverflowMenu
+                                featureFlags={featureFlags}
+                                inlineBlameEnabled={inlineBlameEnabled}
+                                onOpenInTerminal={handleOpenInTerminal}
+                                onOpenInFinder={handleOpenInFinder}
+                                onClone={() => { setCloneDialogOpen(true); }}
+                                onQuickSwitch={() => { setFuzzyFinderOpen(true); }}
+                                onFilterCommits={() => { setShowFiltersDialog(true); }}
+                                onLineStaging={() => { commandPaletteActions.onLineStaging?.(); }}
+                                onToggleTerminal={() => { setTerminalOpen(!terminalOpen); }}
+                                onStatistics={() => { setStatisticsOpen(true); }}
+                                onManageRemotes={() => { setRemoteManageOpen(true); }}
+                                onCompareBranches={() => { setBranchCompareOpen(true); }}
+                                onHooks={() => { setHooksManageOpen(true); }}
+                                onCommitSigning={() => { setCommitSigningOpen(true); }}
+                                onReflog={() => { setReflogOpen(true); }}
+                                onTemplates={() => { setTemplatesOpen(true); }}
+                                onGitignore={() => { setGitignoreOpen(true); }}
+                                onCustomCommands={() => { setCustomCommandsOpen(true); }}
+                                onSearchCommits={() => { setSearchCommitsOpen(true); }}
+                                onLfs={() => { setLfsOpen(true); }}
+                                onToggleInlineBlame={() => { setInlineBlameEnabled(!inlineBlameEnabled); }}
+                                onPullRequests={() => { setPrIntegrationOpen(true); }}
+                                onWorktrees={() => { setWorktreeOpen(true); }}
+                                onWorkflows={() => { setWorkflowOpen(true); }}
+                                onSubmodules={() => { setSubmoduleOpen(true); }}
+                                onRecentRepos={() => { setRecentReposOpen(true); }}
+                                onWorkspaces={() => { setWorkspacesOpen(true); }}
+                                onKeyboardHelp={() => { setKeyboardHelpOpen(true); }}
+                                onRestartOnboarding={restartOnboarding}
+                                onStashes={() => { setStashManageOpen(true); }}
+                                onGraphLegend={() => { setGraphLegendOpen(true); }}
+                                onGitFlow={() => { setGitFlowOpen(true); }}
+                                onHealthCheck={() => { setHealthCheckOpen(true); }}
+                                onBisect={() => { setBisectOpen(true); }}
+                                onUndoStack={() => { setUndoStackOpen(true); }}
+                                onConfigEditor={() => { setConfigEditorOpen(true); }}
+                                onExternalDiff={() => { setExternalDiffOpen(true); }}
+                                onIssueTracker={() => { setIssueTrackerOpen(true); }}
+                                onBulkOps={() => { setBulkOpsOpen(true); }}
+                                onFileAnnotations={() => { setFileAnnotationsOpen(true); }}
+                                onActivityHeatmap={() => { setActivityHeatmapOpen(true); }}
+                                onSettings={() => { openSettingsAt('general'); }}
+                                onDiagnostics={() => { openSettingsAt('integrations'); }}
+                                onCommandPalette={() => { setCommandPaletteOpen(true); }}
+                                onUndoLastCommit={() => gitOps.undoLastCommit()}
+                            />
+                        }
+                        onSync={async () => {
+                            await gitOps.fetch();
+                            await gitOps.pull(currentHead, 'origin', false, false);
+                        }}
+                        onFetch={() => {
+                            void gitOps.fetch();
+                        }}
+                        onPush={() => {
+                            handlePreviewedPush(false);
+                        }}
+                        onForcePush={() => {
+                            handlePreviewedPush(true);
+                        }}
+                        onPull={() => {
+                            void gitOps.pull(currentHead, 'origin', false, false);
+                        }}
+                        onPullFfOnly={() => {
+                            void gitOps.pull(currentHead, 'origin', false, true);
+                        }}
+                        onCreateBranch={() => {
+                            setTargetCommit(selectedCommit ?? 'HEAD');
+                            setCreateBranchOpen(true);
+                        }}
+                        onCreateTag={() => {
+                            setTargetCommit(selectedCommit ?? 'HEAD');
+                            setAddTagOpen(true);
+                        }}
+                        onStash={() => {
+                            setStashManageOpen(true);
+                        }}
+                        onOpenWorkspaces={() => {
+                            setWorkspacesOpen(true);
+                        }}
+                        onClearFilters={() => {
+                            setCommitFilters({});
+                            setMaxCommits(baselineInitialMaxCommits);
+                            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+                        }}
+                        onFind={() => {
+                            setFindWidgetOpen(true);
+                        }}
+                        onRefresh={handleRefreshAll}
+                        onToggleSidePanel={() => {
+                            setShowSidePanel(!showSidePanel);
+                        }}
+                        onOpenPinnedCommits={() => {
+                            setPinnedCommitsOpen(true);
+                        }}
+                    />
                     <QuickActionsToolbar
                         className='border-border/60 border-t'
                         onCreateBranch={() => {
@@ -2655,6 +2222,40 @@ export function GitGraph() {
                         }}
                         onStash={() => {
                             setStashManageOpen(true);
+                        }}
+                    />
+
+                    <FeatureHubStrip
+                        worktreeCount={featureHubData.worktreeCount}
+                        worktreeAttentionCount={featureHubData.worktreeAttentionCount}
+                        workflowCount={featureHubData.workflowCount}
+                        workflowFailureCount={featureHubData.workflowFailureCount}
+                        auditCount={featureHubData.auditCount}
+                        protocolRegistered={featureHubData.protocolRegistered}
+                        prSummary={featureHubData.prSummary}
+                        repoPolicy={featureHubData.repoPolicy}
+                        onOpenWorktrees={() => {
+                            if (featureFlags.worktreePro) {
+                                setWorktreeOpen(true);
+                                return;
+                            }
+                            openSettingsAt('integrations');
+                        }}
+                        onOpenWorkflows={() => {
+                            if (featureFlags.workflowEngine) {
+                                setWorkflowOpen(true);
+                                return;
+                            }
+                            openSettingsAt('integrations');
+                        }}
+                        onOpenPullRequests={() => {
+                            setPrIntegrationOpen(true);
+                        }}
+                        onOpenRepoPolicy={() => {
+                            openSettingsAt('integrations');
+                        }}
+                        onOpenDiagnostics={() => {
+                            openSettingsAt('integrations');
                         }}
                     />
 
@@ -2692,6 +2293,13 @@ export function GitGraph() {
                                     setMergeOpen(true);
                                 }}
                                 enableBranchPinning={featureFlags.branchPinning}
+                                onOpenWorktrees={
+                                    featureFlags.worktreePro
+                                        ? () => {
+                                              setWorktreeOpen(true);
+                                          }
+                                        : undefined
+                                }
                             />
                         )}
 
@@ -3249,153 +2857,6 @@ export function GitGraph() {
                         }}
                     />
 
-                    {/* Reflog Viewer */}
-                    {reflogOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <ReflogViewer
-                                open={reflogOpen}
-                                onOpenChange={setReflogOpen}
-                                onCreateBranchFromHash={handleCreateBranchFromHash}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Commit Templates */}
-                    {templatesOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CommitTemplatesDialog
-                                open={templatesOpen}
-                                onOpenChange={setTemplatesOpen}
-                                templates={templates}
-                                onTemplatesChange={setTemplates}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Gitignore Manager */}
-                    {gitignoreOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <GitignoreManager open={gitignoreOpen} onOpenChange={setGitignoreOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Custom Commands */}
-                    {customCommandsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CustomCommands open={customCommandsOpen} onOpenChange={setCustomCommandsOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Search All Commits */}
-                    {searchCommitsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <SearchAllCommits
-                                open={searchCommitsOpen}
-                                onOpenChange={setSearchCommitsOpen}
-                                onSelectCommit={(hash) => {
-                                    // Find and select the commit in the list
-                                    const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
-                                    if (index !== undefined && index >= 0) {
-                                        handleSelectCommit(index);
-                                    }
-                                }}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* LFS Support */}
-                    {lfsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <LFSSupport open={lfsOpen} onOpenChange={setLfsOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Pull Request Integration */}
-                    {prIntegrationOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <PullRequestIntegration open={prIntegrationOpen} onOpenChange={setPrIntegrationOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Worktree Management */}
-                    {featureFlags.worktreePro && worktreeOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <WorktreeManagement open={worktreeOpen} onOpenChange={setWorktreeOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Workflow Engine */}
-                    {featureFlags.workflowEngine && workflowOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <WorkflowEngineDialog open={workflowOpen} onOpenChange={setWorkflowOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Submodule Management */}
-                    {submoduleOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <SubmoduleManagement open={submoduleOpen} onOpenChange={setSubmoduleOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Keyboard Shortcuts Help */}
-                    {keyboardHelpOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <KeyboardShortcutsHelp open={keyboardHelpOpen} onOpenChange={setKeyboardHelpOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Keyboard Shortcuts Editor */}
-                    {keyboardEditorOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <KeyboardShortcutsEditor open={keyboardEditorOpen} onOpenChange={setKeyboardEditorOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Onboarding Tour */}
-                    {onboardingOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <OnboardingDialog open={onboardingOpen} onOpenChange={setOnboardingOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Recent Repositories */}
-                    {recentReposOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <RecentRepositories open={recentReposOpen} onOpenChange={setRecentReposOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Workspaces Launchpad */}
-                    {workspacesOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <WorkspacesManager open={workspacesOpen} onOpenChange={setWorkspacesOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Clone Repository */}
-                    {cloneDialogOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CloneRepositoryDialog
-                                open={cloneDialogOpen}
-                                onOpenChange={setCloneDialogOpen}
-                                onCloned={async (repoPath) => {
-                                    await activateRepoPath(repoPath, {
-                                        ensureRegistered: true,
-                                        errorTitle: 'Failed to open cloned repository',
-                                    });
-                                }}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Stash Management */}
-                    {stashManageOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <StashManagement open={stashManageOpen} onOpenChange={setStashManageOpen} />
-                        </Suspense>
-                    )}
-
                     {/* Graph Legend */}
                     <CommitGraphLegend open={graphLegendOpen} onOpenChange={setGraphLegendOpen} />
 
@@ -3406,272 +2867,148 @@ export function GitGraph() {
                         sourceCommit={cherryPickCommit}
                     />
 
-                    {/* Settings Dialog */}
-                    {settingsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-                        </Suspense>
-                    )}
+                    <CommitContextMenuOverlay
+                        open={contextMenuOpen}
+                        position={contextMenuPosition}
+                        selectedCommit={
+                            selectedCommitData
+                                ? {
+                                      hash: selectedCommitData.hash,
+                                      message: selectedCommitData.message,
+                                      author: selectedCommitData.author,
+                                  }
+                                : null
+                        }
+                        onClose={() => { setContextMenuOpen(false); }}
+                        onCreateBranch={() => {
+                            if (!selectedCommitData) return;
+                            setTargetCommit(selectedCommitData.hash);
+                            setCreateBranchOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                        onCreateTag={() => {
+                            if (!selectedCommitData) return;
+                            setTargetCommit(selectedCommitData.hash);
+                            setAddTagOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                        onMerge={() => {
+                            if (!selectedCommitData) return;
+                            setTargetBranch(selectedCommitData.hash);
+                            setMergeOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                        onRebase={() => {
+                            if (!selectedCommitData) return;
+                            setTargetCommit(selectedCommitData.hash);
+                            setRebaseOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                        onCherryPick={() => {
+                            if (!selectedCommitData) return;
+                            setTargetCommit(selectedCommitData.hash);
+                            setCherryPickOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                        onRevert={() => {
+                            if (!selectedCommitData) return;
+                            setTargetCommit(selectedCommitData.hash);
+                            setRevertOpen(true);
+                            setContextMenuOpen(false);
+                        }}
+                    />
 
-                    {/* Line Staging */}
-                    {lineStagingOpen && stagingFile && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <LineStaging
-                                open={lineStagingOpen}
-                                onOpenChange={(nextOpen) => {
-                                    setLineStagingOpen(nextOpen);
-                                    if (!nextOpen) {
-                                        setStagingFile(null);
-                                    }
-                                }}
-                                filePath={stagingFile}
-                                onStaged={() => {
-                                    void gitUtils.git.workingTreeStatus
-                                        .invalidate({ repo: activeRepo ?? '' })
-                                        .catch((error) => {
-                                            console.error('[git-graph] Failed to refresh working tree status:', error);
-                                        });
-                                }}
-                            />
-                        </Suspense>
-                    )}
+                    <CommitFiltersDialog
+                        open={showFiltersDialog}
+                        onOpenChange={setShowFiltersDialog}
+                        filters={commitFilters}
+                        onChange={(filters) => {
+                            setCommitFilters(filters);
+                            setMaxCommits(baselineInitialMaxCommits);
+                            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+                            if (Object.keys(filters).length === 0) {
+                                setShowFiltersDialog(false);
+                            }
+                        }}
+                    />
 
-                    {/* Context Menu for Commits */}
-                    {contextMenuOpen && selectedCommitData && (
-                        <div
-                            className='fixed inset-0 z-50'
-                            onClick={() => { setContextMenuOpen(false); }}
-                            onContextMenu={() => { setContextMenuOpen(false); }}>
-                            <div
-                                className='fixed z-50'
-                                style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}>
-                                <Suspense fallback={<DialogLoadingFallback />}>
-                                    <CommitContextMenu
-                                        commit={{
-                                            hash: selectedCommitData.hash,
-                                            message: selectedCommitData.message,
-                                            author: selectedCommitData.author,
-                                        }}
-                                        onCreateBranch={() => {
-                                            setTargetCommit(selectedCommitData.hash);
-                                            setCreateBranchOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}
-                                        onCreateTag={() => {
-                                            setTargetCommit(selectedCommitData.hash);
-                                            setAddTagOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}
-                                        onMerge={() => {
-                                            setTargetBranch(selectedCommitData.hash);
-                                            setMergeOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}
-                                        onRebase={() => {
-                                            setTargetCommit(selectedCommitData.hash);
-                                            setRebaseOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}
-                                        onCherryPick={() => {
-                                            setTargetCommit(selectedCommitData.hash);
-                                            setCherryPickOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}
-                                        onRevert={() => {
-                                            setTargetCommit(selectedCommitData.hash);
-                                            setRevertOpen(true);
-                                            setContextMenuOpen(false);
-                                        }}>
-                                        <div />
-                                    </CommitContextMenu>
-                                </Suspense>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Commit Filters Dialog */}
-                    <Dialog open={showFiltersDialog} onOpenChange={setShowFiltersDialog}>
-                        <DialogContent className='ui-surface sm:max-w-md'>
-                            <DialogHeader>
-                                <DialogTitle className='flex items-center gap-2'>
-                                    <Filter className='h-5 w-5' />
-                                    Filter Commits
-                                </DialogTitle>
-                            </DialogHeader>
-                            <div className='space-y-4 py-4'>
-                                {showFiltersDialog && (
-                                    <Suspense fallback={<DialogLoadingFallback />}>
-                                        <CommitHistoryFilters
-                                            filters={commitFilters}
-                                            onChange={(filters) => {
-                                                setCommitFilters(filters);
-                                                setMaxCommits(baselineInitialMaxCommits);
-                                                setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-                                                if (Object.keys(filters).length === 0) {
-                                                    setShowFiltersDialog(false);
-                                                }
-                                            }}
-                                        />
-                                    </Suspense>
-                                )}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Command Palette */}
-                    {commandPaletteOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CommandPalette
-                                open={commandPaletteOpen}
-                                onOpenChange={setCommandPaletteOpen}
-                                actions={{
-                                    onCreateBranch: () => { setCreateBranchOpen(true); },
-                                    onCreateTag: () => { setAddTagOpen(true); },
-                                    onFetch: () => gitOps.fetch(),
-                                    onPull: () => gitOps.pull(currentHead, 'origin', false),
-                                    onPullFfOnly: () => gitOps.pull(currentHead, 'origin', false, true),
-                                    onPush: () => gitOps.push(currentHead, 'origin', true, false),
-                                    onRefresh: handleRefreshAll,
-                                    onSettings: () => { setSettingsOpen(true); },
-                                    onSearch: () => { setSearchCommitsOpen(true); },
-                                    onTerminal: () => { setTerminalOpen(!terminalOpen); },
-                                    onClone: () => { setCloneDialogOpen(true); },
-                                    onOpenInFinder: () => { handleOpenInFinder(); },
-                                    ...(featureFlags.deepLinks ? { onCopyDeepLink: () => { void handleCopyDeepLink(); } } : {}),
-                                    onStash: () => { setStashManageOpen(true); },
-                                    onCommitSigning: () => { setCommitSigningOpen(true); },
-                                    onReflog: () => { setReflogOpen(true); },
-                                    onTemplates: () => { setTemplatesOpen(true); },
-                                    onGitignore: () => { setGitignoreOpen(true); },
-                                    onCustomCommands: () => { setCustomCommandsOpen(true); },
-                                    onLFS: () => { setLfsOpen(true); },
-                                    onPRIntegration: () => { setPrIntegrationOpen(true); },
-                                    ...(featureFlags.worktreePro ? { onWorktrees: () => { setWorktreeOpen(true); } } : {}),
-                                    ...(featureFlags.workflowEngine ? { onWorkflows: () => { setWorkflowOpen(true); } } : {}),
-                                    onSubmodules: () => { setSubmoduleOpen(true); },
-                                    onStatistics: () => { setStatisticsOpen(true); },
-                                    onRemotes: () => { setRemoteManageOpen(true); },
-                                    onFilters: () => { setShowFiltersDialog(true); },
-                                    onPinned: () => { setPinnedCommitsOpen(true); },
-                                    onLineStaging: () => {
-                                        const fileForLineStaging =
-                                            workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file;
-                                        if (!fileForLineStaging) {
-                                            toast.info('No changed files available for line staging');
-                                            return;
-                                        }
-                                        setStagingFile(fileForLineStaging);
-                                        setLineStagingOpen(true);
-                                    },
-                                    onWorkspaces: () => { setWorkspacesOpen(true); },
-                                    onKeyboardHelp: () => { setKeyboardHelpOpen(true); },
-                                    onKeyboardCustomize: () => { setKeyboardEditorOpen(true); },
-                                    onHealthCheck: () => { setHealthCheckOpen(true); },
-                                    onFuzzyFinder: () => { setFuzzyFinderOpen(true); },
-                                    onUndoStack: () => { setUndoStackOpen(true); },
-                                    onConfigEditor: () => { setConfigEditorOpen(true); },
-                                    onExternalDiff: () => { setExternalDiffOpen(true); },
-                                    onIssueTracker: () => { setIssueTrackerOpen(true); },
-                                    onBulkOps: () => { setBulkOpsOpen(true); },
-                                    onFileAnnotations: () => {
-                                        setAnnotationsFile('README.md'); // Default file
-                                        setFileAnnotationsOpen(true);
-                                    },
-                                    onActivityHeatmap: () => { setActivityHeatmapOpen(true); },
-                                }}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Git Flow Automation */}
-                    {gitFlowOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <GitFlowAutomation open={gitFlowOpen} onOpenChange={setGitFlowOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Repository Health Check */}
-                    {healthCheckOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <RepoHealthCheck open={healthCheckOpen} onOpenChange={setHealthCheckOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Git Bisect UI */}
-                    {bisectOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <GitBisectUI
-                                open={bisectOpen}
-                                onOpenChange={setBisectOpen}
-                                {...(selectedCommit ? { currentCommitHash: selectedCommit } : {})}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Undo Stack Dialog */}
-                    {undoStackOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <UndoStackDialog open={undoStackOpen} onOpenChange={setUndoStackOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Git Config Editor */}
-                    {configEditorOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <GitConfigEditor open={configEditorOpen} onOpenChange={setConfigEditorOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* External Diff Settings */}
-                    {externalDiffOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <ExternalDiffConfig open={externalDiffOpen} onOpenChange={setExternalDiffOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Issue Tracker Settings */}
-                    {issueTrackerOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <IssueTrackerSettings open={issueTrackerOpen} onOpenChange={setIssueTrackerOpen} />
-                        </Suspense>
-                    )}
-
-                    {/* Bulk Commit Operations */}
-                    {bulkOpsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <BulkCommitOperations
-                                open={bulkOpsOpen}
-                                onOpenChange={setBulkOpsOpen}
-                                commits={(commitsData?.commits ?? []).map((c: ClientCommit) => ({
-                                    hash: c.hash,
-                                    message: c.message,
-                                    author: c.author,
-                                    date: c.date,
-                                    parents: c.parents,
-                                }))}
-                                onComplete={handleRefreshAll}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* File Annotations Panel */}
-                    {fileAnnotationsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <FileAnnotationsPanel
-                                open={fileAnnotationsOpen}
-                                onOpenChange={setFileAnnotationsOpen}
-                                filePath={annotationsFile}
-                                commitHash={selectedCommit ?? 'HEAD'}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Activity Heatmap */}
-                    {activityHeatmapOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <ActivityHeatmap open={activityHeatmapOpen} onOpenChange={setActivityHeatmapOpen} />
-                        </Suspense>
-                    )}
+                    <GitGraphFeatureDialogs
+                        featureFlags={featureFlags}
+                        reflog={{ open: reflogOpen, onOpenChange: setReflogOpen }}
+                        onCreateBranchFromHash={handleCreateBranchFromHash}
+                        templates={{ open: templatesOpen, onOpenChange: setTemplatesOpen }}
+                        templateValues={templates}
+                        onTemplatesChange={setTemplates}
+                        gitignore={{ open: gitignoreOpen, onOpenChange: setGitignoreOpen }}
+                        customCommands={{ open: customCommandsOpen, onOpenChange: setCustomCommandsOpen }}
+                        searchCommits={{ open: searchCommitsOpen, onOpenChange: setSearchCommitsOpen }}
+                        onSelectCommit={(hash) => {
+                            const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+                            if (index !== undefined && index >= 0) {
+                                handleSelectCommit(index);
+                            }
+                        }}
+                        lfs={{ open: lfsOpen, onOpenChange: setLfsOpen }}
+                        pullRequests={{ open: prIntegrationOpen, onOpenChange: setPrIntegrationOpen }}
+                        worktree={{ open: worktreeOpen, onOpenChange: setWorktreeOpen }}
+                        workflow={{ open: workflowOpen, onOpenChange: setWorkflowOpen }}
+                        submodule={{ open: submoduleOpen, onOpenChange: setSubmoduleOpen }}
+                        keyboardHelp={{ open: keyboardHelpOpen, onOpenChange: setKeyboardHelpOpen }}
+                        keyboardEditor={{ open: keyboardEditorOpen, onOpenChange: setKeyboardEditorOpen }}
+                        onboarding={{ open: onboardingOpen, onOpenChange: setOnboardingOpen }}
+                        recentRepos={{ open: recentReposOpen, onOpenChange: setRecentReposOpen }}
+                        workspaces={{ open: workspacesOpen, onOpenChange: setWorkspacesOpen }}
+                        cloneRepository={{ open: cloneDialogOpen, onOpenChange: setCloneDialogOpen }}
+                        onCloned={async (repoPath) => {
+                            await activateRepoPath(repoPath, {
+                                ensureRegistered: true,
+                                errorTitle: 'Failed to open cloned repository',
+                            });
+                        }}
+                        stashManagement={{ open: stashManageOpen, onOpenChange: setStashManageOpen }}
+                        settings={{
+                            open: settingsOpen,
+                            onOpenChange: setSettingsOpen,
+                            initialTab: settingsInitialTab,
+                        }}
+                        lineStaging={{ open: lineStagingOpen, onOpenChange: setLineStagingOpen }}
+                        stagingFile={stagingFile}
+                        onLineStagingChange={(nextOpen) => {
+                            setLineStagingOpen(nextOpen);
+                            if (!nextOpen) {
+                                setStagingFile(null);
+                            }
+                        }}
+                        onLineStaged={() => {
+                            void gitUtils.git.workingTreeStatus
+                                .invalidate({ repo: activeRepo ?? '' })
+                                .catch((error) => {
+                                    console.error('[git-graph] Failed to refresh working tree status:', error);
+                                });
+                        }}
+                        commandPalette={{ open: commandPaletteOpen, onOpenChange: setCommandPaletteOpen }}
+                        commandPaletteActions={commandPaletteActions}
+                        gitFlow={{ open: gitFlowOpen, onOpenChange: setGitFlowOpen }}
+                        healthCheck={{ open: healthCheckOpen, onOpenChange: setHealthCheckOpen }}
+                        bisect={{ open: bisectOpen, onOpenChange: setBisectOpen }}
+                        selectedCommit={selectedCommit}
+                        undoStack={{ open: undoStackOpen, onOpenChange: setUndoStackOpen }}
+                        configEditor={{ open: configEditorOpen, onOpenChange: setConfigEditorOpen }}
+                        externalDiff={{ open: externalDiffOpen, onOpenChange: setExternalDiffOpen }}
+                        issueTracker={{ open: issueTrackerOpen, onOpenChange: setIssueTrackerOpen }}
+                        bulkOps={{ open: bulkOpsOpen, onOpenChange: setBulkOpsOpen }}
+                        bulkOpCommits={(commitsData?.commits ?? []).map((c: ClientCommit) => ({
+                            hash: c.hash,
+                            message: c.message,
+                            author: c.author,
+                            date: c.date,
+                            parents: c.parents,
+                        }))}
+                        onBulkOpsComplete={handleRefreshAll}
+                        fileAnnotations={{ open: fileAnnotationsOpen, onOpenChange: setFileAnnotationsOpen }}
+                        annotationsFile={annotationsFile}
+                        activityHeatmap={{ open: activityHeatmapOpen, onOpenChange: setActivityHeatmapOpen }}
+                    />
 
                     {/* Drag Cherry-Pick Handler */}
                     {dragCommit && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CommitTemplate } from './commit-templates';
+import { trpc } from '@/trpc/client';
 
 const DEFAULT_TEMPLATES: CommitTemplate[] = [
     {
@@ -45,45 +46,44 @@ const DEFAULT_TEMPLATES: CommitTemplate[] = [
         isDefault: true,
     },
 ];
-
-const STORAGE_KEY = 'git-graph-commit-templates';
-
 export function useCommitTemplates() {
     const [templates, setTemplates] = useState<CommitTemplate[]>([]);
+    const utils = trpc.useUtils();
+    const templatesQuery = trpc.config.commitTemplates.useQuery(undefined, { staleTime: 10_000 });
+    const setTemplatesMutation = trpc.config.setCommitTemplates.useMutation({
+        onSuccess: async () => {
+            await utils.config.commitTemplates.invalidate();
+        },
+    });
 
     useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                setTemplates(JSON.parse(stored));
-            } catch {
-                setTemplates(DEFAULT_TEMPLATES);
-            }
-        } else {
+        const stored = templatesQuery.data?.templates;
+        if (stored && stored.length > 0) {
+            setTemplates(stored);
+        } else if (templatesQuery.isSuccess) {
             setTemplates(DEFAULT_TEMPLATES);
         }
-    }, []);
+    }, [templatesQuery.data?.templates, templatesQuery.isSuccess]);
 
-    useEffect(() => {
-        if (templates.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-        }
-    }, [templates]);
+    const persistTemplates = (nextTemplates: CommitTemplate[]) => {
+        setTemplates(nextTemplates);
+        setTemplatesMutation.mutate({ templates: nextTemplates });
+    };
 
     const addTemplate = (template: Omit<CommitTemplate, 'id'>) => {
         const newTemplate: CommitTemplate = {
             ...template,
             id: Date.now().toString(),
         };
-        setTemplates((prev) => [...prev, newTemplate]);
+        persistTemplates([...templates, newTemplate]);
     };
 
     const updateTemplate = (id: string, updates: Partial<CommitTemplate>) => {
-        setTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+        persistTemplates(templates.map((t) => (t.id === id ? { ...t, ...updates } : t)));
     };
 
     const deleteTemplate = (id: string) => {
-        setTemplates((prev) => prev.filter((t) => t.id !== id));
+        persistTemplates(templates.filter((t) => t.id !== id));
     };
 
     const duplicateTemplate = (id: string) => {
@@ -99,7 +99,7 @@ export function useCommitTemplates() {
 
     return {
         templates,
-        setTemplates,
+        setTemplates: persistTemplates,
         addTemplate,
         updateTemplate,
         deleteTemplate,
