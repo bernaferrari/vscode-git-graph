@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "vscode_git_graph",
+  "project_id": "0895879d-787b-4652-91a4-bb376b796841"
+}
