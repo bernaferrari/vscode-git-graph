@@ -54,6 +54,8 @@ release/
 
 # Coverage
 coverage/
+playwright-report/
+test-results/
 
 # Mac keychain / code signing (if present)
 *.p12

@@ -1,6 +1,6 @@
-import type { z } from 'zod';
-
 import { collaborationBundleSchema, parseCollaborationBundle } from '@/app/backend/store/collaboration';
+
+import type { z } from 'zod';
 
 export interface CollaborationRemoteRequest {
 	endpointUrl: string;
@@ -124,7 +124,9 @@ export interface CollaborationTeamProfileMutationRequest extends CollaborationRe
 
 async function withTimeout<T>(timeoutMs: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
 	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+	const timeout = setTimeout(() => {
+		controller.abort();
+	}, timeoutMs);
 	try {
 		return await run(controller.signal);
 	} finally {
@@ -171,6 +173,8 @@ export async function requestCollaborationSync(input: CollaborationSyncRequest):
 	const payload = await requestJson<{ bundle?: unknown; error?: string; ok?: boolean }>({
 		endpointUrl: input.endpointUrl,
 		authToken: input.authToken,
+		memberId: input.memberId,
+		memberApiKey: input.memberApiKey,
 		timeoutMs: input.timeoutMs,
 		method: 'POST',
 		path: '/',
