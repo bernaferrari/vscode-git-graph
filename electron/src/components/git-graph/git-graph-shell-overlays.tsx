@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
 
 import { DialogLoadingFallback } from './git-graph-feature-dialogs';
+
+import type { Dispatch, SetStateAction } from 'react';
+
 
 const Statistics = lazy(() => import('./statistics').then((mod) => ({ default: mod.Statistics })));
 const MergeConflictEditor = lazy(() =>

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
 import { CommandPalette } from './command-palette';
 
 type CommandPaletteActions = Parameters<typeof CommandPalette>[0]['actions'];

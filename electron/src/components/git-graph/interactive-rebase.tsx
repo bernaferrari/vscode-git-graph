@@ -3,9 +3,16 @@
  * Drag-drop to reorder, squash, edit, drop commits
  */
 
+import {
+	GripVertical,
+	ChevronDown,
+	ChevronUp,
+	RotateCcw,
+} from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
@@ -13,14 +20,9 @@ import {
 	DialogTitle,
 	DialogFooter,
 } from '@/components/ui/dialog';
-import {
-	GripVertical,
-	ChevronDown,
-	ChevronUp,
-	RotateCcw,
-} from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGitOperations } from '@/hooks/useGitOperations';
-import { toast } from 'sonner';
+
 
 interface InteractiveRebaseProps {
 	open: boolean;
@@ -117,7 +119,7 @@ export function InteractiveRebase({
 		setRebaseCommits((prev) => {
 			const next = [...prev];
 			if (next[index]) {
-				next[index] = { ...next[index]!, action };
+				next[index] = { ...next[index], action };
 			}
 			return next;
 		});
@@ -204,9 +206,9 @@ export function InteractiveRebase({
 								<div
 									key={commit.hash}
 									draggable
-									onDragStart={() => handleDragStart(index)}
-									onDragOver={(e) => handleDragOver(e, index)}
-									onDrop={(e) => handleDrop(e, index)}
+									onDragStart={() => { handleDragStart(index); }}
+									onDragOver={(e) => { handleDragOver(e, index); }}
+									onDrop={(e) => { handleDrop(e, index); }}
 									onDragEnd={handleDragEnd}
 									className={`flex items-center gap-2 p-2 rounded border transition-all ${
 										isDragging
@@ -220,7 +222,7 @@ export function InteractiveRebase({
 
 									<select
 										value={commit.action}
-										onChange={(e) => changeAction(index, e.target.value as RebaseAction)}
+										onChange={(e) => { changeAction(index, e.target.value as RebaseAction); }}
 										className={`text-xs font-medium bg-transparent border-0 cursor-pointer ${config.color}`}
 									>
 										{Object.entries(ACTION_CONFIG).map(([action, cfg]) => (
@@ -247,7 +249,7 @@ export function InteractiveRebase({
 											variant="ghost"
 											size="sm"
 											className="h-6 w-6 p-0"
-											onClick={() => moveCommit(index, 'up')}
+											onClick={() => { moveCommit(index, 'up'); }}
 											disabled={index === 0}
 										>
 											<ChevronUp className="h-3 w-3" />
@@ -256,7 +258,7 @@ export function InteractiveRebase({
 											variant="ghost"
 											size="sm"
 											className="h-6 w-6 p-0"
-											onClick={() => moveCommit(index, 'down')}
+											onClick={() => { moveCommit(index, 'down'); }}
 											disabled={index === rebaseCommits.length - 1}
 										>
 											<ChevronDown className="h-3 w-3" />
@@ -272,7 +274,7 @@ export function InteractiveRebase({
 					<div className="flex items-center gap-2 text-xs text-muted-foreground mr-auto">
 						{validCommits.length} commits will be applied
 					</div>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={executeRebase} disabled={isSubmitting || validCommits.length === 0}>

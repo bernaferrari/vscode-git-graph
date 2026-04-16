@@ -1,10 +1,12 @@
 import { ClipboardCheck, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
 
-import type { CollaborationAssignment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+import type { CollaborationAssignment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
+import type { ReactNode } from 'react';
 
 const STATUS_LABELS: Record<CollaborationAssignment['status'], string> = {
 	open: 'Open',
@@ -72,7 +74,7 @@ export function CollaborationAssignmentPanel({
 										<select
 											className='border-border bg-background h-10 rounded-md border px-3 text-sm'
 											value={assignment.status}
-											onChange={(event) => onStatusChange(assignment.id, event.target.value as CollaborationAssignment['status'])}>
+											onChange={(event) => { onStatusChange(assignment.id, event.target.value as CollaborationAssignment['status']); }}>
 											{Object.entries(STATUS_LABELS).map(([value, label]) => (
 												<option key={value} value={value}>
 													{label}
@@ -86,7 +88,7 @@ export function CollaborationAssignmentPanel({
 									size='sm'
 									className='h-10 w-10 shrink-0 p-0'
 									aria-label={`Delete assignment for ${assignment.assigneeName}`}
-									onClick={() => onDelete(assignment.id)}>
+									onClick={() => { onDelete(assignment.id); }}>
 									<Trash2 className='h-4 w-4' />
 								</Button>
 							</div>
@@ -97,7 +99,7 @@ export function CollaborationAssignmentPanel({
 					<select
 						className='border-border bg-background h-10 rounded-md border px-3 text-sm'
 						value={selectedAssigneeId}
-						onChange={(event) => onAssigneeChange(event.target.value)}>
+						onChange={(event) => { onAssigneeChange(event.target.value); }}>
 						<option value=''>Assign to…</option>
 						{members.map((member) => (
 							<option key={member.id} value={member.id}>
@@ -107,7 +109,7 @@ export function CollaborationAssignmentPanel({
 					</select>
 					<Input
 						value={noteDraft}
-						onChange={(event) => onNoteChange(event.target.value)}
+						onChange={(event) => { onNoteChange(event.target.value); }}
 						placeholder='Optional handoff note or acceptance criteria'
 					/>
 					<Button className='h-10 min-w-28' disabled={pending || !selectedAssigneeId} onClick={onCreate}>

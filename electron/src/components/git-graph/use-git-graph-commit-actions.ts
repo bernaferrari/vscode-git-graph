@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 
-import type { ActionPreview } from '@/components/action-preview';
 import { trpc } from '@/trpc/client';
+
+import type { ActionPreview } from '@/components/action-preview';
+import type { ReactNode } from 'react';
 
 interface CommitActionCommit {
     hash: string;
@@ -146,7 +147,7 @@ export function useGitGraphCommitActions({
             };
 
             actionPreview.showPreview(preview, () => {
-                void gitOps.reset(targetCommit, mode);
+                gitOps.reset(targetCommit, mode);
                 setResetOpen(false);
             });
         },
@@ -199,7 +200,7 @@ export function useGitGraphCommitActions({
             };
 
             actionPreview.showPreview(preview, () => {
-                void gitOps.merge(targetBranch, options);
+                gitOps.merge(targetBranch, options);
                 setMergeOpen(false);
             });
         },
@@ -268,7 +269,7 @@ export function useGitGraphCommitActions({
             };
 
             actionPreview.showPreview(preview, () => {
-                void gitOps.cherryPick(targetCommit, noCommit);
+                gitOps.cherryPick(targetCommit, noCommit);
                 setCherryPickOpen(false);
             });
         },
@@ -292,7 +293,7 @@ export function useGitGraphCommitActions({
             };
 
             actionPreview.showPreview(preview, () => {
-                void gitOps.revert(targetCommit, noCommit);
+                gitOps.revert(targetCommit, noCommit);
                 setRevertOpen(false);
             });
         },

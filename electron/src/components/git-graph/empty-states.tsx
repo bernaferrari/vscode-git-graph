@@ -3,8 +3,6 @@
  * Helpful guidance when nothing to show + skeleton screens
  */
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
 	FolderGit2,
 	GitBranch,
@@ -19,6 +17,9 @@ import {
 	RefreshCw,
 } from 'lucide-react';
 import React from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 // Skeleton components for loading states
 

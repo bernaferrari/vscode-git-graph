@@ -3,24 +3,26 @@
  * View and toggle git hooks
  */
 
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+import {
+	Settings,
+	FileCode,
+	Info,
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Switch,
 } from '@/components/ui/switch';
-import {
-	Settings,
-	FileCode,
-	Info,
-} from 'lucide-react';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface HooksManageDialogProps {
 	open: boolean;
@@ -122,7 +124,7 @@ export function HooksManageDialog({ open, onOpenChange }: HooksManageDialogProps
 				</div>
 
 				<div className="flex justify-end pt-2">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>

@@ -61,25 +61,26 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 
 	// Fetch commit details
 	const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
-		{ repo, hash: commit.hash },
+		{ repo, commitHash: commit.hash },
 		{ enabled: !!repo && !!commit.hash }
 	);
 
 	// Fetch diff for expanded files
 	const expandedFilePath = expandedFiles.size > 0 ? Array.from(expandedFiles)[0] : null;
 	const { data: fileDiff } = trpc.git.fileDiff.useQuery(
-		{ repo, hash: commit.hash, path: expandedFilePath ?? '' },
+		{ repo, commitHash: commit.hash, filePath: expandedFilePath ?? '' },
 		{ enabled: !!expandedFilePath && !!repo }
 	);
 
 	const fileChanges: FileChange[] = useMemo(() => {
-		if (!commitDetails?.files) return [];
-		return commitDetails.files.map((f: any) => ({
-			path: f.path,
-			additions: f.additions ?? 0,
-			deletions: f.deletions ?? 0,
-			status: f.status ?? 'modified',
-			binary: f.binary,
+		if (!commitDetails?.details?.fileChanges) return [];
+		return commitDetails.details.fileChanges.map((change) => ({
+			path: change.newFilePath,
+			additions: change.additions ?? 0,
+			deletions: change.deletions ?? 0,
+			status: change.type === 'A' ? 'added' : change.type === 'D' ? 'deleted' : change.type === 'R' ? 'renamed' : 'modified',
+			...(change.oldFilePath !== change.newFilePath ? { oldPath: change.oldFilePath } : {}),
+			binary: change.additions === null && change.deletions === null,
 		}));
 	}, [commitDetails]);
 

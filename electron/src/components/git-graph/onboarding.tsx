@@ -3,14 +3,6 @@
  * Welcome guide for new users
  */
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	CheckCircle2,
 	ChevronRight,
@@ -25,6 +17,15 @@ import {
 	Search,
 	Sparkles,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import { trpc } from '@/trpc/client';
 
 interface OnboardingStep {

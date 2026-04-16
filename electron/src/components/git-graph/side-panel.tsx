@@ -6,11 +6,6 @@
 import { AlertTriangle, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useGitOperations } from '@/hooks/useGitOperations';
-import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
 import {
     BranchItem,
     MoreItems,
@@ -28,6 +23,12 @@ import {
     TagsSection,
     WorktreesSection,
 } from './side-panel-sections';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGitOperations } from '@/hooks/useGitOperations';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 import type { AheadBehindEntry, SmartBranchEntry, WorktreeEntry, SubmoduleEntry } from './side-panel-types';
 
 interface SidePanelProps {
@@ -250,7 +251,7 @@ export function SidePanel({
     const smartBranchesLookup = useMemo(
         () =>
             new Map<string, SmartBranchEntry>(
-                (smartBranchesData?.branches ?? []).map((entry: SmartBranchEntry) => [entry.name, entry])
+                (smartBranchesData?.branches ?? []).map((entry) => [entry.name, entry as SmartBranchEntry])
             ),
         [smartBranchesData?.branches]
     );

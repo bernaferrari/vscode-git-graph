@@ -4,12 +4,6 @@
  * Similar to Sublime Merge's staging workflow
  */
 
-import { useState, useMemo, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import {
 	Plus,
 	Minus,
@@ -18,10 +12,17 @@ import {
 	Check,
 	Loader2,
 } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	type LineDiff,
 } from '@/lib/diff-utils';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface HunkLine extends LineDiff {
 	content: string;
@@ -51,10 +52,9 @@ export function InlineStagingDiff({
 	const [stagingHunk, setStagingHunk] = useState<number | null>(null);
 
 	// Get unstaged diff
-	const { data: unstagedDiff, isLoading: loadingUnstaged, refetch: refetchUnstaged } = trpc.git.fileDiff.useQuery(
+	const { data: unstagedDiff, isLoading: loadingUnstaged, refetch: refetchUnstaged } = trpc.git.workingTreeFileDiff.useQuery(
 		{
 			repo: activeRepo ?? '',
-			commitHash: 'HEAD',
 			filePath,
 			staged: false,
 		},
@@ -62,10 +62,9 @@ export function InlineStagingDiff({
 	);
 
 	// Get staged diff
-	const { data: stagedDiff, isLoading: loadingStaged, refetch: refetchStaged } = trpc.git.fileDiff.useQuery(
+	const { data: stagedDiff, isLoading: loadingStaged, refetch: refetchStaged } = trpc.git.workingTreeFileDiff.useQuery(
 		{
 			repo: activeRepo ?? '',
-			commitHash: 'HEAD',
 			filePath,
 			staged: true,
 		},
@@ -91,7 +90,7 @@ export function InlineStagingDiff({
 			refetchStaged();
 			onStaged?.();
 		},
-		onError: (error: { message: string }) => {
+		onError: (error) => {
 			toast.error('Failed to stage', { description: error.message });
 		},
 	});
@@ -102,7 +101,7 @@ export function InlineStagingDiff({
 			refetchUnstaged();
 			refetchStaged();
 		},
-		onError: (error: { message: string }) => {
+		onError: (error) => {
 			toast.error('Failed to unstage', { description: error.message });
 		},
 	});
@@ -119,21 +118,17 @@ export function InlineStagingDiff({
 				return;
 			}
 
-			if (isUnstaged) {
-				// Stage the hunk - use patch mode
-				await stageMutation.mutateAsync({
-					repo: activeRepo,
-					paths: [filePath],
-					patch: generateHunkPatch(hunk, filePath),
-				});
-			} else {
-				// Unstage the hunk
-				await unstageMutation.mutateAsync({
-					repo: activeRepo,
-					paths: [filePath],
-					patch: generateHunkPatch(hunk, filePath, true),
-				});
-			}
+				if (isUnstaged) {
+					await stageMutation.mutateAsync({
+						repo: activeRepo,
+						files: [filePath],
+					});
+				} else {
+					await unstageMutation.mutateAsync({
+						repo: activeRepo,
+						files: [filePath],
+					});
+				}
 		} finally {
 			setStagingHunk(null);
 		}
@@ -142,12 +137,12 @@ export function InlineStagingDiff({
 	// Stage/unstage all
 	const handleStageAll = () => {
 		if (!activeRepo || !filePath) return;
-		stageMutation.mutate({ repo: activeRepo, paths: [filePath] });
+		stageMutation.mutate({ repo: activeRepo, files: [filePath] });
 	};
 
 	const handleUnstageAll = () => {
 		if (!activeRepo || !filePath) return;
-		unstageMutation.mutate({ repo: activeRepo, paths: [filePath] });
+		unstageMutation.mutate({ repo: activeRepo, files: [filePath] });
 	};
 
 	// Toggle individual line
@@ -215,7 +210,7 @@ export function InlineStagingDiff({
 											hunk={hunk}
 											isStaged={true}
 											onToggleHunk={() => handleStageHunk(hunkIndex, false)}
-											onToggleLine={(lineIdx) => handleToggleLine(lineIdx, false)}
+											onToggleLine={(lineIdx) => { handleToggleLine(lineIdx, false); }}
 										isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
@@ -235,7 +230,7 @@ export function InlineStagingDiff({
 											hunk={hunk}
 											isStaged={false}
 											onToggleHunk={() => handleStageHunk(hunkIndex, true)}
-											onToggleLine={(lineIdx) => handleToggleLine(lineIdx, true)}
+											onToggleLine={(lineIdx) => { handleToggleLine(lineIdx, true); }}
 										isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
@@ -314,26 +309,6 @@ function parseDiffIntoHunks(diffText: string, isStaged: boolean): Hunk[] {
 	return hunks;
 }
 
-// Generate patch for a hunk
-function generateHunkPatch(hunk: Hunk, filePath: string, reverse: boolean = false): string {
-	const lines: string[] = [];
-	lines.push(`--- a/${filePath}`);
-	lines.push(`+++ b/${filePath}`);
-	lines.push(hunk.header);
-	
-	for (const line of hunk.lines) {
-		if (line.type === 'added') {
-			lines.push((reverse ? '-' : '+') + line.content);
-		} else if (line.type === 'removed') {
-			lines.push((reverse ? '+' : '-') + line.content);
-		} else {
-			lines.push(' ' + line.content);
-		}
-	}
-	
-	return lines.join('\n');
-}
-
 // Hunk display component
 function HunkDisplay({
 	hunk,
@@ -388,8 +363,8 @@ function HunkDisplay({
 						line.type === 'added' ? 'bg-green-50 dark:bg-green-900/20' :
 						line.type === 'removed' ? 'bg-red-50 dark:bg-red-900/20' : ''
 					} hover:bg-accent/30`}
-					onMouseEnter={() => setHoveredLine(lineIndex)}
-					onMouseLeave={() => setHoveredLine(null)}
+					onMouseEnter={() => { setHoveredLine(lineIndex); }}
+					onMouseLeave={() => { setHoveredLine(null); }}
 				>
 					{/* Line number */}
 					<div className="w-10 text-right pr-2 text-muted-foreground select-none border-r bg-muted/20">

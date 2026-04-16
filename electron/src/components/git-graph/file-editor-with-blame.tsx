@@ -3,16 +3,6 @@
  * Edit files with inline git blame annotations
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Edit3,
 	Save,
@@ -22,8 +12,19 @@ import {
 	Undo,
 	History,
 } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+
 import { Avatar } from './avatar';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface BlameLine {
 	lineNumber: number;
@@ -236,7 +237,7 @@ export function FileEditorWithBlame({
 							<Button
 								variant={showBlame ? 'default' : 'outline'}
 								size="sm"
-								onClick={() => setShowBlame(!showBlame)}
+								onClick={() => { setShowBlame(!showBlame); }}
 							>
 								<GitCommit className="h-4 w-4 mr-1" />
 								Blame
@@ -338,7 +339,7 @@ export function FileEditorWithBlame({
 								<textarea
 									ref={editorRef}
 									value={content}
-									onChange={(e) => setContent(e.target.value)}
+									onChange={(e) => { setContent(e.target.value); }}
 									className="w-full h-full p-1 font-mono text-sm bg-transparent resize-none focus:outline-none"
 									spellCheck={false}
 								/>
@@ -379,7 +380,7 @@ export function FileEditorWithBlame({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => setIsEditing(true)}
+								onClick={() => { setIsEditing(true); }}
 							>
 								<Edit3 className="h-4 w-4 mr-1" />
 								Edit

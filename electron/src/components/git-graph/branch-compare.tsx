@@ -3,23 +3,6 @@
  * Compare two branches and show diff
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
 import {
 	GitBranch,
 	ArrowRight,
@@ -27,6 +10,24 @@ import {
 	Minus,
 	FileText,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface BranchCompareProps {
 	open: boolean;

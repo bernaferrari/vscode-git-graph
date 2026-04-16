@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
 import { Disposable, toDisposable, combineDisposables } from './disposable';
 
 describe('Disposable', () => {
@@ -94,6 +95,6 @@ describe('combineDisposables', () => {
 	});
 
 	it('should handle empty arguments', () => {
-		expect(() => combineDisposables().dispose()).not.toThrow();
+		expect(() => { combineDisposables().dispose(); }).not.toThrow();
 	});
 });

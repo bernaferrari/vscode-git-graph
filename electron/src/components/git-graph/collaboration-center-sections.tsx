@@ -13,13 +13,8 @@ import {
 	Users,
 } from 'lucide-react';
 
-import { CollaborationCommentThread } from '@/components/git-graph/collaboration-comment-thread';
-import type {
-	CollaborationAssignment,
-	CollaborationComment,
-	CollaborationMemberProfile,
-} from '@/components/git-graph/collaboration-types';
 import { CollaborationAssignmentPanel } from '@/components/git-graph/collaboration-center-assignment';
+import { CollaborationCommentThread } from '@/components/git-graph/collaboration-comment-thread';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +24,12 @@ import { Switch } from '@/components/ui/switch';
 import { TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+
+import type {
+	CollaborationAssignment,
+	CollaborationComment,
+	CollaborationMemberProfile,
+} from '@/components/git-graph/collaboration-types';
 
 export interface SyncConfigState {
 	enabled: boolean;
@@ -61,11 +62,13 @@ export interface SyncConfigState {
 export interface CollaborationActivityEntry {
 	id: string;
 	timestamp: number;
-	type: 'workspace-share' | 'patch-share' | 'bundle-export' | 'bundle-import' | 'remote-sync';
-	action: 'created' | 'deleted' | 'exported' | 'imported' | 'pushed' | 'pulled' | 'roundtrip' | 'failed';
+	type: 'workspace-share' | 'patch-share' | 'bundle-export' | 'bundle-import' | 'remote-sync' | 'comment' | 'assignment';
+	action: 'created' | 'deleted' | 'exported' | 'imported' | 'pushed' | 'pulled' | 'roundtrip' | 'failed' | 'updated';
 	status: 'success' | 'failed' | 'info';
 	title: string;
 	description?: string;
+	metadata?: Record<string, unknown>;
+	actor?: string;
 }
 
 export interface CollaborationRemoteHealth {
@@ -271,7 +274,7 @@ export function WorkspaceHandoffsTab({
 								<select
 									className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm'
 									value={selectedWorkspaceId}
-									onChange={(event) => onWorkspaceChange(event.target.value)}>
+									onChange={(event) => { onWorkspaceChange(event.target.value); }}>
 									{workspaces.map((workspace) => (
 										<option key={workspace.id} value={workspace.id}>
 											{workspace.name}
@@ -281,13 +284,13 @@ export function WorkspaceHandoffsTab({
 							</label>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Share name</span>
-								<Input value={workspaceShareName} onChange={(event) => onShareNameChange(event.target.value)} />
+								<Input value={workspaceShareName} onChange={(event) => { onShareNameChange(event.target.value); }} />
 							</label>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Note</span>
 								<Textarea
 									value={workspaceShareNote}
-									onChange={(event) => onShareNoteChange(event.target.value)}
+									onChange={(event) => { onShareNoteChange(event.target.value); }}
 									placeholder='Context for reviewers, QA, or the next engineer'
 									className='min-h-28 resize-none'
 								/>
@@ -319,7 +322,7 @@ export function WorkspaceHandoffsTab({
 												{new Date(share.createdAt).toLocaleString()} · {share.repos.length} repo{share.repos.length === 1 ? '' : 's'}
 											</CardDescription>
 										</div>
-										<Button variant='ghost' size='sm' className='h-10 w-10 p-0' aria-label={`Delete ${share.name}`} onClick={() => onDelete(share.id)}>
+										<Button variant='ghost' size='sm' className='h-10 w-10 p-0' aria-label={`Delete ${share.name}`} onClick={() => { onDelete(share.id); }}>
 											<Trash2 className='h-4 w-4' />
 										</Button>
 									</div>
@@ -337,7 +340,7 @@ export function WorkspaceHandoffsTab({
 												</div>
 												<div className='flex flex-wrap items-center gap-2'>
 													{repo.needsAttention && <Badge variant='outline'>attention</Badge>}
-													<Button variant='outline' size='sm' className='h-10 text-xs' onClick={() => onCopyLink(repo.deepLink)}>
+													<Button variant='outline' size='sm' className='h-10 text-xs' onClick={() => { onCopyLink(repo.deepLink); }}>
 														<Link2 className='mr-1 h-3.5 w-3.5' />
 														Copy Link
 													</Button>
@@ -350,8 +353,8 @@ export function WorkspaceHandoffsTab({
 										comments={commentsByTarget[`workspace-share:${share.id}`] ?? []}
 										draft={commentDrafts[`workspace-share:${share.id}`] ?? ''}
 										submitPending={commentMutating}
-										onDraftChange={(value) => onCommentDraftChange(`workspace-share:${share.id}`, value)}
-										onSubmit={() => onCommentSubmit('workspace-share', share.id)}
+										onDraftChange={(value) => { onCommentDraftChange(`workspace-share:${share.id}`, value); }}
+										onSubmit={() => { onCommentSubmit('workspace-share', share.id); }}
 										onDelete={onCommentDelete}
 									/>
 									<CollaborationAssignmentPanel
@@ -361,9 +364,9 @@ export function WorkspaceHandoffsTab({
 										selectedAssigneeId={assignmentDrafts[`workspace-share:${share.id}`]?.assigneeId ?? ''}
 										noteDraft={assignmentDrafts[`workspace-share:${share.id}`]?.note ?? ''}
 										pending={assignmentMutating}
-										onAssigneeChange={(value) => onAssignmentAssigneeChange(`workspace-share:${share.id}`, value)}
-										onNoteChange={(value) => onAssignmentNoteChange(`workspace-share:${share.id}`, value)}
-										onCreate={() => onAssignmentCreate('workspace-share', share.id)}
+										onAssigneeChange={(value) => { onAssignmentAssigneeChange(`workspace-share:${share.id}`, value); }}
+										onNoteChange={(value) => { onAssignmentNoteChange(`workspace-share:${share.id}`, value); }}
+										onCreate={() => { onAssignmentCreate('workspace-share', share.id); }}
 										onStatusChange={onAssignmentStatusChange}
 										onDelete={onAssignmentDelete}
 									/>
@@ -450,15 +453,15 @@ export function PatchShelfTab({
 						<CardContent className='space-y-3'>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Patch name</span>
-								<Input value={patchName} onChange={(event) => onPatchNameChange(event.target.value)} />
+								<Input value={patchName} onChange={(event) => { onPatchNameChange(event.target.value); }} />
 							</label>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Base ref</span>
-								<Input list='collaboration-branch-list' value={patchBaseRef} onChange={(event) => onPatchBaseRefChange(event.target.value)} />
+								<Input list='collaboration-branch-list' value={patchBaseRef} onChange={(event) => { onPatchBaseRefChange(event.target.value); }} />
 							</label>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Head ref</span>
-								<Input list='collaboration-branch-list' value={patchHeadRef} onChange={(event) => onPatchHeadRefChange(event.target.value)} />
+								<Input list='collaboration-branch-list' value={patchHeadRef} onChange={(event) => { onPatchHeadRefChange(event.target.value); }} />
 							</label>
 							<datalist id='collaboration-branch-list'>
 								{repoBranches.map((branch) => (
@@ -492,7 +495,7 @@ export function PatchShelfTab({
 												{patch.baseRef}...{patch.headRef} · {patch.summary}
 											</CardDescription>
 										</div>
-										<Button variant='ghost' size='sm' className='h-10 w-10 p-0' aria-label={`Delete ${patch.name}`} onClick={() => onDelete(patch.id)}>
+										<Button variant='ghost' size='sm' className='h-10 w-10 p-0' aria-label={`Delete ${patch.name}`} onClick={() => { onDelete(patch.id); }}>
 											<Trash2 className='h-4 w-4' />
 										</Button>
 									</div>
@@ -504,7 +507,7 @@ export function PatchShelfTab({
 										<Badge variant='outline'>-{patch.deletions}</Badge>
 									</div>
 									<div className='mt-3 flex flex-wrap gap-2'>
-										<Button variant='outline' size='sm' className='h-10 text-xs' onClick={() => onCopyPatch(patch.patch)}>
+										<Button variant='outline' size='sm' className='h-10 text-xs' onClick={() => { onCopyPatch(patch.patch); }}>
 											<Copy className='mr-1 h-3.5 w-3.5' />
 											Copy Patch
 										</Button>
@@ -514,8 +517,8 @@ export function PatchShelfTab({
 										comments={commentsByTarget[`patch-share:${patch.id}`] ?? []}
 										draft={commentDrafts[`patch-share:${patch.id}`] ?? ''}
 										submitPending={commentMutating}
-										onDraftChange={(value) => onCommentDraftChange(`patch-share:${patch.id}`, value)}
-										onSubmit={() => onCommentSubmit('patch-share', patch.id)}
+										onDraftChange={(value) => { onCommentDraftChange(`patch-share:${patch.id}`, value); }}
+										onSubmit={() => { onCommentSubmit('patch-share', patch.id); }}
 										onDelete={onCommentDelete}
 									/>
 									<CollaborationAssignmentPanel
@@ -525,9 +528,9 @@ export function PatchShelfTab({
 										selectedAssigneeId={assignmentDrafts[`patch-share:${patch.id}`]?.assigneeId ?? ''}
 										noteDraft={assignmentDrafts[`patch-share:${patch.id}`]?.note ?? ''}
 										pending={assignmentMutating}
-										onAssigneeChange={(value) => onAssignmentAssigneeChange(`patch-share:${patch.id}`, value)}
-										onNoteChange={(value) => onAssignmentNoteChange(`patch-share:${patch.id}`, value)}
-										onCreate={() => onAssignmentCreate('patch-share', patch.id)}
+										onAssigneeChange={(value) => { onAssignmentAssigneeChange(`patch-share:${patch.id}`, value); }}
+										onNoteChange={(value) => { onAssignmentNoteChange(`patch-share:${patch.id}`, value); }}
+										onCreate={() => { onAssignmentCreate('patch-share', patch.id); }}
 										onStatusChange={onAssignmentStatusChange}
 										onDelete={onAssignmentDelete}
 									/>
@@ -623,53 +626,53 @@ export function CollaborationSyncTab({
 							<div className='grid gap-4 md:grid-cols-2'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Provider</span>
-									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.provider} onChange={() => onSyncConfigChange({ provider: 'self-host' })}>
+									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.provider} onChange={() => { onSyncConfigChange({ provider: 'self-host' }); }}>
 										<option value='self-host'>Self-host</option>
 									</select>
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Project ID</span>
-									<Input value={syncConfig.projectId} onChange={(event) => onSyncConfigChange({ projectId: event.target.value })} />
+									<Input value={syncConfig.projectId} onChange={(event) => { onSyncConfigChange({ projectId: event.target.value }); }} />
 								</label>
 							</div>
 							<label className='block text-xs font-medium'>
 								<span className='mb-1 block text-muted-foreground'>Endpoint URL</span>
-								<Input placeholder='https://git-sync.example.com/api/git-graph/collaboration' value={syncConfig.endpointUrl} onChange={(event) => onSyncConfigChange({ endpointUrl: event.target.value })} />
+								<Input placeholder='https://git-sync.example.com/api/git-graph/collaboration' value={syncConfig.endpointUrl} onChange={(event) => { onSyncConfigChange({ endpointUrl: event.target.value }); }} />
 							</label>
 							<div className='grid gap-4 md:grid-cols-[1fr_140px]'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Bearer token</span>
-									<Input type='password' placeholder='Optional' value={syncConfig.authToken} onChange={(event) => onSyncConfigChange({ authToken: event.target.value })} />
+									<Input type='password' placeholder='Optional' value={syncConfig.authToken} onChange={(event) => { onSyncConfigChange({ authToken: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Timeout (ms)</span>
-									<Input type='number' min={2000} max={120000} value={syncConfig.timeoutMs} onChange={(event) => onSyncConfigChange({ timeoutMs: Number.parseInt(event.target.value, 10) || syncConfig.timeoutMs })} />
+									<Input type='number' min={2000} max={120000} value={syncConfig.timeoutMs} onChange={(event) => { onSyncConfigChange({ timeoutMs: Number.parseInt(event.target.value, 10) || syncConfig.timeoutMs }); }} />
 								</label>
 							</div>
 							<div className='grid gap-4 md:grid-cols-2'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Member ID</span>
-									<Input value={syncConfig.memberId} placeholder='ada@example.com' onChange={(event) => onSyncConfigChange({ memberId: event.target.value })} />
+									<Input value={syncConfig.memberId} placeholder='ada@example.com' onChange={(event) => { onSyncConfigChange({ memberId: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Member API key</span>
-									<Input type='password' placeholder='Optional per-member key' value={syncConfig.memberApiKey} onChange={(event) => onSyncConfigChange({ memberApiKey: event.target.value })} />
+									<Input type='password' placeholder='Optional per-member key' value={syncConfig.memberApiKey} onChange={(event) => { onSyncConfigChange({ memberApiKey: event.target.value }); }} />
 								</label>
 							</div>
 							<div className='grid gap-4 md:grid-cols-2'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Display name</span>
-									<Input value={syncConfig.displayName} placeholder='Ada Lovelace' onChange={(event) => onSyncConfigChange({ displayName: event.target.value })} />
+									<Input value={syncConfig.displayName} placeholder='Ada Lovelace' onChange={(event) => { onSyncConfigChange({ displayName: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Email</span>
-									<Input value={syncConfig.email} placeholder='ada@example.com' onChange={(event) => onSyncConfigChange({ email: event.target.value })} />
+									<Input value={syncConfig.email} placeholder='ada@example.com' onChange={(event) => { onSyncConfigChange({ email: event.target.value }); }} />
 								</label>
 							</div>
 							<div className='grid gap-4 md:grid-cols-4'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Role</span>
-									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.role} onChange={(event) => onSyncConfigChange({ role: event.target.value as SyncConfigState['role'] })}>
+									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.role} onChange={(event) => { onSyncConfigChange({ role: event.target.value as SyncConfigState['role'] }); }}>
 										<option value='developer'>Developer</option>
 										<option value='reviewer'>Reviewer</option>
 										<option value='lead'>Lead</option>
@@ -678,7 +681,7 @@ export function CollaborationSyncTab({
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Permission</span>
-									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.permissionLevel} onChange={(event) => onSyncConfigChange({ permissionLevel: event.target.value as SyncConfigState['permissionLevel'] })}>
+									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={syncConfig.permissionLevel} onChange={(event) => { onSyncConfigChange({ permissionLevel: event.target.value as SyncConfigState['permissionLevel'] }); }}>
 										<option value='owner'>Owner</option>
 										<option value='manager'>Manager</option>
 										<option value='member'>Member</option>
@@ -687,31 +690,31 @@ export function CollaborationSyncTab({
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Avatar URL</span>
-									<Input value={syncConfig.avatarUrl} placeholder='https://example.com/avatar.png' onChange={(event) => onSyncConfigChange({ avatarUrl: event.target.value })} />
+									<Input value={syncConfig.avatarUrl} placeholder='https://example.com/avatar.png' onChange={(event) => { onSyncConfigChange({ avatarUrl: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Device label</span>
-									<Input value={syncConfig.deviceLabel} placeholder='Design MacBook' onChange={(event) => onSyncConfigChange({ deviceLabel: event.target.value })} />
+									<Input value={syncConfig.deviceLabel} placeholder='Design MacBook' onChange={(event) => { onSyncConfigChange({ deviceLabel: event.target.value }); }} />
 								</label>
 							</div>
 							<div className='grid gap-4 md:grid-cols-2'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Organization ID</span>
-									<Input value={syncConfig.organizationId} placeholder='acme' onChange={(event) => onSyncConfigChange({ organizationId: event.target.value })} />
+									<Input value={syncConfig.organizationId} placeholder='acme' onChange={(event) => { onSyncConfigChange({ organizationId: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Organization name</span>
-									<Input value={syncConfig.organizationName} placeholder='Acme Engineering' onChange={(event) => onSyncConfigChange({ organizationName: event.target.value })} />
+									<Input value={syncConfig.organizationName} placeholder='Acme Engineering' onChange={(event) => { onSyncConfigChange({ organizationName: event.target.value }); }} />
 								</label>
 							</div>
 							<div className='grid gap-4 md:grid-cols-2'>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Team ID</span>
-									<Input value={syncConfig.teamId} placeholder='platform' onChange={(event) => onSyncConfigChange({ teamId: event.target.value })} />
+									<Input value={syncConfig.teamId} placeholder='platform' onChange={(event) => { onSyncConfigChange({ teamId: event.target.value }); }} />
 								</label>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Team name</span>
-									<Input value={syncConfig.teamName} placeholder='Platform Team' onChange={(event) => onSyncConfigChange({ teamName: event.target.value })} />
+									<Input value={syncConfig.teamName} placeholder='Platform Team' onChange={(event) => { onSyncConfigChange({ teamName: event.target.value }); }} />
 								</label>
 							</div>
 							<div className='grid gap-3 md:grid-cols-5'>
@@ -720,35 +723,35 @@ export function CollaborationSyncTab({
 										<p className='text-sm font-medium'>Enable remote sync</p>
 										<p className='text-muted-foreground text-xs'>Use this endpoint for push, pull, or roundtrip exchange.</p>
 									</div>
-									<Switch checked={syncConfig.enabled} onCheckedChange={(checked) => onSyncConfigChange({ enabled: checked })} />
+									<Switch checked={syncConfig.enabled} onCheckedChange={(checked) => { onSyncConfigChange({ enabled: checked }); }} />
 								</label>
 								<label className='flex min-h-11 items-center justify-between rounded-xl border border-border/70 px-3 py-2'>
 									<div>
 										<p className='text-sm font-medium'>Auto sync on open</p>
 										<p className='text-muted-foreground text-xs'>Run one roundtrip sync when the center opens.</p>
 									</div>
-									<Switch checked={syncConfig.autoSyncOnOpen} onCheckedChange={(checked) => onSyncConfigChange({ autoSyncOnOpen: checked })} />
+									<Switch checked={syncConfig.autoSyncOnOpen} onCheckedChange={(checked) => { onSyncConfigChange({ autoSyncOnOpen: checked }); }} />
 								</label>
 								<label className='flex min-h-11 items-center justify-between rounded-xl border border-border/70 px-3 py-2'>
 									<div>
 										<p className='text-sm font-medium'>Publish live presence</p>
 										<p className='text-muted-foreground text-xs'>Show who is actively working in the project.</p>
 									</div>
-									<Switch checked={syncConfig.presenceEnabled} onCheckedChange={(checked) => onSyncConfigChange({ presenceEnabled: checked })} />
+									<Switch checked={syncConfig.presenceEnabled} onCheckedChange={(checked) => { onSyncConfigChange({ presenceEnabled: checked }); }} />
 								</label>
 								<label className='flex min-h-11 items-center justify-between rounded-xl border border-border/70 px-3 py-2'>
 									<div>
 										<p className='text-sm font-medium'>Live sync</p>
 										<p className='text-muted-foreground text-xs'>Roundtrip changes after comments, assignments, and shares.</p>
 									</div>
-									<Switch checked={syncConfig.liveSyncEnabled} onCheckedChange={(checked) => onSyncConfigChange({ liveSyncEnabled: checked })} />
+									<Switch checked={syncConfig.liveSyncEnabled} onCheckedChange={(checked) => { onSyncConfigChange({ liveSyncEnabled: checked }); }} />
 								</label>
 								<label className='flex min-h-11 items-center justify-between rounded-xl border border-border/70 px-3 py-2'>
 									<div>
 										<p className='text-sm font-medium'>Realtime updates</p>
 										<p className='text-muted-foreground text-xs'>Listen for collaboration events and pull fresh shared state.</p>
 									</div>
-									<Switch checked={syncConfig.realtimeEnabled} onCheckedChange={(checked) => onSyncConfigChange({ realtimeEnabled: checked })} />
+									<Switch checked={syncConfig.realtimeEnabled} onCheckedChange={(checked) => { onSyncConfigChange({ realtimeEnabled: checked }); }} />
 								</label>
 							</div>
 							<div className='flex flex-wrap gap-2 pt-1'>
@@ -794,7 +797,7 @@ export function CollaborationSyncTab({
 								</div>
 								<label className='block text-xs font-medium'>
 									<span className='mb-1 block text-muted-foreground'>Import strategy</span>
-									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={importStrategy} onChange={(event) => onImportStrategyChange(event.target.value === 'replace' ? 'replace' : 'merge')}>
+									<select className='border-border bg-background h-11 w-full rounded-md border px-3 text-sm' value={importStrategy} onChange={(event) => { onImportStrategyChange(event.target.value === 'replace' ? 'replace' : 'merge'); }}>
 										<option value='merge'>Merge with existing shares</option>
 										<option value='replace'>Replace local collaboration state</option>
 									</select>

@@ -4,10 +4,11 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
@@ -218,7 +219,7 @@ export function InteractiveMergeEditor({
 						</Button>
 						<Button
 							size="sm"
-							onClick={() => onResolve(resolvedContent)}
+							onClick={() => { onResolve(resolvedContent); }}
 							disabled={resolvedCount < conflictCount}
 						>
 							Accept Resolution
@@ -256,7 +257,7 @@ export function InteractiveMergeEditor({
 													variant="ghost"
 													size="sm"
 													className="h-5 px-1.5 text-xs"
-													onClick={() => acceptHunk(hunk.start, hunk.lines, 'ours')}
+													onClick={() => { acceptHunk(hunk.start, hunk.lines, 'ours'); }}
 												>
 													Take Ours
 												</Button>
@@ -264,7 +265,7 @@ export function InteractiveMergeEditor({
 													variant="ghost"
 													size="sm"
 													className="h-5 px-1.5 text-xs"
-													onClick={() => acceptHunk(hunk.start, hunk.lines, 'theirs')}
+													onClick={() => { acceptHunk(hunk.start, hunk.lines, 'theirs'); }}
 												>
 													Take Theirs
 												</Button>

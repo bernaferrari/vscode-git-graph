@@ -3,15 +3,6 @@
  * Allows users to switch between different Git profiles
  */
 
-import { useProfiles, type GitProfile } from '@/lib/profiles';
-import { Button } from '@/components/ui/button';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
 	User,
 	Briefcase,
@@ -24,6 +15,16 @@ import {
 	ChevronDown,
 	Check,
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useProfiles, type GitProfile } from '@/lib/profiles';
 import { cn } from '@/lib/utils';
 
 const PROFILE_ICONS: Record<string, React.ElementType> = {
@@ -102,7 +103,7 @@ export function ProfileSwitcher({ className }: ProfileSwitcherProps) {
 					return (
 						<DropdownMenuItem
 							key={profile.id}
-							onClick={() => setActiveProfile(profile.id)}
+							onClick={() => { setActiveProfile(profile.id); }}
 							className={cn('flex items-center gap-2 cursor-pointer', isActive && 'bg-accent')}
 						>
 							<Icon

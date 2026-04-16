@@ -3,16 +3,6 @@
  * Shows what will happen before risky Git operations
  */
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	AlertTriangle,
 	GitBranch,
@@ -25,6 +15,17 @@ import {
 	Check,
 	X,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 export type ActionType = 
@@ -185,7 +186,7 @@ export function ActionPreviewDialog({
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" onClick={onCancel || (() => onOpenChange(false))}>
+					<Button variant="outline" onClick={onCancel || (() => { onOpenChange(false); })}>
 						Cancel
 					</Button>
 					<Button 

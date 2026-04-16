@@ -3,15 +3,16 @@
  * Exposes Git operations as tRPC procedures
  */
 
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { appStore, instanceStore } from '@/app/backend/store';
 import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
 
+import { parseWorktreePorcelainRecords } from './worktree';
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
 import {
@@ -30,7 +31,6 @@ import {
     type PullRequestProvider,
 } from '../../../services/pullRequest';
 import { router, publicProcedure } from '../../init';
-import { parseWorktreePorcelainRecords } from './worktree';
 
 // Singleton Git service instance
 let gitService: GitService | null = null;
@@ -5778,11 +5778,11 @@ export const gitRouter = router({
                 try {
                     for (const step of workflow.steps) {
                         updateStep(step.id, 'running');
-                        const params = step.params as Record<string, unknown>;
+                        const params = step.params;
                         const asString = (key: string, fallback: string = ''): string =>
-                            typeof params[key] === 'string' ? resolveTemplate(params[key] as string) : fallback;
+                            typeof params[key] === 'string' ? resolveTemplate(params[key]) : fallback;
                         const asBool = (key: string, fallback: boolean = false): boolean =>
-                            typeof params[key] === 'boolean' ? (params[key] as boolean) : fallback;
+                            typeof params[key] === 'boolean' ? (params[key]) : fallback;
 
                         let stepError: string | null = null;
 

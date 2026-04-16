@@ -8,8 +8,8 @@ import { exec, spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { z } from 'zod';
 
-import { publicProcedure, router } from '@/app/backend/trpc/init';
 import { appendAuditEntry, clearAuditEntries, listAuditEntries } from '@/app/backend/store/audit';
+import { publicProcedure, router } from '@/app/backend/trpc/init';
 
 import { signalReady } from './signalReady';
 import { getAutoUpdateManager } from '../../../services/autoUpdater';

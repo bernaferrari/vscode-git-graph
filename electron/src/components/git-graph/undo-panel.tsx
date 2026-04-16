@@ -3,11 +3,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 
 interface ReflogEntry {
 	hash: string;
@@ -76,7 +77,7 @@ export function UndoPanel({ repo }: UndoPanelProps) {
 									variant="ghost"
 									size="sm"
 									className="h-6 px-2"
-									onClick={() => handleUndo(entry.hash, 'hard')}
+									onClick={() => { handleUndo(entry.hash, 'hard'); }}
 								>
 									Undo
 								</Button>

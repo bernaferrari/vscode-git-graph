@@ -3,11 +3,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -15,6 +15,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import { trpc } from '@/trpc/client';
 
 const COMMON_DIFF_TOOLS = [
 	{ value: 'vscode', label: 'VS Code' },
@@ -99,7 +100,7 @@ export function DiffToolConfig({ repo }: DiffToolConfigProps) {
 						<Label className="text-xs">Custom Tool Command</Label>
 						<Input
 							value={customTool}
-							onChange={(e) => setCustomTool(e.target.value)}
+							onChange={(e) => { setCustomTool(e.target.value); }}
 							placeholder="e.g., /usr/local/bin/mydiff"
 							className="h-8"
 						/>
@@ -109,7 +110,7 @@ export function DiffToolConfig({ repo }: DiffToolConfigProps) {
 				<div className="flex gap-2">
 					<Button
 						size="sm"
-						onClick={() => handleSetTool(false)}
+						onClick={() => { handleSetTool(false); }}
 						disabled={!selectedTool || (selectedTool === 'custom' && !customTool)}
 					>
 						Set for Repo
@@ -117,7 +118,7 @@ export function DiffToolConfig({ repo }: DiffToolConfigProps) {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => handleSetTool(true)}
+						onClick={() => { handleSetTool(true); }}
 						disabled={!selectedTool || (selectedTool === 'custom' && !customTool)}
 					>
 						Set Global

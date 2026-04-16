@@ -3,18 +3,6 @@
  * Diagnose repository issues and show recommendations
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Check,
 	X,
@@ -23,6 +11,19 @@ import {
 	RefreshCw,
 	Activity,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface HealthCheck {
 	id: string;
@@ -46,12 +47,16 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 	const [score, setScore] = useState(0);
 
 	// Get repo info
-	const { data: statusData } = trpc.git.status.useQuery(
-		{ repo: activeRepo ?? '' },
+	const { data: repoInfo } = trpc.git.repoInfo.useQuery(
+		{
+			repo: activeRepo ?? '',
+			showRemoteBranches: false,
+			showStashes: false,
+			hideRemotes: [],
+		},
 		{ enabled: !!activeRepo && open }
 	);
-
-	const { data: branchData } = trpc.git.branches.useQuery(
+	const { data: statusData } = trpc.git.workingDirectoryStatus.useQuery(
 		{ repo: activeRepo ?? '' },
 		{ enabled: !!activeRepo && open }
 	);
@@ -68,16 +73,18 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		const newChecks: HealthCheck[] = [];
 
 		// Check 1: Uncommitted changes
-		const hasUncommitted = (statusData?.changes?.length ?? 0) > 0 || (statusData?.untracked?.length ?? 0) > 0;
-		newChecks.push({
-			id: 'uncommitted',
-			label: 'Working Directory',
-			description: 'Check for uncommitted changes',
-			status: hasUncommitted ? 'warn' : 'pass',
-			detail: hasUncommitted 
-				? `${statusData?.changes?.length ?? 0} modified, ${statusData?.untracked?.length ?? 0} untracked`
-				: 'Clean working directory',
-		});
+			const unstagedCount = statusData?.unstaged?.length ?? 0;
+			const stagedCount = statusData?.staged?.length ?? 0;
+			const hasUncommitted = unstagedCount + stagedCount > 0;
+			newChecks.push({
+				id: 'uncommitted',
+				label: 'Working Directory',
+				description: 'Check for uncommitted changes',
+				status: hasUncommitted ? 'warn' : 'pass',
+				detail: hasUncommitted 
+					? `${unstagedCount} unstaged, ${stagedCount} staged`
+					: 'Clean working directory',
+			});
 
 		// Check 2: Remote configured
 		const hasRemote = (remoteData?.remotes?.length ?? 0) > 0;
@@ -92,7 +99,7 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		});
 
 		// Check 3: Default branch
-		const hasMain = branchData?.branches?.some((branch: { name: string }) => branch.name === 'main' || branch.name === 'master');
+			const hasMain = repoInfo?.branches?.some((branch) => branch === 'main' || branch === 'master');
 		newChecks.push({
 			id: 'default-branch',
 			label: 'Default Branch',
@@ -113,7 +120,7 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		});
 
 		// Check 5: Merge conflicts
-		const hasConflicts = (statusData?.conflicted?.length ?? 0) > 0;
+			const hasConflicts = (statusData?.conflicted?.length ?? 0) > 0;
 		newChecks.push({
 			id: 'conflicts',
 			label: 'Merge Conflicts',
@@ -125,13 +132,13 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		});
 
 		// Check 6: Stale branches (placeholder)
-		newChecks.push({
-			id: 'stale-branches',
-			label: 'Branch Hygiene',
-			description: 'Check for merged/stale branches',
-			status: branchData?.branches?.length && branchData.branches.length > 10 ? 'warn' : 'pass',
-			detail: `${branchData?.branches?.length ?? 0} branches`,
-		});
+			newChecks.push({
+				id: 'stale-branches',
+				label: 'Branch Hygiene',
+				description: 'Check for merged/stale branches',
+				status: repoInfo?.branches?.length && repoInfo.branches.length > 10 ? 'warn' : 'pass',
+				detail: `${repoInfo?.branches?.length ?? 0} branches`,
+			});
 
 		setChecks(newChecks);
 
@@ -227,7 +234,7 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 				</ScrollArea>
 
 				<div className="flex justify-end gap-2 pt-4 border-t">
-					<Button variant="outline" onClick={() => setChecks([])}>
+					<Button variant="outline" onClick={() => { setChecks([]); }}>
 						Clear
 					</Button>
 					<Button onClick={runHealthCheck} disabled={isRunning || !activeRepo}>

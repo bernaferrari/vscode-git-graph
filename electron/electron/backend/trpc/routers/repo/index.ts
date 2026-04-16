@@ -9,15 +9,27 @@ import { z } from 'zod';
 
 import type { GitRepoState } from '@/web/lib/types';
 
-import { appStore, instanceStore } from '@/app/backend/store';
-import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
 import {
-	buildCollaborationPullRequestFileTargetId,
-	buildCollaborationPullRequestTargetId,
-	deriveCollaborationRepoKey,
-	parseCollaborationReviewTargetId,
-} from '@/lib/collaboration-review-targets';
+	requestCollaborationHealth,
+	requestCollaborationMembers,
+	requestCollaborationPresence,
+	requestCollaborationRemoteActivity,
+	requestCollaborationTeamProfile,
+	requestCollaborationTeamInsights,
+	requestCollaborationSync,
+	removeCollaborationMember,
+	publishCollaborationPresence,
+	publishCollaborationSession,
+	upsertCollaborationTeamProfile,
+	upsertCollaborationMember,
+} from '@/app/backend/services/collaborationSync';
+import { appStore, instanceStore } from '@/app/backend/store';
 import { listAuditEntries } from '@/app/backend/store/audit';
+import {
+	getCodeReviewProgress,
+	resetCodeReviewProgress,
+	updateCodeReviewProgress,
+} from '@/app/backend/store/codeReviews';
 import {
 	appendCollaborationActivity,
 	buildCollaborationReviewDashboard,
@@ -41,27 +53,9 @@ import {
 	upsertCollaborationAssignment,
 	upsertCollaborationComment,
 } from '@/app/backend/store/collaboration';
-import { toDeepLink } from '@/app/backend/trpc/routers/app';
-import {
-	getCodeReviewProgress,
-	resetCodeReviewProgress,
-	updateCodeReviewProgress,
-} from '@/app/backend/store/codeReviews';
 import { getRepoPolicy, repoPolicySchema, upsertRepoPolicy } from '@/app/backend/store/repoPolicies';
-import {
-	requestCollaborationHealth,
-	requestCollaborationMembers,
-	requestCollaborationPresence,
-	requestCollaborationRemoteActivity,
-	requestCollaborationTeamProfile,
-	requestCollaborationTeamInsights,
-	requestCollaborationSync,
-	removeCollaborationMember,
-	publishCollaborationPresence,
-	publishCollaborationSession,
-	upsertCollaborationTeamProfile,
-	upsertCollaborationMember,
-} from '@/app/backend/services/collaborationSync';
+import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
+import { toDeepLink } from '@/app/backend/trpc/routers/app';
 
 import { findGit } from '../../../services/gitExecutable';
 import { getGitService } from '../../../services/gitService';
@@ -79,6 +73,12 @@ import {
 } from '../../../services/pullRequest';
 import { getRepoManager } from '../../../services/repoManager';
 import { router, publicProcedure } from '../../init';
+import {
+	buildCollaborationPullRequestFileTargetId,
+	buildCollaborationPullRequestTargetId,
+	deriveCollaborationRepoKey,
+	parseCollaborationReviewTargetId,
+} from '@/lib/collaboration-review-targets';
 
 let gitInitPromise: Promise<string | null> | null = null;
 

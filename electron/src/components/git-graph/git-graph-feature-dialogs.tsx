@@ -1,9 +1,10 @@
 import { lazy, Suspense } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+
 
 import type { CommandPaletteActions } from './command-palette';
 import type { CommitTemplate } from './commit-templates';
 import type { SettingsTab } from './use-git-graph-shell-panels';
+import type { Dispatch, SetStateAction } from 'react';
 
 const CloneRepositoryDialog = lazy(() =>
     import('./clone-repository-dialog').then((mod) => ({ default: mod.CloneRepositoryDialog }))

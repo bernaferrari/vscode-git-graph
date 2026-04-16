@@ -32,7 +32,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
+import { trpcClient } from '@/lib/trpcClient';
 
 
 interface ConfigSection {
@@ -136,11 +136,11 @@ export function GitConfigEditor({
 		const loadConfig = async () => {
 			setIsLoading(true);
 			try {
-				const result = (await trpc.git.configList.query({ repo: activeRepo })) as Record<string, unknown>;
+				const result = (await trpcClient.git.configList.query({ repo: activeRepo })) as Record<string, unknown>;
 				setConfigSections(buildConfigSections(result));
 
 				// Also get raw config
-				const rawResult = await trpc.git.configRaw.query({ repo: activeRepo });
+				const rawResult = await trpcClient.git.configRaw.query({ repo: activeRepo });
 				setRawConfig(rawResult || '');
 			} catch (error) {
 				toast.error('Failed to load git config');
@@ -182,7 +182,7 @@ export function GitConfigEditor({
 				const key = section?.keys.find(k => `${section.name}.${k.key}` === fullKey);
 
 				if (key) {
-					await trpc.git.configSet.mutate({
+					await trpcClient.git.configSet.mutate({
 						repo: activeRepo,
 						key: fullKey,
 						value: key.value,
@@ -205,7 +205,7 @@ export function GitConfigEditor({
 
 		setIsSaving(true);
 		try {
-			const result = await trpc.git.configSetRaw.mutate({
+			const result = await trpcClient.git.configSetRaw.mutate({
 				repo: activeRepo,
 				content: rawConfig,
 			});
@@ -245,7 +245,7 @@ export function GitConfigEditor({
 		if (!confirm(`Delete ${sectionName}.${keyName}?`)) return;
 
 		try {
-			await trpc.git.configUnset.mutate({
+			await trpcClient.git.configUnset.mutate({
 				repo: activeRepo,
 				key: `${sectionName}.${keyName}`,
 			});
@@ -301,7 +301,7 @@ export function GitConfigEditor({
 		setModifiedKeys(new Set());
 		// Reload config
 		if (activeRepo) {
-			trpc.git.configList.query({ repo: activeRepo }).then((result: unknown) => {
+			trpcClient.git.configList.query({ repo: activeRepo }).then((result: unknown) => {
 				setConfigSections(buildConfigSections((result ?? {}) as Record<string, unknown>));
 			});
 		}

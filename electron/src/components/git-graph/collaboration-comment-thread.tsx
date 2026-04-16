@@ -2,10 +2,11 @@ import { formatDistanceToNow } from 'date-fns';
 import { MessageSquare, Send, Trash2 } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 
-import type { CollaborationComment } from '@/components/git-graph/collaboration-types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+
+import type { CollaborationComment } from '@/components/git-graph/collaboration-types';
 
 export function CollaborationCommentThread({
 	title = 'Discussion',
@@ -67,7 +68,7 @@ export function CollaborationCommentThread({
 										size='sm'
 										className='h-10 w-10 p-0'
 										aria-label={`Delete comment by ${comment.author}`}
-										onClick={() => onDelete(comment.id)}>
+										onClick={() => { onDelete(comment.id); }}>
 										<Trash2 className='h-4 w-4' />
 									</Button>
 								</div>
@@ -78,7 +79,7 @@ export function CollaborationCommentThread({
 				<div className='space-y-2'>
 					<Textarea
 						value={draft}
-						onChange={(event) => onDraftChange(event.target.value)}
+						onChange={(event) => { onDraftChange(event.target.value); }}
 						placeholder='Leave context for teammates, reviewers, or your next session'
 						className='min-h-24 resize-none text-sm'
 					/>

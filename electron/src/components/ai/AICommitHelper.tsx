@@ -3,11 +3,6 @@
  * Provides AI-powered commit message generation
  */
 
-import { useState } from 'react';
-import { useAIFeatures } from '@/hooks/useAIFeatures';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
 	Sparkles,
 	Check,
@@ -17,8 +12,15 @@ import {
 	Lightbulb,
 	 Wand2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAIFeatures } from '@/hooks/useAIFeatures';
+import { cn } from '@/lib/utils';
+
 
 interface AICommitHelperProps {
 	stagedFiles: string[];
@@ -72,7 +74,7 @@ export function AICommitHelper({
 			<Button
 				variant="ghost"
 				size="sm"
-				onClick={() => setAIEnabled(true)}
+				onClick={() => { setAIEnabled(true); }}
 				className={cn('gap-1.5 text-muted-foreground', className)}
 			>
 				<Wand2 className="h-4 w-4" />
@@ -189,7 +191,7 @@ export function AICommitHelper({
 						variant="ghost"
 						size="sm"
 						className="h-7 w-7 p-0 text-muted-foreground"
-						onClick={() => setAIEnabled(false)}
+						onClick={() => { setAIEnabled(false); }}
 					>
 						<Sparkles className="h-3 w-3" />
 					</Button>

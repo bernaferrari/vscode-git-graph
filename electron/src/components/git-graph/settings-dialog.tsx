@@ -3,14 +3,6 @@
  * Comprehensive app configuration
  */
 
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
 import {
     Settings,
     Globe,
@@ -23,9 +15,18 @@ import {
     Loader2,
     RotateCcw,
 } from 'lucide-react';
-import { trpc } from '@/trpc/client';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
 import { useSettings } from './useSettings';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface SettingsDialogProps {
     open: boolean;
@@ -294,7 +295,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description='Ask for confirmation before destructive operations'>
                                     <Switch
                                         checked={settings.confirmDestructiveActions}
-                                        onCheckedChange={(v: boolean) => updateSetting('confirmDestructiveActions', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('confirmDestructiveActions', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -307,20 +308,20 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-20'
                                         value={settings.autoFetchInterval}
                                         onChange={(e) =>
-                                            updateSetting('autoFetchInterval', parseInt(e.currentTarget.value) || 0)
+                                            { updateSetting('autoFetchInterval', parseInt(e.currentTarget.value) || 0); }
                                         }
                                     />
                                 </SettingRow>
                                 <SettingRow label='Check for updates' description='Automatically check for app updates'>
                                     <Switch
                                         checked={settings.checkForUpdates}
-                                        onCheckedChange={(v: boolean) => updateSetting('checkForUpdates', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('checkForUpdates', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Launch at startup' description='Start Git Graph when you log in'>
                                     <Switch
                                         checked={settings.launchAtStartup}
-                                        onCheckedChange={(v: boolean) => updateSetting('launchAtStartup', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('launchAtStartup', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Lens Mode' description='Choose your interface experience level'>
@@ -328,7 +329,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-9 rounded-md border bg-transparent px-3 py-1 text-sm'
                                         value={settings.lensMode}
                                         onChange={(e) =>
-                                            updateSetting('lensMode', e.currentTarget.value as 'guided' | 'craft' | 'control')
+                                            { updateSetting('lensMode', e.currentTarget.value as 'guided' | 'craft' | 'control'); }
                                         }>
                                         <option value='guided'>Guided - Simple and safe</option>
                                         <option value='craft'>Craft - Balanced with shortcuts</option>
@@ -345,7 +346,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-9 rounded-md border bg-transparent px-3 py-1 text-sm'
                                         value={settings.theme}
                                         onChange={(e) =>
-                                            updateSetting('theme', e.currentTarget.value as typeof settings.theme)
+                                            { updateSetting('theme', e.currentTarget.value as typeof settings.theme); }
                                         }>
                                         <option value='system'>System</option>
                                         <option value='light'>Light</option>
@@ -357,7 +358,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-9 rounded-md border bg-transparent px-3 py-1 text-sm'
                                         value={settings.graphTheme}
                                         onChange={(e) =>
-                                            updateSetting('graphTheme', e.currentTarget.value as typeof settings.graphTheme)
+                                            { updateSetting('graphTheme', e.currentTarget.value as typeof settings.graphTheme); }
                                         }>
                                         <option value='default'>Default</option>
                                         <option value='colorful'>Colorful</option>
@@ -370,7 +371,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 <SettingRow label='Show avatars' description='Display author avatars in commits'>
                                     <Switch
                                         checked={settings.showAvatars}
-                                        onCheckedChange={(v: boolean) => updateSetting('showAvatars', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('showAvatars', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -378,7 +379,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description="Use '2 days ago' instead of full dates">
                                     <Switch
                                         checked={settings.showRelativeDates}
-                                        onCheckedChange={(v: boolean) => updateSetting('showRelativeDates', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('showRelativeDates', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Date format' description='How to display dates'>
@@ -386,7 +387,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-9 rounded-md border bg-transparent px-3 py-1 text-sm'
                                         value={settings.dateFormat}
                                         onChange={(e) =>
-                                            updateSetting('dateFormat', e.currentTarget.value as typeof settings.dateFormat)
+                                            { updateSetting('dateFormat', e.currentTarget.value as typeof settings.dateFormat); }
                                         }>
                                         <option value='relative'>Relative</option>
                                         <option value='iso'>ISO (YYYY-MM-DD)</option>
@@ -398,7 +399,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description='Increase contrast and focus visibility for accessibility'>
                                     <Switch
                                         checked={settings.enhancedAccessibility}
-                                        onCheckedChange={(v: boolean) => updateSetting('enhancedAccessibility', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('enhancedAccessibility', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -411,7 +412,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-20'
                                         value={settings.commitMessageLength}
                                         onChange={(e) =>
-                                            updateSetting('commitMessageLength', parseInt(e.currentTarget.value) || 0)
+                                            { updateSetting('commitMessageLength', parseInt(e.currentTarget.value) || 0); }
                                         }
                                     />
                                 </SettingRow>
@@ -426,7 +427,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Input
                                         className='w-32'
                                         value={settings.defaultBranch}
-                                        onChange={(e) => updateSetting('defaultBranch', e.currentTarget.value)}
+                                        onChange={(e) => { updateSetting('defaultBranch', e.currentTarget.value); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -434,7 +435,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description='Automatically sign commits with GPG/SSH key'>
                                     <Switch
                                         checked={settings.autoSignCommits}
-                                        onCheckedChange={(v: boolean) => updateSetting('autoSignCommits', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('autoSignCommits', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -444,7 +445,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-20 w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm'
                                         placeholder='feat: &#10;&#10;'
                                         value={settings.commitTemplate}
-                                        onChange={(e) => updateSetting('commitTemplate', e.currentTarget.value)}
+                                        onChange={(e) => { updateSetting('commitTemplate', e.currentTarget.value); }}
                                     />
                                 </SettingRow>
                             </SettingsSection>
@@ -457,7 +458,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-48'
                                         placeholder='e.g., code --wait'
                                         value={settings.mergeTool}
-                                        onChange={(e) => updateSetting('mergeTool', e.currentTarget.value)}
+                                        onChange={(e) => { updateSetting('mergeTool', e.currentTarget.value); }}
                                     />
                                 </SettingRow>
                             </SettingsSection>
@@ -468,25 +469,25 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 <SettingRow label='Push notifications' description='Notify when push completes'>
                                     <Switch
                                         checked={settings.notifyOnPush}
-                                        onCheckedChange={(v: boolean) => updateSetting('notifyOnPush', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('notifyOnPush', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Pull notifications' description='Notify when pull completes'>
                                     <Switch
                                         checked={settings.notifyOnPull}
-                                        onCheckedChange={(v: boolean) => updateSetting('notifyOnPull', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('notifyOnPull', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Merge notifications' description='Notify when merge completes'>
                                     <Switch
                                         checked={settings.notifyOnMerge}
-                                        onCheckedChange={(v: boolean) => updateSetting('notifyOnMerge', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('notifyOnMerge', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Sound effects' description='Play sounds for notifications'>
                                     <Switch
                                         checked={settings.soundEnabled}
-                                        onCheckedChange={(v: boolean) => updateSetting('soundEnabled', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('soundEnabled', v); }}
                                     />
                                 </SettingRow>
                             </SettingsSection>
@@ -504,7 +505,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         step={100}
                                         className='w-24'
                                         value={settings.maxCommits}
-                                        onChange={(e) => updateSetting('maxCommits', parseInt(e.currentTarget.value) || 1000)}
+                                        onChange={(e) => { updateSetting('maxCommits', parseInt(e.currentTarget.value) || 1000); }}
                                     />
                                 </SettingRow>
                                 <SettingRow
@@ -512,13 +513,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description='Use virtual scrolling for better performance'>
                                     <Switch
                                         checked={settings.enableVirtualization}
-                                        onCheckedChange={(v: boolean) => updateSetting('enableVirtualization', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('enableVirtualization', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Lazy load images' description='Defer loading images until needed'>
                                     <Switch
                                         checked={settings.lazyLoadImages}
-                                        onCheckedChange={(v: boolean) => updateSetting('lazyLoadImages', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('lazyLoadImages', v); }}
                                     />
                                 </SettingRow>
                             </SettingsSection>
@@ -532,7 +533,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.worktreePro}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, worktreePro: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, worktreePro: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -542,7 +543,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.workflowEngine}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, workflowEngine: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, workflowEngine: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -552,7 +553,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.graphiteInterop}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, graphiteInterop: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, graphiteInterop: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -562,7 +563,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.aiProd}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, aiProd: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, aiProd: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -572,7 +573,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.deepLinks}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, deepLinks: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, deepLinks: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -582,7 +583,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={featureFlags.branchPinning}
                                         onCheckedChange={(value: boolean) =>
-                                            setFeatureFlags((previous) => ({ ...previous, branchPinning: value }))
+                                            { setFeatureFlags((previous) => ({ ...previous, branchPinning: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -601,7 +602,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.enabled}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({ ...previous, enabled: value }))
+                                            { setAiConfig((previous) => ({ ...previous, enabled: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -612,10 +613,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='h-9 rounded-md border bg-transparent px-3 py-1 text-sm'
                                         value={aiConfig.provider}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 provider: event.currentTarget.value === 'self-host' ? 'self-host' : 'openai-compatible',
-                                            }))
+                                            })); }
                                         }>
                                         <option value='openai-compatible'>OpenAI-compatible</option>
                                         <option value='self-host'>Self-host compatible</option>
@@ -629,7 +630,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         placeholder='https://api.openai.com'
                                         value={aiConfig.baseUrl}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({ ...previous, baseUrl: event.currentTarget.value }))
+                                            { setAiConfig((previous) => ({ ...previous, baseUrl: event.currentTarget.value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -638,7 +639,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-48'
                                         value={aiConfig.model}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({ ...previous, model: event.currentTarget.value }))
+                                            { setAiConfig((previous) => ({ ...previous, model: event.currentTarget.value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -652,10 +653,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-28'
                                         value={aiConfig.timeoutMs}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 timeoutMs: Number.parseInt(event.currentTarget.value, 10) || previous.timeoutMs,
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -669,10 +670,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-28'
                                         value={aiConfig.maxTokens}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 maxTokens: Number.parseInt(event.currentTarget.value, 10) || previous.maxTokens,
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -684,10 +685,10 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                         className='w-20'
                                         value={aiConfig.retries}
                                         onChange={(event) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 retries: Number.parseInt(event.currentTarget.value, 10) || 0,
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -697,7 +698,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.redactSensitivePaths}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({ ...previous, redactSensitivePaths: value }))
+                                            { setAiConfig((previous) => ({ ...previous, redactSensitivePaths: value })); }
                                         }
                                     />
                                 </SettingRow>
@@ -707,13 +708,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.featureToggles.commitMessage}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 featureToggles: {
                                                     ...previous.featureToggles,
                                                     commitMessage: value,
                                                 },
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -723,13 +724,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.featureToggles.pullRequest}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 featureToggles: {
                                                     ...previous.featureToggles,
                                                     pullRequest: value,
                                                 },
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -739,13 +740,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.featureToggles.conflictExplain}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 featureToggles: {
                                                     ...previous.featureToggles,
                                                     conflictExplain: value,
                                                 },
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -755,13 +756,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.featureToggles.explainCommit}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 featureToggles: {
                                                     ...previous.featureToggles,
                                                     explainCommit: value,
                                                 },
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -771,13 +772,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     <Switch
                                         checked={aiConfig.featureToggles.reviewDiff}
                                         onCheckedChange={(value: boolean) =>
-                                            setAiConfig((previous) => ({
+                                            { setAiConfig((previous) => ({
                                                 ...previous,
                                                 featureToggles: {
                                                     ...previous.featureToggles,
                                                     reviewDiff: value,
                                                 },
-                                            }))
+                                            })); }
                                         }
                                     />
                                 </SettingRow>
@@ -790,7 +791,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                             className='w-56'
                                             placeholder='sk-...'
                                             value={runtimeApiKey}
-                                            onChange={(event) => setRuntimeApiKey(event.currentTarget.value)}
+                                            onChange={(event) => { setRuntimeApiKey(event.currentTarget.value); }}
                                         />
                                         <Button
                                             variant='outline'
@@ -833,7 +834,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                             <Switch
                                                 checked={repoPolicy.requireSignedCommits}
                                                 onCheckedChange={(value: boolean) =>
-                                                    setRepoPolicy((previous) => ({ ...previous, requireSignedCommits: value }))
+                                                    { setRepoPolicy((previous) => ({ ...previous, requireSignedCommits: value })); }
                                                 }
                                             />
                                         </SettingRow>
@@ -843,7 +844,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                             <Switch
                                                 checked={repoPolicy.requireUpToDate}
                                                 onCheckedChange={(value: boolean) =>
-                                                    setRepoPolicy((previous) => ({ ...previous, requireUpToDate: value }))
+                                                    { setRepoPolicy((previous) => ({ ...previous, requireUpToDate: value })); }
                                                 }
                                             />
                                         </SettingRow>
@@ -853,7 +854,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                             <Switch
                                                 checked={repoPolicy.enableStacking}
                                                 onCheckedChange={(value: boolean) =>
-                                                    setRepoPolicy((previous) => ({ ...previous, enableStacking: value }))
+                                                    { setRepoPolicy((previous) => ({ ...previous, enableStacking: value })); }
                                                 }
                                             />
                                         </SettingRow>
@@ -864,7 +865,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                                 className='w-32'
                                                 value={repoPolicy.defaultStackBase}
                                                 onChange={(event) =>
-                                                    setRepoPolicy((previous) => ({ ...previous, defaultStackBase: event.currentTarget.value }))
+                                                    { setRepoPolicy((previous) => ({ ...previous, defaultStackBase: event.currentTarget.value })); }
                                                 }
                                             />
                                         </SettingRow>
@@ -905,7 +906,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                                 placeholder='Example: Rebase stacks onto main before merge.'
                                                 value={repoPolicy.customWorkflow}
                                                 onChange={(event) =>
-                                                    setRepoPolicy((previous) => ({ ...previous, customWorkflow: event.currentTarget.value }))
+                                                    { setRepoPolicy((previous) => ({ ...previous, customWorkflow: event.currentTarget.value })); }
                                                 }
                                             />
                                         </SettingRow>
@@ -990,13 +991,13 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                     description='Send anonymous usage data to help improve the app'>
                                     <Switch
                                         checked={settings.telemetryEnabled}
-                                        onCheckedChange={(v: boolean) => updateSetting('telemetryEnabled', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('telemetryEnabled', v); }}
                                     />
                                 </SettingRow>
                                 <SettingRow label='Crash reports' description='Automatically send crash reports'>
                                     <Switch
                                         checked={settings.crashReports}
-                                        onCheckedChange={(v: boolean) => updateSetting('crashReports', v)}
+                                        onCheckedChange={(v: boolean) => { updateSetting('crashReports', v); }}
                                     />
                                 </SettingRow>
                             </SettingsSection>
@@ -1009,7 +1010,7 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                         <RotateCcw className='mr-2 h-4 w-4' />
                         Reset to Defaults
                     </Button>
-                    <Button onClick={() => onOpenChange(false)}>Done</Button>
+                    <Button onClick={() => { onOpenChange(false); }}>Done</Button>
                 </div>
             </DialogContent>
         </Dialog>

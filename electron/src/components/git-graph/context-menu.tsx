@@ -3,6 +3,8 @@
  * Uses Shadcn dropdown-menu for right-click context menus
  */
 
+import { useState, type ReactNode } from 'react';
+
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -11,7 +13,6 @@ import {
 	DropdownMenuTrigger,
 	DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
-import { useState, type ReactNode } from 'react';
 
 export interface ContextMenuAction {
 	title: ReactNode;

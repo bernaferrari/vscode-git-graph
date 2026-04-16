@@ -1,3 +1,4 @@
+import { PlusIcon, BluetoothIcon, MoreVerticalIcon, FileIcon, FolderIcon, FolderOpenIcon, FileCodeIcon, MoreHorizontalIcon, FolderSearchIcon, SaveIcon, DownloadIcon, EyeIcon, LayoutIcon, PaletteIcon, SunIcon, MoonIcon, MonitorIcon, UserIcon, CreditCardIcon, SettingsIcon, KeyboardIcon, LanguagesIcon, BellIcon, MailIcon, ShieldIcon, HelpCircleIcon, FileTextIcon, LogOutIcon } from "lucide-react"
 import * as React from "react"
 
 import {
@@ -63,7 +64,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { PlusIcon, BluetoothIcon, MoreVerticalIcon, FileIcon, FolderIcon, FolderOpenIcon, FileCodeIcon, MoreHorizontalIcon, FolderSearchIcon, SaveIcon, DownloadIcon, EyeIcon, LayoutIcon, PaletteIcon, SunIcon, MoonIcon, MonitorIcon, UserIcon, CreditCardIcon, SettingsIcon, KeyboardIcon, LanguagesIcon, BellIcon, MailIcon, ShieldIcon, HelpCircleIcon, FileTextIcon, LogOutIcon } from "lucide-react"
 
 export function ComponentExample() {
   return (
@@ -247,10 +247,10 @@ function FormExample() {
                   <DropdownMenuCheckboxItem
                     checked={notifications.email}
                     onCheckedChange={(checked) =>
-                      setNotifications({
+                      { setNotifications({
                         ...notifications,
-                        email: checked === true,
-                      })
+                        email: checked,
+                      }); }
                     }
                   >
                     <EyeIcon
@@ -260,10 +260,10 @@ function FormExample() {
                   <DropdownMenuCheckboxItem
                     checked={notifications.sms}
                     onCheckedChange={(checked) =>
-                      setNotifications({
+                      { setNotifications({
                         ...notifications,
-                        sms: checked === true,
-                      })
+                        sms: checked,
+                      }); }
                     }
                   >
                     <LayoutIcon
@@ -354,10 +354,10 @@ function FormExample() {
                                   <DropdownMenuCheckboxItem
                                     checked={notifications.push}
                                     onCheckedChange={(checked) =>
-                                      setNotifications({
+                                      { setNotifications({
                                         ...notifications,
-                                        push: checked === true,
-                                      })
+                                        push: checked,
+                                      }); }
                                     }
                                   >
                                     <BellIcon
@@ -367,10 +367,10 @@ function FormExample() {
                                   <DropdownMenuCheckboxItem
                                     checked={notifications.email}
                                     onCheckedChange={(checked) =>
-                                      setNotifications({
+                                      { setNotifications({
                                         ...notifications,
-                                        email: checked === true,
-                                      })
+                                        email: checked,
+                                      }); }
                                     }
                                   >
                                     <MailIcon

@@ -8,10 +8,12 @@ import {
     Users,
     Workflow,
 } from 'lucide-react';
-import type { ElementType } from 'react';
+
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+
+import type { ElementType } from 'react';
 
 interface FeatureHubStripProps {
     worktreeCount: number;

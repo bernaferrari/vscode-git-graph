@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
+
+import type { ReactNode } from 'react';
 
 export type GitOperationType =
     | 'commit'
@@ -33,7 +34,7 @@ export type GitOperationType =
 
 export interface GitOperation {
     id: string;
-    type: GitOperationType;
+    type: GitOperationType | string;
     timestamp: number;
     description: string;
     details: Record<string, unknown>;
@@ -86,7 +87,7 @@ function getCompatMutation<TInput extends Record<string, unknown>, TResult exten
     return {
         mutateAsync: async (input: TInput) => {
             const result = await legacyMutation?.mutate?.(input);
-            return (result ?? ({ error: null } as TResult)) as TResult;
+            return (result ?? ({ error: null } as TResult));
         },
     };
 }

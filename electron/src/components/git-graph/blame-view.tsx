@@ -3,10 +3,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 
 interface BlameLine {
 	lineNumber: number;
@@ -91,8 +92,8 @@ export function BlameView({ repo, filePath, commitHash }: BlameViewProps) {
 									className={`border-b border-border/50 hover:bg-accent ${
 										hoveredHash === line.hash ? 'bg-accent/50' : ''
 									}`}
-									onMouseEnter={() => setHoveredHash(line.hash)}
-									onMouseLeave={() => setHoveredHash(null)}
+									onMouseEnter={() => { setHoveredHash(line.hash); }}
+									onMouseLeave={() => { setHoveredHash(null); }}
 								>
 									<td className="p-1 text-muted-foreground w-12 text-right">
 										{line.lineNumber}

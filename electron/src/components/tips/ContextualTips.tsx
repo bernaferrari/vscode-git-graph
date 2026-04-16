@@ -3,11 +3,12 @@
  * Shows helpful tips based on current state and lens mode
  */
 
+import { Lightbulb, X, ChevronRight, Sparkles, Keyboard, Shield, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+import { useLensMode } from '@/components/lens';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useLensMode } from '@/components/lens';
-import { Lightbulb, X, ChevronRight, Sparkles, Keyboard, Shield, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Tip {

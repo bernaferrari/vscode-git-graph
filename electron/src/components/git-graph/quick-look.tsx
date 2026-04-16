@@ -3,15 +3,6 @@
  * macOS Quick Look preview for files in commits
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/components/ui/tooltip';
 import {
 	Eye,
 	FileImage,
@@ -24,7 +15,18 @@ import {
 	RotateCw,
 	X,
 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { trpcClient } from '@/lib/trpcClient';
+import { useAppStore } from '@/lib/store';
+
 
 interface QuickLookState {
 	isOpen: boolean;
@@ -61,7 +63,7 @@ function subscribe(listener: () => void) {
 }
 
 function notify() {
-	listeners.forEach(l => l());
+	listeners.forEach(l => { l(); });
 }
 
 function updateState(newState: Partial<QuickLookState>) {
@@ -93,7 +95,7 @@ export function useQuickLook() {
 	const [, forceUpdate] = useState({});
 
 	useEffect(() => {
-		return subscribe(() => forceUpdate({}));
+		return subscribe(() => { forceUpdate({}); });
 	}, []);
 
 	const openQuickLook = useCallback(async (filePath: string, commitHash: string = 'HEAD') => {
@@ -112,30 +114,34 @@ export function useQuickLook() {
 			rotation: 0,
 		});
 
-		try {
-			if (isImageFile(filePath)) {
-				// For images, get base64 data
-				const result = await trpc.git.showFile.query({
-					repo: activeRepo,
-					commitHash,
-					filePath,
-				});
-				updateState({
-					imageData: result,
-					isLoading: false,
-				});
-			} else {
-				// For text files, get content
-				const result = await trpc.git.showFile.query({
-					repo: activeRepo,
-					commitHash,
-					filePath,
-				});
-				updateState({
-					content: result,
-					isLoading: false,
-				});
-			}
+			try {
+				if (isImageFile(filePath)) {
+					const result = await trpcClient.git.fileAtRevision.query({
+						repo: activeRepo,
+						commitHash,
+						filePath,
+					});
+					if (result.error) {
+						throw new Error(result.error);
+					}
+					updateState({
+						imageData: result.content ? `data:image/*;base64,${btoa(result.content)}` : null,
+						isLoading: false,
+					});
+				} else {
+					const result = await trpcClient.git.fileAtRevision.query({
+						repo: activeRepo,
+						commitHash,
+						filePath,
+					});
+					if (result.error) {
+						throw new Error(result.error);
+					}
+					updateState({
+						content: result.content,
+						isLoading: false,
+					});
+				}
 		} catch (error) {
 			toast.error('Failed to load file preview');
 			updateState({
@@ -230,7 +236,7 @@ export function QuickLookPanel() {
 		>
 			<div
 				className="ui-surface max-w-5xl max-h-[90vh] w-full mx-4 overflow-hidden flex flex-col"
-				onClick={(e) => e.stopPropagation()}
+				onClick={(e) => { e.stopPropagation(); }}
 			>
 				{/* Header */}
 				<div className="ui-toolbar flex items-center justify-between px-4 py-3">
@@ -244,7 +250,7 @@ export function QuickLookPanel() {
 								<Button
 									variant="ghost"
 									size="sm"
-									onClick={() => setZoom(zoom - 0.25)}
+									onClick={() => { setZoom(zoom - 0.25); }}
 									disabled={zoom <= 0.25}
 								>
 									<ZoomOut className="h-4 w-4" />
@@ -255,7 +261,7 @@ export function QuickLookPanel() {
 								<Button
 									variant="ghost"
 									size="sm"
-									onClick={() => setZoom(zoom + 0.25)}
+									onClick={() => { setZoom(zoom + 0.25); }}
 									disabled={zoom >= 5}
 								>
 									<ZoomIn className="h-4 w-4" />
@@ -263,7 +269,7 @@ export function QuickLookPanel() {
 								<Button
 									variant="ghost"
 									size="sm"
-									onClick={() => setRotation(rotation + 90)}
+									onClick={() => { setRotation(rotation + 90); }}
 								>
 									<RotateCw className="h-4 w-4" />
 								</Button>
@@ -342,7 +348,7 @@ export function useQuickLookKeyboard() {
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
+		return () => { window.removeEventListener('keydown', handleKeyDown); };
 	}, [isOpen, closeQuickLook, setZoom, zoom]);
 }
 

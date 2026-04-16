@@ -3,11 +3,12 @@
  * Provides convenient access to Git tRPC mutations
  */
 
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+
 import { useOperationLog, type OperationReceipt } from '@/lib/operationLog';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface MutationResultShape {
     error?: string | null;
@@ -50,8 +51,8 @@ interface FetchVariables {
 interface PullVariables {
     remote: string;
     branchName: string;
-    fastForwardOnly?: boolean;
-    noFastForward?: boolean;
+    fastForwardOnly?: boolean | undefined;
+    noFastForward?: boolean | undefined;
 }
 
 interface PushVariables {
@@ -63,33 +64,34 @@ interface PushVariables {
 
 interface MergeVariables {
     branch: string;
-    noFastForward?: boolean;
-    squash?: boolean;
-    noCommit?: boolean;
+    noFastForward?: boolean | undefined;
+    squash?: boolean | undefined;
+    noCommit?: boolean | undefined;
 }
 
 interface RebaseVariables {
     onto: string;
-    interactive?: boolean;
+    interactive?: boolean | undefined;
+    todos?: string | undefined;
 }
 
 interface CherryPickVariables {
     commitHash: string;
-    noCommit?: boolean;
+    noCommit?: boolean | undefined;
 }
 
 interface RevertVariables {
     commitHash: string;
-    noCommit?: boolean;
+    noCommit?: boolean | undefined;
 }
 
 interface CommitVariables {
-    amend?: boolean;
+    amend?: boolean | undefined;
     message: string;
 }
 
 interface UndoLastCommitVariables {
-    soft: boolean;
+    soft?: boolean | undefined;
 }
 
 type LoggedOperation = Omit<OperationReceipt, 'id' | 'timestamp'>;
@@ -735,8 +737,8 @@ export function useGitOperations() {
             logOperation({
                 type: 'reset',
                 description: 'Undid last commit',
-                details: variables.soft === false ? 'mixed HEAD~1' : 'soft HEAD~1',
-                gitCommands: [`git reset ${variables.soft === false ? '--mixed' : '--soft'} HEAD~1`],
+                details: !variables.soft ? 'mixed HEAD~1' : 'soft HEAD~1',
+                gitCommands: [`git reset ${!variables.soft ? '--mixed' : '--soft'} HEAD~1`],
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [],
                 status: 'success',

@@ -20,7 +20,17 @@ vi.mock('@/trpc/client', () => ({
                 mutate: openExternalDiff,
             },
         },
-    },
+	},
+}));
+
+vi.mock('@/lib/trpcClient', () => ({
+	trpcClient: {
+		git: {
+			openExternalDiff: {
+				mutate: openExternalDiff,
+			},
+		},
+	},
 }));
 
 vi.mock('@/lib/store', () => ({

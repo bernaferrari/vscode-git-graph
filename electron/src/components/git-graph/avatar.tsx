@@ -3,8 +3,8 @@
  * Fetch author avatars from Gravatar, GitHub, etc.
  */
 
-import { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -121,7 +121,7 @@ export function Avatar({ email, name, size = 'md', className }: AvatarProps) {
 			alt={name || email || 'Avatar'}
 			className={cn("rounded-full object-cover", className)}
 			style={{ width: pixelSize, height: pixelSize }}
-			onError={() => setHasError(true)}
+			onError={() => { setHasError(true); }}
 		/>
 	);
 }

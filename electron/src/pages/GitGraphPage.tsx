@@ -1,9 +1,10 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+
 import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
-import { useAppStore } from '@/lib/store';
 import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
+import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
 const LazyGitGraph = lazy(async () => {
@@ -18,7 +19,7 @@ function GitGraphLoadingFallback() {
         const timer = window.setTimeout(() => {
             setShowSlowHint(true);
         }, 1500);
-        return () => window.clearTimeout(timer);
+        return () => { window.clearTimeout(timer); };
     }, []);
 
     return (

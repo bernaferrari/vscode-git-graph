@@ -3,19 +3,6 @@
  * Preview merge before executing
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
 	import {
 			GitMerge,
 			GitBranch,
@@ -30,7 +17,23 @@ import {
 			ChevronDown,
 			ChevronRight,
 		} from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpcClient } from '@/lib/trpcClient';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface MergePreviewProps {
 	open: boolean;
@@ -52,10 +55,6 @@ interface MergePreviewData {
 	warnings: string[];
 }
 
-interface BranchEntry {
-	name: string;
-}
-
 export function MergePreview({
 	open,
 	onOpenChange,
@@ -70,8 +69,13 @@ export function MergePreview({
 	);
 
 	// Get branches
-	const { data: branchData } = trpc.git.branches.useQuery(
-		{ repo: activeRepo ?? '' },
+	const { data: repoInfo } = trpc.git.repoInfo.useQuery(
+		{
+			repo: activeRepo ?? '',
+			showRemoteBranches: false,
+			showStashes: false,
+			hideRemotes: [],
+		},
 		{ enabled: !!activeRepo && open }
 	);
 
@@ -90,7 +94,7 @@ export function MergePreview({
 	);
 
 	const preview = previewData as MergePreviewData | undefined;
-	const branches = (branchData?.branches ?? []) as BranchEntry[];
+	const branches = repoInfo?.branches ?? [];
 
 	const toggleSection = (section: string) => {
 		setExpandedSections(prev => {
@@ -107,15 +111,18 @@ export function MergePreview({
 	const handleMerge = async () => {
 		if (!activeRepo || !localSource || !localTarget) return;
 
-		setIsMerging(true);
-		try {
-			await trpc.git.merge.mutate({
-				repo: activeRepo,
-				sourceBranch: localSource,
-				targetBranch: localTarget,
-			});
-			toast.success(`Merged ${localSource} into ${localTarget}`);
-			onOpenChange(false);
+			setIsMerging(true);
+			try {
+				await trpcClient.git.checkout.mutate({
+					repo: activeRepo,
+					ref: localTarget,
+				});
+				await trpcClient.git.merge.mutate({
+					repo: activeRepo,
+					branch: localSource,
+				});
+				toast.success(`Merged ${localSource} into ${localTarget}`);
+				onOpenChange(false);
 		} catch (error) {
 			toast.error('Merge failed', {
 				description: error instanceof Error ? error.message : 'Unknown error',
@@ -169,12 +176,12 @@ export function MergePreview({
 						<select
 							className="w-full h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
 							value={localSource}
-							onChange={(e) => setLocalSource(e.target.value)}
+							onChange={(e) => { setLocalSource(e.target.value); }}
 						>
 							<option value="">Select branch to merge...</option>
-								{branches.filter((branch: BranchEntry) => branch.name !== localTarget).map((branch: BranchEntry) => (
-			<option key={branch.name} value={branch.name}>{branch.name}</option>
-		))}
+									{branches.filter((branch) => branch !== localTarget).map((branch) => (
+				<option key={branch} value={branch}>{branch}</option>
+			))}
 						</select>
 					</div>
 					<ArrowRight className="h-4 w-4 text-muted-foreground mt-4" />
@@ -183,11 +190,11 @@ export function MergePreview({
 						<select
 							className="w-full h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
 							value={localTarget}
-							onChange={(e) => setLocalTarget(e.target.value)}
+							onChange={(e) => { setLocalTarget(e.target.value); }}
 						>
-			{branches.map((branch: BranchEntry) => (
-				<option key={branch.name} value={branch.name}>{branch.name}</option>
-			))}
+				{branches.map((branch) => (
+					<option key={branch} value={branch}>{branch}</option>
+				))}
 						</select>
 					</div>
 				</div>
@@ -224,7 +231,7 @@ export function MergePreview({
 								<div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3">
 									<button
 										className="flex items-center gap-2 text-red-700 dark:text-red-400 text-sm font-medium w-full"
-										onClick={() => toggleSection('conflicts')}
+										onClick={() => { toggleSection('conflicts'); }}
 									>
 										{expandedSections.has('conflicts') ? (
 											<ChevronDown className="h-4 w-4" />
@@ -252,7 +259,7 @@ export function MergePreview({
 								<div className="border rounded-lg overflow-hidden">
 									<button
 										className="flex items-center gap-2 px-4 py-2 bg-muted/50 w-full text-left"
-										onClick={() => toggleSection('commits')}
+										onClick={() => { toggleSection('commits'); }}
 									>
 										{expandedSections.has('commits') ? (
 											<ChevronDown className="h-4 w-4" />
@@ -289,7 +296,7 @@ export function MergePreview({
 								<div className="border rounded-lg overflow-hidden">
 									<button
 										className="flex items-center gap-2 px-4 py-2 bg-muted/50 w-full text-left"
-										onClick={() => toggleSection('files')}
+										onClick={() => { toggleSection('files'); }}
 									>
 										{expandedSections.has('files') ? (
 											<ChevronDown className="h-4 w-4" />
@@ -314,7 +321,7 @@ export function MergePreview({
 													className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-accent/50 ${
 														selectedFile === file.path ? 'bg-accent' : ''
 													}`}
-													onClick={() => setSelectedFile(file.path)}
+													onClick={() => { setSelectedFile(file.path); }}
 												>
 													{getFileIcon(file.path)}
 													<span className="flex-1 text-sm truncate">{file.path}</span>
@@ -365,7 +372,7 @@ export function MergePreview({
 						)}
 					</div>
 					<div className="flex items-center gap-2">
-						<Button variant="outline" onClick={() => onOpenChange(false)}>
+						<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button

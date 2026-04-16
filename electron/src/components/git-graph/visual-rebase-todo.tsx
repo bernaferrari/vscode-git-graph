@@ -3,19 +3,6 @@
  * Edit rebase todo list with drag and drop
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
 import {
 	GitCommit,
 	GripVertical,
@@ -31,7 +18,23 @@ import {
 	ArrowDown,
 	RotateCcw,
 } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpcClient } from '@/lib/trpcClient';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 type CommandTodoAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop' | 'exec' | 'break' | 'label' | 'reset' | 'merge' | 'noop';
 type NonCommandTodoAction = 'comment' | 'raw';
@@ -358,7 +361,7 @@ export function VisualRebaseTodoEditor({
 				return;
 			}
 
-			const result = await trpc.git.log.query({
+			const result = await trpcClient.git.log.query({
 				repo: activeRepo,
 				startHash: fromCommit,
 				maxCommits: 50,
@@ -550,7 +553,7 @@ export function VisualRebaseTodoEditor({
 				.join('\n');
 
 			// Continue rebase with edited todos
-			const result = await trpc.git.rebaseContinue.mutate({
+			const result = await trpcClient.git.rebaseContinue.mutate({
 				repo: activeRepo,
 				todos: todoContent,
 			});
@@ -573,7 +576,7 @@ export function VisualRebaseTodoEditor({
 		if (!confirm('Abort the rebase? All changes will be lost.')) return;
 
 		try {
-			await trpc.git.rebaseAbort.mutate({ repo: activeRepo });
+			await trpcClient.git.rebaseAbort.mutate({ repo: activeRepo });
 			toast.success('Rebase aborted');
 			onOpenChange(false);
 		} catch (error) {
@@ -639,8 +642,8 @@ export function VisualRebaseTodoEditor({
 										key={todo.id}
 										draggable={isDraggable}
 										onDragStart={() => isDraggable && handleDragStart(index)}
-										onDragOver={(e) => isDraggable ? handleDragOver(e, index) : undefined}
-										onDrop={() => isDraggable ? handleDrop(index) : undefined}
+										onDragOver={(e) => { isDraggable ? handleDragOver(e, index) : undefined; }}
+										onDrop={() => { isDraggable ? handleDrop(index) : undefined; }}
 										onDragEnd={handleDragEnd}
 										onClick={() => isDraggable && setSelectedTodo(isSelected ? null : todo.id)}
 										className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${

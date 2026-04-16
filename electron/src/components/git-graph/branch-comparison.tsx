@@ -3,14 +3,15 @@
  * Compare two branches side by side
  */
 
-import { useState } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { GitBranch, ArrowRight, Plus, Minus, RefreshCw, Loader2, FileCode, FileText, Image } from 'lucide-react';
+import { useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface BranchComparisonProps {
     open: boolean;
@@ -95,7 +96,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                         <select
                             className='h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm'
                             value={baseBranch}
-                            onChange={(e) => setBaseBranch(e.target.value)}>
+                            onChange={(e) => { setBaseBranch(e.target.value); }}>
                             <option value=''>Select base branch...</option>
                             {branches.map((b: string) => (
                                 <option key={b} value={b}>
@@ -110,7 +111,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                         <select
                             className='h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm'
                             value={compareBranch}
-                            onChange={(e) => setCompareBranch(e.target.value)}>
+                            onChange={(e) => { setCompareBranch(e.target.value); }}>
                             <option value=''>Select branch to compare...</option>
                             {branches
                                 .filter((b: string) => b !== baseBranch)
@@ -189,7 +190,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                 </ScrollArea>
 
                 <div className='flex justify-end border-t pt-4'>
-                    <Button variant='outline' onClick={() => onOpenChange(false)}>
+                    <Button variant='outline' onClick={() => { onOpenChange(false); }}>
                         Close
                     </Button>
                 </div>

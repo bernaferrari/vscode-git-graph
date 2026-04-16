@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+
 import type { GitRepoState } from '../types/state';
 
 // ==================== Types ====================
@@ -151,127 +152,127 @@ export const useAppStore = create<AppState & AppActions>()(
             ...initialState,
 
             // Repository actions
-            setRepos: (repos) => set({ repos }),
+            setRepos: (repos) => { set({ repos }); },
 
             addRepo: (path, state) =>
-                set((s) => ({
+                { set((s) => ({
                     repos: { ...s.repos, [path]: state },
-                })),
+                })); },
 
             removeRepo: (path) =>
-                set((s) => {
+                { set((s) => {
                     const { [path]: _, ...rest } = s.repos;
                     return {
                         repos: rest,
                         activeRepo: s.activeRepo === path ? null : s.activeRepo,
                     };
-                }),
+                }); },
 
             setActiveRepo: (path) =>
-                set((s) => {
+                { set((s) => {
                     if (!path) {
                         return { activeRepo: null, selectedCommit: null };
                     }
                     const nextOpened = [path, ...s.openedRepos.filter((p) => p !== path)].slice(0, 20);
                     return { activeRepo: path, selectedCommit: null, openedRepos: nextOpened };
-                }),
+                }); },
 
             ignoreRepo: (path) =>
-                set((s) => ({
+                { set((s) => ({
                     ignoredRepos: [...s.ignoredRepos, path],
                     repos: Object.fromEntries(Object.entries(s.repos).filter(([p]) => p !== path)),
                     activeRepo: s.activeRepo === path ? null : s.activeRepo,
-                })),
+                })); },
 
             unignoreRepo: (path) =>
-                set((s) => ({
+                { set((s) => ({
                     ignoredRepos: s.ignoredRepos.filter((p) => p !== path),
-                })),
+                })); },
 
             updateRepoState: (path, state) =>
-                set((s) => ({
+                { set((s) => ({
                     repos: {
                         ...s.repos,
                         [path]: { ...s.repos[path], ...state } as GitRepoState,
                     },
-                })),
+                })); },
 
             // Recent repos
             addRecentRepo: (path) =>
-                set((s) => {
+                { set((s) => {
                     const filtered = s.recentRepos.filter((p) => p !== path);
                     return { recentRepos: [path, ...filtered].slice(0, 10) };
-                }),
+                }); },
 
-            clearRecentRepos: () => set({ recentRepos: [] }),
+            clearRecentRepos: () => { set({ recentRepos: [] }); },
             addOpenedRepo: (path) =>
-                set((s) => {
+                { set((s) => {
                     const filtered = s.openedRepos.filter((p) => p !== path);
                     return { openedRepos: [path, ...filtered].slice(0, 20) };
-                }),
+                }); },
             removeOpenedRepo: (path) =>
-                set((s) => {
+                { set((s) => {
                     const nextOpened = s.openedRepos.filter((p) => p !== path);
                     return {
                         openedRepos: nextOpened,
                         activeRepo: s.activeRepo === path ? (nextOpened[0] ?? null) : s.activeRepo,
                     };
-                }),
-            setRepoNavMode: (mode) => set({ repoNavMode: mode }),
+                }); },
+            setRepoNavMode: (mode) => { set({ repoNavMode: mode }); },
 
             // UI actions
-            setSidebarOpen: (open) => set({ sidebarOpen: open }),
-            setCommitDetailsOpen: (open) => set({ commitDetailsOpen: open }),
-            setSelectedCommit: (hash) => set({ selectedCommit: hash }),
-            setFindWidgetOpen: (open) => set({ findWidgetOpen: open }),
-            setSettingsOpen: (open) => set({ settingsOpen: open }),
+            setSidebarOpen: (open) => { set({ sidebarOpen: open }); },
+            setCommitDetailsOpen: (open) => { set({ commitDetailsOpen: open }); },
+            setSelectedCommit: (hash) => { set({ selectedCommit: hash }); },
+            setFindWidgetOpen: (open) => { set({ findWidgetOpen: open }); },
+            setSettingsOpen: (open) => { set({ settingsOpen: open }); },
 
             // View state
-            setFindCaseSensitive: (value) => set({ findIsCaseSensitive: value }),
-            setFindRegex: (value) => set({ findIsRegex: value }),
-            setFindOpenCommitDetailsView: (value) => set({ findOpenCommitDetailsView: value }),
+            setFindCaseSensitive: (value) => { set({ findIsCaseSensitive: value }); },
+            setFindRegex: (value) => { set({ findIsRegex: value }); },
+            setFindOpenCommitDetailsView: (value) => { set({ findOpenCommitDetailsView: value }); },
 
             // Loading actions
-            setLoading: (loading) => set({ isLoading: loading }),
+            setLoading: (loading) => { set({ isLoading: loading }); },
             beginOperation: (label) =>
-                set((s) => {
+                { set((s) => {
                     const nextCount = s.operationLoadingCount + 1;
                     return {
                         operationLoading: true,
                         operationLoadingCount: nextCount,
                         operationLabel: label,
                     };
-                }),
+                }); },
             endOperation: () =>
-                set((s) => {
+                { set((s) => {
                     const nextCount = Math.max(0, s.operationLoadingCount - 1);
                     return {
                         operationLoading: nextCount > 0,
                         operationLoadingCount: nextCount,
                         operationLabel: nextCount > 0 ? s.operationLabel : null,
                     };
-                }),
+                }); },
             enqueueOperation: (id, label) =>
-                set((s) => ({
+                { set((s) => ({
                     operationQueue: [...s.operationQueue, { id, label, status: 'queued' }],
-                })),
+                })); },
             markOperationRunning: (id) =>
-                set((s) => ({
+                { set((s) => ({
                     operationQueue: s.operationQueue.map((entry) =>
                         entry.id === id ? { ...entry, status: 'running' } : entry
                     ),
-                })),
+                })); },
             removeOperation: (id) =>
-                set((s) => ({
+                { set((s) => ({
                     operationQueue: s.operationQueue.filter((entry) => entry.id !== id),
-                })),
+                })); },
             cancelQueuedOperation: (id) =>
-                set((s) => ({
+                { set((s) => ({
                     operationQueue: s.operationQueue.filter((entry) => !(entry.id === id && entry.status === 'queued')),
-                })),
-            setError: (error) => set({ error }),
+                })); },
+            setError: (error) => { set({ error }); },
             setRepoLoading: (loading) =>
-                set((s) => ({
+                { set((s) => ({
                     repoLoading: loading,
                     repoLoadingCount: loading ? Math.max(1, s.repoLoadingCount) : 0,
                     repoLoadPhase: loading
@@ -280,9 +281,9 @@ export const useAppStore = create<AppState & AppActions>()(
                             : s.repoLoadPhase
                         : s.repoLoadPhase,
                     repoLoadStartedAt: loading ? (s.repoLoadStartedAt ?? Date.now()) : s.repoLoadStartedAt,
-                })),
+                })); },
             beginRepoLoading: () =>
-                set((s) => {
+                { set((s) => {
                     const nextCount = s.repoLoadingCount + 1;
                     return {
                         repoLoadingCount: nextCount,
@@ -293,17 +294,17 @@ export const useAppStore = create<AppState & AppActions>()(
                                 : s.repoLoadPhase,
                         repoLoadStartedAt: s.repoLoadStartedAt ?? Date.now(),
                     };
-                }),
+                }); },
             endRepoLoading: () =>
-                set((s) => {
+                { set((s) => {
                     const nextCount = Math.max(0, s.repoLoadingCount - 1);
                     return {
                         repoLoadingCount: nextCount,
                         repoLoading: nextCount > 0,
                     };
-                }),
+                }); },
             setRepoLoadState: (next) =>
-                set((s) => {
+                { set((s) => {
                     const isLoadingPhase = next.phase === 'validating' || next.phase === 'loading-graph';
                     const resolvedMessage = next.message !== undefined ? next.message : s.repoLoadMessage;
                     const resolvedError =
@@ -320,9 +321,9 @@ export const useAppStore = create<AppState & AppActions>()(
                         repoLoading: isLoadingPhase,
                         repoLoadingCount: isLoadingPhase ? Math.max(1, s.repoLoadingCount) : 0,
                     };
-                }),
+                }); },
             resetRepoLoadState: (phase = 'idle') =>
-                set({
+                { set({
                     repoLoadPhase: phase,
                     repoLoadMessage: null,
                     repoLoadError: null,
@@ -330,10 +331,10 @@ export const useAppStore = create<AppState & AppActions>()(
                     repoLoadTarget: null,
                     repoLoading: false,
                     repoLoadingCount: 0,
-                }),
+                }); },
 
             // Reset
-            reset: () => set(initialState),
+            reset: () => { set(initialState); },
         }))
 );
 

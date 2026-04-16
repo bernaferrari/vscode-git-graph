@@ -62,10 +62,10 @@ export function parseDeepLink(raw: string): {
 			panel: (() => {
 				const value = panelValue;
 				if (value === 'worktree' || value === 'diff' || value === 'blame') {
-					return value as 'worktree' | 'diff' | 'blame';
+					return value;
 				}
 				return undefined;
-			})(),
+			})() as z.infer<typeof deepLinkTargetSchema>['panel'],
 		};
 
 		return {

@@ -2,10 +2,11 @@
 
 import { Radio as RadioPrimitive } from "@base-ui/react/radio"
 import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group"
+import { CircleIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { CircleIcon } from "@hugeicons/core-free-icons"
+
 
 function RadioGroup({ className, ...props }: RadioGroupPrimitive.Props) {
   return (

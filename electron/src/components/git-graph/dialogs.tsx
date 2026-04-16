@@ -3,6 +3,8 @@
  * Uses Shadcn alert-dialog and custom dialog components
  */
 
+import { useState, type ReactNode } from 'react';
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,10 +15,11 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -25,8 +28,6 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { useState, type ReactNode } from 'react';
 
 // ==================== Confirm Dialog ====================
 
@@ -104,7 +105,7 @@ export function Dialog({
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
 			<div
 				className="fixed inset-0 bg-black/55"
-				onClick={() => onOpenChange(false)}
+				onClick={() => { onOpenChange(false); }}
 			/>
 			<Card className={`relative z-50 w-full ${widthClasses[width]} mx-4 ui-surface`}>
 				<CardHeader>
@@ -152,7 +153,7 @@ export function CreateBranchDialog({
 			title="Create Branch"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleSubmit} disabled={!name.trim()}>
@@ -167,7 +168,7 @@ export function CreateBranchDialog({
 					<Input
 						id="branch-name"
 						value={name}
-						onChange={(e) => setName(e.target.value)}
+						onChange={(e) => { setName(e.target.value); }}
 						placeholder="Enter branch name..."
 						autoFocus
 						onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
@@ -178,7 +179,7 @@ export function CreateBranchDialog({
 						type="checkbox"
 						id="branch-checkout"
 						checked={checkout}
-						onChange={(e) => setCheckout(e.target.checked)}
+						onChange={(e) => { setCheckout(e.target.checked); }}
 						className="h-4 w-4"
 					/>
 					<Label htmlFor="branch-checkout" className="cursor-pointer">
@@ -228,7 +229,7 @@ export function AddTagDialog({
 			title="Add Tag"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleSubmit} disabled={!name.trim()}>
@@ -243,7 +244,7 @@ export function AddTagDialog({
 					<Input
 						id="tag-name"
 						value={name}
-						onChange={(e) => setName(e.target.value)}
+						onChange={(e) => { setName(e.target.value); }}
 						placeholder="Enter tag name..."
 						autoFocus
 						onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
@@ -251,7 +252,7 @@ export function AddTagDialog({
 				</div>
 				<div className="space-y-2">
 					<Label>Tag Type</Label>
-					<Select value={type} onValueChange={(v) => setType(v as 'annotated' | 'lightweight')}>
+					<Select value={type} onValueChange={(v) => { setType(v as 'annotated' | 'lightweight'); }}>
 						<SelectTrigger>
 							<SelectValue />
 						</SelectTrigger>
@@ -266,7 +267,7 @@ export function AddTagDialog({
 						type="checkbox"
 						id="tag-push"
 						checked={push}
-						onChange={(e) => setPush(e.target.checked)}
+						onChange={(e) => { setPush(e.target.checked); }}
 						className="h-4 w-4"
 					/>
 					<Label htmlFor="tag-push" className="cursor-pointer">
@@ -309,7 +310,7 @@ export function ResetDialog({
 			title="Reset to Commit"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button
@@ -330,7 +331,7 @@ export function ResetDialog({
 					<Label>Reset Mode</Label>
 					<Select
 						value={mode}
-						onValueChange={(v) => setMode(v as 'soft' | 'mixed' | 'hard')}
+						onValueChange={(v) => { setMode(v as 'soft' | 'mixed' | 'hard'); }}
 					>
 						<SelectTrigger>
 							<SelectValue />
@@ -400,7 +401,7 @@ export function DeleteBranchDialog({
 								type="checkbox"
 								id="force-delete"
 								checked={force}
-								onChange={(e) => setForce(e.target.checked)}
+								onChange={(e) => { setForce(e.target.checked); }}
 								className="h-4 w-4"
 							/>
 							<Label htmlFor="force-delete" className="cursor-pointer text-sm">
@@ -450,7 +451,7 @@ export function MergeDialog({
 			title="Merge Branch"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleMerge}>Merge</Button>
@@ -468,7 +469,7 @@ export function MergeDialog({
 							type="checkbox"
 							id="no-ff"
 							checked={noFastForward}
-							onChange={(e) => setNoFastForward(e.target.checked)}
+							onChange={(e) => { setNoFastForward(e.target.checked); }}
 							className="h-4 w-4"
 						/>
 						<Label htmlFor="no-ff" className="cursor-pointer">
@@ -480,7 +481,7 @@ export function MergeDialog({
 							type="checkbox"
 							id="squash"
 							checked={squash}
-							onChange={(e) => setSquash(e.target.checked)}
+							onChange={(e) => { setSquash(e.target.checked); }}
 							className="h-4 w-4"
 						/>
 						<Label htmlFor="squash" className="cursor-pointer">
@@ -492,7 +493,7 @@ export function MergeDialog({
 							type="checkbox"
 							id="no-commit"
 							checked={noCommit}
-							onChange={(e) => setNoCommit(e.target.checked)}
+							onChange={(e) => { setNoCommit(e.target.checked); }}
 							className="h-4 w-4"
 						/>
 						<Label htmlFor="no-commit" className="cursor-pointer">
@@ -535,7 +536,7 @@ export function RebaseDialog({
 			title="Rebase"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleRebase}>Rebase</Button>
@@ -551,7 +552,7 @@ export function RebaseDialog({
 						type="checkbox"
 						id="interactive"
 						checked={interactive}
-						onChange={(e) => setInteractive(e.target.checked)}
+						onChange={(e) => { setInteractive(e.target.checked); }}
 						className="h-4 w-4"
 					/>
 					<Label htmlFor="interactive" className="cursor-pointer">
@@ -595,7 +596,7 @@ export function CherryPickDialog({
 			title="Cherry Pick"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleCherryPick}>Cherry Pick</Button>
@@ -614,7 +615,7 @@ export function CherryPickDialog({
 						type="checkbox"
 						id="no-commit-cp"
 						checked={noCommit}
-						onChange={(e) => setNoCommit(e.target.checked)}
+						onChange={(e) => { setNoCommit(e.target.checked); }}
 						className="h-4 w-4"
 					/>
 					<Label htmlFor="no-commit-cp" className="cursor-pointer">
@@ -658,7 +659,7 @@ export function RevertDialog({
 			title="Revert Commit"
 			footer={
 				<>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleRevert}>Revert</Button>
@@ -677,7 +678,7 @@ export function RevertDialog({
 						type="checkbox"
 						id="no-commit-rv"
 						checked={noCommit}
-						onChange={(e) => setNoCommit(e.target.checked)}
+						onChange={(e) => { setNoCommit(e.target.checked); }}
 						className="h-4 w-4"
 					/>
 					<Label htmlFor="no-commit-rv" className="cursor-pointer">

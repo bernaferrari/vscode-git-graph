@@ -3,13 +3,6 @@
  * Hierarchical file tree with expand/collapse
  */
 
-import { useState, useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import {
 	ChevronRight,
 	ChevronDown,
@@ -20,6 +13,14 @@ import {
 	Image,
 	Binary,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 interface FileNode {
 	name: string;

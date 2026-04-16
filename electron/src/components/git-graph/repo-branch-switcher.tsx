@@ -1,12 +1,12 @@
 import { ChevronDown, GitBranch, Globe } from 'lucide-react';
 
-import { Input } from '@/components/ui/input';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 
 interface RepoBranchSwitcherProps {
     repoLabel: string;

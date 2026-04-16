@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
 import { Filter } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 

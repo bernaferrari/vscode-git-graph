@@ -3,13 +3,6 @@
  * Quick access to all commands and actions (Ctrl/Cmd+Shift+P)
  */
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-} from '@/components/ui/dialog';
 import {
 	GitBranch,
 	Upload,
@@ -42,6 +35,14 @@ import {
 	Siren,
 	Users,
 } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+
+import {
+	Dialog,
+	DialogContent,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const isMacPlatform = () => {
 	if (typeof navigator === 'undefined') {
@@ -541,7 +542,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 					<Input
 						placeholder="Type a command or search..."
 						value={query}
-						onChange={(e) => setQuery(e.target.value)}
+						onChange={(e) => { setQuery(e.target.value); }}
 						onKeyDown={handleKeyDown}
 						className="border-0 focus-visible:ring-0 px-0"
 						autoFocus
@@ -556,12 +557,12 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 					) : (
 						<div className="py-2">
 								{Object.entries(
-									filteredCommands.reduce((acc, cmd) => {
+									filteredCommands.reduce<Record<string, Command[]>>((acc, cmd) => {
 										const bucket = acc[cmd.category] ?? [];
 										bucket.push(cmd);
 										acc[cmd.category] = bucket;
 										return acc;
-									}, {} as Record<string, Command[]>)
+									}, {})
 								).map(([category, cmds]) => (
 								<div key={category}>
 									<div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
@@ -582,7 +583,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 													onOpenChange(false);
 													setQuery('');
 												}}
-												onMouseEnter={() => setSelectedIndex(globalIndex)}
+												onMouseEnter={() => { setSelectedIndex(globalIndex); }}
 											>
 												<div className="text-muted-foreground">
 													{cmd.icon}

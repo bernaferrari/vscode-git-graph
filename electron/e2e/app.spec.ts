@@ -46,19 +46,18 @@ test.afterAll(async () => {
 test.describe('Application Launch', () => {
 	test('should launch the application', async () => {
 		await expect(page).toHaveTitle(/Git Graph/);
-		await expect(page.getByRole('heading', { name: /welcome to git graph/i })).toBeVisible();
+		await expect(page.getByText(/open a repository or resume a workspace/i)).toBeVisible();
 	});
 });
 
 test.describe('Repository Selection', () => {
 	test('should have open repository button', async () => {
-		await expect(page.getByRole('button', { name: /open repository/i })).toBeVisible();
+		await expect(page.getByRole('button', { name: /open repository/i }).first()).toBeVisible();
 	});
 
-	test('should surface quick-start and feature sections', async () => {
-		await expect(page.getByRole('button', { name: /clone repository/i })).toBeVisible();
-		await expect(page.getByRole('heading', { name: /features/i })).toBeVisible();
-		await expect(page.getByText(/visual graph/i)).toBeVisible();
-		await expect(page.getByText(/pull requests/i)).toBeVisible();
+	test('should surface multi-repo onboarding cards', async () => {
+		await expect(page.getByText(/multi-repo focus/i)).toBeVisible();
+		await expect(page.getByText(/review focus/i)).toBeVisible();
+		await expect(page.getByText(/safer recovery/i)).toBeVisible();
 	});
 });

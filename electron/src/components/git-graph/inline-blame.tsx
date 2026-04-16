@@ -3,16 +3,17 @@
  * Show git blame info inline in code views
  */
 
+import { User, Calendar, GitCommit, Copy, Check } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+
 import { Button } from '@/components/ui/button';
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { User, Calendar, GitCommit, Copy, Check } from 'lucide-react';
+import { trpcClient } from '@/lib/trpcClient';
+import { useAppStore } from '@/lib/store';
 
 interface BlameLine {
 	lineNumber: number;
@@ -95,7 +96,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 		if (!activeRepo || !filePath) return;
 
 		setIsLoading(true);
-		trpc.git.blame.query({
+		trpcClient.git.blame.query({
 			repo: activeRepo,
 			path: filePath,
 		}).then((result: { error?: string | null; blame?: string | null }) => {
@@ -136,7 +137,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 		e.stopPropagation();
 		navigator.clipboard.writeText(hash);
 		setCopiedHash(hash);
-		setTimeout(() => setCopiedHash(null), 2000);
+		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};
 
 	if (isLoading) {
@@ -186,7 +187,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 											variant="ghost"
 											size="sm"
 											className="h-5 w-5 p-0"
-											onClick={(e) => handleCopyHash(blame.hash, e)}
+											onClick={(e) => { handleCopyHash(blame.hash, e); }}
 										>
 											{copiedHash === blame.hash ? (
 												<Check className="h-3 w-3 text-green-600" />
@@ -213,7 +214,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 											variant="outline"
 											size="sm"
 											className="w-full mt-2"
-											onClick={() => onCommitClick(blame.hash)}
+											onClick={() => { onCommitClick(blame.hash); }}
 										>
 											View Commit
 										</Button>

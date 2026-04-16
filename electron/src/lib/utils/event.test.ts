@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { EventEmitter, debounceEvent, eventToPromise } from './event';
 
 describe('EventEmitter', () => {

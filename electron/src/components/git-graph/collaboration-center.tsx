@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { BarChart3, FolderGit2, PackageOpen, Server, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
 	CollaborationActivityTab,
 	type CollaborationRemoteHealth,
@@ -17,6 +15,14 @@ import {
 	CollaborationTeamTab,
 } from '@/components/git-graph/collaboration-center-team';
 import { CollaborationReviewDashboardTab } from '@/components/git-graph/collaboration-review-dashboard';
+import { detectPullRequestProvider } from '@/components/git-graph/pull-request-provider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
+import { buildCollaborationPullRequestTargetId, deriveCollaborationRepoKey, parseCollaborationReviewTargetId } from '@/lib/collaboration-review-targets';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 import type {
 	CollaborationAssignment,
 	CollaborationComment,
@@ -25,11 +31,6 @@ import type {
 	CollaborationTeamProfile,
 	CollaborationTeamInsights,
 } from '@/components/git-graph/collaboration-types';
-import { detectPullRequestProvider } from '@/components/git-graph/pull-request-provider';
-import { buildCollaborationPullRequestTargetId, deriveCollaborationRepoKey, parseCollaborationReviewTargetId } from '@/lib/collaboration-review-targets';
-import { useAppNotifications } from '@/hooks/useAppNotifications';
-import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
 
 interface CollaborationCenterProps {
 	open: boolean;
@@ -752,11 +753,11 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						}
 						onDelete={(id) => deleteWorkspaceShare.mutate({ id })}
 						onCopyLink={(value) => void handleCopy(value, 'Deep link copied')}
-						onCommentDraftChange={(targetKey, value) => setCommentDrafts((previous) => ({ ...previous, [targetKey]: value }))}
+						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetType, targetId) => void handleCommentSubmit(targetType, targetId)}
 						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
-						onAssignmentAssigneeChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } }))}
-						onAssignmentNoteChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } }))}
+						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
+						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetType, targetId) => void handleAssignmentCreate(targetType, targetId)}
 						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
 						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
@@ -796,11 +797,11 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						}
 						onDelete={(id) => deletePatchShare.mutate({ id })}
 						onCopyPatch={(value) => void handleCopy(value, 'Patch copied')}
-						onCommentDraftChange={(targetKey, value) => setCommentDrafts((previous) => ({ ...previous, [targetKey]: value }))}
+						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetType, targetId) => void handleCommentSubmit(targetType, targetId)}
 						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
-						onAssignmentAssigneeChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } }))}
-						onAssignmentNoteChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } }))}
+						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
+						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetType, targetId) => void handleAssignmentCreate(targetType, targetId)}
 						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
 						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
@@ -873,11 +874,11 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						onMemberRemove={(memberId) => removeMemberMutation.mutate({ id: memberId })}
 						onTeamProfileSave={(profile) => updateTeamProfileMutation.mutate(profile)}
 						onOpenReviewUrl={handleOpenReviewUrl}
-						onCommentDraftChange={(targetKey, value) => setCommentDrafts((previous) => ({ ...previous, [targetKey]: value }))}
+						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetId) => void handleCommentSubmit('pull-request', targetId)}
 						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
-						onAssignmentAssigneeChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } }))}
-						onAssignmentNoteChange={(targetKey, value) => setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } }))}
+						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
+						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetId) => void handleAssignmentCreate('pull-request', targetId)}
 						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
 						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
@@ -899,7 +900,7 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						savePending={saveSyncConfigMutation.isPending}
 						importPending={importBundleMutation.isPending}
 						probePending={probeRemoteMutation.isPending}
-						onSyncConfigChange={(patch) => setSyncConfig((previous) => ({ ...previous, ...patch }))}
+						onSyncConfigChange={(patch) => { setSyncConfig((previous) => ({ ...previous, ...patch })); }}
 						onImportStrategyChange={setImportStrategy}
 						onSave={() => saveSyncConfigMutation.mutate(syncConfig)}
 						onProbe={() => void handleProbeRemote()}

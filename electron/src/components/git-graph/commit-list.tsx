@@ -3,9 +3,10 @@
  * Renders the list of commits aligned with the graph
  */
 
-import type { GraphLayout } from '@/lib/graph/layout';
-import { getGravatarUrl } from '@/lib/gravatar';
 import { CIStatusMini } from './ci-status';
+import { getGravatarUrl } from '@/lib/gravatar';
+
+import type { GraphLayout } from '@/lib/graph/layout';
 
 // Minimal commit type for display
 interface DisplayCommit {
@@ -90,12 +91,12 @@ export function CommitList({
                     isSelected={selectedIndex === index}
                     isMuted={layout?.mutedCommits[index] ?? false}
                     graphOffset={layout?.widthsAtVertices[index] ?? 0}
-                    onSelect={() => onSelect(index)}
-                    onToggleExpand={() => onExpand(expandedIndex === index ? null : index)}
+                    onSelect={() => { onSelect(index); }}
+                    onToggleExpand={() => { onExpand(expandedIndex === index ? null : index); }}
                     showAvatar={showAvatars}
                     hideRefs={hideRefs}
                     {...(repo !== undefined ? { repo } : {})}
-                    {...(onContextMenu ? { onContextMenu: (e: React.MouseEvent) => onContextMenu(index, e) } : {})}
+                    {...(onContextMenu ? { onContextMenu: (e: React.MouseEvent) => { onContextMenu(index, e); } } : {})}
                 />
             ))}
         </div>

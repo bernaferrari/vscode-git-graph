@@ -3,12 +3,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
+
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -16,7 +16,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { trpc } from '@/trpc/client';
 
 interface SigningConfigProps {
 	repo: string;
@@ -93,7 +94,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 							<Label className="text-xs">Signing Method</Label>
 							<Select
 								value={signingMethod}
-								onValueChange={(v) => v && setSigningMethod(v as 'gpg' | 'ssh')}
+								onValueChange={(v) => v && setSigningMethod(v)}
 							>
 								<SelectTrigger className="h-8">
 									<SelectValue />
@@ -129,7 +130,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 									) : (
 										<Input
 											value={signingKey}
-											onChange={(e) => setSigningKey(e.target.value)}
+											onChange={(e) => { setSigningKey(e.target.value); }}
 											placeholder="Enter GPG key ID..."
 											className="h-8"
 										/>
@@ -140,7 +141,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 									<Label className="text-xs">GPG Program (optional)</Label>
 									<Input
 										value={gpgProgram}
-										onChange={(e) => setGpgProgram(e.target.value)}
+										onChange={(e) => { setGpgProgram(e.target.value); }}
 										placeholder="/usr/bin/gpg"
 										className="h-8"
 									/>
@@ -177,7 +178,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 									<Label className="text-xs">SSH Public Key Path</Label>
 									<Input
 										value={signingKey}
-										onChange={(e) => setSigningKey(e.target.value)}
+										onChange={(e) => { setSigningKey(e.target.value); }}
 										placeholder="~/.ssh/id_ed25519.pub"
 										className="h-8"
 									/>
@@ -187,7 +188,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 									<Label className="text-xs">Allowed Signers File (optional)</Label>
 									<Input
 										value={allowedSignersFile}
-										onChange={(e) => setAllowedSignersFile(e.target.value)}
+										onChange={(e) => { setAllowedSignersFile(e.target.value); }}
 										placeholder="~/.config/git/allowed_signers"
 										className="h-8"
 									/>
@@ -205,7 +206,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 				<div className="flex gap-2">
 					<Button
 						size="sm"
-						onClick={() => handleSave(false)}
+						onClick={() => { handleSave(false); }}
 						disabled={setSigningMutation.isPending || !canSave}
 					>
 						Save for Repo
@@ -213,7 +214,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => handleSave(true)}
+						onClick={() => { handleSave(true); }}
 						disabled={setSigningMutation.isPending || !canSave}
 					>
 						Save Global

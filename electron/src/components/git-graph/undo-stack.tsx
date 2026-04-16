@@ -2,7 +2,6 @@
  * Git Undo Stack UI
  */
 
-import { useCallback, useState } from 'react';
 import {
     AlertTriangle,
     Archive,
@@ -19,14 +18,15 @@ import {
     Undo,
     Upload,
 } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
+import { useUndoStack } from './undo-stack-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useUndoStack, type GitOperationType } from './undo-stack-provider';
 
-function getOperationIcon(type: GitOperationType) {
+function getOperationIcon(type: string) {
     switch (type) {
         case 'commit':
         case 'amend':
@@ -60,7 +60,7 @@ function getOperationIcon(type: GitOperationType) {
     }
 }
 
-function getOperationColor(type: GitOperationType): string {
+function getOperationColor(type: string): string {
     switch (type) {
         case 'commit':
         case 'amend':
@@ -190,7 +190,7 @@ export function UndoStackDialog({
                             <Trash2 className='mr-2 h-4 w-4' />
                             Clear History
                         </Button>
-                        <Button variant='ghost' onClick={() => onOpenChange(false)}>
+                        <Button variant='ghost' onClick={() => { onOpenChange(false); }}>
                             Close
                         </Button>
                     </div>

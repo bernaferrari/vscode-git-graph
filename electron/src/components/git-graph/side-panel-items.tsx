@@ -15,11 +15,13 @@ import {
     Trash2,
     Wrench,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
 import type { StashEntry, SubmoduleEntry, WorktreeEntry } from './side-panel-types';
+import type { ReactNode } from 'react';
 
 const SIDE_ITEM_CLASS =
     'group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';

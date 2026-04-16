@@ -3,11 +3,14 @@
  * Handles 100k+ commits with efficient rendering using @tanstack/react-virtual
  */
 
-import { useRef, useCallback, memo, useMemo, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { GraphLayout } from '@/lib/graph/layout';
-import { getGravatarUrl } from '@/lib/gravatar';
+import { useRef, useCallback, memo, useMemo, useEffect } from 'react';
+
 import { CIStatusMini } from './ci-status';
+import { getGravatarUrl } from '@/lib/gravatar';
+
+import type { GraphLayout } from '@/lib/graph/layout';
+
 
 // Minimal commit type for display
 interface DisplayCommit {
@@ -401,15 +404,15 @@ export function VirtualizedCommitList({
                                 isSelected={selectedIndex === virtualRow.index}
                                 isMuted={layout?.mutedCommits[virtualRow.index] ?? false}
                                 graphOffset={layout?.widthsAtVertices[virtualRow.index] ?? 0}
-                                onSelect={() => onSelect(virtualRow.index)}
+                                onSelect={() => { onSelect(virtualRow.index); }}
                                 onToggleExpand={() =>
-                                    onExpand(expandedIndex === virtualRow.index ? null : virtualRow.index)
+                                    { onExpand(expandedIndex === virtualRow.index ? null : virtualRow.index); }
                                 }
                                 showAvatar={showAvatars}
                                 hideRefs={hideRefs}
                                 {...(repo ? { repo } : {})}
                                 {...(onContextMenu
-                                    ? { onContextMenu: (e: React.MouseEvent) => onContextMenu(virtualRow.index, e) }
+                                    ? { onContextMenu: (e: React.MouseEvent) => { onContextMenu(virtualRow.index, e); } }
                                     : {})}
                             />
                         </div>

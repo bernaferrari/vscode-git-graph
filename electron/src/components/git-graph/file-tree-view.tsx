@@ -3,8 +3,9 @@
  * Hierarchical tree view for staging files
  */
 
-import { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileText, Folder, Plus, Minus, RotateCcw } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface FileTreeItem {
@@ -120,7 +121,7 @@ export function FileTreeView({ files, selectedFiles, onToggle, onToggleFolder }:
 					<div
 						className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-accent/50 cursor-pointer"
 						style={{ paddingLeft: depth * 12 + 8 }}
-						onClick={() => toggleFolder(node.path)}
+						onClick={() => { toggleFolder(node.path); }}
 					>
 						<Checkbox
 							checked={isAllSelected}
@@ -160,12 +161,12 @@ export function FileTreeView({ files, selectedFiles, onToggle, onToggleFolder }:
 				key={node.path}
 				className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-accent/50 cursor-pointer"
 				style={{ paddingLeft: depth * 12 + 8 }}
-				onClick={() => onToggle(node.path)}
+				onClick={() => { onToggle(node.path); }}
 			>
 				<Checkbox
 					checked={selectedFiles.has(node.path)}
 					className="h-3 w-3"
-					onClick={(e) => e.stopPropagation()}
+					onClick={(e) => { e.stopPropagation(); }}
 				/>
 				{getStatusIcon(node.status)}
 				<span className="text-xs truncate flex-1" title={node.path}>

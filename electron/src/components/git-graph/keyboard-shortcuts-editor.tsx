@@ -3,16 +3,6 @@
  * Customize keyboard shortcuts
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Keyboard,
 	RotateCcw,
@@ -20,7 +10,18 @@ import {
 	AlertTriangle,
 	Check,
 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { trpc } from '@/trpc/client';
 
 interface ShortcutAction {
@@ -97,7 +98,7 @@ export function KeyboardShortcutsEditor({
 		const overrides = keybindingQuery.data?.overrides ?? {};
 		setShortcuts(DEFAULT_SHORTCUTS.map((s) => ({
 			...s,
-			customKey: overrides[s.id],
+			...(overrides[s.id] ? { customKey: overrides[s.id] } : {}),
 		})));
 	}, [keybindingQuery.data?.overrides]);
 
@@ -131,11 +132,11 @@ export function KeyboardShortcutsEditor({
 		: shortcuts;
 
 	// Group by category
-	const grouped = filteredShortcuts.reduce((acc, s) => {
+	const grouped = filteredShortcuts.reduce<Record<string, ShortcutAction[]>>((acc, s) => {
 		const bucket = acc[s.category] ?? (acc[s.category] = []);
 		bucket.push(s);
 		return acc;
-	}, {} as Record<string, ShortcutAction[]>);
+	}, {});
 
 	// Update shortcut
 	const handleUpdate = (id: string, key: string) => {
@@ -224,7 +225,7 @@ export function KeyboardShortcutsEditor({
 					<Input
 						placeholder="Search shortcuts..."
 						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
+						onChange={(e) => { setSearchQuery(e.target.value); }}
 						className="pl-9"
 					/>
 				</div>
@@ -274,8 +275,8 @@ export function KeyboardShortcutsEditor({
 															autoFocus
 															className="w-48 h-8"
 															placeholder="Press key..."
-															onKeyDown={(e) => handleKeyDown(e, shortcut.id)}
-															onBlur={() => setEditingId(null)}
+															onKeyDown={(e) => { handleKeyDown(e, shortcut.id); }}
+															onBlur={() => { setEditingId(null); }}
 														/>
 													) : (
 														<>
@@ -285,7 +286,7 @@ export function KeyboardShortcutsEditor({
 																		? 'bg-primary/10 text-primary'
 																		: 'bg-muted'
 																}`}
-																onClick={() => setEditingId(shortcut.id)}
+																onClick={() => { setEditingId(shortcut.id); }}
 															>
 																{key || 'Not set'}
 															</kbd>
@@ -294,7 +295,7 @@ export function KeyboardShortcutsEditor({
 																	variant="ghost"
 																	size="sm"
 																	className="h-6 w-6 p-0"
-																	onClick={() => handleReset(shortcut.id)}
+																	onClick={() => { handleReset(shortcut.id); }}
 																>
 																	<RotateCcw className="h-3 w-3" />
 																</Button>
@@ -318,7 +319,7 @@ export function KeyboardShortcutsEditor({
 						Reset All
 					</Button>
 					<div className="flex items-center gap-2">
-						<Button variant="ghost" onClick={() => onOpenChange(false)}>
+						<Button variant="ghost" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button onClick={handleSave}>

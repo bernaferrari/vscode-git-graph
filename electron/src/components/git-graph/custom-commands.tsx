@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -168,7 +169,7 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 		setOutput(null);
 		
 		try {
-			const result = await trpc.git.runCustomCommand.mutate({
+			const result = await trpcClient.git.runCustomCommand.mutate({
 				repo: activeRepo,
 				command: cmd.command,
 			});

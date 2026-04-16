@@ -3,13 +3,6 @@
  * Explain graph visualization elements
  */
 
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	GitMerge,
 	GitBranch,
@@ -17,6 +10,14 @@ import {
 	Circle,
 	Info,
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 
 interface CommitGraphLegendProps {
 	open: boolean;
@@ -139,7 +140,7 @@ export function CommitGraphLegend({ open, onOpenChange }: CommitGraphLegendProps
 				</div>
 
 				<div className="flex justify-end pt-4 border-t">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>

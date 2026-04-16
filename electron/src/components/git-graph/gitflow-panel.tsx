@@ -3,12 +3,12 @@
  */
 
 import { useState } from 'react';
-import { trpc } from '@/trpc/client';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -17,6 +17,7 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { trpc } from '@/trpc/client';
 
 interface GitFlowPanelProps {
 	repo: string;
@@ -96,7 +97,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 								<Label className="text-xs">Feature</Label>
 								<Input
 									value={prefixes.feature}
-									onChange={(e) => setPrefixes({ ...prefixes, feature: e.target.value })}
+									onChange={(e) => { setPrefixes({ ...prefixes, feature: e.target.value }); }}
 									className="h-7 text-xs"
 								/>
 							</div>
@@ -104,7 +105,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 								<Label className="text-xs">Release</Label>
 								<Input
 									value={prefixes.release}
-									onChange={(e) => setPrefixes({ ...prefixes, release: e.target.value })}
+									onChange={(e) => { setPrefixes({ ...prefixes, release: e.target.value }); }}
 									className="h-7 text-xs"
 								/>
 							</div>
@@ -112,7 +113,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 								<Label className="text-xs">Hotfix</Label>
 								<Input
 									value={prefixes.hotfix}
-									onChange={(e) => setPrefixes({ ...prefixes, hotfix: e.target.value })}
+									onChange={(e) => { setPrefixes({ ...prefixes, hotfix: e.target.value }); }}
 									className="h-7 text-xs"
 								/>
 							</div>
@@ -120,7 +121,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 								<Label className="text-xs">Support</Label>
 								<Input
 									value={prefixes.support}
-									onChange={(e) => setPrefixes({ ...prefixes, support: e.target.value })}
+									onChange={(e) => { setPrefixes({ ...prefixes, support: e.target.value }); }}
 									className="h-7 text-xs"
 								/>
 							</div>
@@ -147,7 +148,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 								</Select>
 								<Input
 									value={branchName}
-									onChange={(e) => setBranchName(e.target.value)}
+									onChange={(e) => { setBranchName(e.target.value); }}
 									placeholder="Branch name..."
 									className="h-8 flex-1"
 								/>
@@ -176,7 +177,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 													variant="ghost"
 													size="sm"
 													className="h-6 px-2"
-													onClick={() => handleFinish(type as FlowBranch, branch)}
+													onClick={() => { handleFinish(type as FlowBranch, branch); }}
 												>
 													Finish
 												</Button>

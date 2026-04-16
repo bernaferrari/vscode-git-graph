@@ -4,8 +4,10 @@
  */
 
 import { useMemo } from 'react';
-import type { GraphLayout, GraphConfig } from '@/lib/graph/layout';
+
 import { getGravatarUrl } from '@/lib/gravatar';
+
+import type { GraphLayout, GraphConfig } from '@/lib/graph/layout';
 
 interface CommitInfo {
     hash: string;
@@ -171,9 +173,9 @@ export function CommitGraph({
                                 // Avatar on top of smaller node
                                 <g
                                     className='cursor-pointer'
-                                    onClick={() => onVertexClick(v.id)}
-                                    onMouseEnter={() => onVertexHover(v.id)}
-                                    onMouseLeave={() => onVertexHover(null)}>
+                                    onClick={() => { onVertexClick(v.id); }}
+                                    onMouseEnter={() => { onVertexHover(v.id); }}
+                                    onMouseLeave={() => { onVertexHover(null); }}>
                                     {/* Small colored circle underneath */}
                                     <circle cx={v.cx} cy={v.cy} r={avatarRadius + 1} fill={v.colour} />
                                     {/* White background for avatar */}
@@ -225,9 +227,9 @@ export function CommitGraph({
                                             stroke={v.colour}
                                             strokeWidth={2.5}
                                             className='cursor-pointer'
-                                            onClick={() => onVertexClick(v.id)}
-                                            onMouseEnter={() => onVertexHover(v.id)}
-                                            onMouseLeave={() => onVertexHover(null)}
+                                            onClick={() => { onVertexClick(v.id); }}
+                                            onMouseEnter={() => { onVertexHover(v.id); }}
+                                            onMouseLeave={() => { onVertexHover(null); }}
                                         />
                                     ) : (
                                         <circle
@@ -238,9 +240,9 @@ export function CommitGraph({
                                             stroke='var(--background)'
                                             strokeWidth={1.5}
                                             className='cursor-pointer'
-                                            onClick={() => onVertexClick(v.id)}
-                                            onMouseEnter={() => onVertexHover(v.id)}
-                                            onMouseLeave={() => onVertexHover(null)}
+                                            onClick={() => { onVertexClick(v.id); }}
+                                            onMouseEnter={() => { onVertexHover(v.id); }}
+                                            onMouseLeave={() => { onVertexHover(null); }}
                                         />
                                     )}
                                     {v.isStash && !v.isCurrent && (

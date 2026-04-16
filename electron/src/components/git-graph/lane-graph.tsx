@@ -205,7 +205,7 @@ export function LaneGraph({
 								r={nodeRadius}
 								fill={laneData.color}
 								className="cursor-pointer hover:opacity-80 transition-opacity"
-								onClick={() => onSelectCommit(index)}
+								onClick={() => { onSelectCommit(index); }}
 							/>
 							{/* Branch/tag indicators */}
 							{(commit.heads?.length || commit.tags?.length) && (

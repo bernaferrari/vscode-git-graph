@@ -3,17 +3,6 @@
  * Drag commits to cherry-pick them onto branches
  */
 
-import { useState, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
 import {
 	GitCommit,
 	AlertCircle,
@@ -22,7 +11,20 @@ import {
 	Copy,
 	ArrowRight,
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface DragDropCherryPickProps {
 	open: boolean;
@@ -40,19 +42,18 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 	const [isCherryPicking, setIsCherryPicking] = useState(false);
 
 	// Fetch branches
-	const { data: branchData } = trpc.git.branches.useQuery(
-		{ repo: activeRepo ?? '' },
+	const { data: repoInfo } = trpc.git.repoInfo.useQuery(
+		{
+			repo: activeRepo ?? '',
+			showRemoteBranches: true,
+			showStashes: false,
+			hideRemotes: [],
+		},
 		{ enabled: !!activeRepo && open }
 	);
 
-	// Fetch ahead/behind info
-	const { data: statusData } = trpc.git.status.useQuery(
-		{ repo: activeRepo ?? '' },
-		{ enabled: !!activeRepo && open }
-	);
-
-	const branches = branchData?.branches ?? [];
-	const currentBranch = statusData?.branch ?? '';
+	const branches = repoInfo?.branches ?? [];
+	const currentBranch = repoInfo?.head ?? '';
 
 	// Cherry-pick mutation
 	const cherryPickMutation = trpc.git.cherryPick.useMutation({
@@ -61,7 +62,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 			onOpenChange(false);
 			setTargetBranch('');
 		},
-		onError: (error: Error) => {
+		onError: (error) => {
 			toast.error('Cherry-pick failed', { description: error.message });
 		},
 		onSettled: () => {
@@ -75,7 +76,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 		setIsCherryPicking(true);
 		cherryPickMutation.mutate({
 			repo: activeRepo ?? '',
-			hash: sourceCommit.hash,
+			commitHash: sourceCommit.hash,
 		});
 	}, [sourceCommit, targetBranch, activeRepo, cherryPickMutation]);
 
@@ -120,12 +121,12 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 						<select
 							className="w-full h-9 rounded-md border bg-transparent px-3 py-1 text-sm"
 							value={targetBranch}
-							onChange={(e) => setTargetBranch(e.target.value)}
+							onChange={(e) => { setTargetBranch(e.target.value); }}
 						>
 							<option value="">Select branch...</option>
-							{branches.map((b: { name: string }) => (
-								<option key={b.name} value={b.name}>
-									{b.name} {b.name === currentBranch ? '(current)' : ''}
+							{branches.map((branch) => (
+								<option key={branch} value={branch}>
+									{branch} {branch === currentBranch ? '(current)' : ''}
 								</option>
 							))}
 						</select>
@@ -151,7 +152,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 				</div>
 
 				<DialogFooter className="ui-toolbar">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button

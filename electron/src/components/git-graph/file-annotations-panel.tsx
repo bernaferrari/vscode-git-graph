@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
+import { trpcClient } from '@/lib/trpcClient';
 
 
 interface AnnotationLine {
@@ -41,6 +41,43 @@ interface AnnotationLine {
 	email: string;
 	date: number;
 	message: string;
+}
+
+interface BlameMetadata {
+	hash: string;
+	author: string;
+	email: string;
+	timestamp: number;
+	summary: string;
+}
+
+function parseBlamePorcelain(output: string): BlameMetadata[] {
+	const rows: BlameMetadata[] = [];
+	let current: Partial<BlameMetadata> = {};
+
+	for (const line of output.split('\n')) {
+		if (/^[a-f0-9]{40}\s+/.test(line)) {
+			current.hash = line.split(' ')[0] ?? '';
+		} else if (line.startsWith('author ')) {
+			current.author = line.slice('author '.length);
+		} else if (line.startsWith('author-mail ')) {
+			current.email = line.slice('author-mail '.length).replace(/[<>]/g, '');
+		} else if (line.startsWith('author-time ')) {
+			current.timestamp = Number.parseInt(line.slice('author-time '.length), 10) || 0;
+		} else if (line.startsWith('summary ')) {
+			current.summary = line.slice('summary '.length);
+		} else if (line.startsWith('\t')) {
+			rows.push({
+				hash: current.hash ?? '',
+				author: current.author ?? 'Unknown',
+				email: current.email ?? '',
+				timestamp: current.timestamp ?? 0,
+				summary: current.summary ?? '',
+			});
+		}
+	}
+
+	return rows;
 }
 
 interface FileAnnotationsPanelProps {
@@ -69,40 +106,35 @@ export function FileAnnotationsPanel({
 	useEffect(() => {
 		if (!open || !activeRepo || !filePath) return;
 
-		const loadAnnotations = async () => {
-			setIsLoading(true);
-			try {
-				// Get file content
-					const fileContent = await trpc.git.showFile.query({
+			const loadAnnotations = async () => {
+				setIsLoading(true);
+				try {
+					// Get file content
+					const fileContentResult = await trpcClient.git.fileAtRevision.query({
 						repo: activeRepo,
 						commitHash,
 						filePath,
 					});
 
 					// Get blame info
-					const blameResult = await trpc.git.blameFile.query({
+					const blameResult = await trpcClient.git.blame.query({
 						repo: activeRepo,
-						filePath,
+						path: filePath,
 						commitHash,
 					});
 
-					if (blameResult?.lines) {
-						const lines = String(fileContent ?? '').split('\n');
-						const blameLines = blameResult.lines as Array<
-							Partial<{
-								hash: string;
-								author: string;
-								email: string;
-								timestamp: number;
-								summary: string;
-							}>
-						>;
-						const annotationLines: AnnotationLine[] = lines.map((line: string, index: number) => {
-							const blame = blameLines[index];
-							return {
-								lineNumber: index + 1,
-								content: line,
-								commitHash: blame?.hash || '',
+					if (fileContentResult.error || blameResult.error) {
+						throw new Error(fileContentResult.error ?? blameResult.error ?? 'Failed to load annotations');
+					}
+
+					const lines = String(fileContentResult.content ?? '').split('\n');
+					const blameLines = parseBlamePorcelain(blameResult.blame ?? '');
+					const annotationLines: AnnotationLine[] = lines.map((line: string, index: number) => {
+						const blame = blameLines[index];
+						return {
+							lineNumber: index + 1,
+							content: line,
+							commitHash: blame?.hash || '',
 							author: blame?.author || 'Unknown',
 							email: blame?.email || '',
 							date: blame?.timestamp || 0,
@@ -110,10 +142,9 @@ export function FileAnnotationsPanel({
 						};
 					});
 					setAnnotations(annotationLines);
-				}
-			} catch (error) {
-				console.error('Failed to load annotations:', error);
-			} finally {
+				} catch (error) {
+					console.error('Failed to load annotations:', error);
+				} finally {
 				setIsLoading(false);
 			}
 		};

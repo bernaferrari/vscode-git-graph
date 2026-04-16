@@ -3,11 +3,6 @@
  * Blame view and file history
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
 	History,
 	User,
@@ -15,6 +10,12 @@ import {
 	Hash,
 	Loader2,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface FileHistoryProps {
 	filePath: string;
@@ -89,7 +90,7 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 						{filePath}
 					</span>
 				</div>
-				<Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+				<Tabs value={view} onValueChange={(v) => { setView(v as typeof view); }}>
 					<TabsList className="h-7">
 						<TabsTrigger value="blame" className="text-xs h-5 px-2">
 							<User className="h-3 w-3 mr-1" />

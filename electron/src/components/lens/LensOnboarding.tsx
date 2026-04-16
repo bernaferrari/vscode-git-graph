@@ -3,7 +3,10 @@
  * Explains the lens system to new users
  */
 
+import { Compass, Wand2, Terminal, ArrowRight, Check, Sparkles, Keyboard, Shield, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import { useLensMode, type LensMode } from '@/components/lens';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -13,9 +16,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Compass, Wand2, Terminal, ArrowRight, Check, Sparkles, Keyboard, Shield, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useLensMode, type LensMode } from '@/components/lens';
 import { trpc } from '@/trpc/client';
 
 interface LensOnboardingProps {
@@ -125,7 +126,7 @@ export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
                         return (
                             <button
                                 key={lens.mode}
-                                onClick={() => setSelectedLens(lens.mode)}
+                                onClick={() => { setSelectedLens(lens.mode); }}
                                 className={cn(
                                     'relative flex flex-col rounded-xl border-2 p-4 text-left transition-all',
                                     lens.borderColor,
@@ -182,7 +183,7 @@ export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
                 </div>
 
                 <DialogFooter className='mt-4'>
-                    <Button variant='outline' onClick={() => onOpenChange(false)}>
+                    <Button variant='outline' onClick={() => { onOpenChange(false); }}>
                         Skip for now
                     </Button>
                     <Button onClick={handleConfirm}>

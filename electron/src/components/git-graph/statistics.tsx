@@ -3,8 +3,8 @@
  * Author breakdown, activity cadence, and repository hotspots.
  */
 
-import { useMemo, useState } from 'react';
 import { Activity, BarChart3, Calendar, Flame, GitCommit, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -80,7 +80,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 	const maxCommits = Math.max(...authors.map((author: AuthorStat) => author.commits), 1);
 	const activity: ActivityDay[] = insightsData?.activity ?? [];
 	const maxDailyCommits = Math.max(...activity.map((day: ActivityDay) => day.commits), 1);
-	const summary: SummaryStats | undefined = insightsData?.summary;
+	const summary: SummaryStats | undefined = insightsData?.summary ?? undefined;
 	const hotspots: HotspotFile[] = insightsData?.hotspots ?? [];
 
 	return (
@@ -100,7 +100,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 							variant={timeRange === range ? 'secondary' : 'ghost'}
 							size='sm'
 							className='h-7 px-2 text-xs'
-							onClick={() => setTimeRange(range)}>
+							onClick={() => { setTimeRange(range); }}>
 							{formatRange(range)}
 						</Button>
 					))}

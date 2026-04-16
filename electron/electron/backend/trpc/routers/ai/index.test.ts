@@ -83,7 +83,7 @@ describe('ai router secret handling', () => {
 				baseUrl: 'https://ai.example.com',
 			})
 		);
-		expect((appStoreState as Record<string, unknown>).runtimeApiKey).toBeUndefined();
+		expect((appStoreState).runtimeApiKey).toBeUndefined();
 		expect(fetchMock).toHaveBeenCalledWith(
 			'https://ai.example.com/v1/chat/completions',
 			expect.objectContaining({

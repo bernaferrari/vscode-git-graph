@@ -49,10 +49,10 @@ export function useAppNotifications() {
 
     return {
         notify,
-        notifySuccess: useCallback((title: string, options?: NotifyOptions) => notify('success', title, options), [notify]),
-        notifyWarning: useCallback((title: string, options?: NotifyOptions) => notify('warning', title, options), [notify]),
-        notifyError: useCallback((title: string, options?: NotifyOptions) => notify('error', title, options), [notify]),
-        notifyInfo: useCallback((title: string, options?: NotifyOptions) => notify('info', title, options), [notify]),
+        notifySuccess: useCallback((title: string, options?: NotifyOptions) => { notify('success', title, options); }, [notify]),
+        notifyWarning: useCallback((title: string, options?: NotifyOptions) => { notify('warning', title, options); }, [notify]),
+        notifyError: useCallback((title: string, options?: NotifyOptions) => { notify('error', title, options); }, [notify]),
+        notifyInfo: useCallback((title: string, options?: NotifyOptions) => { notify('info', title, options); }, [notify]),
     };
 }
 

@@ -3,18 +3,19 @@
  * Embedded terminal at bottom of window
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Terminal,
 	X,
 	Maximize2,
 	Minimize2,
 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface TerminalPanelProps {
 	open: boolean;
@@ -172,7 +173,7 @@ Any other command is executed by your system shell in the active repository.`,
 					variant="ghost"
 					size="sm"
 					className="h-5 w-5 p-0"
-					onClick={() => setMaximized(!maximized)}
+					onClick={() => { setMaximized(!maximized); }}
 				>
 					{maximized ? (
 						<Minimize2 className="h-3 w-3" />
@@ -184,7 +185,7 @@ Any other command is executed by your system shell in the active repository.`,
 					variant="ghost"
 					size="sm"
 					className="h-5 w-5 p-0"
-					onClick={() => onOpenChange(false)}
+					onClick={() => { onOpenChange(false); }}
 				>
 					<X className="h-3 w-3" />
 				</Button>
@@ -201,13 +202,11 @@ Any other command is executed by your system shell in the active repository.`,
 						history.map((item, i) => (
 							<div
 								key={i}
-								className={`${
-									item.type === 'input'
+								className={item.type === 'input'
 										? 'text-foreground'
 										: item.type === 'error'
 											? 'text-red-500'
-											: 'text-muted-foreground'
-								}`}
+											: 'text-muted-foreground'}
 							>
 								{item.text}
 							</div>
@@ -222,7 +221,7 @@ Any other command is executed by your system shell in the active repository.`,
 				<Input
 					ref={inputRef}
 					value={input}
-					onChange={(e) => setInput(e.target.value)}
+					onChange={(e) => { setInput(e.target.value); }}
 					onKeyDown={handleKeyDown}
 					placeholder="Enter command..."
 					disabled={runTerminalCommand.isPending}

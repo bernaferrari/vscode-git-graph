@@ -27,7 +27,6 @@ import { toast } from 'sonner';
 
 import { CollaborationAssignmentPanel } from '@/components/git-graph/collaboration-center-assignment';
 import { CollaborationCommentThread } from '@/components/git-graph/collaboration-comment-thread';
-import type { CollaborationAssignment, CollaborationComment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
 import { detectPullRequestProvider, type PullRequestProvider } from '@/components/git-graph/pull-request-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { parseDiffWithInlineDiffs } from '@/lib/diff-utils';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import {
     buildCollaborationPullRequestFileTargetId,
     buildCollaborationPullRequestTargetId,
@@ -44,9 +43,11 @@ import {
     getCollaborationReviewRootTargetId,
     parseCollaborationReviewTargetId,
 } from '@/lib/collaboration-review-targets';
+import { parseDiffWithInlineDiffs } from '@/lib/diff-utils';
 import { useAppStore } from '@/lib/store';
-import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { trpc } from '@/trpc/client';
+
+import type { CollaborationAssignment, CollaborationComment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
 
 type PullRequestStateFilter = 'open' | 'closed' | 'all';
 
@@ -182,7 +183,7 @@ interface MutationCallbacks<TResult = unknown> {
 }
 
 interface MutationState<TInput> {
-    mutate: (input: TInput, callbacks?: MutationCallbacks<unknown>) => void;
+    mutate: (input: TInput, callbacks?: MutationCallbacks) => void;
     isPending: boolean;
 }
 
@@ -1820,7 +1821,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                                     onDraftChange={(value) => {
                                                                         setFileReviewDrafts((current) => ({ ...current, [fileTargetId]: value }));
                                                                     }}
-                                                                    onSubmit={() => handleFileReviewComment(fileTargetId, filePath)}
+                                                                    onSubmit={() => { handleFileReviewComment(fileTargetId, filePath); }}
                                                                     onDelete={(commentId) => {
                                                                         deleteCollaborationCommentMutation.mutate(
                                                                             { id: commentId },
@@ -1853,7 +1854,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                                     onToggleTarget={(targetId) => {
                                                                         setExpandedReviewFiles((current) => ({ ...current, [targetId]: !current[targetId] }));
                                                                     }}
-                                                                    onSubmit={(targetId) => handleFileReviewComment(targetId, filePath)}
+                                                                    onSubmit={(targetId) => { handleFileReviewComment(targetId, filePath); }}
                                                                     onDelete={(commentId) => {
                                                                         deleteCollaborationCommentMutation.mutate(
                                                                             { id: commentId },
@@ -2150,7 +2151,7 @@ function ReviewDiffThread({
                         <button
                             type='button'
                             className='flex w-full items-start justify-between gap-3 px-3 py-2 text-left'
-                            onClick={() => onToggleTarget(targetId)}>
+                            onClick={() => { onToggleTarget(targetId); }}>
                             <div className='min-w-0'>
                                 <p className='font-mono text-xs text-muted-foreground'>
                                     {side === 'right' ? '+' : '-'}{anchorLine}
@@ -2168,8 +2169,8 @@ function ReviewDiffThread({
                                     comments={commentsByTarget[targetId] ?? []}
                                     draft={drafts[targetId] ?? ''}
                                     submitPending={submitPending || deletePending}
-                                    onDraftChange={(value) => onDraftChange(targetId, value)}
-                                    onSubmit={() => onSubmit(targetId)}
+                                    onDraftChange={(value) => { onDraftChange(targetId, value); }}
+                                    onSubmit={() => { onSubmit(targetId); }}
                                     onDelete={onDelete}
                                     {...(renderCommentBadges ? { renderCommentBadges } : {})}
                                     {...(renderCommentActions ? { renderCommentActions } : {})}

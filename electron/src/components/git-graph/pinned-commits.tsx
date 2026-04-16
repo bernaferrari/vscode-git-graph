@@ -3,16 +3,6 @@
  * Save and manage favorite/important commits
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Star,
 	Pin,
@@ -24,21 +14,32 @@ import {
 	GitBranch,
 	MoreHorizontal,
 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 
 export interface PinnedCommit {
 	hash: string;
 	message: string;
 	author: string;
 	date: string;
-	branch?: string;
+	branch?: string | undefined;
 	pinnedAt: number;
-	note?: string;
+	note?: string | undefined;
 }
 
 interface PinnedCommitsProps {
@@ -141,7 +142,7 @@ export function PinnedCommitsDialog({
 													<input
 														type="text"
 														value={noteText}
-														onChange={(e) => setNoteText(e.target.value)}
+														onChange={(e) => { setNoteText(e.target.value); }}
 														placeholder="Add a note..."
 														className="flex-1 px-2 py-1 text-xs border rounded"
 														autoFocus
@@ -156,7 +157,7 @@ export function PinnedCommitsDialog({
 													<Button
 														size="sm"
 														className="h-6 px-2 text-xs"
-														onClick={() => handleSaveNote(commit.hash)}
+														onClick={() => { handleSaveNote(commit.hash); }}
 													>
 														Save
 													</Button>
@@ -171,7 +172,7 @@ export function PinnedCommitsDialog({
 												</Button>
 											</DropdownMenuTrigger>
 											<DropdownMenuContent align="end">
-												<DropdownMenuItem onClick={() => onJumpToCommit(commit.hash)}>
+												<DropdownMenuItem onClick={() => { onJumpToCommit(commit.hash); }}>
 													<GitBranch className="h-4 w-4 mr-2" />
 													Jump to Commit
 												</DropdownMenuItem>
@@ -185,7 +186,7 @@ export function PinnedCommitsDialog({
 													{commit.note ? 'Edit Note' : 'Add Note'}
 												</DropdownMenuItem>
 												<DropdownMenuItem
-													onClick={() => onUnpin(commit.hash)}
+													onClick={() => { onUnpin(commit.hash); }}
 													className="text-red-600"
 												>
 													<PinOff className="h-4 w-4 mr-2" />
@@ -212,14 +213,11 @@ export function usePinnedCommits(repoId: string | null) {
         { repo: repoId ?? '' },
         { enabled: !!repoId, staleTime: 10_000 }
     );
-    const setPinnedCommitsMutation = trpc.repo.setPinnedCommits.useMutation({
-        onSuccess: async (
-			_result: unknown,
-			variables: { repo: string; commits: PinnedCommit[] }
-		) => {
-            await utils.repo.pinnedCommits.invalidate({ repo: variables.repo });
-        },
-    });
+	    const setPinnedCommitsMutation = trpc.repo.setPinnedCommits.useMutation({
+	        onSuccess: async (_result, variables) => {
+	            await utils.repo.pinnedCommits.invalidate({ repo: variables.repo });
+	        },
+	    });
 
 	useEffect(() => {
 		if (!repoId) {

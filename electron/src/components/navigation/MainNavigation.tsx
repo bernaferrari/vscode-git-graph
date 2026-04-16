@@ -3,17 +3,6 @@
  * Unified sidebar for all lens modes with PLAN as differentiator
  */
 
-import { useState, useMemo } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from '@/components/ui/sheet';
-import { useLensMode } from '@/components/lens';
 import {
 	// Home
 	Home,
@@ -49,6 +38,18 @@ import {
 	ChevronRight,
 	Sparkles,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+
+import { useLensMode } from '@/components/lens';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -195,7 +196,7 @@ export function MainNavigation({ activeItem, onItemSelect, className }: MainNavi
 							<div key={section.id}>
 								{/* Section Header */}
 								<button
-									onClick={() => toggleSection(section.id)}
+									onClick={() => { toggleSection(section.id); }}
 									className={cn(
 										'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm font-medium transition-colors',
 										section.id === 'plan' ? 'text-amber-600' : 'text-muted-foreground',
@@ -224,7 +225,7 @@ export function MainNavigation({ activeItem, onItemSelect, className }: MainNavi
 											return (
 												<button
 													key={item.id}
-													onClick={() => onItemSelect(item.id)}
+													onClick={() => { onItemSelect(item.id); }}
 													className={cn(
 														'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors',
 														isActive

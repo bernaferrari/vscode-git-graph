@@ -3,11 +3,12 @@
  * Quick access to recently opened repositories
  */
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FolderGit2, Clock, X, Pin, GitBranch, Plus, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';

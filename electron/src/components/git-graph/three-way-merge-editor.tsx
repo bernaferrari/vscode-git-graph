@@ -3,17 +3,6 @@
  * Resolve merge conflicts with 3-way diff view
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	GitMerge,
 	Check,
@@ -22,7 +11,20 @@ import {
 	Loader2,
 	AlertTriangle,
 } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
+
 
 interface ConflictHunk {
 	startLine: number;
@@ -44,6 +46,8 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 	const { activeRepo } = useAppStore();
 	const [resolutions, setResolutions] = useState<Map<number, 'ours' | 'theirs' | 'both' | 'manual'>>(new Map());
 	const [isSaving, setIsSaving] = useState(false);
+	const writeFileMutation = trpc.git.writeFile.useMutation();
+	const stageMutation = trpc.git.stage.useMutation();
 
 	// Parse conflict markers from file content
 	const parseConflicts = (content: string): ConflictHunk[] => {
@@ -119,7 +123,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 			if (i < skipUntil) continue;
 
 			const conflictIndex = conflicts.findIndex(c => c.startLine === i);
-			if (conflictIndex >= 0) {
+				if (conflictIndex >= 0) {
 				const conflict = conflicts[conflictIndex];
 				if (!conflict) {
 					continue;
@@ -142,10 +146,10 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 				}
 
 				skipUntil = conflict.endLine + 1;
-			} else {
-				result.push(lines[i]);
+				} else {
+					result.push(lines[i] ?? '');
+				}
 			}
-		}
 
 		return result.join('\n');
 	};
@@ -161,19 +165,19 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 		setIsSaving(true);
 		const resolvedContent = generateResolvedContent();
 
-		try {
-			// Write resolved file
-			await trpc.git.writeFile.mutateAsync({
-				repo: activeRepo ?? '',
-				path: filePath,
-				content: resolvedContent,
-			});
+			try {
+				// Write resolved file
+				await writeFileMutation.mutateAsync({
+					repo: activeRepo ?? '',
+					path: filePath,
+					content: resolvedContent,
+				});
 
-			// Stage the file
-			await trpc.git.stage.mutateAsync({
-				repo: activeRepo ?? '',
-				paths: [filePath],
-			});
+				// Stage the file
+				await stageMutation.mutateAsync({
+					repo: activeRepo ?? '',
+					files: [filePath],
+				});
 
 			toast.success('Conflict resolved and staged');
 			onResolved?.();
@@ -211,7 +215,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => handleResolveAll('ours')}
+							onClick={() => { handleResolveAll('ours'); }}
 						>
 							<ArrowLeft className="h-4 w-4 mr-1" />
 							Accept All Ours
@@ -219,7 +223,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => handleResolveAll('theirs')}
+							onClick={() => { handleResolveAll('theirs'); }}
 						>
 							Accept All Theirs
 							<ArrowRight className="h-4 w-4 ml-1" />
@@ -263,7 +267,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 												<Button
 													variant={resolution === 'ours' ? 'default' : 'outline'}
 													size="sm"
-													onClick={() => handleResolveHunk(index, 'ours')}
+													onClick={() => { handleResolveHunk(index, 'ours'); }}
 												>
 													<ArrowLeft className="h-3 w-3 mr-1" />
 													Ours
@@ -271,14 +275,14 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 												<Button
 													variant={resolution === 'both' ? 'default' : 'outline'}
 													size="sm"
-													onClick={() => handleResolveHunk(index, 'both')}
+													onClick={() => { handleResolveHunk(index, 'both'); }}
 												>
 													Both
 												</Button>
 												<Button
 													variant={resolution === 'theirs' ? 'default' : 'outline'}
 													size="sm"
-													onClick={() => handleResolveHunk(index, 'theirs')}
+													onClick={() => { handleResolveHunk(index, 'theirs'); }}
 												>
 													Theirs
 													<ArrowRight className="h-3 w-3 ml-1" />
@@ -330,7 +334,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 						</span>
 					</div>
 					<div className="flex items-center gap-2">
-						<Button variant="outline" onClick={() => onOpenChange(false)}>
+						<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button

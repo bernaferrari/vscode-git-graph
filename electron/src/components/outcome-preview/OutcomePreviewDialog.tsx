@@ -3,18 +3,6 @@
  * Shows what will happen before merge/rebase operations
  */
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	GitCommit,
 	Merge,
@@ -29,7 +17,21 @@ import {
 	Files,
 	Loader2,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
 import type { OutcomePreview } from '@/lib/outcomePreview';
 
 interface OutcomePreviewDialogProps {
@@ -200,7 +202,7 @@ export function OutcomePreviewDialog({
 										<input
 											type="checkbox"
 											checked={showGhostOverlay}
-											onChange={(e) => setShowGhostOverlay(e.target.checked)}
+											onChange={(e) => { setShowGhostOverlay(e.target.checked); }}
 											className="rounded"
 										/>
 										Show "After" overlay

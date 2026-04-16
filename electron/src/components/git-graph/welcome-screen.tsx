@@ -3,10 +3,6 @@
  * Displayed when no repository is open
  */
 
-import { useState, type KeyboardEvent } from 'react';
-import { useRepoActivation } from '@/hooks/useRepoActivation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     FolderGit2,
     Github,
@@ -19,6 +15,11 @@ import {
     Search,
     Loader2,
 } from 'lucide-react';
+import { useState, type KeyboardEvent } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRepoActivation } from '@/hooks/useRepoActivation';
 
 interface WelcomeScreenProps {
     onOpenRepo: () => void | Promise<void>;
@@ -140,7 +141,7 @@ export function WelcomeScreen({ onOpenRepo }: WelcomeScreenProps) {
                             role='button'
                             tabIndex={0}
                             onClick={item.action}
-                            onKeyDown={(event) => handleQuickStartKeyDown(event, item.action)}
+                            onKeyDown={(event) => { handleQuickStartKeyDown(event, item.action); }}
                             aria-busy={loadingAction === (item.primary ? 'open' : 'clone')}
                             aria-label={item.title}>
                             <CardHeader className='flex flex-row items-start gap-4 space-y-0 pb-2'>

@@ -3,16 +3,6 @@
  * Allows users to switch between Guided/Craft/Control modes
  */
 
-import { useLensMode, type LensMode } from './useLensMode';
-import { Button } from '../ui/button';
-import type { ElementType } from 'react';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
 import {
 	Compass,
 	Wand2,
@@ -20,7 +10,19 @@ import {
 	ChevronDown,
 	Check,
 } from 'lucide-react';
+
+import { useLensMode, type LensMode } from './useLensMode';
+import { Button } from '../ui/button';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+
+import type { ElementType } from 'react';
 
 const LENS_ICONS: Record<LensMode, ElementType> = {
 	guided: Compass,
@@ -60,7 +62,7 @@ export function LensSwitcher({
 							key={lens.mode}
 							variant={isActive ? 'default' : 'ghost'}
 							size="sm"
-							onClick={() => setLensMode(lens.mode)}
+							onClick={() => { setLensMode(lens.mode); }}
 							className={cn(
 								'h-7 px-2 gap-1.5',
 								isActive && LENS_COLORS[lens.mode],
@@ -87,7 +89,7 @@ export function LensSwitcher({
 							key={lens.mode}
 							variant={isActive ? 'secondary' : 'ghost'}
 							size="sm"
-							onClick={() => setLensMode(lens.mode)}
+							onClick={() => { setLensMode(lens.mode); }}
 							className={cn(
 								'h-7 px-2 gap-1',
 								isActive && LENS_COLORS[lens.mode],
@@ -137,7 +139,7 @@ export function LensSwitcher({
 					return (
 						<DropdownMenuItem
 							key={lens.mode}
-							onClick={() => setLensMode(lens.mode)}
+							onClick={() => { setLensMode(lens.mode); }}
 							className={cn(
 								'flex items-center gap-2 cursor-pointer',
 								isActive && 'bg-accent'

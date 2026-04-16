@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+
 import {
 	Dialog,
 	DialogContent,
@@ -174,7 +175,7 @@ export function useKeyboardShortcuts() {
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
+		return () => { window.removeEventListener('keydown', handleKeyDown); };
 	}, []);
 
 	return { open, setOpen };

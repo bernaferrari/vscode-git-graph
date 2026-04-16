@@ -4,18 +4,20 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { trpc } from '@/trpc/client';
-import { toast } from 'sonner';
+
 
 interface RebaseCommit {
 	hash: string;
@@ -144,7 +146,7 @@ export function InteractiveRebaseDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<div className="fixed inset-0 bg-black/55" onClick={() => { onOpenChange(false); }} />
 			<Card className="relative z-50 w-full ui-surface max-w-2xl mx-4 max-h-[80vh]">
 				<CardHeader>
 					<CardTitle className="flex items-center justify-between">
@@ -163,8 +165,8 @@ export function InteractiveRebaseDialog({
 								<div
 									key={commit.hash}
 									draggable
-									onDragStart={() => handleDragStart(index)}
-									onDragOver={(e) => handleDragOver(e, index)}
+									onDragStart={() => { handleDragStart(index); }}
+									onDragOver={(e) => { handleDragOver(e, index); }}
 									onDragEnd={handleDragEnd}
 									className={`flex items-center gap-2 p-2 rounded border cursor-move ${
 										draggedIndex === index ? 'opacity-50 bg-muted' : 'bg-card hover:bg-accent'
@@ -187,7 +189,7 @@ export function InteractiveRebaseDialog({
 											{(Object.keys(ACTION_LABELS) as RebaseCommit['action'][]).map((action) => (
 												<DropdownMenuItem
 													key={action}
-													onClick={() => handleActionChange(index, action)}
+													onClick={() => { handleActionChange(index, action); }}
 												>
 													<Badge className={`mr-2 ${ACTION_LABELS[action].color}`}>
 														{ACTION_LABELS[action].label}
@@ -215,7 +217,7 @@ export function InteractiveRebaseDialog({
 					</ScrollArea>
 
 					<div className="flex justify-end gap-2 mt-4">
-						<Button variant="outline" onClick={() => onOpenChange(false)}>
+						<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button

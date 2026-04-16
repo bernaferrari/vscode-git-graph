@@ -61,8 +61,13 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 	const { data: recentCommits } = trpc.git.commits.useQuery(
 		{
 			repo: activeRepo ?? '',
-			branch: '',
+			branches: null,
 			maxCommits: 20,
+			order: 'date',
+			onlyFollowFirstParent: false,
+			showTags: false,
+			showRemoteBranches: false,
+			hideRemotes: [],
 		},
 		{ enabled: !!activeRepo && open }
 	);

@@ -3,11 +3,11 @@
  */
 
 import { useState } from 'react';
-import { trpc } from '@/trpc/client';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -15,6 +15,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import { trpc } from '@/trpc/client';
 
 interface ArchiveDialogProps {
 	open: boolean;
@@ -61,7 +62,7 @@ export function ArchiveDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<div className="fixed inset-0 bg-black/55" onClick={() => { onOpenChange(false); }} />
 			<Card className="relative z-50 w-full ui-surface max-w-md mx-4">
 				<CardHeader>
 					<CardTitle>Create Archive</CardTitle>
@@ -74,7 +75,7 @@ export function ArchiveDialog({
 
 					<div className="space-y-2">
 						<Label>Format</Label>
-						<Select value={format} onValueChange={(v) => v && setFormat(v as 'zip' | 'tar' | 'tar.gz')}>
+						<Select value={format} onValueChange={(v) => v && setFormat(v)}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -91,7 +92,7 @@ export function ArchiveDialog({
 						<div className="flex gap-2">
 							<Input
 								value={outputPath}
-								onChange={(e) => setOutputPath(e.target.value)}
+								onChange={(e) => { setOutputPath(e.target.value); }}
 								placeholder="Leave empty for default..."
 								className="flex-1"
 							/>
@@ -105,13 +106,13 @@ export function ArchiveDialog({
 						<Label>Prefix (optional)</Label>
 						<Input
 							value={prefix}
-							onChange={(e) => setPrefix(e.target.value)}
+							onChange={(e) => { setPrefix(e.target.value); }}
 							placeholder="Directory prefix for files..."
 						/>
 					</div>
 				</CardContent>
 				<CardFooter className="justify-end gap-2">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleCreate} disabled={archiveMutation.isPending}>

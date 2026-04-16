@@ -3,15 +3,16 @@
  * Display all available keyboard shortcuts
  */
 
+import { Keyboard, Command, ArrowUp, ArrowDown } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
-import { Keyboard, Command, ArrowUp, ArrowDown } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface KeyboardShortcutsHelpProps {
 	open: boolean;
@@ -133,7 +134,7 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
 				</ScrollArea>
 
 				<div className="flex justify-end pt-4 border-t">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>

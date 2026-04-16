@@ -3,17 +3,6 @@
  * Stage specific hunks or individual lines from a file
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Plus,
 	Minus,
@@ -21,6 +10,18 @@ import {
 	ChevronDown,
 	ChevronRight,
 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface LineStagingProps {
 	open: boolean;
@@ -264,7 +265,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 										className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-accent/50 ${
 											hunk.selected ? 'bg-green-500/10' : ''
 										}`}
-										onClick={() => toggleHunk(hunkIndex)}
+										onClick={() => { toggleHunk(hunkIndex); }}
 									>
 										<Button
 											variant="ghost"
@@ -322,7 +323,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 				</ScrollArea>
 
 				<div className="flex items-center justify-end gap-2 pt-4 border-t">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button

@@ -1,9 +1,11 @@
 import { ArrowRight, CircleDotDashed, GitPullRequest, Layers3, ListTree, Sparkles } from 'lucide-react';
-import type { ElementType } from 'react';
+
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import type { ElementType } from 'react';
 
 export interface HomeStartRepoEntry {
     path: string;

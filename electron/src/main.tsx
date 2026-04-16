@@ -7,6 +7,7 @@ import DevTools from '@/web/components/utils/devtools';
 import Providers from '@/web/lib/providers';
 import { trpcClient } from '@/web/lib/trpcClient';
 import { router } from '@/web/router';
+
 import '@/web/styles/index.css';
 import { useAppStore } from '@/lib/store';
 

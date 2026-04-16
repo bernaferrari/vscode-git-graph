@@ -9,7 +9,7 @@ import {
 	RefreshCw,
 	Save,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -112,16 +112,16 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 	const [hasChanges, setHasChanges] = useState(false);
 
 	// Load .gitignore content
-	const { refetch } = trpc.git.readFile.useQuery(
+	const { data: readFileData, refetch } = trpc.git.readFile.useQuery(
 		{ repo: activeRepo ?? '', path: '.gitignore' },
-		{ 
-			enabled: !!activeRepo && open,
-			onSuccess: (data: { content?: string } | undefined) => {
-				setContent(data?.content ?? '');
-				setHasChanges(false);
-			}
-		}
+		{ enabled: !!activeRepo && open }
 	);
+
+	useEffect(() => {
+		if (!open) return;
+		setContent(readFileData?.content ?? '');
+		setHasChanges(false);
+	}, [open, readFileData?.content]);
 
 	// Save mutation
 	const saveMutation = trpc.git.writeFile.useMutation({

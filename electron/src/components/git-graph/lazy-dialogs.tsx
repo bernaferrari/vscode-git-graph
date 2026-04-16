@@ -3,8 +3,8 @@
  * Code splitting for better performance
  */
 
-import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 
 // Loading fallback component
 function DialogLoader() {

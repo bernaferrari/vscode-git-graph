@@ -3,10 +3,11 @@
  * Manages conflict resolution memory
  */
 
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface MutationErrorShape {
 	message: string;

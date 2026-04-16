@@ -2,8 +2,8 @@
  * Undo Stack Tests
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAppStore } from '@/lib/store';
 
@@ -63,19 +63,19 @@ function Harness() {
         <div>
             <button
                 onClick={() =>
-                    stack.pushOperation({
+                    { stack.pushOperation({
                         type: 'commit',
                         description: 'Test commit',
                         details: {},
                         undoable: true,
-                    })
+                    }); }
                 }>
                 Add Operation
             </button>
             <span data-testid='operation-count'>{stack.operations.length}</span>
             <span data-testid='can-undo'>{String(stack.canUndo)}</span>
             <span data-testid='can-redo'>{String(stack.canRedo)}</span>
-            <button onClick={() => stack.clearHistory()}>Clear</button>
+            <button onClick={() => { stack.clearHistory(); }}>Clear</button>
         </div>
     );
 }

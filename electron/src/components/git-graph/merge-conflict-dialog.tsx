@@ -3,12 +3,13 @@
  */
 
 import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { trpc } from '@/trpc/client';
 
 interface ConflictFile {
 	path: string;
@@ -80,7 +81,7 @@ export function MergeConflictDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<div className="fixed inset-0 bg-black/55" onClick={() => { onOpenChange(false); }} />
 			<Card className="relative z-50 w-full ui-surface max-w-4xl mx-4 max-h-[80vh]">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
@@ -96,7 +97,7 @@ export function MergeConflictDialog({
 								{conflicts.map((conflict) => (
 									<button
 										key={conflict.path}
-										onClick={() => setSelectedFile(conflict.path)}
+										onClick={() => { setSelectedFile(conflict.path); }}
 										className={`w-full text-left p-2 rounded text-sm hover:bg-accent ${
 											selectedFile === conflict.path ? 'bg-accent' : ''
 										}`}
@@ -139,19 +140,19 @@ Incoming changes from merge
 									<div className="flex gap-2">
 										<Button
 											variant="outline"
-											onClick={() => handleResolve(selectedFile, 'ours')}
+											onClick={() => { handleResolve(selectedFile, 'ours'); }}
 										>
 											Keep Current
 										</Button>
 										<Button
 											variant="outline"
-											onClick={() => handleResolve(selectedFile, 'theirs')}
+											onClick={() => { handleResolve(selectedFile, 'theirs'); }}
 										>
 											Keep Incoming
 										</Button>
 										<Button
 											variant="outline"
-											onClick={() => handleResolve(selectedFile, 'both')}
+											onClick={() => { handleResolve(selectedFile, 'both'); }}
 										>
 											Keep Both
 										</Button>
@@ -170,7 +171,7 @@ Incoming changes from merge
 						Abort Merge
 					</Button>
 					<div className="flex gap-2">
-						<Button variant="outline" onClick={() => onOpenChange(false)}>
+						<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 							Cancel
 						</Button>
 						<Button

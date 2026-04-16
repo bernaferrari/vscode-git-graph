@@ -3,16 +3,6 @@
  * Quick preview for merge/rebase operations in the toolbar
  */
 
-import { Button } from '@/components/ui/button';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
 	GitBranch,
 	Merge,
@@ -24,8 +14,19 @@ import {
 	Clock,
 	Sparkles,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+
 import { useLensMode } from '@/components/lens';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface WhatIfPreviewButtonProps {
 	branch?: string;

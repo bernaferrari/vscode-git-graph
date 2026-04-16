@@ -8,7 +8,6 @@ import {
 	Plus,
 	Trash2,
 	RefreshCw,
-	ExternalLink,
 	Loader2,
 	GitBranch,
 	AlertCircle,
@@ -32,12 +31,10 @@ import { trpc } from '@/trpc/client';
 
 
 interface Submodule {
-	name: string;
 	path: string;
-	url: string;
-	branch?: string;
-	head?: string;
-	status?: string;
+	currentCommit?: string | undefined;
+	branch?: string | undefined;
+	status: string;
 }
 
 interface SubmoduleManagementProps {
@@ -95,18 +92,20 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 		},
 	});
 
-	// Sync submodule mutation
-	const syncMutation = trpc.git.submodule.sync.useMutation({
-		onSuccess: () => {
-			toast.success('Submodule synced');
-			refetch();
-		},
-		onError: (error: unknown) => {
-			toast.error('Failed to sync submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
-		},
-	});
-
-	const submodules: Submodule[] = submoduleData?.submodules ?? [];
+	const submodules: Submodule[] = (submoduleData?.submodules ?? [])
+		.flatMap((entry) => {
+			if (!entry?.path) {
+				return [];
+			}
+			return [
+				{
+					path: entry.path,
+					currentCommit: entry.currentCommit ?? undefined,
+					branch: entry.branch ?? undefined,
+					status: entry.status ?? 'unknown',
+				},
+			];
+		});
 
 	const handleAddSubmodule = () => {
 		if (!newSubmodule.url || !newSubmodule.path) {
@@ -133,7 +132,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 	};
 
 	const handleSyncSubmodule = (path: string) => {
-		syncMutation.mutate({ repo: activeRepo ?? '', path });
+		updateMutation.mutate({ repo: activeRepo ?? '', path, init: true, recursive: true });
 	};
 
 	const handleUpdateAll = () => {
@@ -252,14 +251,11 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 												</Badge>
 											)}
 										</div>
-										<div className="text-xs text-muted-foreground truncate mb-1">
-											{sm.url}
-										</div>
-										{sm.head && (
-											<div className="text-xs font-mono text-muted-foreground">
-												@ {sm.head.slice(0, 7)}
-											</div>
-										)}
+											{sm.currentCommit && (
+												<div className="text-xs font-mono text-muted-foreground">
+													@ {sm.currentCommit.slice(0, 7)}
+												</div>
+											)}
 										{sm.status && (
 											<div className="text-xs text-amber-600 mt-1">
 												{sm.status}
@@ -267,18 +263,11 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 										)}
 									</div>
 									<div className="flex items-center gap-1 shrink-0">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => window.open(sm.url, '_blank')}
-										>
-											<ExternalLink className="h-4 w-4" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
+											<Button
+												variant="ghost"
+												size="sm"
 											onClick={() => { handleSyncSubmodule(sm.path); }}
-											disabled={syncMutation.isPending}
+											disabled={updateMutation.isPending}
 										>
 											<RefreshCw className="h-4 w-4" />
 										</Button>

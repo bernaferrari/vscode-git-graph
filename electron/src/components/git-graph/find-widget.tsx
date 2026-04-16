@@ -3,9 +3,6 @@
  * Clean, minimal search for commits
  */
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
 	Search,
 	X,
@@ -14,6 +11,10 @@ import {
 	CaseSensitive,
 	Regex,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface FindWidgetProps {
 	open: boolean;

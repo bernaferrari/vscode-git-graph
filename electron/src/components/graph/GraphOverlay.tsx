@@ -3,8 +3,6 @@
  * Shows before/after commit graph with ghost commits
  */
 
-import { useMemo } from 'react';
-import { Button } from '@/components/ui/button';
 import {
 	ArrowRight,
 	Plus,
@@ -13,6 +11,9 @@ import {
 	Eye,
 	EyeOff,
 } from 'lucide-react';
+import { useMemo } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export interface GraphCommitNode {
@@ -160,7 +161,7 @@ export function GraphOverlay({
 									>
 										<div className={cn(
 											'w-2 h-2 rounded-full shrink-0',
-											actionColors[action as keyof typeof actionColors]
+											actionColors[action]
 										)} />
 										<span className="font-mono text-[10px] text-muted-foreground">
 											{commit.hash.substring(0, 7)}
@@ -204,7 +205,7 @@ export function GraphOverlay({
 									>
 										<div className={cn(
 											'w-2 h-2 rounded-full shrink-0',
-											actionColors[action as keyof typeof actionColors]
+											actionColors[action]
 										)} />
 										<span className="font-mono text-[10px] text-muted-foreground">
 											{commit.hash.substring(0, 7)}

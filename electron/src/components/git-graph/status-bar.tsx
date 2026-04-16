@@ -3,11 +3,12 @@
  * Show repository status, branch info, and quick actions at bottom
  */
 
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
 import { GitBranch, RefreshCw, AlertCircle, Check, Upload, Download, Loader2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { trpc } from '@/trpc/client';
 
 interface StatusBarProps {
     className?: string;

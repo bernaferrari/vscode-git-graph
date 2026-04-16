@@ -3,10 +3,11 @@
  * Commands filtered/adjusted based on current lens mode
  */
 
-import { useMemo, useState } from 'react';
-import { CommandDialog } from '@/components/ui/command';
-import { useLensMode, type LensMode } from '@/components/lens';
 import { GitBranch, GitCommit, Settings, Terminal, Compass, Wand2, Eye, Zap, Info } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { useLensMode, type LensMode } from '@/components/lens';
+import { CommandDialog } from '@/components/ui/command';
 
 export interface CommandItem {
 	id: string;
@@ -39,7 +40,7 @@ export function LensCommandPalette({
 			label: 'Switch to Guided Mode',
 			shortcut: '⌘1',
 			icon: Compass,
-			action: () => setLensMode('guided'),
+			action: () => { setLensMode('guided'); },
 			lensModes: ['craft', 'control'] as LensMode[],
 			category: 'settings' as const,
 		},
@@ -48,7 +49,7 @@ export function LensCommandPalette({
 			label: 'Switch to Craft Mode',
 			shortcut: '⌘2',
 			icon: Wand2,
-			action: () => setLensMode('craft'),
+			action: () => { setLensMode('craft'); },
 			lensModes: ['guided', 'control'] as LensMode[],
 			category: 'settings' as const,
 		},
@@ -57,7 +58,7 @@ export function LensCommandPalette({
 			label: 'Switch to Control Mode',
 			shortcut: '⌘3',
 			icon: Terminal,
-			action: () => setLensMode('control'),
+			action: () => { setLensMode('control'); },
 			lensModes: ['guided', 'craft'] as LensMode[],
 			category: 'settings' as const,
 		},
@@ -109,7 +110,7 @@ export function LensCommandPalette({
 				type='text'
 				placeholder='Type a command or search...'
 				value={search}
-				onChange={(e) => setSearch(e.target.value)}
+				onChange={(e) => { setSearch(e.target.value); }}
 				className='text-muted-foreground w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground'
 				autoFocus
 			/>

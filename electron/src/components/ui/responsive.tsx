@@ -61,7 +61,7 @@ export function ResponsiveProvider({ children }: ResponsiveProviderProps) {
 
 		updateBreakpoint();
 		window.addEventListener('resize', updateBreakpoint);
-		return () => window.removeEventListener('resize', updateBreakpoint);
+		return () => { window.removeEventListener('resize', updateBreakpoint); };
 	}, []);
 
 	const value: ResponsiveContextValue = {

@@ -20,8 +20,8 @@ const safeStorage = (
 	(electron as {
 		safeStorage?: SafeStorageLike;
 	}).safeStorage ??
-	((globalThis as { electron?: { safeStorage?: SafeStorageLike } }).electron?.safeStorage as SafeStorageLike | undefined)
-) as SafeStorageLike | undefined;
+	((globalThis as { electron?: { safeStorage?: SafeStorageLike } }).electron?.safeStorage)
+);
 
 function isEncryptionAvailable(): boolean {
 	return typeof safeStorage?.isEncryptionAvailable === 'function' ? safeStorage.isEncryptionAvailable() : false;

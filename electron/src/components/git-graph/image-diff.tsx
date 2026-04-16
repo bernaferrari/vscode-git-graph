@@ -3,10 +3,6 @@
  * Visual comparison for image files
  */
 
-import { useState } from 'react';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
 	ZoomIn,
 	ZoomOut,
@@ -16,6 +12,11 @@ import {
 	Square,
 	Eye,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppStore } from '@/lib/store';
 
 interface ImageDiffProps {
 	file: {
@@ -51,9 +52,9 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 	const isNewFile = file.status === 'A';
 	const isDeleted = file.status === 'D';
 
-	const handleZoomIn = () => setZoom(Math.min(zoom + 25, 400));
-	const handleZoomOut = () => setZoom(Math.max(zoom - 25, 25));
-	const handleFit = () => setZoom(100);
+	const handleZoomIn = () => { setZoom(Math.min(zoom + 25, 400)); };
+	const handleZoomOut = () => { setZoom(Math.max(zoom - 25, 25)); };
+	const handleFit = () => { setZoom(100); };
 
 	return (
 		<div className="flex flex-col h-full">
@@ -67,7 +68,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 					</span>
 				</div>
 				<div className="flex items-center gap-2">
-					<Tabs value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
+					<Tabs value={viewMode} onValueChange={(v) => { setViewMode(v as typeof viewMode); }}>
 						<TabsList className="h-7">
 							<TabsTrigger value="side-by-side" className="text-xs h-5 px-2">
 								<Columns className="h-3 w-3 mr-1" />
@@ -163,7 +164,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 								min="0"
 								max="100"
 								value={overlayOpacity}
-								onChange={(e) => setOverlayOpacity(parseInt(e.target.value))}
+								onChange={(e) => { setOverlayOpacity(parseInt(e.target.value)); }}
 								className="w-32"
 							/>
 							<span className="text-xs">{overlayOpacity}%</span>

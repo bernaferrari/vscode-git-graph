@@ -4,13 +4,14 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 
 interface MergeEditorProps {
 	repo: string;
@@ -68,7 +69,7 @@ export function MergeEditor({
 						<Button variant="outline" size="sm" onClick={onCancel}>
 							Cancel
 						</Button>
-						<Button size="sm" onClick={() => onResolve(resolvedContent)}>
+						<Button size="sm" onClick={() => { onResolve(resolvedContent); }}>
 							Accept Resolution
 						</Button>
 					</div>
@@ -84,10 +85,10 @@ export function MergeEditor({
 					<Button variant="outline" size="sm" onClick={handleAcceptTheirs}>
 						Take Theirs
 					</Button>
-					<Button variant="outline" size="sm" onClick={() => handleAcceptBoth('ours-first')}>
+					<Button variant="outline" size="sm" onClick={() => { handleAcceptBoth('ours-first'); }}>
 						Ours Then Theirs
 					</Button>
-					<Button variant="outline" size="sm" onClick={() => handleAcceptBoth('theirs-first')}>
+					<Button variant="outline" size="sm" onClick={() => { handleAcceptBoth('theirs-first'); }}>
 						Theirs Then Ours
 					</Button>
 				</div>
@@ -182,7 +183,7 @@ export function MergeEditor({
 					</div>
 					<Textarea
 						value={resolvedContent}
-						onChange={(e) => handleManualEdit(e.target.value)}
+						onChange={(e) => { handleManualEdit(e.target.value); }}
 						className="flex-1 font-mono text-xs min-h-[100px]"
 						placeholder="Resolved content will appear here..."
 					/>
@@ -289,8 +290,8 @@ function parseConflictMarkers(content: string): {
 	theirs: string;
 } {
 	const lines = content.split('\n');
-	let ours: string[] = [];
-	let theirs: string[] = [];
+	const ours: string[] = [];
+	const theirs: string[] = [];
 	let base: string[] = [];
 	let current: 'ours' | 'theirs' | 'base' | null = null;
 	let hasBase = false;

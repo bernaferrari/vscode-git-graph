@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
 import { trpc } from '@/trpc/client';
 
 export interface AppSettings {

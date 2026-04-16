@@ -13,8 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAppStore } from '@/lib/store';
 import { useAppNotifications } from '@/hooks/useAppNotifications';
+import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 import { trpc } from '@/trpc/client';
 
 type WorkflowStepType = 'checkout' | 'fetch' | 'createBranch' | 'merge' | 'rebase' | 'push' | 'openPR' | 'runHook' | 'notify';
@@ -51,12 +52,6 @@ interface WorkflowRun {
 	status: string;
 	startedAt: string | number;
 	steps: WorkflowRunStep[];
-}
-
-interface WorkflowMutationResult {
-	error?: string | null;
-	success?: boolean;
-	workflow?: { id: string };
 }
 
 const WORKFLOW_STEP_TYPES: WorkflowStepType[] = [
@@ -220,7 +215,7 @@ export function WorkflowEngineDialog({
 
 	const listQuery = trpc.git.workflow.list.useQuery(undefined, { enabled: open });
 	const createMutation = trpc.git.workflow.create.useMutation({
-		onSuccess: async (result: WorkflowMutationResult) => {
+		onSuccess: async (result) => {
 			if (result.error) {
 				notifyError('Workflow create failed', { description: result.error });
 				return;
@@ -233,7 +228,7 @@ export function WorkflowEngineDialog({
 		},
 	});
 	const deleteMutation = trpc.git.workflow.delete.useMutation({
-		onSuccess: async (result: WorkflowMutationResult) => {
+		onSuccess: async (result) => {
 			if (!result.success) {
 				notifyError('Workflow delete failed', { description: result.error ?? 'Failed to delete workflow' });
 				return;
@@ -243,7 +238,7 @@ export function WorkflowEngineDialog({
 		},
 	});
 	const updateMutation = trpc.git.workflow.update.useMutation({
-		onSuccess: async (result: WorkflowMutationResult) => {
+		onSuccess: async (result) => {
 			if (result.error) {
 				notifyError('Workflow update failed', { description: result.error });
 				return;
@@ -252,9 +247,8 @@ export function WorkflowEngineDialog({
 			await trpcUtils.git.workflow.list.invalidate();
 		},
 	});
-	const dryRunMutation = trpc.git.workflow.dryRun.useMutation();
 	const executeMutation = trpc.git.workflow.execute.useMutation({
-		onSuccess: async (result: WorkflowMutationResult) => {
+		onSuccess: async (result) => {
 			if (result.error) {
 				notifyError('Workflow run failed', { description: result.error });
 				return;
@@ -310,7 +304,7 @@ export function WorkflowEngineDialog({
 		setEditorSteps(
 			(selectedWorkflow.steps ?? []).map((step) => ({
 				id: step.id,
-				type: step.type as WorkflowStepType,
+				type: step.type,
 				params: Object.entries(step.params ?? {}).map(([key, value]) => toStepParamForm(key, value)),
 			}))
 		);
@@ -425,7 +419,7 @@ export function WorkflowEngineDialog({
 		if (!activeRepo || !selectedWorkflow) {
 			return;
 		}
-		const result = await dryRunMutation.mutateAsync({
+		const result = await trpcClient.git.workflow.dryRun.query({
 			repo: activeRepo,
 			workflowId: selectedWorkflow.id,
 			inputs: {},

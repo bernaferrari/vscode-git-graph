@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
+import { useAppShellPersistence } from '@/layouts/use-app-shell-persistence';
 import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
 import { useAppStore } from '@/lib/store';
-import { useAppShellPersistence } from '@/layouts/use-app-shell-persistence';
 import { trpc } from '@/trpc/client';
 
 

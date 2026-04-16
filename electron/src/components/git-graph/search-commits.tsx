@@ -3,18 +3,6 @@
  * Full-text search across commit messages, authors, files
  */
 
-import { useState, useEffect } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
 import {
 	Search,
 	GitCommit,
@@ -22,14 +10,27 @@ import {
 	Loader2,
 	X,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 // Simple debounce hook
 function useDebounce<T>(value: T, delay: number): T {
 	const [debouncedValue, setDebouncedValue] = useState(value);
 
 	useEffect(() => {
-		const timer = setTimeout(() => setDebouncedValue(value), delay);
-		return () => clearTimeout(timer);
+		const timer = setTimeout(() => { setDebouncedValue(value); }, delay);
+		return () => { clearTimeout(timer); };
 	}, [value, delay]);
 
 	return debouncedValue;
@@ -97,7 +98,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 						<Input
 							placeholder="Search commits..."
 							value={query}
-							onChange={(e) => setQuery(e.target.value)}
+							onChange={(e) => { setQuery(e.target.value); }}
 							className="pl-10 pr-10"
 							autoFocus
 						/>
@@ -125,7 +126,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 										? 'bg-background shadow-sm'
 										: 'hover:bg-background/50'
 								}`}
-								onClick={() => setSearchType(type)}
+								onClick={() => { setSearchType(type); }}
 							>
 								{type.charAt(0).toUpperCase() + type.slice(1)}
 							</button>
@@ -157,7 +158,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 								<button
 									key={commit.hash}
 									className="w-full text-left p-3 rounded-lg border hover:bg-accent/50 transition-colors"
-									onClick={() => handleSelect(commit.hash)}
+									onClick={() => { handleSelect(commit.hash); }}
 								>
 									<div className="flex items-start gap-3">
 										<div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted shrink-0">

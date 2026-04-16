@@ -29,11 +29,10 @@ import { trpc } from '@/trpc/client';
 
 interface ReflogEntry {
 	hash: string;
-	head: string;
-	operation: string;
-	ref: string;
-	message: string;
-	date: number;
+	ref?: string;
+	action?: string;
+	message?: string;
+	date?: string;
 }
 
 interface ReflogViewerProps {
@@ -52,7 +51,15 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 		{ enabled: !!activeRepo && open }
 	);
 
-	const entries: ReflogEntry[] = reflogData?.entries ?? [];
+	const entries: ReflogEntry[] = (reflogData?.entries ?? [])
+		.filter((entry) => typeof entry.hash === 'string' && entry.hash.length > 0)
+		.map((entry) => ({
+			hash: entry.hash as string,
+			...(entry.ref ? { ref: entry.ref } : {}),
+			...(entry.action ? { action: entry.action } : {}),
+			...(entry.message ? { message: entry.message } : {}),
+			...(entry.date ? { date: entry.date } : {}),
+		}));
 
 	const handleCopyHash = (hash: string) => {
 		navigator.clipboard.writeText(hash);
@@ -94,7 +101,10 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 	};
 
 	const formatDate = (timestamp: number) => {
-		const date = new Date(timestamp * 1000);
+		if (!Number.isFinite(timestamp)) {
+			return 'Unknown';
+		}
+		const date = new Date(timestamp);
 		const now = new Date();
 		const diffMs = now.getTime() - date.getTime();
 		const diffMins = Math.floor(diffMs / 60000);
@@ -154,7 +164,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 								>
 									<div className="flex items-start gap-3">
 										<div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted">
-											{getOperationIcon(entry.operation)}
+													{getOperationIcon(entry.action ?? '')}
 										</div>
 										<div className="flex-1 min-w-0">
 											<div className="flex items-center gap-2 mb-1">
@@ -162,7 +172,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 													{entry.hash.slice(0, 7)}
 												</code>
 												<span className="text-xs px-1.5 py-0.5 rounded bg-muted/50">
-													{entry.operation}
+														{entry.action ?? 'unknown'}
 												</span>
 												{entry.ref && (
 													<span className="text-xs text-muted-foreground">
@@ -170,11 +180,11 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 													</span>
 												)}
 												<span className="text-xs text-muted-foreground ml-auto">
-													{formatDate(entry.date)}
+														{formatDate(Date.parse(entry.date ?? ''))}
 												</span>
 											</div>
 											<p className="text-sm truncate" title={entry.message}>
-												{entry.message || entry.head}
+													{entry.message ?? ''}
 											</p>
 										</div>
 										<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -3,9 +3,6 @@
  * Support for working with multiple repositories simultaneously
  */
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
 	Plus,
 	X,
@@ -14,6 +11,9 @@ import {
 	StarOff,
 	MoreHorizontal,
 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -21,6 +21,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface RepoTab {
 	id: string;
@@ -58,7 +59,7 @@ export function RepoTabs({
 									? 'bg-background border-b-2 border-b-primary'
 									: 'hover:bg-accent/50'
 							}`}
-							onClick={() => onSelect(tab.id)}
+							onClick={() => { onSelect(tab.id); }}
 						>
 							{tab.isStarred ? (
 								<Star className="h-3 w-3 text-amber-500 fill-amber-500" />
@@ -98,7 +99,7 @@ export function RepoTabs({
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{tabs.map((tab) => (
-						<DropdownMenuItem key={tab.id} onClick={() => onStar(tab.id)}>
+						<DropdownMenuItem key={tab.id} onClick={() => { onStar(tab.id); }}>
 							{tab.isStarred ? (
 								<StarOff className="h-4 w-4 mr-2" />
 							) : (
@@ -162,7 +163,7 @@ export function useRepoTabs() {
 		tabs,
 		activeTab,
 		activeTabId,
-		setActiveTabId: (id: string) => setActiveTabId(id),
+		setActiveTabId: (id: string) => { setActiveTabId(id); },
 		addTab,
 		closeTab,
 		starTab,

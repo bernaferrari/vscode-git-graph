@@ -3,10 +3,11 @@
  */
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface BranchRenameDialogProps {
 	open: boolean;
@@ -36,7 +37,7 @@ export function BranchRenameDialog({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			<div className="fixed inset-0 bg-black/55" onClick={() => onOpenChange(false)} />
+			<div className="fixed inset-0 bg-black/55" onClick={() => { onOpenChange(false); }} />
 			<Card className="relative z-50 w-full ui-surface max-w-md mx-4">
 				<CardHeader>
 					<CardTitle>Rename Branch</CardTitle>
@@ -51,7 +52,7 @@ export function BranchRenameDialog({
 						<Input
 							id="new-name"
 							value={newName}
-							onChange={(e) => setNewName(e.target.value)}
+							onChange={(e) => { setNewName(e.target.value); }}
 							placeholder="Enter new branch name..."
 							autoFocus
 							onKeyDown={(e) => e.key === 'Enter' && handleRename()}
@@ -62,7 +63,7 @@ export function BranchRenameDialog({
 							type="checkbox"
 							id="force-rename"
 							checked={force}
-							onChange={(e) => setForce(e.target.checked)}
+							onChange={(e) => { setForce(e.target.checked); }}
 							className="h-4 w-4"
 						/>
 						<Label htmlFor="force-rename" className="cursor-pointer text-sm">
@@ -71,7 +72,7 @@ export function BranchRenameDialog({
 					</div>
 				</CardContent>
 				<CardFooter className="justify-end gap-2">
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
+					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={handleRename} disabled={!newName.trim()}>

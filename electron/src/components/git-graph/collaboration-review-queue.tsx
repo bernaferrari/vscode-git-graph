@@ -2,14 +2,15 @@ import { ExternalLink, GitPullRequest } from 'lucide-react';
 
 import { CollaborationAssignmentPanel } from '@/components/git-graph/collaboration-center-assignment';
 import { CollaborationCommentThread } from '@/components/git-graph/collaboration-comment-thread';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import type {
 	CollaborationAssignment,
 	CollaborationComment,
 	CollaborationMemberProfile,
 } from '@/components/git-graph/collaboration-types';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 function renderProviderAssignmentBadge(assignment: CollaborationAssignment) {
 	if (!assignment.providerSync) {
@@ -102,7 +103,7 @@ export function CollaborationReviewQueueSection({
 											{item.headRef} → {item.baseRef} · author {item.author}
 										</p>
 									</div>
-									<Button variant='outline' size='sm' className='h-10' onClick={() => onOpen(item.webUrl)}>
+									<Button variant='outline' size='sm' className='h-10' onClick={() => { onOpen(item.webUrl); }}>
 										<ExternalLink className='mr-1.5 h-4 w-4' />
 										Open PR
 									</Button>
@@ -115,9 +116,9 @@ export function CollaborationReviewQueueSection({
 									selectedAssigneeId={assignmentDrafts[targetKey]?.assigneeId ?? ''}
 									noteDraft={assignmentDrafts[targetKey]?.note ?? ''}
 									pending={pending}
-									onAssigneeChange={(value) => onAssignmentAssigneeChange(targetKey, value)}
-									onNoteChange={(value) => onAssignmentNoteChange(targetKey, value)}
-									onCreate={() => onAssignmentCreate(item.targetId)}
+									onAssigneeChange={(value) => { onAssignmentAssigneeChange(targetKey, value); }}
+									onNoteChange={(value) => { onAssignmentNoteChange(targetKey, value); }}
+									onCreate={() => { onAssignmentCreate(item.targetId); }}
 									onStatusChange={onAssignmentStatusChange}
 									onDelete={onAssignmentDelete}
 									renderAssignmentBadges={renderProviderAssignmentBadge}
@@ -128,8 +129,8 @@ export function CollaborationReviewQueueSection({
 									comments={item.comments}
 									draft={commentDrafts[targetKey] ?? ''}
 									submitPending={pending}
-									onDraftChange={(value) => onCommentDraftChange(targetKey, value)}
-									onSubmit={() => onCommentSubmit(item.targetId)}
+									onDraftChange={(value) => { onCommentDraftChange(targetKey, value); }}
+									onSubmit={() => { onCommentSubmit(item.targetId); }}
 									onDelete={onCommentDelete}
 								/>
 							</div>

@@ -4,16 +4,6 @@
  */
 
 import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuItem,
-	ContextMenuSeparator,
-	ContextMenuSub,
-	ContextMenuSubContent,
-	ContextMenuSubTrigger,
-	ContextMenuTrigger,
-} from '@/components/ui/context-menu';
-import {
 	GitBranch,
 	Tag,
 	Copy,
@@ -24,6 +14,17 @@ import {
 	Scissors,
 	History,
 } from 'lucide-react';
+
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuSeparator,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
+	ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { useGitOperations } from '@/hooks/useGitOperations';
 
 interface CommitContextMenuProps {
@@ -122,15 +123,15 @@ export function CommitContextMenu({
 						Reset to Here
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent>
-						<ContextMenuItem onClick={() => handleResetHere('soft')}>
+						<ContextMenuItem onClick={() => { handleResetHere('soft'); }}>
 							<span className="text-amber-600">Soft</span>
 							<span className="ml-2 text-xs text-muted-foreground">Keep changes staged</span>
 						</ContextMenuItem>
-						<ContextMenuItem onClick={() => handleResetHere('mixed')}>
+						<ContextMenuItem onClick={() => { handleResetHere('mixed'); }}>
 							<span className="text-blue-600">Mixed</span>
 							<span className="ml-2 text-xs text-muted-foreground">Keep changes unstaged</span>
 						</ContextMenuItem>
-						<ContextMenuItem onClick={() => handleResetHere('hard')} className="text-red-600">
+						<ContextMenuItem onClick={() => { handleResetHere('hard'); }} className="text-red-600">
 							Hard
 							<span className="ml-2 text-xs opacity-70">Discard all changes</span>
 						</ContextMenuItem>

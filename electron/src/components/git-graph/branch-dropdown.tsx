@@ -3,12 +3,13 @@
  * Clean popover-based branch selector
  */
 
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronDown, GitBranch, Globe, Search, X } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface BranchOption {
     name: string;
@@ -112,7 +113,7 @@ export function BranchDropdown({
                         <Input
                             ref={inputRef}
                             value={filter}
-                            onChange={(e) => setFilter(e.target.value)}
+                            onChange={(e) => { setFilter(e.target.value); }}
                             placeholder='Filter branches...'
                             className='border-border/70 bg-background/85 focus-visible:ring-primary/30 h-8 pl-8 text-sm focus-visible:ring-2'
                         />
@@ -121,7 +122,7 @@ export function BranchDropdown({
                                 variant='ghost'
                                 size='sm'
                                 className='absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 rounded-sm p-0'
-                                onClick={() => setFilter('')}>
+                                onClick={() => { setFilter(''); }}>
                                 <X className='h-3 w-3' />
                             </Button>
                         )}
@@ -137,7 +138,7 @@ export function BranchDropdown({
                                     name='All branches'
                                     icon={<GitBranch className='h-4 w-4' />}
                                     selected={isAllSelected}
-                                    onClick={() => handleSelect('__all__')}
+                                    onClick={() => { handleSelect('__all__'); }}
                                 />
                                 <div className='bg-border mx-2 my-1 h-px' />
                             </>
@@ -155,7 +156,7 @@ export function BranchDropdown({
                                         name={branch.name}
                                         icon={<GitBranch className='h-4 w-4' />}
                                         selected={isSelected(branch.value)}
-                                        onClick={() => handleSelect(branch.value)}
+                                        onClick={() => { handleSelect(branch.value); }}
                                         {...(branch.isCurrent ? { isCurrent: true } : {})}
                                     />
                                 ))}
@@ -175,7 +176,7 @@ export function BranchDropdown({
                                         name={branch.name}
                                         icon={<Globe className='h-4 w-4' />}
                                         selected={isSelected(branch.value)}
-                                        onClick={() => handleSelect(branch.value)}
+                                        onClick={() => { handleSelect(branch.value); }}
                                     />
                                 ))}
                             </>

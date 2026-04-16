@@ -3,11 +3,6 @@
  * Context-aware actions based on lens mode and current state
  */
 
-import { useMemo } from 'react';
-import { useLensMode, type LensMode } from '@/components/lens';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
 import {
 	GitBranch,
 	GitPullRequest,
@@ -25,6 +20,12 @@ import {
 	Compass,
 	Wand2,
 } from 'lucide-react';
+import { useMemo } from 'react';
+
+import { useLensMode, type LensMode } from '@/components/lens';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface QuickAction {
@@ -223,7 +224,7 @@ export function AdaptiveQuickActions(props: AdaptiveQuickActionsProps) {
 								variant="ghost"
 								size="sm"
 								className="h-8 px-2 gap-1.5"
-								onClick={() => onAction(action.id)}
+								onClick={() => { onAction(action.id); }}
 								disabled={
 									(action.id === 'commit' && !hasStagedChanges && !hasUnstagedChanges) ||
 									(action.id === 'ai' && !hasStagedChanges)

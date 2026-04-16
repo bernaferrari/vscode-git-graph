@@ -31,6 +31,7 @@ import {
 import {
 	Switch,
 } from '@/components/ui/switch';
+import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -260,7 +261,7 @@ export function ExternalDiffConfig({
 		if (!selectedToolInfo) return;
 
 		try {
-			await trpc.git.testDiffTool.mutate({
+			await trpcClient.git.testDiffTool.mutate({
 				command: selectedToolInfo.command,
 			});
 			toast.success(`${selectedToolInfo.name} is available`);
@@ -478,7 +479,7 @@ export function OpenInExternalDiffButton({
 		}
 
 		try {
-			await trpc.git.openExternalDiff.mutate({
+			await trpcClient.git.openExternalDiff.mutate({
 				repo: activeRepo ?? '',
 				filePath,
 				commitHash,

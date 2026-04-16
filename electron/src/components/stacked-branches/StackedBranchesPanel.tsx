@@ -64,6 +64,13 @@ interface GraphiteSyncResult {
 	branches: GraphiteSyncBranchResult[];
 }
 
+interface GraphiteExportResult {
+	success: boolean;
+	fallbackMode: string;
+	missingBranches?: string[];
+	error?: string | null;
+}
+
 interface GraphiteStackItem {
 	branch: string;
 	parent: string | null;
@@ -413,7 +420,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 					branch: entry.name,
 					parent: sortedStack.find((candidate) => candidate.id === entry.parentId)?.name ?? null,
 				})),
-			})) as GraphiteSyncResult;
+			})) as GraphiteExportResult;
 
 		if (!result.success) {
 			toast.error(result.error ?? 'Export failed');

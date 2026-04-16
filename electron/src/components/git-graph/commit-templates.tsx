@@ -3,13 +3,14 @@
  * Predefined commit message templates for consistency
  */
 
+import { Plus, Trash2, Edit, Copy, FileText, Search } from 'lucide-react';
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, Copy, FileText, Search } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface CommitTemplate {
     id: string;
@@ -88,11 +89,11 @@ export function CommitTemplatesDialog({
                         <Input
                             placeholder='Search templates...'
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => { setSearchQuery(e.target.value); }}
                             className='pl-8'
                         />
                     </div>
-                    <Button variant='outline' size='sm' onClick={() => setIsCreating(true)}>
+                    <Button variant='outline' size='sm' onClick={() => { setIsCreating(true); }}>
                         <Plus className='mr-1 h-4 w-4' />
                         New
                     </Button>
@@ -106,19 +107,19 @@ export function CommitTemplatesDialog({
                                 <Input
                                     placeholder='Template name'
                                     value={newTemplate.name}
-                                    onChange={(e) => setNewTemplate((prev) => ({ ...prev, name: e.target.value }))}
+                                    onChange={(e) => { setNewTemplate((prev) => ({ ...prev, name: e.target.value })); }}
                                 />
                                 <Input
                                     placeholder='Description (optional)'
                                     value={newTemplate.description ?? ''}
                                     onChange={(e) =>
-                                        setNewTemplate((prev) => ({ ...prev, description: e.target.value }))
+                                        { setNewTemplate((prev) => ({ ...prev, description: e.target.value })); }
                                     }
                                 />
                                 <Textarea
                                     placeholder='Template content (use {description} as placeholder)'
                                     value={newTemplate.content}
-                                    onChange={(e) => setNewTemplate((prev) => ({ ...prev, content: e.target.value }))}
+                                    onChange={(e) => { setNewTemplate((prev) => ({ ...prev, content: e.target.value })); }}
                                     className='min-h-[100px] font-mono text-sm'
                                 />
                                 <div className='flex justify-end gap-2'>
@@ -147,30 +148,30 @@ export function CommitTemplatesDialog({
                                     placeholder='Template name'
                                     value={editingTemplate.name}
                                     onChange={(e) =>
-                                        setEditingTemplate((prev) => (prev ? { ...prev, name: e.target.value } : null))
+                                        { setEditingTemplate((prev) => (prev ? { ...prev, name: e.target.value } : null)); }
                                     }
                                 />
                                 <Input
                                     placeholder='Description (optional)'
                                     value={editingTemplate.description ?? ''}
                                     onChange={(e) =>
-                                        setEditingTemplate((prev) =>
+                                        { setEditingTemplate((prev) =>
                                             prev ? { ...prev, description: e.target.value } : null
-                                        )
+                                        ); }
                                     }
                                 />
                                 <Textarea
                                     placeholder='Template content'
                                     value={editingTemplate.content}
                                     onChange={(e) =>
-                                        setEditingTemplate((prev) =>
+                                        { setEditingTemplate((prev) =>
                                             prev ? { ...prev, content: e.target.value } : null
-                                        )
+                                        ); }
                                     }
                                     className='min-h-[100px] font-mono text-sm'
                                 />
                                 <div className='flex justify-end gap-2'>
-                                    <Button variant='outline' size='sm' onClick={() => setEditingTemplate(null)}>
+                                    <Button variant='outline' size='sm' onClick={() => { setEditingTemplate(null); }}>
                                         Cancel
                                     </Button>
                                     <Button size='sm' onClick={handleUpdate}>
@@ -186,7 +187,7 @@ export function CommitTemplatesDialog({
                             <div
                                 key={template.id}
                                 className='hover:bg-accent/50 group flex cursor-pointer items-start gap-3 rounded-lg border p-3'
-                                onClick={() => handleSelect(template)}>
+                                onClick={() => { handleSelect(template); }}>
                                 <div className='min-w-0 flex-1'>
                                     <div className='mb-1 flex items-center gap-2'>
                                         <span className='font-medium'>{template.name}</span>
@@ -276,7 +277,7 @@ export function TemplateQuickInsert({ onSelect, templates }: TemplateQuickInsert
 
     return (
         <div className='relative'>
-            <Button variant='ghost' size='sm' className='h-7 px-2 text-xs' onClick={() => setIsOpen(!isOpen)}>
+            <Button variant='ghost' size='sm' className='h-7 px-2 text-xs' onClick={() => { setIsOpen(!isOpen); }}>
                 <FileText className='mr-1 h-3 w-3' />
                 Template
             </Button>
@@ -286,7 +287,7 @@ export function TemplateQuickInsert({ onSelect, templates }: TemplateQuickInsert
                     <Input
                         placeholder='Search...'
                         value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
+                        onChange={(e) => { setFilter(e.target.value); }}
                         className='mb-1 h-7 text-xs'
                         autoFocus
                     />

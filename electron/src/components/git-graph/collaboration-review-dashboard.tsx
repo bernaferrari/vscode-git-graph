@@ -2,13 +2,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { Activity, AlertTriangle, BarChart3, GitPullRequest, MessageSquare, UserRound } from 'lucide-react';
 import { useMemo } from 'react';
 
-import type { CollaborationReviewQueueItem } from '@/components/git-graph/collaboration-review-queue';
-import type { CollaborationReviewDashboard } from '@/components/git-graph/collaboration-types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+
+import type { CollaborationReviewQueueItem } from '@/components/git-graph/collaboration-review-queue';
+import type { CollaborationReviewDashboard } from '@/components/git-graph/collaboration-types';
 
 function DashboardCard({ label, value, hint }: { label: string; value: string; hint: string }) {
 	return (

@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { GitGraphToolbar } from './git-graph-toolbar';
+
+import type { ComponentProps } from 'react';
+
 
 function getToolbarProps(overrides: Partial<ComponentProps<typeof GitGraphToolbar>> = {}) {
     const props: ComponentProps<typeof GitGraphToolbar> = {

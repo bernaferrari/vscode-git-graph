@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { SigningConfig } from './signing-config';
 
 const mocks = vi.hoisted(() => ({
@@ -70,9 +71,9 @@ describe('SigningConfig (SSH)', () => {
         });
 
         expect(screen.getByText('Allowed Signers File (optional)')).toBeDefined();
-        const keyPathInput = screen.getByPlaceholderText('~/.ssh/id_ed25519.pub') as HTMLInputElement;
-        expect(keyPathInput.value).toBe('/Users/test/.ssh/id_ed25519.pub');
-    });
+		const keyPathInput = screen.getByPlaceholderText('~/.ssh/id_ed25519.pub') as HTMLInputElement;
+		expect(keyPathInput.value).toBe('/Users/test/.ssh/id_ed25519.pub');
+	});
 
     it('submits allowed signers file when saving SSH signing config', async () => {
         mocks.signingStatus = {

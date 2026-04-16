@@ -3,19 +3,6 @@
  * Visual 3-way diff for resolving conflicts
  */
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { trpc } from '@/trpc/client';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
 import {
 	ArrowRight,
 	ArrowLeft,
@@ -28,6 +15,20 @@ import {
 	Wand2,
 	Loader2,
 } from 'lucide-react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { trpc } from '@/trpc/client';
 
 interface ConflictFile {
 	path: string;
@@ -78,7 +79,7 @@ export function MergeConflictEditor({
 		(configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
 	);
 	const explainConflictMutation = trpc.ai.explainConflict.useMutation({
-		onSuccess: (result: { explanation?: string; suggestions?: string[]; error?: string }) => {
+		onSuccess: (result) => {
 			if (!result.explanation) {
 				toast.warning(result.error ?? 'No explanation available');
 				return;
@@ -344,14 +345,14 @@ export function MergeConflictEditor({
 	const acceptTheirs = () => applyResolution('theirs');
 	const acceptBoth = () => applyResolution('both');
 	const acceptBase = () => applyResolution('base');
-	const acceptActiveOursAndNext = () => applyActiveResolutionAndAdvance('ours');
-	const acceptActiveTheirsAndNext = () => applyActiveResolutionAndAdvance('theirs');
-	const acceptActiveBothAndNext = () => applyActiveResolutionAndAdvance('both');
-	const acceptActiveBaseAndNext = () => applyActiveResolutionAndAdvance('base');
-	const resetResolution = () => setResolved('');
-	const goToPreviousConflict = () => setActiveConflictIndex((current) => Math.max(0, current - 1));
-	const goToNextConflict = () => setActiveConflictIndex((current) => Math.min(unresolvedConflicts.length - 1, current + 1));
-	const goToFirstConflict = () => setActiveConflictIndex(0);
+	const acceptActiveOursAndNext = () => { applyActiveResolutionAndAdvance('ours'); };
+	const acceptActiveTheirsAndNext = () => { applyActiveResolutionAndAdvance('theirs'); };
+	const acceptActiveBothAndNext = () => { applyActiveResolutionAndAdvance('both'); };
+	const acceptActiveBaseAndNext = () => { applyActiveResolutionAndAdvance('base'); };
+	const resetResolution = () => { setResolved(''); };
+	const goToPreviousConflict = () => { setActiveConflictIndex((current) => Math.max(0, current - 1)); };
+	const goToNextConflict = () => { setActiveConflictIndex((current) => Math.min(unresolvedConflicts.length - 1, current + 1)); };
+	const goToFirstConflict = () => { setActiveConflictIndex(0); };
 	const handleExplainConflict = () => {
 		if (!aiProdEnabled) {
 			toast.info('AI production features are disabled by feature flag');
@@ -502,14 +503,14 @@ export function MergeConflictEditor({
 						<Button
 							variant={viewMode === 'split' ? 'secondary' : 'ghost'}
 							size="sm"
-							onClick={() => setViewMode('split')}
+							onClick={() => { setViewMode('split'); }}
 						>
 							Split
 						</Button>
 						<Button
 							variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
 							size="sm"
-							onClick={() => setViewMode('unified')}
+							onClick={() => { setViewMode('unified'); }}
 							disabled={isBinaryConflict}
 						>
 							Unified
@@ -581,7 +582,7 @@ export function MergeConflictEditor({
 									key={`${chunk.startLine}-${chunk.endLine}-${index}`}
 									variant={index === activeConflictIndex ? 'secondary' : 'outline'}
 									size="sm"
-									onClick={() => setActiveConflictIndex(index)}
+									onClick={() => { setActiveConflictIndex(index); }}
 								>
 									{index + 1}: {chunk.startLine + 1}-{chunk.endLine + 1}
 								</Button>
@@ -661,7 +662,7 @@ export function MergeConflictEditor({
 									<textarea
 										className="w-full h-64 p-2 text-xs font-mono bg-muted/30 rounded resize-none focus:outline-none focus:ring-1 focus:ring-primary"
 										value={resolved || conflict.ours}
-										onChange={(e) => setResolved(e.target.value)}
+										onChange={(e) => { setResolved(e.target.value); }}
 										placeholder="Edit the merged content here..."
 									/>
 								)}
@@ -670,7 +671,7 @@ export function MergeConflictEditor({
 					</ScrollArea>
 
 				<DialogFooter className="ui-toolbar">
-					<Button variant="outline" onClick={() => handleClose(false)}>
+					<Button variant="outline" onClick={() => { handleClose(false); }}>
 						Cancel
 					</Button>
 					<Button

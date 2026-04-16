@@ -4,8 +4,8 @@
  */
 
 import { router } from '@/app/backend/trpc/init';
-import { appLevelRouter } from '@/app/backend/trpc/routers/app';
 import { aiRouter } from '@/app/backend/trpc/routers/ai';
+import { appLevelRouter } from '@/app/backend/trpc/routers/app';
 import { configRouter } from '@/app/backend/trpc/routers/config';
 import { gitRouter } from '@/app/backend/trpc/routers/git';
 import { pullRequestRouter } from '@/app/backend/trpc/routers/pr';

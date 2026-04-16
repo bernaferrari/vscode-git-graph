@@ -5,6 +5,7 @@
  */
 
 import { useMemo, useCallback, useRef, useEffect } from 'react';
+
 import type { GraphLayout } from '@/lib/graph/layout';
 
 interface Commit {
@@ -445,7 +446,7 @@ export function LaneBasedGraphSVG({
 				return (
 					<g 
 						key={`node-${index}`}
-						onClick={() => onSelectCommit(index)}
+						onClick={() => { onSelectCommit(index); }}
 						className="cursor-pointer"
 					>
 						{isSelected && (

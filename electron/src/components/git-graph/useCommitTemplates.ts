@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { CommitTemplate } from './commit-templates';
+
 import { trpc } from '@/trpc/client';
+
+import type { CommitTemplate } from './commit-templates';
 
 const DEFAULT_TEMPLATES: CommitTemplate[] = [
     {

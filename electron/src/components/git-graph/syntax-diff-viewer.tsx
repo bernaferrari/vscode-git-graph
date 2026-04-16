@@ -3,14 +3,15 @@
  * Display diffs with syntax highlighting and word-level diff
  */
 
-import { useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Toggle } from '@/components/ui/toggle';
 import { Eye, EyeOff } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { Toggle } from '@/components/ui/toggle';
 import {
 	parseDiffWithInlineDiffs,
 	DiffCharRenderer,
 } from '@/lib/diff-utils';
+import { cn } from '@/lib/utils';
 
 interface SyntaxDiffViewerProps {
 	diff: string;
@@ -35,7 +36,7 @@ function highlightSyntax(content: string, filename?: string): string {
 
 	const langKeywords = (keywords[ext ?? 'ts'] ?? keywords.ts) as string[];
 	
-	let result = content
+	const result = content
 		// Escape HTML
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')

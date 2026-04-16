@@ -20,15 +20,15 @@ import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef, star
 import { toast } from 'sonner';
 
 import { BranchDropdown } from './branch-dropdown';
-import { CommitGraph } from './commit-graph';
-import { CommitGraphLegend } from './commit-graph-legend';
-import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { CommitContextMenuOverlay } from './commit-context-menu-overlay';
 import { CommitFiltersDialog } from './commit-filters-dialog';
+import { CommitGraph } from './commit-graph';
+import { CommitGraphLegend } from './commit-graph-legend';
 import { DragCommitHandler } from './drag-commit-to-branch';
 import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
 import { FeatureHubStrip } from './feature-hub-strip';
+import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
 import { GitGraphShellOverlays } from './git-graph-shell-overlays';
 import { GitGraphToolbar } from './git-graph-toolbar';
@@ -37,32 +37,31 @@ import { OperationStatusBar } from './operation-status-bar';
 import { OverflowMenu } from './overflow-menu';
 import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
 import { QuickActionsToolbar } from './quick-actions-toolbar';
+import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
 import { RepoBranchSwitcher } from './repo-branch-switcher';
 import { SidePanel } from './side-panel';
-import { useCommandPaletteActions } from './use-command-palette-actions';
-import { useFeatureHubData } from './use-feature-hub-data';
+import { UndoStackProvider } from './undo-stack-provider';
 import { useCollaborationPresence } from './use-collaboration-presence';
 import { useCollaborationRealtime } from './use-collaboration-realtime';
+import { useCommandPaletteActions } from './use-command-palette-actions';
+import { useFeatureHubData } from './use-feature-hub-data';
 import { useGitGraphCommitActions } from './use-git-graph-commit-actions';
 import { useGitGraphShellPanels } from './use-git-graph-shell-panels';
 import { useRepoCommitFilters } from './use-repo-commit-filters';
-
 import { useCommitTemplates } from './useCommitTemplates';
 import { useSettings } from './useSettings';
 import { VirtualizedCommitList } from './virtualized-commit-list';
-import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
-import { UndoStackProvider } from './undo-stack-provider';
 import { useActionPreview, type ActionPreview } from '@/components/action-preview';
 import { LensSwitcher, useLensMode } from '@/components/lens';
 import { useLensOnboarding } from '@/components/lens/LensOnboarding';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { DEFAULT_GRAPH_CONFIG } from '@/lib/graph/layout';
 import { useGraphLayoutWorker } from '@/lib/graph/useGraphLayoutWorker';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -99,12 +98,6 @@ interface QueryPerfSummary {
 interface SimpleMutationResult {
     success?: boolean;
     error?: string | null;
-}
-
-interface CommitsQueryResultShape {
-    commits?: ClientCommit[];
-    refsDeferred?: boolean;
-    head?: string | null;
 }
 
 type PerfHistoryKey = 'repoInfo' | 'commits' | 'refs';
@@ -711,7 +704,7 @@ export function GitGraph() {
         enabled: !!activeRepo,
         staleTime: 10000,
         refetchOnWindowFocus: false,
-        placeholderData: (previous: CommitsQueryResultShape | undefined) => previous,
+        placeholderData: (previous) => previous,
     });
     const { data: refsData, isFetching: refsFetching } = trpc.git.refs.useQuery(
         {
@@ -1411,7 +1404,7 @@ export function GitGraph() {
         gitOps,
         terminalOpen,
         featureFlags,
-        workingTreeStatus,
+        ...(workingTreeStatus ? { workingTreeStatus } : {}),
         openSettingsAt,
         handleRefreshAll,
         openers: {

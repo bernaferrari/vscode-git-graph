@@ -3,17 +3,6 @@
  * Drag and drop commits onto branches to cherry-pick
  */
 
-import { useState, useCallback } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog';
 import {
 	GitBranch,
 	GitCommit,
@@ -23,7 +12,20 @@ import {
 	Loader2,
 	Copy,
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+} from '@/components/ui/dialog';
+import { trpcClient } from '@/lib/trpcClient';
+import { useAppStore } from '@/lib/store';
+
 
 interface DragCommitProps {
 	commitHash: string;
@@ -95,7 +97,7 @@ export function BranchDropZone({
 				e.dataTransfer.dropEffect = 'copy';
 				setIsOver(true);
 			}}
-			onDragLeave={() => setIsOver(false)}
+			onDragLeave={() => { setIsOver(false); }}
 			onDrop={(e) => {
 				e.preventDefault();
 				setIsOver(false);
@@ -167,7 +169,7 @@ export function DragCherryPickDialog({
 				</div>
 
 				<DialogFooter className="ui-toolbar">
-					<Button variant="ghost" onClick={() => onOpenChange(false)}>
+					<Button variant="ghost" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
 					<Button onClick={onConfirm}>
@@ -202,13 +204,13 @@ export function DragCommitHandler({
 		setIsExecuting(true);
 		try {
 			// Checkout the target branch
-			await trpc.git.checkout.mutate({
+			await trpcClient.git.checkout.mutate({
 				repo: activeRepo,
-				branch: targetBranch,
+				ref: targetBranch,
 			});
 
 			// Cherry-pick the commit
-			await trpc.git.cherryPick.mutate({
+			await trpcClient.git.cherryPick.mutate({
 				repo: activeRepo,
 				commitHash,
 			});
@@ -267,7 +269,7 @@ export function DragCommitHandler({
 				</div>
 
 				<DialogFooter className="ui-toolbar">
-					<Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isExecuting}>
+					<Button variant="ghost" onClick={() => { onOpenChange(false); }} disabled={isExecuting}>
 						Cancel
 					</Button>
 					<Button onClick={handleConfirm} disabled={isExecuting}>

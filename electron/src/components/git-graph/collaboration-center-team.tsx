@@ -6,6 +6,14 @@ import {
 	CollaborationReviewQueueSection,
 	type CollaborationReviewQueueItem,
 } from '@/components/git-graph/collaboration-review-queue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { TabsContent } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+
 import type {
 	CollaborationAssignment,
 	CollaborationMemberProfile,
@@ -14,13 +22,6 @@ import type {
 	CollaborationTeamProfile,
 	CollaborationTeamInsights,
 } from '@/components/git-graph/collaboration-types';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { TabsContent } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 
 function PresenceCard({ entry }: { entry: CollaborationRemotePresence }) {
 	return (
@@ -115,18 +116,18 @@ function TeamProfileCard({
 			</CardHeader>
 			<CardContent className='space-y-3'>
 				<div className='grid gap-3 md:grid-cols-2'>
-					<Input value={draft.organizationId} placeholder='Organization ID' onChange={(event) => setDraft((current) => ({ ...current, organizationId: event.target.value }))} />
-					<Input value={draft.organizationName} placeholder='Organization name' onChange={(event) => setDraft((current) => ({ ...current, organizationName: event.target.value }))} />
+					<Input value={draft.organizationId} placeholder='Organization ID' onChange={(event) => { setDraft((current) => ({ ...current, organizationId: event.target.value })); }} />
+					<Input value={draft.organizationName} placeholder='Organization name' onChange={(event) => { setDraft((current) => ({ ...current, organizationName: event.target.value })); }} />
 				</div>
 				<div className='grid gap-3 md:grid-cols-2'>
-					<Input value={draft.teamId} placeholder='Team ID' onChange={(event) => setDraft((current) => ({ ...current, teamId: event.target.value }))} />
-					<Input value={draft.teamName} placeholder='Team name' onChange={(event) => setDraft((current) => ({ ...current, teamName: event.target.value }))} />
+					<Input value={draft.teamId} placeholder='Team ID' onChange={(event) => { setDraft((current) => ({ ...current, teamId: event.target.value })); }} />
+					<Input value={draft.teamName} placeholder='Team name' onChange={(event) => { setDraft((current) => ({ ...current, teamName: event.target.value })); }} />
 				</div>
 				<div className='flex flex-wrap items-center gap-3'>
 					<select
 						className='border-border bg-background h-10 rounded-md border px-3 text-sm'
 						value={draft.defaultPermissionLevel}
-						onChange={(event) => setDraft((current) => ({ ...current, defaultPermissionLevel: event.target.value as typeof current.defaultPermissionLevel }))}>
+						onChange={(event) => { setDraft((current) => ({ ...current, defaultPermissionLevel: event.target.value as typeof current.defaultPermissionLevel })); }}>
 						<option value='owner'>Owner default</option>
 						<option value='manager'>Manager default</option>
 						<option value='member'>Member default</option>
@@ -142,13 +143,13 @@ function TeamProfileCard({
 							!draft.teamName.trim()
 						}
 						onClick={() =>
-							onSave({
+							{ onSave({
 								organizationId: draft.organizationId.trim(),
 								organizationName: draft.organizationName.trim(),
 								teamId: draft.teamId.trim(),
 								teamName: draft.teamName.trim(),
 								defaultPermissionLevel: draft.defaultPermissionLevel,
-							})
+							}); }
 						}>
 						Save Team Profile
 					</Button>
@@ -191,7 +192,7 @@ function MemberCard({
 							className='border-border bg-background h-9 rounded-md border px-2 text-xs'
 							value={member.role}
 							disabled={disabled}
-							onChange={(event) => onRoleChange(member.id, event.target.value as CollaborationMemberProfile['role'])}>
+							onChange={(event) => { onRoleChange(member.id, event.target.value as CollaborationMemberProfile['role']); }}>
 							<option value='developer'>Developer</option>
 							<option value='reviewer'>Reviewer</option>
 							<option value='lead'>Lead</option>
@@ -201,7 +202,7 @@ function MemberCard({
 							className='border-border bg-background h-9 rounded-md border px-2 text-xs'
 							value={member.permissionLevel}
 							disabled={disabled}
-							onChange={(event) => onPermissionChange(member.id, event.target.value as CollaborationMemberProfile['permissionLevel'])}>
+							onChange={(event) => { onPermissionChange(member.id, event.target.value as CollaborationMemberProfile['permissionLevel']); }}>
 							<option value='owner'>Owner</option>
 							<option value='manager'>Manager</option>
 							<option value='member'>Member</option>
@@ -212,7 +213,7 @@ function MemberCard({
 							size='sm'
 							className='h-9 px-2 text-xs'
 							disabled={disabled}
-							onClick={() => onRemove(member.id)}>
+							onClick={() => { onRemove(member.id); }}>
 							<Trash2 className='mr-1 h-3.5 w-3.5' />
 							Remove
 						</Button>

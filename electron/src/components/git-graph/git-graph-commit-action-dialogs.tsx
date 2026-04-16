@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
-import type { ReactNode } from 'react';
 
 import { DialogLoadingFallback } from './git-graph-feature-dialogs';
+
+import type { ReactNode } from 'react';
+
 
 const InteractiveRebase = lazy(() =>
     import('./interactive-rebase').then((mod) => ({ default: mod.InteractiveRebase }))

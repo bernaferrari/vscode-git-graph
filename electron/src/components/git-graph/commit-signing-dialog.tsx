@@ -3,11 +3,12 @@
  * Wrapper around the production signing configuration surface.
  */
 
-import { useAppStore } from '@/lib/store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Key } from 'lucide-react';
+
 import { SigningConfig } from './signing-config';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useAppStore } from '@/lib/store';
 
 interface CommitSigningProps {
 	open: boolean;
@@ -34,7 +35,7 @@ export function CommitSigningDialog({ open, onOpenChange }: CommitSigningProps) 
 				)}
 
 				<div className='flex justify-end'>
-					<Button variant='outline' onClick={() => onOpenChange(false)}>
+					<Button variant='outline' onClick={() => { onOpenChange(false); }}>
 						Close
 					</Button>
 				</div>
