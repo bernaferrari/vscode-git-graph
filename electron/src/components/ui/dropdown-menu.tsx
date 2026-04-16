@@ -167,8 +167,9 @@ function DropdownMenuCheckboxItem({
   checked,
   inset,
   ...props
-}: MenuPrimitive.CheckboxItem.Props & {
+}: Omit<MenuPrimitive.CheckboxItem.Props, "checked"> & {
   inset?: boolean
+  checked?: MenuPrimitive.CheckboxItem.Props["checked"]
 }) {
   return (
     <MenuPrimitive.CheckboxItem
@@ -178,7 +179,7 @@ function DropdownMenuCheckboxItem({
         "focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/60 focus-visible:**:text-accent-foreground gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm data-inset:pl-7 [&_svg:not([class*='size-'])]:size-4 relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
-      checked={checked}
+      {...(checked !== undefined ? { checked } : {})}
       {...props}
     >
       <span

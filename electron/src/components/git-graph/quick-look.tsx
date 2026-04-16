@@ -22,18 +22,9 @@ import {
 	ZoomIn,
 	ZoomOut,
 	RotateCw,
-	Download,
 	X,
-	ChevronLeft,
-	ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface QuickLookPreviewProps {
-	filePath: string;
-	commitHash?: string;
-	onClose?: () => void;
-}
 
 interface QuickLookState {
 	isOpen: boolean;

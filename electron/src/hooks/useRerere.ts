@@ -8,6 +8,10 @@ import { useAppStore } from '@/lib/store';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
+interface MutationErrorShape {
+	message: string;
+}
+
 export function useRerere() {
 	const { activeRepo } = useAppStore();
 
@@ -29,7 +33,7 @@ export function useRerere() {
 			toast.success('Rerere enabled', { description: 'Conflict resolutions will be remembered' });
 			rerereStatus.refetch();
 		},
-		onError: (error) => {
+		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to enable rerere', { description: error.message });
 		},
 	});
@@ -40,7 +44,7 @@ export function useRerere() {
 			toast.success('Rerere disabled');
 			rerereStatus.refetch();
 		},
-		onError: (error) => {
+		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to disable rerere', { description: error.message });
 		},
 	});
@@ -51,7 +55,7 @@ export function useRerere() {
 			toast.success('Rerere cache cleared');
 			rerereList.refetch();
 		},
-		onError: (error) => {
+		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to clear rerere', { description: error.message });
 		},
 	});

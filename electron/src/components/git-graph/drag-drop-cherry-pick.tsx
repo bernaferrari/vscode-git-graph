@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog';
 import {
 	GitCommit,
-	GitBranch,
 	AlertCircle,
 	Check,
 	Loader2,
@@ -62,7 +61,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 			onOpenChange(false);
 			setTargetBranch('');
 		},
-		onError: (error) => {
+		onError: (error: Error) => {
 			toast.error('Cherry-pick failed', { description: error.message });
 		},
 		onSettled: () => {
@@ -124,7 +123,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 							onChange={(e) => setTargetBranch(e.target.value)}
 						>
 							<option value="">Select branch...</option>
-							{branches.map((b) => (
+							{branches.map((b: { name: string }) => (
 								<option key={b.name} value={b.name}>
 									{b.name} {b.name === currentBranch ? '(current)' : ''}
 								</option>

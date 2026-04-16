@@ -16,14 +16,11 @@ import {
 	Trash2,
 	Edit,
 	Eye,
-	Share,
 	Download,
 	Upload,
 	RefreshCw,
-	Plus,
 	MoreHorizontal,
 	Sparkles,
-	Keyboard,
 	Terminal,
 	Compass,
 	Wand2,
@@ -148,15 +145,15 @@ const ACTIONS: Record<string, Omit<QuickAction, 'action'>> = {
 	},
 };
 
-export function AdaptiveQuickActions({
-	hasSelection,
-	hasStagedChanges,
-	hasUnstagedChanges,
-	hasConflicts,
-	currentBranch,
-	onAction,
-	className,
-}: AdaptiveQuickActionsProps) {
+export function AdaptiveQuickActions(props: AdaptiveQuickActionsProps) {
+	const {
+		hasSelection,
+		hasStagedChanges,
+		hasUnstagedChanges,
+		hasConflicts,
+		onAction,
+		className,
+	} = props;
 	const { mode, config, isGuided, isCraft, isControl } = useLensMode();
 
 	// Filter and prioritize actions based on lens mode and state

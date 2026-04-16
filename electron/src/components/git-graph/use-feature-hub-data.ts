@@ -29,6 +29,14 @@ export function useFeatureHubData(activeRepo: string | null, featureFlags: Relea
         staleTime: 15_000,
         refetchOnWindowFocus: false,
     });
+    const collaborationSummaryQuery = trpc.repo.collaboration.list.useQuery(undefined, {
+        staleTime: 15_000,
+        refetchOnWindowFocus: false,
+    });
+    const collaborationConfigQuery = trpc.config.collaborationSyncConfig.useQuery(undefined, {
+        staleTime: 15_000,
+        refetchOnWindowFocus: false,
+    });
     const launchpadSummaryQuery = trpc.repo.launchpad.useQuery(
         { repos: activeRepo ? [activeRepo] : [], includePullRequests: true },
         { enabled: !!activeRepo, staleTime: 12_000, refetchOnWindowFocus: false }
@@ -37,14 +45,17 @@ export function useFeatureHubData(activeRepo: string | null, featureFlags: Relea
     const worktreeAttentionCount = useMemo(
         () =>
             (worktreeSummaryQuery.data?.worktrees ?? []).filter(
-                (entry) =>
+                (entry: { locked?: boolean; prunable?: boolean }) =>
                     Boolean((entry as { locked?: boolean }).locked) || Boolean((entry as { prunable?: boolean }).prunable)
             ).length,
         [worktreeSummaryQuery.data?.worktrees]
     );
 
     const workflowFailureCount = useMemo(
-        () => (workflowSummaryQuery.data?.runs ?? []).filter((run) => run.status === 'failed').length,
+        () =>
+            (workflowSummaryQuery.data?.runs ?? []).filter(
+                (run: { status?: string | null }) => run.status === 'failed'
+            ).length,
         [workflowSummaryQuery.data?.runs]
     );
 
@@ -65,6 +76,12 @@ export function useFeatureHubData(activeRepo: string | null, featureFlags: Relea
         workflowFailureCount,
         auditCount: auditSummaryQuery.data?.entries?.length ?? 0,
         protocolRegistered: Boolean(diagnosticsSummaryQuery.data?.protocolRegistered),
+        collaborationSummary: {
+            workspaceShares: collaborationSummaryQuery.data?.workspaceShares?.length ?? 0,
+            patchShelf: collaborationSummaryQuery.data?.patchShelf?.length ?? 0,
+            syncEnabled: Boolean(collaborationConfigQuery.data?.config?.enabled),
+            lastSyncStatus: collaborationConfigQuery.data?.config?.lastSyncStatus ?? 'idle',
+        },
         repoPolicy: {
             requireSignedCommits: Boolean(repoPolicySummaryQuery.data?.policy?.requireSignedCommits),
             requireUpToDate: Boolean(repoPolicySummaryQuery.data?.policy?.requireUpToDate),

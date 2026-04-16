@@ -117,7 +117,11 @@ export function SubmodulesPanel({ repo }: SubmodulesPanelProps) {
     };
 
     const handleUpdate = (submodulePath: string, init?: boolean) => {
-        updateMutation.mutate({ repo, path: submodulePath, init });
+        if (typeof init === 'boolean') {
+            updateMutation.mutate({ repo, path: submodulePath, init });
+            return;
+        }
+        updateMutation.mutate({ repo, path: submodulePath });
     };
 
     const handleRemove = (submodulePath: string) => {

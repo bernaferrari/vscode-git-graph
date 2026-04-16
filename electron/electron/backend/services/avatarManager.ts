@@ -72,11 +72,7 @@ export class AvatarManager extends Disposable {
 
 	private avatars: AvatarCache = {};
 	private queue: AvatarRequestItem[] = [];
-	private remoteSourceCache: { [repo: string]: RemoteSource } = {};
 	private interval: ReturnType<typeof setInterval> | null = null;
-
-	private githubTimeout: number = 0;
-	private gitLabTimeout: number = 0;
 
 	constructor(
 		logger: (message: string) => void = () => {}
@@ -227,7 +223,6 @@ export class AvatarManager extends Disposable {
 		if (this.interval !== null) {
 			clearInterval(this.interval);
 			this.interval = null;
-			this.remoteSourceCache = {};
 		}
 	}
 

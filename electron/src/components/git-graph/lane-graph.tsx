@@ -40,7 +40,7 @@ const LANE_COLORS = [
 ];
 
 function getLaneColor(laneIndex: number): string {
-	return LANE_COLORS[laneIndex % LANE_COLORS.length];
+	return LANE_COLORS[laneIndex % LANE_COLORS.length] ?? LANE_COLORS[0] ?? '#4A90D9';
 }
 
 export function LaneGraph({
@@ -179,6 +179,8 @@ export function LaneGraph({
 			{/* Nodes (commit dots) */}
 			<g className="nodes">
 				{lanes.map((laneData, index) => {
+					const commit = commits[index];
+					if (!commit) return null;
 					const x = paddingX + laneData.lane * laneWidth + laneWidth / 2;
 					const y = index * rowHeight + rowHeight / 2;
 					const isSelected = selectedIndex === index;
@@ -206,7 +208,7 @@ export function LaneGraph({
 								onClick={() => onSelectCommit(index)}
 							/>
 							{/* Branch/tag indicators */}
-							{(commits[index].heads?.length || commits[index].tags?.length) && (
+							{(commit.heads?.length || commit.tags?.length) && (
 								<circle
 									cx={x}
 									cy={y}

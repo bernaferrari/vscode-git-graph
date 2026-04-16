@@ -75,6 +75,10 @@ export function CommitDetailsPanel({
     const [historyFile, setHistoryFile] = useState<string | null>(null);
     const [aiExplanation, setAiExplanation] = useState<string | null>(null);
     const [aiRiskAreas, setAiRiskAreas] = useState<string[]>([]);
+    const [aiReviewSummary, setAiReviewSummary] = useState<string | null>(null);
+    const [aiReviewRisks, setAiReviewRisks] = useState<string[]>([]);
+    const [aiReviewSuggestions, setAiReviewSuggestions] = useState<string[]>([]);
+    const [aiReviewTests, setAiReviewTests] = useState<string[]>([]);
 
     const { data: commitDetails, isLoading } = trpc.git.commitDetails.useQuery(
         {
@@ -87,8 +91,12 @@ export function CommitDetailsPanel({
     const aiProdEnabled = Boolean(
         (configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
     );
-    const explainCommitMutation = trpc.ai.explainCommit.useMutation({
-        onSuccess: (result) => {
+	const explainCommitMutation = trpc.ai.explainCommit.useMutation({
+		onSuccess: (result: {
+			explanation?: string | null;
+			error?: string | null;
+			riskAreas?: string[];
+		}) => {
             if (!result.explanation) {
                 toast.warning(result.error ?? 'No AI explanation available');
                 return;
@@ -101,10 +109,36 @@ export function CommitDetailsPanel({
                 toast.success('Commit explanation generated');
             }
         },
-        onError: (error) => {
-            toast.error(error instanceof Error ? error.message : 'Failed to explain commit');
+		onError: (error: unknown) => {
+			toast.error(error instanceof Error ? error.message : 'Failed to explain commit');
+		},
+	});
+	const reviewDiffMutation = trpc.ai.reviewDiff.useMutation({
+		onSuccess: (result: {
+			summary?: string | null;
+			error?: string | null;
+			risks?: string[];
+			suggestions?: string[];
+			tests?: string[];
+		}) => {
+            if (!result.summary) {
+                toast.warning(result.error ?? 'No AI review available');
+                return;
+            }
+            setAiReviewSummary(result.summary);
+            setAiReviewRisks(result.risks ?? []);
+            setAiReviewSuggestions(result.suggestions ?? []);
+            setAiReviewTests(result.tests ?? []);
+            if (result.error) {
+                toast.warning('AI review used fallback', { description: result.error });
+            } else {
+                toast.success('AI review notes generated');
+            }
         },
-    });
+		onError: (error: unknown) => {
+			toast.error(error instanceof Error ? error.message : 'Failed to review diff');
+		},
+	});
 
     // Get selected file info
     const selectedFileInfo = commitDetails?.details?.fileChanges.find(
@@ -163,6 +197,26 @@ export function CommitDetailsPanel({
             commitHash: details.hash,
             subject: details.body.split('\n')[0] ?? details.hash,
             body: details.body,
+            diff: `Files changed: ${String(details.fileChanges.length)}\n${diffSummary}`,
+        });
+    };
+
+    const handleReviewDiff = () => {
+        if (!commitHash || !commitDetails?.details) {
+            return;
+        }
+        const details = commitDetails.details;
+        const diffSummary = details.fileChanges
+            .slice(0, 250)
+            .map(
+                (file: FileChange) =>
+                    `${file.type}\t${file.newFilePath}\t+${String(file.additions ?? 0)}\t-${String(file.deletions ?? 0)}`
+            )
+            .join('\n');
+
+        reviewDiffMutation.mutate({
+            title: details.body.split('\n')[0] ?? details.hash,
+            files: details.fileChanges.map((file: FileChange) => file.newFilePath),
             diff: `Files changed: ${String(details.fileChanges.length)}\n${diffSummary}`,
         });
     };
@@ -269,20 +323,36 @@ export function CommitDetailsPanel({
                         <div className='mb-1 flex items-center justify-between gap-2'>
                             <p className='text-[14px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
                             {aiProdEnabled && (
-                                <Button
-                                    type='button'
-                                    variant='outline'
-                                    size='sm'
-                                    className='h-7 shrink-0 text-xs'
-                                    onClick={handleExplainCommit}
-                                    disabled={explainCommitMutation.isPending}>
-                                    {explainCommitMutation.isPending ? (
-                                        <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
-                                    ) : (
-                                        <Wand2 className='mr-1 h-3.5 w-3.5' />
-                                    )}
-                                    Explain
-                                </Button>
+                                <div className='flex shrink-0 items-center gap-1'>
+                                    <Button
+                                        type='button'
+                                        variant='outline'
+                                        size='sm'
+                                        className='h-7 text-xs'
+                                        onClick={handleExplainCommit}
+                                        disabled={explainCommitMutation.isPending}>
+                                        {explainCommitMutation.isPending ? (
+                                            <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
+                                        ) : (
+                                            <Wand2 className='mr-1 h-3.5 w-3.5' />
+                                        )}
+                                        Explain
+                                    </Button>
+                                    <Button
+                                        type='button'
+                                        variant='outline'
+                                        size='sm'
+                                        className='h-7 text-xs'
+                                        onClick={handleReviewDiff}
+                                        disabled={reviewDiffMutation.isPending}>
+                                        {reviewDiffMutation.isPending ? (
+                                            <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
+                                        ) : (
+                                            <AlertTriangle className='mr-1 h-3.5 w-3.5' />
+                                        )}
+                                        Review
+                                    </Button>
+                                </div>
                             )}
                         </div>
                         {commitBody && (
@@ -309,6 +379,58 @@ export function CommitDetailsPanel({
                                             {aiRiskAreas.map((risk) => (
                                                 <p key={risk} className='text-xs text-amber-900 dark:text-amber-100'>
                                                     - {risk}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {aiProdEnabled && aiReviewSummary && (
+                            <div className='mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 p-2'>
+                                <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                    AI Review Notes
+                                </p>
+                                <p className='mt-1 text-xs whitespace-pre-wrap text-amber-950 dark:text-amber-50'>
+                                    {aiReviewSummary}
+                                </p>
+                                {aiReviewRisks.length > 0 && (
+                                    <div className='mt-2'>
+                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                            Risks
+                                        </p>
+                                        <div className='mt-1 space-y-1'>
+                                            {aiReviewRisks.map((risk) => (
+                                                <p key={risk} className='text-xs text-amber-950 dark:text-amber-50'>
+                                                    - {risk}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {aiReviewSuggestions.length > 0 && (
+                                    <div className='mt-2'>
+                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                            Suggested Follow-ups
+                                        </p>
+                                        <div className='mt-1 space-y-1'>
+                                            {aiReviewSuggestions.map((suggestion) => (
+                                                <p key={suggestion} className='text-xs text-amber-950 dark:text-amber-50'>
+                                                    - {suggestion}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {aiReviewTests.length > 0 && (
+                                    <div className='mt-2'>
+                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                            Test Focus
+                                        </p>
+                                        <div className='mt-1 space-y-1'>
+                                            {aiReviewTests.map((testIdea) => (
+                                                <p key={testIdea} className='text-xs text-amber-950 dark:text-amber-50'>
+                                                    - {testIdea}
                                                 </p>
                                             ))}
                                         </div>
@@ -356,7 +478,7 @@ export function CommitDetailsPanel({
                     )}
 
                     {/* CI/CD */}
-                    <CIStatusPanel commitHash={details.hash} repo={activeRepo ?? undefined} />
+                    <CIStatusPanel commitHash={details.hash} {...(activeRepo ? { repo: activeRepo } : {})} />
 
                     {/* File Changes */}
                     <div className='space-y-2'>

@@ -6,11 +6,8 @@
 import {
 	FileText,
 	Plus,
-	Trash2,
 	RefreshCw,
 	Save,
-	Search,
-	GitBranch,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -115,11 +112,11 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 	const [hasChanges, setHasChanges] = useState(false);
 
 	// Load .gitignore content
-	const { data: gitignoreData, isLoading, refetch } = trpc.git.readFile.useQuery(
+	const { refetch } = trpc.git.readFile.useQuery(
 		{ repo: activeRepo ?? '', path: '.gitignore' },
 		{ 
 			enabled: !!activeRepo && open,
-			onSuccess: (data) => {
+			onSuccess: (data: { content?: string } | undefined) => {
 				setContent(data?.content ?? '');
 				setHasChanges(false);
 			}
@@ -133,8 +130,10 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 			setHasChanges(false);
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to save .gitignore', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to save .gitignore', {
+				description: error instanceof Error ? error.message : 'Unknown error',
+			});
 		},
 	});
 

@@ -40,6 +40,50 @@ import { trpc } from '@/trpc/client';
 
 type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 
+interface RepoRemote {
+	name: string;
+	url: string;
+}
+
+interface GraphiteSyncBranchResult {
+	branch: string;
+	pr?: {
+		url?: string | null;
+		number?: number | null;
+		state?: string | null;
+	};
+	baseDrift?: boolean;
+	needsAttention?: boolean;
+	pushError?: string | null;
+}
+
+interface GraphiteSyncResult {
+	success: boolean;
+	error?: string | null;
+	warnings: string[];
+	branches: GraphiteSyncBranchResult[];
+}
+
+interface GraphiteStackItem {
+	branch: string;
+	parent: string | null;
+	baseBranch?: string;
+}
+
+interface GraphiteImportResult {
+	error?: string | null;
+	stack?: Array<{ branch: string; parent?: string | null }>;
+}
+
+interface PullRequestResult {
+	error?: string | null;
+	pullRequest?: {
+		webUrl: string;
+		state: string;
+		number: number;
+	};
+}
+
 const STATUS_CONFIG: Record<StackedBranch['status'], { icon: React.ElementType; color: string; label: string }> = {
 	draft: { icon: Clock, color: 'text-yellow-500', label: 'Draft' },
 	ready: { icon: Check, color: 'text-green-500', label: 'Ready' },
@@ -106,7 +150,8 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 		const preferred = ['main', 'master', 'develop'].find((branch) => branchNames.includes(branch));
 		return preferred ?? branchNames[0] ?? 'main';
 	}, [branchNames]);
-	const remoteUrl = remotesData?.remotes?.find((remote) => remote.name === 'origin')?.url ?? '';
+	const remotes: RepoRemote[] = remotesData?.remotes ?? [];
+	const remoteUrl = remotes.find((remote: RepoRemote) => remote.name === 'origin')?.url ?? '';
 	const provider = detectProvider(remoteUrl);
 	const integrityWarnings = useMemo(() => {
 		const warnings: string[] = [];
@@ -127,7 +172,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 	const graphiteInteropEnabled = enableGraphiteInterop && graphiteCliAvailable;
 	const graphiteFallbackLocalMode = enableGraphiteInterop && graphiteStatus.data?.available === false;
 	const graphiteStatusError = graphiteStatus.data?.error ?? null;
-	const backendValidationWarnings = enableGraphiteInterop ? validateStackQuery.data?.issues ?? [] : [];
+	const backendValidationWarnings: string[] = enableGraphiteInterop ? validateStackQuery.data?.issues ?? [] : [];
 
 	if (!activeRepo) {
 		return null;
@@ -184,7 +229,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 
 		setCreatingPrBranchId(branch.id);
 		try {
-			const result = await createPullRequest.mutateAsync({
+			const result = (await createPullRequest.mutateAsync({
 				repo: activeRepo,
 				provider,
 				title: branch.name,
@@ -192,7 +237,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 				head: branch.name,
 				base: targetBranch,
 				draft: branch.status === 'draft',
-			});
+			})) as PullRequestResult;
 
 			if (result.error || !result.pullRequest) {
 				toast.error('Failed to create pull request', {
@@ -224,17 +269,17 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 		if (!graphiteCliAvailable) {
 			toast.info('Graphite CLI unavailable, syncing in local stack mode');
 		}
-		const result = await syncStackMutation.mutateAsync({
-			repo: activeRepo,
-			stack: sortedStack.map((entry) => ({
-				branch: entry.name,
-				parent: sortedStack.find((candidate) => candidate.id === entry.parentId)?.name ?? null,
-				baseBranch: entry.baseBranch,
-			})),
-			push: true,
-			forceWithLease: true,
-			refreshPullRequests: true,
-		});
+			const result = (await syncStackMutation.mutateAsync({
+				repo: activeRepo,
+				stack: sortedStack.map((entry): GraphiteStackItem => ({
+					branch: entry.name,
+					parent: sortedStack.find((candidate) => candidate.id === entry.parentId)?.name ?? null,
+					baseBranch: entry.baseBranch,
+				})),
+				push: true,
+				forceWithLease: true,
+				refreshPullRequests: true,
+			})) as GraphiteSyncResult;
 
 		if (!result.success) {
 			toast.error(result.error ?? 'Stack sync completed with issues');
@@ -246,28 +291,42 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 			toast.warning(result.warnings.join('\n'));
 		}
 
-		result.branches.forEach((entry) => {
+			result.branches.forEach((entry: GraphiteSyncBranchResult) => {
 			const local = stack.find((item) => item.name === entry.branch);
 			if (!local) return;
 
-			updateBranch(activeRepo, local.id, {
-				prUrl: entry.pr?.url ?? local.prUrl,
-				prNumber: entry.pr?.number ?? local.prNumber,
-				prState: entry.pr?.state ?? local.prState,
-				baseDrift: entry.baseDrift,
-				needsAttention: entry.needsAttention,
-				syncState: entry.pushError ? 'error' : entry.needsAttention ? 'warning' : 'ok',
-				syncMessage: entry.pushError ?? (entry.baseDrift ? 'Base drift detected' : 'Synced'),
-				status:
-					entry.pr?.state === 'merged'
-						? 'merged'
-						: entry.needsAttention
-							? 'stale'
-							: local.status === 'draft'
-								? 'draft'
-								: 'ready',
+				const nextBranchUpdate: Partial<StackedBranch> = {
+					syncState: entry.pushError ? 'error' : entry.needsAttention ? 'warning' : 'ok',
+					syncMessage: entry.pushError ?? (entry.baseDrift ? 'Base drift detected' : 'Synced'),
+					status:
+						entry.pr?.state === 'merged'
+							? 'merged'
+							: entry.needsAttention
+								? 'stale'
+								: local.status === 'draft'
+									? 'draft'
+									: 'ready',
+				};
+				const nextPrUrl = entry.pr?.url ?? local.prUrl;
+				if (typeof nextPrUrl === 'string') {
+					nextBranchUpdate.prUrl = nextPrUrl;
+				}
+				const nextPrNumber = entry.pr?.number ?? local.prNumber;
+				if (typeof nextPrNumber === 'number') {
+					nextBranchUpdate.prNumber = nextPrNumber;
+				}
+				const nextPrState = entry.pr?.state ?? local.prState;
+				if (nextPrState) {
+					nextBranchUpdate.prState = nextPrState as 'open' | 'closed' | 'merged';
+				}
+				if (entry.baseDrift !== undefined) {
+					nextBranchUpdate.baseDrift = entry.baseDrift;
+				}
+				if (entry.needsAttention !== undefined) {
+					nextBranchUpdate.needsAttention = entry.needsAttention;
+				}
+				updateBranch(activeRepo, local.id, nextBranchUpdate);
 			});
-		});
 
 		void refetchRepoInfo();
 	};
@@ -301,26 +360,27 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 		if (!requireGraphiteInterop()) {
 			return;
 		}
-		const result = await importStackQuery.refetch();
-		const payload = result.data;
-		if (!payload) {
-			toast.error('Unable to import stack metadata');
-			return;
-		}
-		if (payload.error) {
-			toast.error(payload.error);
-			return;
-		}
-		if ((payload.stack ?? []).length === 0) {
-			toast.info('No Graphite stack entries found');
-			return;
-		}
+			const result = await importStackQuery.refetch();
+			const payload = result.data as GraphiteImportResult | undefined;
+			if (!payload) {
+				toast.error('Unable to import stack metadata');
+				return;
+			}
+			if (payload.error) {
+				toast.error(payload.error);
+				return;
+			}
+			const stackItems = payload.stack ?? [];
+			if (stackItems.length === 0) {
+				toast.info('No Graphite stack entries found');
+				return;
+			}
 
-		const existingByName = new Map(stack.map((entry) => [entry.name, entry]));
-		for (const item of payload.stack) {
-			if (!existingByName.has(item.branch)) {
-				addBranch(activeRepo, {
-					name: item.branch,
+			const existingByName = new Map(stack.map((entry) => [entry.name, entry]));
+			for (const item of stackItems) {
+				if (!existingByName.has(item.branch)) {
+					addBranch(activeRepo, {
+						name: item.branch,
 					baseBranch: item.parent ?? defaultBaseBranch,
 					parentId: null,
 					commitHash: 'HEAD',
@@ -331,29 +391,29 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 
 		const refreshed = getStack(activeRepo);
 		const idByName = new Map(refreshed.map((entry) => [entry.name, entry.id]));
-		for (const item of payload.stack) {
-			const id = idByName.get(item.branch);
-			if (!id) continue;
-			updateBranch(activeRepo, id, {
+			for (const item of stackItems) {
+				const id = idByName.get(item.branch);
+				if (!id) continue;
+				updateBranch(activeRepo, id, {
 				parentId: item.parent ? idByName.get(item.parent) ?? null : null,
 				baseBranch: item.parent ?? defaultBaseBranch,
 			});
 		}
 
-		toast.success(`Imported ${String(payload.stack.length)} stack entries`);
-	};
+			toast.success(`Imported ${String(stackItems.length)} stack entries`);
+		};
 
 	const handleExportGraphiteStack = async () => {
 		if (!requireGraphiteInterop()) {
 			return;
 		}
-		const result = await exportStackMutation.mutateAsync({
-			repo: activeRepo,
-			stack: sortedStack.map((entry) => ({
-				branch: entry.name,
-				parent: sortedStack.find((candidate) => candidate.id === entry.parentId)?.name ?? null,
-			})),
-		});
+			const result = (await exportStackMutation.mutateAsync({
+				repo: activeRepo,
+				stack: sortedStack.map((entry): GraphiteStackItem => ({
+					branch: entry.name,
+					parent: sortedStack.find((candidate) => candidate.id === entry.parentId)?.name ?? null,
+				})),
+			})) as GraphiteSyncResult;
 
 		if (!result.success) {
 			toast.error(result.error ?? 'Export failed');

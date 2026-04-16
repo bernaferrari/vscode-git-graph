@@ -5,7 +5,6 @@
 
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -26,10 +25,10 @@ interface FileNode {
 	name: string;
 	path: string;
 	type: 'file' | 'folder';
-	children?: FileNode[];
-	additions?: number;
-	deletions?: number;
-	status?: 'added' | 'modified' | 'deleted' | 'renamed';
+	children?: FileNode[] | undefined;
+	additions?: number | undefined;
+	deletions?: number | undefined;
+	status?: 'added' | 'modified' | 'deleted' | 'renamed' | undefined;
 }
 
 interface FileTreeProps {
@@ -52,8 +51,11 @@ function buildTree(files: FileTreeProps['files']): FileNode[] {
 
 		for (let i = 0; i < parts.length; i++) {
 			const part = parts[i];
+			if (!part) {
+				continue;
+			}
 			const isFile = i === parts.length - 1;
-			const existing = current.find(n => n.name === part);
+			const existing = current.find((n) => n.name === part);
 
 			if (existing) {
 				current = existing.children!;
@@ -76,9 +78,9 @@ function buildTree(files: FileTreeProps['files']): FileNode[] {
 	return root;
 }
 
-function getFileIcon(name: string, status?: string) {
+function getFileIcon(name: string) {
 	const ext = name.split('.').pop()?.toLowerCase();
-	
+
 	if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext ?? '')) {
 		return <Image className="h-4 w-4 text-purple-500" />;
 	}
@@ -117,8 +119,8 @@ function getStatusLabel(status?: string) {
 interface TreeNodeProps {
 	node: FileNode;
 	level: number;
-	onFileClick?: (path: string) => void;
-	selectedPath?: string;
+	onFileClick: ((path: string) => void) | undefined;
+	selectedPath: string | undefined;
 }
 
 function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
@@ -176,7 +178,7 @@ function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
 			style={{ paddingLeft: `${level * 12 + 28}px` }}
 			onClick={() => onFileClick?.(node.path)}
 		>
-			{getFileIcon(node.name, node.status)}
+			{getFileIcon(node.name)}
 			<span className="text-sm truncate flex-1">{node.name}</span>
 			<span className={cn("text-xs font-mono", getStatusColor(node.status))}>
 				{getStatusLabel(node.status)}

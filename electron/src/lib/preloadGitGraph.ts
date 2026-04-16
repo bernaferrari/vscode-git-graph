@@ -3,7 +3,7 @@ let gitGraphPreloadScheduled = false;
 
 type IdleRequestCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
 
-interface IdleWindow extends Window {
+interface IdleWindow {
     requestIdleCallback?: (callback: IdleRequestCallback) => number;
     cancelIdleCallback?: (handle: number) => void;
 }

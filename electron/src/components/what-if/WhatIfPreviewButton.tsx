@@ -3,7 +3,6 @@
  * Quick preview for merge/rebase operations in the toolbar
  */
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
 	DropdownMenu,
@@ -37,13 +36,12 @@ interface WhatIfPreviewButtonProps {
 }
 
 export function WhatIfPreviewButton({
-	branch,
 	onPreviewMerge,
 	onPreviewRebase,
 	onPreviewSquash,
 	className,
 }: WhatIfPreviewButtonProps) {
-	const { isGuided, config } = useLensMode();
+	const { isGuided } = useLensMode();
 
 	// In Guided mode, show a simple "Preview" button
 	// In Craft/Control, show options
@@ -86,7 +84,7 @@ export function WhatIfPreviewButton({
 					Preview Operation
 				</div>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={onPreviewMerge} className="gap-2">
+				<DropdownMenuItem {...(onPreviewMerge ? { onClick: onPreviewMerge } : {})} className="gap-2">
 					<Merge className="h-4 w-4 text-purple-500" />
 					<div className="flex flex-col">
 						<span>Merge</span>
@@ -95,7 +93,7 @@ export function WhatIfPreviewButton({
 						</span>
 					</div>
 				</DropdownMenuItem>
-				<DropdownMenuItem onClick={onPreviewRebase} className="gap-2">
+				<DropdownMenuItem {...(onPreviewRebase ? { onClick: onPreviewRebase } : {})} className="gap-2">
 					<RotateCcw className="h-4 w-4 text-blue-500" />
 					<div className="flex flex-col">
 						<span>Rebase</span>
@@ -104,7 +102,7 @@ export function WhatIfPreviewButton({
 						</span>
 					</div>
 				</DropdownMenuItem>
-				<DropdownMenuItem onClick={onPreviewSquash} className="gap-2">
+				<DropdownMenuItem {...(onPreviewSquash ? { onClick: onPreviewSquash } : {})} className="gap-2">
 					<GitBranch className="h-4 w-4 text-amber-500" />
 					<div className="flex flex-col">
 						<span>Squash</span>

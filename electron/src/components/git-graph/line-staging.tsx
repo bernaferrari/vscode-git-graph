@@ -69,7 +69,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 			return;
 		}
 
-		const lines = diffData.diff.split('\n');
+		const lines: string[] = diffData.diff.split('\n');
 		const firstHunkIndex = lines.findIndex((line) => line.startsWith('@@'));
 		setDiffHeaderLines(firstHunkIndex >= 0 ? lines.slice(0, firstHunkIndex) : []);
 		const parsedHunks: DiffHunk[] = [];
@@ -77,7 +77,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 		let oldLineNum = 0;
 		let newLineNum = 0;
 
-		lines.forEach((line, index) => {
+		lines.forEach((line: string, index: number) => {
 			if (line.startsWith('@@')) {
 				if (currentHunk) {
 					parsedHunks.push(currentHunk);
@@ -134,7 +134,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 		}
 
 		setHunks(parsedHunks);
-		setExpandedHunks(new Set(parsedHunks.map((_, i) => i)));
+		setExpandedHunks(new Set(parsedHunks.map((_: DiffHunk, i: number) => i)));
 	}, [diffData?.diff]);
 
 	const toggleHunk = useCallback((hunkIndex: number) => {

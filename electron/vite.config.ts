@@ -20,12 +20,36 @@ export default defineConfig({
                     }
 
                     if (
+                        id.includes('@tanstack/react-router') ||
+                        id.includes('@tanstack/router-core') ||
+                        id.includes('@tanstack/react-query') ||
+                        id.includes('@tanstack/query-core') ||
+                        id.includes('@trpc/client') ||
+                        id.includes('@trpc/react-query') ||
+                        id.includes('@trpc/server')
+                    ) {
+                        return 'vendor-tanstack-trpc';
+                    }
+
+                    if (
                         id.includes('@shikijs') ||
                         id.includes('shiki') ||
                         id.includes('vscode-oniguruma') ||
                         id.includes('vscode-textmate')
                     ) {
                         return 'vendor-syntax-highlight';
+                    }
+
+                    if (id.includes('date-fns')) {
+                        return 'vendor-date';
+                    }
+
+                    if (id.includes('sonner')) {
+                        return 'vendor-feedback';
+                    }
+
+                    if (id.includes('lucide-react') || id.includes('react-icons')) {
+                        return 'vendor-icons';
                     }
                 },
             },

@@ -126,9 +126,13 @@ function md51(input: string): [number, number, number, number] {
 	let tail = new Array<number>(16).fill(0);
 	const remainder = input.substring(i - 64);
 	for (i = 0; i < remainder.length; i += 1) {
-		tail[i >> 2] |= remainder.charCodeAt(i) << ((i % 4) << 3);
+		const tailIndex = i >> 2;
+		tail[tailIndex] = (tail[tailIndex] ?? 0) | (remainder.charCodeAt(i) << ((i % 4) << 3));
 	}
-	tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+	{
+		const tailIndex = i >> 2;
+		tail[tailIndex] = (tail[tailIndex] ?? 0) | (0x80 << ((i % 4) << 3));
+	}
 	if (i > 55) {
 		md5Cycle(state, tail);
 		tail = new Array<number>(16).fill(0);

@@ -71,7 +71,7 @@ function Item({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "item",
       variant,

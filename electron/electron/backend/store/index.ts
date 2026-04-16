@@ -19,6 +19,12 @@ export const appStore = new Store<{
 		azureToken: string;
 	};
 
+	// Encrypted secrets managed outside the plain app store values
+	secretVault: {
+		version: 1;
+		entries: Record<string, string>;
+	};
+
 	// Global view state
 	globalViewState: {
 		alwaysAcceptCheckoutCommit: boolean;
@@ -51,7 +57,36 @@ export const appStore = new Store<{
 			pullRequest: boolean;
 			conflictExplain: boolean;
 			explainCommit: boolean;
+			reviewDiff: boolean;
 		};
+	};
+
+	collaborationSyncConfig: {
+		enabled: boolean;
+		provider: 'self-host';
+		endpointUrl: string;
+		projectId: string;
+		authToken: string;
+		memberId: string;
+		memberApiKey: string;
+		displayName: string;
+		email: string;
+		role: 'developer' | 'reviewer' | 'lead' | 'qa';
+		permissionLevel: 'owner' | 'manager' | 'member' | 'observer';
+		organizationId: string;
+		organizationName: string;
+		teamId: string;
+		teamName: string;
+		avatarUrl: string;
+		deviceLabel: string;
+		presenceEnabled: boolean;
+		liveSyncEnabled: boolean;
+		realtimeEnabled: boolean;
+		timeoutMs: number;
+		autoSyncOnOpen: boolean;
+		lastSyncedAt: number | null;
+		lastSyncStatus: 'idle' | 'syncing' | 'success' | 'error';
+		lastSyncError: string | null;
 	};
 
 	commitTemplates: Array<{
@@ -84,6 +119,15 @@ export const appStore = new Store<{
 		autoDetect: boolean;
 		patterns: string[];
 	};
+	customCommands: Array<{
+		id: string;
+		name: string;
+		command: string;
+		description?: string;
+		alias?: string;
+		lastUsed?: number;
+		useCount: number;
+	}>;
 	gitGraphSettings: {
 		confirmDestructiveActions: boolean;
 		autoFetchInterval: number;
@@ -113,6 +157,19 @@ export const appStore = new Store<{
 	};
 	onboardingState: {
 		gitGraphCompleted: boolean;
+		lensOnboardingSeen: boolean;
+	};
+	notificationCenter: {
+		notifications: Array<{
+			id: string;
+			type: 'info' | 'success' | 'warning' | 'error';
+			title: string;
+			message?: string;
+			timestamp: number;
+			read: boolean;
+			actionId?: string;
+			actionLabel?: string;
+		}>;
 	};
 }>({
 	name: 'git-graph-config',
@@ -124,6 +181,10 @@ export const appStore = new Store<{
 			bitbucketToken: '',
 			bitbucketUsername: '',
 			azureToken: '',
+		},
+		secretVault: {
+			version: 1,
+			entries: {},
 		},
 		globalViewState: {
 			alwaysAcceptCheckoutCommit: false,
@@ -145,7 +206,35 @@ export const appStore = new Store<{
 				pullRequest: true,
 				conflictExplain: true,
 				explainCommit: true,
+				reviewDiff: true,
 			},
+		},
+		collaborationSyncConfig: {
+			enabled: false,
+			provider: 'self-host',
+			endpointUrl: '',
+			projectId: 'default',
+			authToken: '',
+			memberId: '',
+			memberApiKey: '',
+			displayName: '',
+			email: '',
+			role: 'developer',
+			permissionLevel: 'member',
+			organizationId: '',
+			organizationName: '',
+			teamId: '',
+			teamName: '',
+			avatarUrl: '',
+			deviceLabel: 'desktop',
+			presenceEnabled: true,
+			liveSyncEnabled: true,
+			realtimeEnabled: true,
+			timeoutMs: 15_000,
+			autoSyncOnOpen: false,
+			lastSyncedAt: null,
+			lastSyncStatus: 'idle',
+			lastSyncError: null,
 		},
 		commitTemplates: [],
 		externalDiffConfig: {
@@ -158,6 +247,7 @@ export const appStore = new Store<{
 			autoDetect: true,
 			patterns: [],
 		},
+		customCommands: [],
 		gitGraphSettings: {
 			confirmDestructiveActions: true,
 			autoFetchInterval: 5,
@@ -187,6 +277,10 @@ export const appStore = new Store<{
 		},
 		onboardingState: {
 			gitGraphCompleted: false,
+			lensOnboardingSeen: false,
+		},
+		notificationCenter: {
+			notifications: [],
 		},
 	},
 });
@@ -293,6 +387,88 @@ export const instanceStore = new Store<{
 	// Branch pinning and launchpad metadata customization
 	pinnedBranches: Record<string, string[]>;
 	launchpadStatusMap: Record<string, Record<string, { label: string; severity: 'info' | 'warn' | 'error' }>>;
+	collaborationWorkspaceShares: Array<{
+		id: string;
+		workspaceId: string;
+		name: string;
+		note: string;
+		createdAt: number;
+		updatedAt: number;
+		repos: Array<{
+			path: string;
+			name: string;
+			head: string | null;
+			headSha: string | null;
+			lastCommitAt: number | null;
+			dirtyCount: number;
+			openPullRequests: number | null;
+			needsAttention: boolean;
+			deepLink: string;
+		}>;
+	}>;
+	collaborationPatchShelf: Array<{
+		id: string;
+		repo: string;
+		name: string;
+		baseRef: string;
+		headRef: string;
+		summary: string;
+		patch: string;
+		fileCount: number;
+		additions: number;
+		deletions: number;
+		createdAt: number;
+	}>;
+	collaborationComments: Array<{
+		id: string;
+		targetType: 'workspace-share' | 'patch-share' | 'pull-request' | 'pull-request-file';
+		targetId: string;
+		author: string;
+		body: string;
+		createdAt: number;
+		updatedAt: number;
+		providerSync?: {
+			status: 'pending' | 'synced' | 'failed';
+			provider: 'github' | 'gitlab' | 'bitbucket' | 'azure';
+			remoteCommentId?: string;
+			remoteThreadId?: string;
+			remoteThreadStatus?: 'open' | 'resolved';
+			remoteUrl?: string;
+			syncedAt?: number;
+			error?: string;
+		};
+	}>;
+	collaborationAssignments: Array<{
+		id: string;
+		targetType: 'workspace-share' | 'patch-share' | 'pull-request' | 'pull-request-file';
+		targetId: string;
+		assigneeId: string;
+		assigneeName: string;
+		status: 'open' | 'in-progress' | 'done' | 'blocked';
+		note: string;
+		createdAt: number;
+		updatedAt: number;
+		createdBy: string;
+		providerSync?: {
+			provider: 'github' | 'gitlab' | 'bitbucket' | 'azure';
+			reviewerId: string;
+			reviewerName: string;
+			reviewerStatus: 'requested' | 'commented' | 'approved' | 'changes-requested' | 'waiting';
+			providerState?: string;
+			syncedAt: number;
+		};
+	}>;
+	collaborationActivity: Array<{
+		id: string;
+		timestamp: number;
+		type: 'workspace-share' | 'patch-share' | 'bundle-export' | 'bundle-import' | 'remote-sync' | 'comment' | 'assignment';
+		action: 'created' | 'deleted' | 'exported' | 'imported' | 'pushed' | 'pulled' | 'roundtrip' | 'failed' | 'updated';
+		status: 'success' | 'failed' | 'info';
+		title: string;
+		description?: string;
+		metadata?: Record<string, unknown>;
+		actor?: string;
+	}>;
 	commitFiltersByRepo: Record<string, {
 		author?: string;
 		filePath?: string;
@@ -316,6 +492,24 @@ export const instanceStore = new Store<{
 		openCount: number;
 		pinned: boolean;
 		currentBranch?: string;
+	}>;
+	appShellState: {
+		sidebarOpen: boolean;
+		repoNavMode: 'sidebar' | 'tabs';
+		openedRepos: string[];
+	};
+	undoHistoryByRepo: Record<string, {
+		operations: Array<{
+			id: string;
+			type: string;
+			timestamp: number;
+			description: string;
+			details: Record<string, unknown>;
+			undoable: boolean;
+			undone?: boolean;
+			reflogEntry?: string;
+		}>;
+		currentIndex: number;
 	}>;
 
 	// Worktree UX view preferences
@@ -359,13 +553,24 @@ export const instanceStore = new Store<{
 			findOpenCommitDetailsView: false,
 		},
 		recentRepos: [],
-		workflowDefinitions: [],
-		workflowRuns: [],
-		pinnedBranches: {},
-		launchpadStatusMap: {},
-		commitFiltersByRepo: {},
-		pinnedCommitsByRepo: {},
+			workflowDefinitions: [],
+			workflowRuns: [],
+			pinnedBranches: {},
+			launchpadStatusMap: {},
+			collaborationWorkspaceShares: [],
+			collaborationPatchShelf: [],
+			collaborationComments: [],
+			collaborationAssignments: [],
+			collaborationActivity: [],
+			commitFiltersByRepo: {},
+			pinnedCommitsByRepo: {},
 		recentRepoDetails: [],
+		appShellState: {
+			sidebarOpen: true,
+			repoNavMode: 'sidebar',
+			openedRepos: [],
+		},
+		undoHistoryByRepo: {},
 		worktreeViewPrefs: {
 			showLocked: true,
 			showPrunable: true,

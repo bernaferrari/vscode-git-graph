@@ -27,6 +27,11 @@ interface HooksManageDialogProps {
 	onOpenChange: (open: boolean) => void;
 }
 
+interface GitHookInfo {
+	name: string;
+	enabled: boolean;
+}
+
 export function HooksManageDialog({ open, onOpenChange }: HooksManageDialogProps) {
 	const { activeRepo } = useAppStore();
 
@@ -39,7 +44,7 @@ export function HooksManageDialog({ open, onOpenChange }: HooksManageDialogProps
 		onSuccess: () => refetch(),
 	});
 
-	const hooks = hooksData?.hooks ?? [];
+	const hooks: GitHookInfo[] = hooksData?.hooks ?? [];
 
 	const HOOK_DESCRIPTIONS: Record<string, string> = {
 		'pre-commit': 'Run before committing. Use to validate code.',
@@ -76,7 +81,7 @@ export function HooksManageDialog({ open, onOpenChange }: HooksManageDialogProps
 						</div>
 					) : (
 						<div className="space-y-2 py-2">
-							{hooks.map((hook) => (
+							{hooks.map((hook: GitHookInfo) => (
 								<div
 									key={hook.name}
 									className="flex items-start gap-3 p-3 rounded-lg border"

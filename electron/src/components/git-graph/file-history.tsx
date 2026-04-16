@@ -46,19 +46,19 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 
 		const lines: Array<{
 			line: string;
-			commit?: string | undefined;
-			author?: string | undefined;
-			date?: string | undefined;
+			commit?: string;
+			author?: string;
+			date?: string;
 			sourceLine?: number;
 		}> = [];
-		const blameText = blameData.blame;
+		const blameText = String(blameData.blame);
 		const blameLines = blameText.split('\n');
 
 		let currentCommit: string | undefined;
 		let currentAuthor: string | undefined;
 		let currentDate: string | undefined;
 
-		blameLines.forEach((line) => {
+		blameLines.forEach((line: string) => {
 			if (line.startsWith('author ')) {
 				currentAuthor = line.slice(7);
 			} else if (line.startsWith('author-time ')) {
@@ -67,15 +67,15 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 			} else if (/^[a-f0-9]{8} \d+ \d+/.test(line)) {
 				const parts = line.split(' ');
 				currentCommit = parts[0];
-			} else if (line.startsWith('\t')) {
-				lines.push({
-					line: line.slice(1),
-					commit: currentCommit,
-					author: currentAuthor,
-					date: currentDate,
-				});
-			}
-		});
+				} else if (line.startsWith('\t')) {
+					lines.push({
+						line: line.slice(1),
+						...(currentCommit ? { commit: currentCommit } : {}),
+						...(currentAuthor ? { author: currentAuthor } : {}),
+						...(currentDate ? { date: currentDate } : {}),
+					});
+				}
+			});
 
 		return lines;
 	}, [blameData?.blame]);
@@ -151,7 +151,7 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 						) : (
 							<ScrollArea className="h-full">
 								<div className="divide-y">
-									{(historyData?.history ?? []).map((commit) => (
+									{((historyData?.history ?? []) as Array<{ hash: string; message: string; author: string; date: string }>).map((commit) => (
 										<div
 											key={commit.hash}
 											className="p-3 hover:bg-accent/30 cursor-pointer"

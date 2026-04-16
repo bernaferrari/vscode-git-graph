@@ -17,7 +17,6 @@ import {
 	GripVertical,
 	ChevronDown,
 	ChevronUp,
-	Trash2,
 	RotateCcw,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';

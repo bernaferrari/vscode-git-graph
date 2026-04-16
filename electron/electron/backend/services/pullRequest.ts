@@ -27,6 +27,11 @@ export interface PullRequestRecord {
 	draft: boolean;
 	mergeable?: boolean | null;
 	webUrl: string;
+	reviewPosition?: {
+		baseSha?: string;
+		startSha?: string;
+		headSha?: string;
+	};
 }
 
 export interface PullRequestComment {
@@ -36,6 +41,59 @@ export interface PullRequestComment {
 	createdAt: string;
 	updatedAt: string;
 	url: string;
+	thread?: {
+		id: string;
+		status: 'open' | 'resolved';
+		canResolve?: boolean;
+	};
+	inline?: {
+		filePath: string;
+		line?: number;
+		side?: 'left' | 'right';
+	};
+}
+
+export interface PullRequestInlineCommentInput {
+	body: string;
+	filePath: string;
+	line: number;
+	side: 'left' | 'right';
+	baseSha?: string;
+	startSha?: string;
+	headSha?: string;
+}
+
+export type PullRequestReviewerStatus =
+	| 'requested'
+	| 'commented'
+	| 'approved'
+	| 'changes-requested'
+	| 'waiting';
+
+export interface PullRequestReviewerState {
+	id: string;
+	name: string;
+	username?: string;
+	role?: string;
+	required?: boolean;
+	status: PullRequestReviewerStatus;
+	providerState?: string;
+	updatedAt?: string;
+}
+
+export interface PullRequestReviewState {
+	overall: 'pending' | 'approved' | 'changes-requested';
+	reviewers: PullRequestReviewerState[];
+	requestedCount: number;
+	approvedCount: number;
+	commentedCount: number;
+	changesRequestedCount: number;
+	waitingCount: number;
+}
+
+export interface PullRequestThreadState {
+	threadId: string;
+	status: 'open' | 'resolved';
 }
 
 export interface ProviderAuthConfig {
@@ -284,7 +342,7 @@ async function requestJson<T>(url: string, options: RequestJsonOptions = {}): Pr
 
 		const payloadMessage = extractErrorMessage(parsedBody) ?? rawBody.trim();
 		const statusText = payloadMessage || response.statusText || 'Unknown error';
-			throw new Error(`HTTP ${String(response.status)}: ${statusText}`);
+		throw new Error(`HTTP ${String(response.status)}: ${statusText}`);
 	}
 
 	if (response.status === 204) {
@@ -372,11 +430,172 @@ function toIsoDate(value: unknown): string {
 	return typeof value === 'string' && value ? value : new Date().toISOString();
 }
 
+function toBoolean(value: unknown, fallback = false): boolean {
+	if (typeof value === 'boolean') return value;
+	if (typeof value === 'number') return value !== 0;
+	if (typeof value === 'string') {
+		if (value === 'true' || value === '1') return true;
+		if (value === 'false' || value === '0') return false;
+	}
+	return fallback;
+}
+
 function toStateLabel(state: string, merged = false): 'open' | 'closed' | 'merged' {
 	if (merged) return 'merged';
 	if (state === 'open' || state === 'opened' || state === 'active' || state === 'OPEN') return 'open';
 	if (state === 'merged' || state === 'MERGED' || state === 'completed') return 'merged';
 	return 'closed';
+}
+
+function normalizeReviewerStatus(value: string): PullRequestReviewerStatus {
+	const normalized = value.trim().toLowerCase();
+	if (normalized === 'approved' || normalized === 'approval' || normalized === 'accept') return 'approved';
+	if (
+		normalized === 'changes_requested' ||
+		normalized === 'changes-requested' ||
+		normalized === 'rejected' ||
+		normalized === 'needs_work'
+	) {
+		return 'changes-requested';
+	}
+	if (normalized === 'commented' || normalized === 'comment') return 'commented';
+	if (normalized === 'waiting' || normalized === 'pending' || normalized === 'unreviewed') return 'waiting';
+	return 'requested';
+}
+
+function reviewerSortKey(review: PullRequestReviewerState): number {
+	return Date.parse(review.updatedAt ?? '') || 0;
+}
+
+function mergeReviewerStates(reviewers: PullRequestReviewerState[]): PullRequestReviewerState[] {
+	const merged = new Map<string, PullRequestReviewerState>();
+	for (const reviewer of reviewers) {
+		const existing = merged.get(reviewer.id);
+		if (!existing || reviewerSortKey(reviewer) >= reviewerSortKey(existing)) {
+			merged.set(reviewer.id, reviewer);
+		}
+	}
+	return [...merged.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function buildReviewState(reviewers: PullRequestReviewerState[]): PullRequestReviewState {
+	const merged = mergeReviewerStates(reviewers);
+	const requestedCount = merged.filter((reviewer) => reviewer.status === 'requested').length;
+	const approvedCount = merged.filter((reviewer) => reviewer.status === 'approved').length;
+	const commentedCount = merged.filter((reviewer) => reviewer.status === 'commented').length;
+	const changesRequestedCount = merged.filter((reviewer) => reviewer.status === 'changes-requested').length;
+	const waitingCount = merged.filter((reviewer) => reviewer.status === 'waiting').length;
+	return {
+		overall:
+			changesRequestedCount > 0
+				? 'changes-requested'
+				: approvedCount > 0 && requestedCount === 0 && waitingCount === 0
+					? 'approved'
+					: 'pending',
+		reviewers: merged,
+		requestedCount,
+		approvedCount,
+		commentedCount,
+		changesRequestedCount,
+		waitingCount,
+	};
+}
+
+function buildReviewPosition(position: {
+	baseSha?: string;
+	startSha?: string;
+	headSha?: string;
+}): PullRequestRecord['reviewPosition'] {
+	const reviewPosition: NonNullable<PullRequestRecord['reviewPosition']> = {};
+
+	if (position.baseSha) {
+		reviewPosition.baseSha = position.baseSha;
+	}
+	if (position.startSha) {
+		reviewPosition.startSha = position.startSha;
+	}
+	if (position.headSha) {
+		reviewPosition.headSha = position.headSha;
+	}
+
+	return Object.keys(reviewPosition).length > 0 ? reviewPosition : undefined;
+}
+
+function mapGitHubReviewer(user: Record<string, unknown>, status: PullRequestReviewerStatus, updatedAt?: string, providerState?: string): PullRequestReviewerState {
+	const reviewer: PullRequestReviewerState = {
+		id: toText(user.id, toText(user.node_id, toText(user.login, 'github-reviewer'))),
+		name: toText(user.login, toText(user.name, 'GitHub reviewer')),
+		status,
+	};
+	const username = toText(user.login);
+	if (username) {
+		reviewer.username = username;
+	}
+	if (providerState) {
+		reviewer.providerState = providerState;
+	}
+	if (updatedAt) {
+		reviewer.updatedAt = updatedAt;
+	}
+	return reviewer;
+}
+
+function mapGitLabReviewer(user: Record<string, unknown>, status: PullRequestReviewerStatus, updatedAt?: string, providerState?: string): PullRequestReviewerState {
+	const reviewer: PullRequestReviewerState = {
+		id: toText(user.id, toText(user.username, 'gitlab-reviewer')),
+		name: toText(user.name, toText(user.username, 'GitLab reviewer')),
+		status,
+	};
+	const username = toText(user.username);
+	if (username) {
+		reviewer.username = username;
+	}
+	if (providerState) {
+		reviewer.providerState = providerState;
+	}
+	if (updatedAt) {
+		reviewer.updatedAt = updatedAt;
+	}
+	return reviewer;
+}
+
+function mapBitbucketReviewer(user: Record<string, unknown>, status: PullRequestReviewerStatus, updatedAt?: string, providerState?: string): PullRequestReviewerState {
+	const reviewer: PullRequestReviewerState = {
+		id: toText(user.uuid, toText(user.account_id, toText(user.nickname, 'bitbucket-reviewer'))),
+		name: toText(user.display_name, toText(user.nickname, 'Bitbucket reviewer')),
+		status,
+	};
+	const username = toText(user.nickname);
+	if (username) {
+		reviewer.username = username;
+	}
+	if (providerState) {
+		reviewer.providerState = providerState;
+	}
+	if (updatedAt) {
+		reviewer.updatedAt = updatedAt;
+	}
+	return reviewer;
+}
+
+function mapAzureReviewer(user: Record<string, unknown>, status: PullRequestReviewerStatus, required: boolean, updatedAt?: string, providerState?: string): PullRequestReviewerState {
+	const reviewer: PullRequestReviewerState = {
+		id: toText(user.id, toText(user.uniqueName, 'azure-reviewer')),
+		name: toText(user.displayName, toText(user.uniqueName, 'Azure reviewer')),
+		required,
+		status,
+	};
+	const username = toText(user.uniqueName);
+	if (username) {
+		reviewer.username = username;
+	}
+	if (providerState) {
+		reviewer.providerState = providerState;
+	}
+	if (updatedAt) {
+		reviewer.updatedAt = updatedAt;
+	}
+	return reviewer;
 }
 
 function mapGitHubPullRequest(pr: Record<string, unknown>): PullRequestRecord {
@@ -385,7 +604,11 @@ function mapGitHubPullRequest(pr: Record<string, unknown>): PullRequestRecord {
 	const base = isRecord(pr.base) ? pr.base : {};
 	const mergeable = pr.mergeable;
 	const state = toStateLabel(toText(pr.state), Boolean(pr.merged_at));
-	return {
+	const reviewPosition = buildReviewPosition({
+		baseSha: toText(base.sha),
+		headSha: toText(head.sha),
+	});
+	const record: PullRequestRecord = {
 		id: toNumber(pr.id),
 		number: toNumber(pr.number),
 		title: toText(pr.title),
@@ -406,12 +629,21 @@ function mapGitHubPullRequest(pr: Record<string, unknown>): PullRequestRecord {
 		mergeable: typeof mergeable === 'boolean' ? mergeable : null,
 		webUrl: toText(pr.html_url),
 	};
+	if (reviewPosition) {
+		record.reviewPosition = reviewPosition;
+	}
+	return record;
 }
 
 function mapGitLabPullRequest(pr: Record<string, unknown>): PullRequestRecord {
 	const author = isRecord(pr.author) ? pr.author : {};
 	const diffRefs = isRecord(pr.diff_refs) ? pr.diff_refs : {};
-	return {
+	const reviewPosition = buildReviewPosition({
+		baseSha: toText(diffRefs.base_sha),
+		startSha: toText(diffRefs.start_sha),
+		headSha: toText(diffRefs.head_sha),
+	});
+	const record: PullRequestRecord = {
 		id: toNumber(pr.id),
 		number: toNumber(pr.iid),
 		title: toText(pr.title),
@@ -435,6 +667,10 @@ function mapGitLabPullRequest(pr: Record<string, unknown>): PullRequestRecord {
 				: null,
 		webUrl: toText(pr.web_url),
 	};
+	if (reviewPosition) {
+		record.reviewPosition = reviewPosition;
+	}
+	return record;
 }
 
 function mapBitbucketPullRequest(pr: Record<string, unknown>): PullRequestRecord {
@@ -447,7 +683,11 @@ function mapBitbucketPullRequest(pr: Record<string, unknown>): PullRequestRecord
 	const destinationCommit = isRecord(destination.commit) ? destination.commit : {};
 	const links = isRecord(pr.links) ? pr.links : {};
 	const html = isRecord(links.html) ? links.html : {};
-	return {
+	const reviewPosition = buildReviewPosition({
+		baseSha: toText(destinationCommit.hash),
+		headSha: toText(sourceCommit.hash),
+	});
+	const record: PullRequestRecord = {
 		id: toNumber(pr.id),
 		number: toNumber(pr.id),
 		title: toText(pr.title),
@@ -467,6 +707,10 @@ function mapBitbucketPullRequest(pr: Record<string, unknown>): PullRequestRecord
 		draft: false,
 		webUrl: toText(html.href),
 	};
+	if (reviewPosition) {
+		record.reviewPosition = reviewPosition;
+	}
+	return record;
 }
 
 function mapAzurePullRequest(
@@ -477,7 +721,11 @@ function mapAzurePullRequest(
 	const sourceCommit = isRecord(pr.lastMergeSourceCommit) ? pr.lastMergeSourceCommit : {};
 	const targetCommit = isRecord(pr.lastMergeTargetCommit) ? pr.lastMergeTargetCommit : {};
 	const id = toNumber(pr.pullRequestId, toNumber(pr.codeReviewId));
-	return {
+	const reviewPosition = buildReviewPosition({
+		baseSha: toText(targetCommit.commitId),
+		headSha: toText(sourceCommit.commitId),
+	});
+	const record: PullRequestRecord = {
 		id,
 		number: id,
 		title: toText(pr.title),
@@ -497,6 +745,10 @@ function mapAzurePullRequest(
 		draft: Boolean(pr.isDraft),
 		webUrl: `${target.webBaseUrl}/pullrequest/${String(id)}`,
 	};
+	if (reviewPosition) {
+		record.reviewPosition = reviewPosition;
+	}
+	return record;
 }
 
 function parseTarget(remoteUrl: string, provider: PullRequestProvider): PullRequestApiTarget {
@@ -861,6 +1113,15 @@ export async function closePullRequest(
 
 function mapGitHubPullRequestComment(comment: Record<string, unknown>): PullRequestComment {
 	const user = isRecord(comment.user) ? comment.user : {};
+	const path = toText(comment.path);
+	const line = typeof comment.line === 'number' ? comment.line : undefined;
+	const side = typeof comment.side === 'string'
+		? comment.side.toLowerCase() === 'left'
+			? 'left'
+			: comment.side.toLowerCase() === 'right'
+				? 'right'
+				: undefined
+		: undefined;
 	return {
 		id: toText(comment.id),
 		author: toText(user.login),
@@ -868,11 +1129,28 @@ function mapGitHubPullRequestComment(comment: Record<string, unknown>): PullRequ
 		createdAt: toIsoDate(comment.created_at),
 		updatedAt: toIsoDate(comment.updated_at),
 		url: toText(comment.html_url),
+		...(path ? { inline: { filePath: path, ...(line ? { line } : {}), ...(side ? { side } : {}) } } : {}),
 	};
 }
 
-function mapGitLabPullRequestComment(comment: Record<string, unknown>): PullRequestComment {
+function mapGitLabPullRequestComment(comment: Record<string, unknown>, discussion?: Record<string, unknown>): PullRequestComment {
 	const author = isRecord(comment.author) ? comment.author : {};
+	const position = isRecord(comment.position) ? comment.position : {};
+	const oldPath = toText(position.old_path);
+	const newPath = toText(position.new_path);
+	const filePath = newPath || oldPath;
+	const line =
+		typeof position.new_line === 'number'
+			? position.new_line
+			: typeof position.old_line === 'number'
+				? position.old_line
+				: undefined;
+	const side =
+		typeof position.new_line === 'number'
+			? 'right'
+			: typeof position.old_line === 'number'
+				? 'left'
+				: undefined;
 	return {
 		id: toText(comment.id),
 		author: toText(author.username, toText(author.name)),
@@ -880,6 +1158,16 @@ function mapGitLabPullRequestComment(comment: Record<string, unknown>): PullRequ
 		createdAt: toIsoDate(comment.created_at),
 		updatedAt: toIsoDate(comment.updated_at),
 		url: '',
+		...(discussion
+			? {
+					thread: {
+						id: toText(discussion.id),
+						status: toBoolean(discussion.resolved) ? 'resolved' : 'open',
+						canResolve: toBoolean(discussion.resolvable, true),
+					},
+			  }
+			: {}),
+		...(filePath ? { inline: { filePath, ...(line ? { line } : {}), ...(side ? { side } : {}) } } : {}),
 	};
 }
 
@@ -888,6 +1176,20 @@ function mapBitbucketPullRequestComment(comment: Record<string, unknown>): PullR
 	const content = isRecord(comment.content) ? comment.content : {};
 	const links = isRecord(comment.links) ? comment.links : {};
 	const html = isRecord(links.html) ? links.html : {};
+	const inline = isRecord(comment.inline) ? comment.inline : {};
+	const filePath = toText(inline.path);
+	const line =
+		typeof inline.to === 'number'
+			? inline.to
+			: typeof inline.from === 'number'
+				? inline.from
+				: undefined;
+	const side =
+		typeof inline.to === 'number'
+			? 'right'
+			: typeof inline.from === 'number'
+				? 'left'
+				: undefined;
 	return {
 		id: toText(comment.id),
 		author: toText(user.display_name, toText(user.nickname)),
@@ -895,16 +1197,34 @@ function mapBitbucketPullRequestComment(comment: Record<string, unknown>): PullR
 		createdAt: toIsoDate(comment.created_on),
 		updatedAt: toIsoDate(comment.updated_on),
 		url: toText(html.href),
+		...(filePath ? { inline: { filePath, ...(line ? { line } : {}), ...(side ? { side } : {}) } } : {}),
 	};
 }
 
 function mapAzurePullRequestComment(
 	target: AzurePullRequestTarget,
 	comment: Record<string, unknown>,
-	fallbackThreadId: number
+	fallbackThreadId: number,
+	thread?: Record<string, unknown>
 ): PullRequestComment {
 	const author = isRecord(comment.author) ? comment.author : {};
 	const commentId = toNumber(comment.id);
+	const threadContext = isRecord(thread?.threadContext) ? thread.threadContext : {};
+	const rightFileStart = isRecord(threadContext.rightFileStart) ? threadContext.rightFileStart : {};
+	const leftFileStart = isRecord(threadContext.leftFileStart) ? threadContext.leftFileStart : {};
+	const filePath = toText(threadContext.filePath).replace(/^\//, '');
+	const line =
+		typeof rightFileStart.line === 'number'
+			? rightFileStart.line
+			: typeof leftFileStart.line === 'number'
+				? leftFileStart.line
+				: undefined;
+	const side =
+		typeof rightFileStart.line === 'number'
+			? 'right'
+			: typeof leftFileStart.line === 'number'
+				? 'left'
+				: undefined;
 	return {
 		id: toText(commentId || fallbackThreadId),
 		author: toText(author.displayName, toText(author.uniqueName)),
@@ -912,6 +1232,15 @@ function mapAzurePullRequestComment(
 		createdAt: toIsoDate(comment.publishedDate),
 		updatedAt: toIsoDate(comment.lastUpdatedDate ?? comment.publishedDate),
 		url: `${target.webBaseUrl}/pullrequest/${String(fallbackThreadId)}`,
+		thread: {
+			id: String(fallbackThreadId),
+			status: (() => {
+				const status = toText(thread?.status).toLowerCase();
+				return status === 'closed' || status === 'fixed' || status === 'resolved' ? 'resolved' : 'open';
+			})(),
+			canResolve: true,
+		},
+		...(filePath ? { inline: { filePath, ...(line ? { line } : {}), ...(side ? { side } : {}) } } : {}),
 	};
 }
 
@@ -925,22 +1254,42 @@ export async function listPullRequestComments(
 	const headers = buildProviderHeaders(provider, auth);
 
 	if (target.provider === 'github') {
-		const comments = await requestJson<Array<Record<string, unknown>>>(
-			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/issues/${String(number)}/comments?per_page=100`,
-			{ headers }
-		);
-		return comments.map((comment) => mapGitHubPullRequestComment(comment));
+		const [issueComments, reviewComments] = await Promise.all([
+			requestJson<Array<Record<string, unknown>>>(
+				`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/issues/${String(number)}/comments?per_page=100`,
+				{ headers }
+			),
+			requestJson<Array<Record<string, unknown>>>(
+				`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}/comments?per_page=100`,
+				{ headers }
+			),
+		]);
+		return [...issueComments, ...reviewComments].map((comment) => mapGitHubPullRequestComment(comment));
 	}
 
 	if (target.provider === 'gitlab') {
 		const projectId = encodeURIComponent(target.projectPath);
-		const comments = await requestJson<Array<Record<string, unknown>>>(
-			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/notes?per_page=100`,
-			{ headers }
-		);
-		return comments
+		const [notes, discussions] = await Promise.all([
+			requestJson<Array<Record<string, unknown>>>(
+				`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/notes?per_page=100`,
+				{ headers }
+			),
+			requestJson<Array<Record<string, unknown>>>(
+				`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/discussions?per_page=100`,
+				{ headers }
+			),
+		]);
+		const topLevelNotes = notes
 			.filter((comment) => comment.system !== true)
 			.map((comment) => mapGitLabPullRequestComment(comment));
+		const discussionNotes = discussions.flatMap((discussion) =>
+			Array.isArray(discussion.notes)
+				? discussion.notes
+						.filter((entry): entry is Record<string, unknown> => isRecord(entry) && entry.system !== true)
+						.map((note) => mapGitLabPullRequestComment(note, discussion))
+				: []
+		);
+		return [...topLevelNotes, ...discussionNotes];
 	}
 
 	if (target.provider === 'bitbucket') {
@@ -962,11 +1311,189 @@ export async function listPullRequestComments(
 		const threadComments = Array.isArray(thread.comments) ? thread.comments : [];
 		for (const comment of threadComments) {
 			if (isRecord(comment)) {
-				comments.push(mapAzurePullRequestComment(target, comment, threadId));
+				comments.push(mapAzurePullRequestComment(target, comment, threadId, thread));
 			}
 		}
 	}
 	return comments;
+}
+
+export async function getPullRequestReviewState(
+	remoteUrl: string,
+	provider: PullRequestProvider,
+	auth: ProviderAuthConfig | undefined,
+	number: number
+): Promise<PullRequestReviewState> {
+	const target = parseTarget(remoteUrl, provider);
+	const headers = buildProviderHeaders(provider, auth);
+
+	if (target.provider === 'github') {
+		const [pullRequest, reviews] = await Promise.all([
+			requestJson<Record<string, unknown>>(
+				`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}`,
+				{ headers }
+			),
+			requestJson<Array<Record<string, unknown>>>(
+				`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}/reviews?per_page=100`,
+				{ headers }
+			),
+		]);
+		const reviewers: PullRequestReviewerState[] = [];
+		const requestedReviewers = Array.isArray(pullRequest.requested_reviewers)
+			? pullRequest.requested_reviewers.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+			: [];
+		for (const reviewer of requestedReviewers) {
+			reviewers.push(mapGitHubReviewer(reviewer, 'requested'));
+		}
+		for (const review of reviews) {
+			const user = isRecord(review.user) ? review.user : {};
+			const state = normalizeReviewerStatus(toText(review.state));
+			reviewers.push(
+				mapGitHubReviewer(
+					user,
+					state,
+					toIsoDate(review.submitted_at ?? review.commit_id ?? review.id),
+					toText(review.state)
+				)
+			);
+		}
+		return buildReviewState(reviewers);
+	}
+
+	if (target.provider === 'gitlab') {
+		const projectId = encodeURIComponent(target.projectPath);
+		const [pullRequest, approvals] = await Promise.all([
+			requestJson<Record<string, unknown>>(
+				`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}`,
+				{ headers }
+			),
+			requestJson<Record<string, unknown>>(
+				`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/approval_state`,
+				{ headers }
+			),
+		]);
+		const reviewers: PullRequestReviewerState[] = [];
+		const requestedReviewers = Array.isArray(pullRequest.reviewers)
+			? pullRequest.reviewers.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+			: [];
+		for (const reviewer of requestedReviewers) {
+			reviewers.push(mapGitLabReviewer(reviewer, 'requested'));
+		}
+		const approvedBy = Array.isArray(approvals.approved_by)
+			? approvals.approved_by.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+			: [];
+		for (const approval of approvedBy) {
+			const user = isRecord(approval.user) ? approval.user : approval;
+			reviewers.push(
+				mapGitLabReviewer(
+					user,
+					'approved',
+					toIsoDate(approval.approved_at ?? approval.created_at),
+					'approved'
+				)
+			);
+		}
+		return buildReviewState(reviewers);
+	}
+
+	if (target.provider === 'bitbucket') {
+		const pullRequest = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}`,
+			{ headers }
+		);
+		const reviewers: PullRequestReviewerState[] = [];
+		const requestedReviewers = Array.isArray(pullRequest.reviewers)
+			? pullRequest.reviewers.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+			: [];
+		for (const reviewer of requestedReviewers) {
+			reviewers.push(mapBitbucketReviewer(reviewer, 'requested'));
+		}
+		const participants = Array.isArray(pullRequest.participants)
+			? pullRequest.participants.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+			: [];
+		for (const participant of participants) {
+			const user = isRecord(participant.user) ? participant.user : participant;
+			const status = toBoolean(participant.approved)
+				? 'approved'
+				: toText(participant.state).toUpperCase() === 'CHANGES_REQUESTED'
+					? 'changes-requested'
+					: 'commented';
+			reviewers.push(
+				mapBitbucketReviewer(
+					user,
+					status,
+					toIsoDate(participant.updated_on ?? participant.participated_on),
+					toText(participant.state)
+				)
+			);
+		}
+		return buildReviewState(reviewers);
+	}
+
+	const response = await requestJson<{ value?: Array<Record<string, unknown>> }>(
+		`${target.apiBaseUrl}/pullRequests/${String(number)}/reviewers?api-version=7.1`,
+		{ headers }
+	);
+	const reviewers = (response.value ?? []).map((reviewer) => {
+		const vote = toNumber(reviewer.vote);
+		const status: PullRequestReviewerStatus =
+			vote >= 5 ? 'approved' : vote <= -5 ? 'changes-requested' : vote === 0 ? 'requested' : 'waiting';
+		return mapAzureReviewer(
+			reviewer,
+			status,
+			toBoolean(reviewer.isRequired),
+			toIsoDate(reviewer.votedForDate ?? reviewer.lastUpdatedDate),
+			String(vote)
+		);
+	});
+	return buildReviewState(reviewers);
+}
+
+export async function setPullRequestThreadResolved(
+	remoteUrl: string,
+	provider: PullRequestProvider,
+	auth: ProviderAuthConfig | undefined,
+	number: number,
+	threadId: string,
+	resolved: boolean
+): Promise<PullRequestThreadState> {
+	const target = parseTarget(remoteUrl, provider);
+	const headers = buildProviderHeaders(provider, auth);
+
+	if (target.provider === 'gitlab') {
+		const projectId = encodeURIComponent(target.projectPath);
+		const discussion = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/discussions/${encodeURIComponent(threadId)}?resolved=${resolved ? 'true' : 'false'}`,
+			{
+				method: 'PUT',
+				headers,
+			}
+		);
+		return {
+			threadId: toText(discussion.id, threadId),
+			status: toBoolean(discussion.resolved) ? 'resolved' : 'open',
+		};
+	}
+
+	if (target.provider === 'azure') {
+		const thread = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/pullRequests/${String(number)}/threads/${encodeURIComponent(threadId)}?api-version=7.1`,
+			{
+				method: 'PATCH',
+				headers,
+				body: {
+					status: resolved ? 'closed' : 'active',
+				},
+			}
+		);
+		const status = toText(thread.status).toLowerCase();
+		return {
+			threadId: String(toNumber(thread.id, Number(threadId))),
+			status: status === 'closed' || status === 'fixed' || status === 'resolved' ? 'resolved' : 'open',
+		};
+	}
+
+	throw new Error(`${provider} does not expose provider thread resolution in the current integration path.`);
 }
 
 export async function addPullRequestComment(
@@ -1038,6 +1565,114 @@ export async function addPullRequestComment(
 		? thread.comments[0]
 		: null;
 	return mapAzurePullRequestComment(target, firstComment ?? { content: body }, threadId);
+}
+
+export async function addPullRequestInlineComment(
+	remoteUrl: string,
+	provider: PullRequestProvider,
+	auth: ProviderAuthConfig | undefined,
+	number: number,
+	input: PullRequestInlineCommentInput
+): Promise<PullRequestComment> {
+	const target = parseTarget(remoteUrl, provider);
+	const headers = buildProviderHeaders(provider, auth);
+
+	if (target.provider === 'github') {
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/pulls/${String(number)}/comments`,
+			{
+				method: 'POST',
+				headers,
+				body: {
+					body: input.body,
+					commit_id: input.headSha,
+					path: input.filePath,
+					line: input.line,
+					side: input.side === 'right' ? 'RIGHT' : 'LEFT',
+				},
+			}
+		);
+		return mapGitHubPullRequestComment(comment);
+	}
+
+	if (target.provider === 'gitlab') {
+		const projectId = encodeURIComponent(target.projectPath);
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/projects/${projectId}/merge_requests/${String(number)}/discussions`,
+			{
+				method: 'POST',
+				headers,
+				body: {
+					body: input.body,
+					position: {
+						position_type: 'text',
+						base_sha: input.baseSha,
+						start_sha: input.startSha ?? input.baseSha,
+						head_sha: input.headSha,
+						old_path: input.filePath,
+						new_path: input.filePath,
+						...(input.side === 'right' ? { new_line: input.line } : { old_line: input.line }),
+					},
+				},
+			}
+		);
+		const notes = Array.isArray(comment.notes) ? comment.notes : [];
+		const firstNote = notes.find((entry) => isRecord(entry));
+		return mapGitLabPullRequestComment(isRecord(firstNote) ? firstNote : comment);
+	}
+
+	if (target.provider === 'bitbucket') {
+		const comment = await requestJson<Record<string, unknown>>(
+			`${target.apiBaseUrl}/repositories/${encodeURIComponent(target.workspace)}/${encodeURIComponent(target.repoSlug)}/pullrequests/${String(number)}/comments`,
+			{
+				method: 'POST',
+				headers,
+				body: {
+					content: { raw: input.body },
+					inline: {
+						path: input.filePath,
+						...(input.side === 'right' ? { to: input.line } : { from: input.line }),
+					},
+				},
+			}
+		);
+		return mapBitbucketPullRequestComment(comment);
+	}
+
+	const thread = await requestJson<Record<string, unknown>>(
+		`${target.apiBaseUrl}/pullRequests/${String(number)}/threads?api-version=7.1`,
+		{
+			method: 'POST',
+			headers,
+			body: {
+				comments: [
+					{
+						parentCommentId: 0,
+						content: input.body,
+						commentType: 1,
+					},
+				],
+				status: 'active',
+				threadContext: {
+					filePath: input.filePath.startsWith('/') ? input.filePath : `/${input.filePath}`,
+					...(input.side === 'right'
+						? {
+								rightFileStart: { line: input.line, offset: 1 },
+								rightFileEnd: { line: input.line, offset: 1 },
+						  }
+						: {
+								leftFileStart: { line: input.line, offset: 1 },
+								leftFileEnd: { line: input.line, offset: 1 },
+						  }),
+				},
+			},
+		}
+	);
+	const threadId = toNumber(thread.id, number);
+	const firstComment = Array.isArray(thread.comments) && isRecord(thread.comments[0])
+		? thread.comments[0]
+		: null;
+	return mapAzurePullRequestComment(target, firstComment ?? { content: input.body }, threadId);
 }
 
 export async function checkBranchPullRequest(

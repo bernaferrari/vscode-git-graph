@@ -7,7 +7,6 @@ import {
 	Search,
 	User,
 	CalendarDays,
-	Filter,
 	X,
 	FileText,
 	RotateCcw,
@@ -18,13 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -41,6 +33,52 @@ interface CommitHistoryFiltersProps {
 	onChange: (filters: CommitFilter) => void;
 }
 
+function buildFilters(current: CommitFilter, patch: Partial<Record<keyof CommitFilter, string | Date | undefined>>): CommitFilter {
+	const next: CommitFilter = { ...current };
+
+	if ('author' in patch) {
+		if (typeof patch.author === 'string' && patch.author.trim()) {
+			next.author = patch.author.trim();
+		} else {
+			delete next.author;
+		}
+	}
+
+	if ('dateFrom' in patch) {
+		if (patch.dateFrom instanceof Date) {
+			next.dateFrom = patch.dateFrom;
+		} else {
+			delete next.dateFrom;
+		}
+	}
+
+	if ('dateTo' in patch) {
+		if (patch.dateTo instanceof Date) {
+			next.dateTo = patch.dateTo;
+		} else {
+			delete next.dateTo;
+		}
+	}
+
+	if ('filePath' in patch) {
+		if (typeof patch.filePath === 'string' && patch.filePath.trim()) {
+			next.filePath = patch.filePath.trim();
+		} else {
+			delete next.filePath;
+		}
+	}
+
+	if ('search' in patch) {
+		if (typeof patch.search === 'string' && patch.search.trim()) {
+			next.search = patch.search.trim();
+		} else {
+			delete next.search;
+		}
+	}
+
+	return next;
+}
+
 export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFiltersProps) {
 	const { activeRepo } = useAppStore();
 	const [localSearch, setLocalSearch] = useState(filters.search ?? '');
@@ -52,7 +90,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 
 	const authors = useMemo(() => {
 		const list = new Set<string>();
-		(authorsData?.authors ?? []).forEach((a) => list.add(a.name));
+		(authorsData?.authors ?? []).forEach((author: { name: string }) => list.add(author.name));
 		return Array.from(list).sort();
 	}, [authorsData?.authors]);
 
@@ -64,7 +102,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 	};
 
 	const handleSearch = () => {
-		onChange({ ...filters, search: localSearch || undefined });
+		onChange(buildFilters(filters, { search: localSearch }));
 	};
 
 	return (
@@ -85,7 +123,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 						className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 p-0"
 						onClick={() => {
 							setLocalSearch('');
-							onChange({ ...filters, search: undefined });
+							onChange(buildFilters(filters, { search: '' }));
 						}}
 					>
 						<X className="h-3 w-3" />
@@ -112,7 +150,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 							variant="ghost"
 							size="sm"
 							className="w-full justify-start h-7 px-2"
-							onClick={() => { onChange({ ...filters, author: undefined }); }}
+							onClick={() => { onChange(buildFilters(filters, { author: '' })); }}
 						>
 							Any Author
 						</Button>
@@ -122,7 +160,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								variant={filters.author === author ? 'secondary' : 'ghost'}
 								size="sm"
 								className="w-full justify-start h-7 px-2"
-								onClick={() => { onChange({ ...filters, author }); }}
+								onClick={() => { onChange(buildFilters(filters, { author })); }}
 							>
 								{author}
 							</Button>
@@ -147,7 +185,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								<Calendar
 									mode="single"
 									selected={filters.dateFrom}
-									onSelect={(date) => { onChange({ ...filters, dateFrom: date }); }}
+									onSelect={(date) => { onChange(buildFilters(filters, { dateFrom: date ?? undefined })); }}
 									className="rounded-md border"
 								/>
 							</div>
@@ -156,7 +194,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 								<Calendar
 									mode="single"
 									selected={filters.dateTo}
-									onSelect={(date) => { onChange({ ...filters, dateTo: date }); }}
+									onSelect={(date) => { onChange(buildFilters(filters, { dateTo: date ?? undefined })); }}
 									className="rounded-md border"
 								/>
 							</div>
@@ -165,7 +203,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 							variant="ghost"
 							size="sm"
 							className="w-full h-7 text-xs"
-							onClick={() => { onChange({ ...filters, dateFrom: undefined, dateTo: undefined }); }}
+							onClick={() => { onChange(buildFilters(filters, { dateFrom: undefined, dateTo: undefined })); }}
 						>
 							Clear Dates
 						</Button>
@@ -185,7 +223,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 					<Input
 						placeholder="src/components/..."
 						value={filters.filePath ?? ''}
-						onChange={(e) => { onChange({ ...filters, filePath: e.target.value || undefined }); }}
+						onChange={(e) => { onChange(buildFilters(filters, { filePath: e.target.value })); }}
 						className="h-7 text-xs"
 					/>
 				</PopoverContent>

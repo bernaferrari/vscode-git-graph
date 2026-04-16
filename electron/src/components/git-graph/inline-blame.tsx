@@ -32,17 +32,6 @@ interface InlineBlameProps {
 
 // Parse git blame porcelain output
 function parseBlamePorcelain(output: string): BlameLine[] {
-	const lines: BlameLine[] = [];
-	const blocks = output.split('\t');
-	
-	// This is simplified - real porcelain parsing is more complex
-	// For now, parse header lines
-	const headerRegex = /^([a-f0-9]+)\s+(\d+)\s+(\d+)\s+(\d+)$/;
-	const authorRegex = /^author\s+(.+)$/;
-	const authorMailRegex = /^author-mail\s+<(.+)>$/;
-	const authorTimeRegex = /^author-time\s+(\d+)$/;
-	const summaryRegex = /^summary\s+(.+)$/;
-	
 	const result: BlameLine[] = [];
 	let currentBlock: Partial<BlameLine> = {};
 	let lineNumber = 0;
@@ -59,7 +48,11 @@ function parseBlamePorcelain(output: string): BlameLine[] {
 		} else if (line.match(/^[a-f0-9]{40}/)) {
 			// New block starts with a hash
 			const hashMatch = line.match(/^([a-f0-9]+)/);
-			if (hashMatch && currentBlock.hash) {
+			const hash = hashMatch?.[1];
+			if (!hash) {
+				continue;
+			}
+			if (currentBlock.hash) {
 				result.push({
 					lineNumber: lineNumber++,
 					content: '',
@@ -70,7 +63,7 @@ function parseBlamePorcelain(output: string): BlameLine[] {
 					summary: currentBlock.summary ?? '',
 				});
 			}
-			currentBlock = { hash: hashMatch[1] };
+			currentBlock = { hash };
 		} else if (line.includes('\t')) {
 			// Content line with tab separator
 			const [info, content] = line.split('\t');
@@ -105,7 +98,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 		trpc.git.blame.query({
 			repo: activeRepo,
 			path: filePath,
-		}).then((result) => {
+		}).then((result: { error?: string | null; blame?: string | null }) => {
 			if (result.error) {
 				console.error('Blame error:', result.error);
 				setBlameData([]);
@@ -121,8 +114,8 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 		return fileContent.split('\n').map((content, index) => ({
 			lineNumber: index + 1,
 			content,
-			blame: blameData[index],
-		}));
+			blame: blameData[index] ?? null,
+		})) as Array<{ lineNumber: number; content: string; blame: BlameLine | null }>;
 	}, [fileContent, blameData]);
 
 	const formatDate = (timestamp: number) => {
@@ -168,14 +161,17 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 
 					{/* Blame annotation */}
 					{line.blame ? (
+						(() => {
+							const blame = line.blame;
+							return (
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<div className="w-48 shrink-0 pr-4 text-xs text-muted-foreground truncate cursor-pointer hover:text-foreground">
 									<span className="font-medium">
-										{line.blame.author}
+										{blame.author}
 									</span>
 									<span className="ml-2 opacity-60">
-										{formatDate(line.blame.authorTime)}
+										{formatDate(blame.authorTime)}
 									</span>
 								</div>
 							</TooltipTrigger>
@@ -184,15 +180,15 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 									<div className="flex items-center gap-2">
 										<GitCommit className="h-4 w-4" />
 										<code className="text-xs">
-											{line.blame.hash.slice(0, 7)}
+											{blame.hash.slice(0, 7)}
 										</code>
 										<Button
 											variant="ghost"
 											size="sm"
 											className="h-5 w-5 p-0"
-											onClick={(e) => handleCopyHash(line.blame.hash, e)}
+											onClick={(e) => handleCopyHash(blame.hash, e)}
 										>
-											{copiedHash === line.blame.hash ? (
+											{copiedHash === blame.hash ? (
 												<Check className="h-3 w-3 text-green-600" />
 											) : (
 												<Copy className="h-3 w-3" />
@@ -200,16 +196,16 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 										</Button>
 									</div>
 									<p className="text-sm font-medium truncate">
-										{line.blame.summary}
+										{blame.summary}
 									</p>
 									<div className="flex items-center gap-4 text-xs text-muted-foreground">
 										<div className="flex items-center gap-1">
 											<User className="h-3 w-3" />
-											{line.blame.author}
+											{blame.author}
 										</div>
 										<div className="flex items-center gap-1">
 											<Calendar className="h-3 w-3" />
-											{new Date(line.blame.authorTime * 1000).toLocaleDateString()}
+											{new Date(blame.authorTime * 1000).toLocaleDateString()}
 										</div>
 									</div>
 									{onCommitClick && (
@@ -217,7 +213,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 											variant="outline"
 											size="sm"
 											className="w-full mt-2"
-											onClick={() => onCommitClick(line.blame.hash)}
+											onClick={() => onCommitClick(blame.hash)}
 										>
 											View Commit
 										</Button>
@@ -225,6 +221,8 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 								</div>
 							</TooltipContent>
 						</Tooltip>
+							);
+						})()
 					) : (
 						<div className="w-48 shrink-0 pr-4" />
 					)}

@@ -2,7 +2,7 @@ import { Archive, Box, FolderTree, GitBranch, Globe, Plus, Tag, Wrench } from 'l
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
-import type { AheadBehindEntry, SmartBranchEntry, StashEntry, SubmoduleEntry, WorktreeEntry } from './side-panel-types';
+import type { AheadBehindEntry, StashEntry, SubmoduleEntry, WorktreeEntry } from './side-panel-types';
 
 export function SidePanelSection({
     title,
@@ -130,12 +130,12 @@ export function BranchesSection({
                     branch,
                     isCurrent: branch === currentHead,
                     pinned,
-                    ahead: aheadBehind?.ahead,
-                    behind: aheadBehind?.behind,
-                    onSelect: onBranchSelect,
+                    ...(aheadBehind?.ahead !== undefined ? { ahead: aheadBehind.ahead } : {}),
+                    ...(aheadBehind?.behind !== undefined ? { behind: aheadBehind.behind } : {}),
+                    ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                     onCheckout: () => onCheckout(branch),
                     onDelete: () => onDelete(branch),
-                    onMerge: onMergeBranch ? () => onMergeBranch(branch) : undefined,
+                    ...(onMergeBranch ? { onMerge: () => onMergeBranch(branch) } : {}),
                     onPinToggle: () => onPinToggle(branch, pinned),
                 });
             })}
@@ -182,7 +182,7 @@ export function RemoteBranchesSection({
             {filteredRemoteBranches.slice(0, 20).map((branch) =>
                 renderRemoteBranchItem({
                     branch,
-                    onSelect: onBranchSelect,
+                    ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                     onCheckout: () => onCheckout(branch),
                 })
             )}
@@ -193,7 +193,7 @@ export function RemoteBranchesSection({
                     children: filteredRemoteBranches.slice(20).map((branch) =>
                         renderRemoteBranchItem({
                             branch,
-                            onSelect: onBranchSelect,
+                            ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                             onCheckout: () => onCheckout(branch),
                         })
                     ),
@@ -253,7 +253,7 @@ export function WorktreesSection({
                 renderWorktreeItem({
                     worktree: wt,
                     onReveal: () => onReveal(wt.path),
-                    onOpenWorktrees,
+                    ...(onOpenWorktrees ? { onOpenWorktrees } : {}),
                 })
             )}
         </SidePanelSection>

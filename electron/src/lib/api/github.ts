@@ -223,7 +223,11 @@ export class GitHubClient {
 	static parseUrl(url: string): { owner: string; repo: string } | null {
 		const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
 		if (match) {
-			return { owner: match[1], repo: match[2].replace('.git', '') };
+			const owner = match[1];
+			const repo = match[2];
+			if (owner !== undefined && repo !== undefined) {
+				return { owner, repo: repo.replace('.git', '') };
+			}
 		}
 		return null;
 	}

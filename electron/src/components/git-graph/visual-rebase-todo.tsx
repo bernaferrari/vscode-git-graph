@@ -322,6 +322,8 @@ export function VisualRebaseTodoEditor({
 			refetchInterval: open && !!activeRepo && !fromCommit && !hasLocalChanges ? 2000 : false,
 		}
 	);
+	const activeTodoSource =
+		typeof activeRebaseTodo?.rawTodo === 'string' ? (activeRebaseTodo.rawTodo as string) : '';
 
 	const sanitizeTodoMessage = useCallback((message: string) => {
 		return message.trim().replace(/[\r\n]+/g, ' ');
@@ -334,24 +336,24 @@ export function VisualRebaseTodoEditor({
 		setIsLoading(true);
 		try {
 			if (!fromCommit) {
-				if (!activeRebaseTodo?.rawTodo) {
+				if (!activeTodoSource) {
 					setTodos([]);
 					setLoadedTodoSource('');
 					setHasLocalChanges(false);
 					return;
 				}
 
-				const parsedTodoItems = activeRebaseTodo.rawTodo
+				const parsedTodoItems: TodoItem[] = activeTodoSource
 					.split('\n')
-					.map((line, index) => parseRebaseTodoLine(line, index))
+					.map((line: string, index: number) => parseRebaseTodoLine(line, index))
 					.filter((todo): todo is TodoItem => Boolean(todo))
-					.map((todo) => ({
+					.map((todo: TodoItem) => ({
 						...todo,
 						message: sanitizeTodoMessage(todo.message ?? ''),
 					}));
 
 				setTodos(parsedTodoItems);
-				setLoadedTodoSource(activeRebaseTodo.rawTodo);
+				setLoadedTodoSource(activeTodoSource);
 				setHasLocalChanges(false);
 				return;
 			}
@@ -370,12 +372,13 @@ export function VisualRebaseTodoEditor({
 				return;
 			}
 
-			const todoItems: TodoItem[] = (result.commits || []).map((commit: { hash: string; message: string }, index: number) => ({
+			const commits = Array.isArray(result.commits) ? (result.commits as Array<{ hash: string; message: string }>) : [];
+			const todoItems: TodoItem[] = commits.map((commit, index) => ({
 				id: commit.hash,
 				kind: 'command',
 				action: 'pick',
 				hash: commit.hash,
-				message: sanitizeTodoMessage(commit.message).split('\n')[0],
+				message: sanitizeTodoMessage(commit.message).split('\n')[0] ?? '',
 				originalAction: 'pick',
 				originalIndex: index,
 			}));
@@ -388,9 +391,7 @@ export function VisualRebaseTodoEditor({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [open, activeRepo, fromCommit, sanitizeTodoMessage, activeRebaseTodo]);
-
-	const getActiveTodoSource = activeRebaseTodo?.rawTodo ?? '';
+	}, [open, activeRepo, fromCommit, sanitizeTodoMessage, activeTodoSource]);
 
 	// Load on open and keep in sync when not editing.
 	useEffect(() => {
@@ -405,10 +406,10 @@ export function VisualRebaseTodoEditor({
 		}
 
 		if (hasLocalChanges) return;
-		if (getActiveTodoSource === loadedTodoSource) return;
+		if (activeTodoSource === loadedTodoSource) return;
 
 		void loadCommits();
-	}, [open, fromCommit, hasLocalChanges, loadedTodoSource, getActiveTodoSource, loadCommits]);
+	}, [open, fromCommit, hasLocalChanges, loadedTodoSource, activeTodoSource, loadCommits]);
 
 	useEffect(() => {
 		if (!open) {
@@ -443,6 +444,11 @@ export function VisualRebaseTodoEditor({
 
 		const newTodos = [...todos];
 		const [draggedItem] = newTodos.splice(dragIndex, 1);
+		if (!draggedItem) {
+			setDragIndex(null);
+			setDropIndex(null);
+			return;
+		}
 		newTodos.splice(index, 0, draggedItem);
 		setTodos(newTodos);
 		setHasLocalChanges(true);
@@ -467,7 +473,10 @@ export function VisualRebaseTodoEditor({
 		if (destinationIndex === null) return;
 
 		const newTodos = [...todos];
-		[newTodos[destinationIndex], newTodos[index]] = [newTodos[index], newTodos[destinationIndex]];
+		const current = newTodos[index];
+		const destination = newTodos[destinationIndex];
+		if (!current || !destination) return;
+		[newTodos[destinationIndex], newTodos[index]] = [current, destination];
 		setTodos(newTodos);
 		setHasLocalChanges(true);
 	};
@@ -485,7 +494,10 @@ export function VisualRebaseTodoEditor({
 		if (destinationIndex === null) return;
 
 		const newTodos = [...todos];
-		[newTodos[index], newTodos[destinationIndex]] = [newTodos[destinationIndex], newTodos[index]];
+		const current = newTodos[index];
+		const destination = newTodos[destinationIndex];
+		if (!current || !destination) return;
+		[newTodos[index], newTodos[destinationIndex]] = [destination, current];
 		setTodos(newTodos);
 		setHasLocalChanges(true);
 	};
@@ -495,13 +507,6 @@ export function VisualRebaseTodoEditor({
 		setTodos(prev => prev.map(todo => 
 			todo.id === id ? { ...todo, action } : todo
 		));
-		setHasLocalChanges(true);
-	};
-
-	const removeTodo = (id: string) => {
-		const target = todos.find((todo) => todo.id === id);
-		if (!target || target.kind !== 'command') return;
-		setTodos(prev => prev.filter(todo => todo.id !== id));
 		setHasLocalChanges(true);
 	};
 

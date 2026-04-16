@@ -3,7 +3,7 @@
  * Preview merge before executing
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -16,22 +16,20 @@ import {
 	DialogTitle,
 	DialogFooter,
 } from '@/components/ui/dialog';
-import {
-	GitMerge,
-	GitBranch,
-	AlertTriangle,
-	Check,
-	X,
-	Plus,
-	Minus,
-	Loader2,
-	ArrowRight,
-	FileCode,
-	FileText,
-	Image,
-	ChevronDown,
-	ChevronRight,
-} from 'lucide-react';
+	import {
+			GitMerge,
+			GitBranch,
+			AlertTriangle,
+			Check,
+			X,
+			Loader2,
+			ArrowRight,
+			FileCode,
+			FileText,
+			Image,
+			ChevronDown,
+			ChevronRight,
+		} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MergePreviewProps {
@@ -52,6 +50,10 @@ interface MergePreviewData {
 		deletions: number;
 	}>;
 	warnings: string[];
+}
+
+interface BranchEntry {
+	name: string;
 }
 
 export function MergePreview({
@@ -78,7 +80,7 @@ export function MergePreview({
 	const [localTarget, setLocalTarget] = useState(targetBranch || 'main');
 
 	// Fetch merge preview
-	const { data: previewData, isLoading, refetch } = trpc.git.mergePreview.useQuery(
+	const { data: previewData, isLoading } = trpc.git.mergePreview.useQuery(
 		{ 
 			repo: activeRepo ?? '', 
 			source: localSource, 
@@ -88,7 +90,7 @@ export function MergePreview({
 	);
 
 	const preview = previewData as MergePreviewData | undefined;
-	const branches = branchData?.branches ?? [];
+	const branches = (branchData?.branches ?? []) as BranchEntry[];
 
 	const toggleSection = (section: string) => {
 		setExpandedSections(prev => {
@@ -170,9 +172,9 @@ export function MergePreview({
 							onChange={(e) => setLocalSource(e.target.value)}
 						>
 							<option value="">Select branch to merge...</option>
-							{branches.filter(b => b.name !== localTarget).map((b) => (
-								<option key={b.name} value={b.name}>{b.name}</option>
-							))}
+								{branches.filter((branch: BranchEntry) => branch.name !== localTarget).map((branch: BranchEntry) => (
+			<option key={branch.name} value={branch.name}>{branch.name}</option>
+		))}
 						</select>
 					</div>
 					<ArrowRight className="h-4 w-4 text-muted-foreground mt-4" />
@@ -183,9 +185,9 @@ export function MergePreview({
 							value={localTarget}
 							onChange={(e) => setLocalTarget(e.target.value)}
 						>
-							{branches.map((b) => (
-								<option key={b.name} value={b.name}>{b.name}</option>
-							))}
+			{branches.map((branch: BranchEntry) => (
+				<option key={branch.name} value={branch.name}>{branch.name}</option>
+			))}
 						</select>
 					</div>
 				</div>
@@ -264,7 +266,7 @@ export function MergePreview({
 									</button>
 									{expandedSections.has('commits') && (
 										<div className="divide-y">
-											{preview.aheadCommits.map((commit, i) => (
+						{preview.aheadCommits.map((commit) => (
 												<div key={commit.hash} className="flex items-center gap-3 px-4 py-2">
 													<code className="text-xs font-mono text-blue-600">
 														{commit.hash.substring(0, 7)}
@@ -306,9 +308,9 @@ export function MergePreview({
 									</button>
 									{expandedSections.has('files') && (
 										<div className="divide-y max-h-64 overflow-y-auto">
-											{preview.files.map((file, i) => (
-												<div
-													key={i}
+						{preview.files.map((file) => (
+													<div
+														key={file.path}
 													className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-accent/50 ${
 														selectedFile === file.path ? 'bg-accent' : ''
 													}`}

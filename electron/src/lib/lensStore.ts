@@ -1,10 +1,7 @@
 /**
- * Lens Mode Store
- * Standalone zustand store for lens mode (no circular dependencies)
+ * Shared lens metadata.
+ * The persisted lens selection now lives in backend-managed Git Graph settings.
  */
-
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 export type LensMode = 'guided' | 'craft' | 'control';
 
@@ -67,84 +64,3 @@ export const LENS_CONFIGS: Record<LensMode, LensConfig> = {
 		confirmDestructive: false,
 	},
 };
-
-interface LensState {
-	mode: LensMode;
-	setMode: (mode: LensMode) => void;
-}
-
-export const useLensStore = create<LensState>()(
-	persist(
-		(set) => ({
-			mode: 'craft',
-			setMode: (mode) => set({ mode }),
-		}),
-		{
-			name: 'git-graph-lens-mode',
-		}
-	)
-);
-
-// Hook that uses the store
-import { useMemo, useCallback } from 'react';
-
-export function useLensMode() {
-	const { mode, setMode } = useLensStore();
-
-	const config = useMemo(() => LENS_CONFIGS[mode], [mode]);
-
-	const setLensMode = useCallback(
-		(newMode: LensMode) => {
-			setMode(newMode);
-		},
-		[setMode]
-	);
-
-	const isGuided = mode === 'guided';
-	const isCraft = mode === 'craft';
-	const isControl = mode === 'control';
-
-	const shouldShow = useCallback(
-		(feature: keyof LensConfig): boolean => {
-			return config[feature] as boolean;
-		},
-		[config]
-	);
-
-	const getActionLabel = useCallback(
-		(action: 'fetch' | 'pull' | 'push' | 'sync' | 'rebase' | 'merge'): string => {
-			if (isGuided) {
-				switch (action) {
-					case 'fetch':
-						return 'Check for updates';
-					case 'pull':
-						return 'Get changes';
-					case 'push':
-						return 'Share changes';
-					case 'sync':
-						return 'Sync all';
-					case 'rebase':
-						return 'Update branch';
-					case 'merge':
-						return 'Combine branches';
-					default:
-						return action;
-				}
-			}
-			return action;
-		},
-		[isGuided]
-	);
-
-	return {
-		mode,
-		config,
-		setLensMode,
-		isGuided,
-		isCraft,
-		isControl,
-		shouldShow,
-		getActionLabel,
-		lensOptions: Object.values(LENS_CONFIGS),
-	};
-}

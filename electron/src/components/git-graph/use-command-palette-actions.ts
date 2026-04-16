@@ -47,6 +47,7 @@ interface UseCommandPaletteActionsInput {
         setStagingFile: (file: string | null) => void;
         setLineStagingOpen: (open: boolean) => void;
         setWorkspacesOpen: (open: boolean) => void;
+        setCollaborationOpen: (open: boolean) => void;
         setKeyboardHelpOpen: (open: boolean) => void;
         setKeyboardEditorOpen: (open: boolean) => void;
         setHealthCheckOpen: (open: boolean) => void;
@@ -61,6 +62,10 @@ interface UseCommandPaletteActionsInput {
         setActivityHeatmapOpen: (open: boolean) => void;
     };
     handleRefreshAll: () => void;
+}
+
+function getPrimaryChangedFile(workingTreeStatus?: UseCommandPaletteActionsInput['workingTreeStatus']) {
+    return workingTreeStatus?.unstaged?.[0]?.file ?? workingTreeStatus?.staged?.[0]?.file ?? null;
 }
 
 export function useCommandPaletteActions(input: UseCommandPaletteActionsInput): CommandPaletteActions {
@@ -178,6 +183,9 @@ export function useCommandPaletteActions(input: UseCommandPaletteActionsInput): 
             onWorkspaces: () => {
                 openers.setWorkspacesOpen(true);
             },
+            onCollaboration: () => {
+                openers.setCollaborationOpen(true);
+            },
             onKeyboardHelp: () => {
                 openers.setKeyboardHelpOpen(true);
             },
@@ -206,7 +214,12 @@ export function useCommandPaletteActions(input: UseCommandPaletteActionsInput): 
                 openers.setBulkOpsOpen(true);
             },
             onFileAnnotations: () => {
-                openers.setAnnotationsFile('README.md');
+                const annotationsFile = getPrimaryChangedFile(workingTreeStatus);
+                if (!annotationsFile) {
+                    toast.info('No changed files available for file annotations');
+                    return;
+                }
+                openers.setAnnotationsFile(annotationsFile);
                 openers.setFileAnnotationsOpen(true);
             },
             onActivityHeatmap: () => {

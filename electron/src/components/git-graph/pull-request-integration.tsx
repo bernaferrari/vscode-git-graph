@@ -6,6 +6,7 @@
 import {
     AlertCircle,
     Check,
+    ClipboardCheck,
     ExternalLink,
     GitBranch,
     GitPullRequest,
@@ -21,9 +22,13 @@ import {
     Wand2,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { CollaborationAssignmentPanel } from '@/components/git-graph/collaboration-center-assignment';
+import { CollaborationCommentThread } from '@/components/git-graph/collaboration-comment-thread';
+import type { CollaborationAssignment, CollaborationComment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
+import { detectPullRequestProvider, type PullRequestProvider } from '@/components/git-graph/pull-request-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,11 +36,18 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { parseDiffWithInlineDiffs } from '@/lib/diff-utils';
+import {
+    buildCollaborationPullRequestFileTargetId,
+    buildCollaborationPullRequestTargetId,
+    deriveCollaborationRepoKey,
+    getCollaborationReviewRootTargetId,
+    parseCollaborationReviewTargetId,
+} from '@/lib/collaboration-review-targets';
 import { useAppStore } from '@/lib/store';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { trpc } from '@/trpc/client';
 
-
-type PullRequestProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
 type PullRequestStateFilter = 'open' | 'closed' | 'all';
 
 interface PullRequest {
@@ -52,11 +64,11 @@ interface PullRequest {
     draft: boolean;
     mergeable?: boolean | null;
     webUrl: string;
-}
-
-interface PRProvider {
-    name: PullRequestProvider;
-    host: string;
+    reviewPosition?: {
+        baseSha?: string;
+        startSha?: string;
+        headSha?: string;
+    };
 }
 
 interface PullRequestComment {
@@ -127,6 +139,31 @@ interface PullRequestCommentsQueryData {
     comments: PullRequestComment[];
 }
 
+interface PullRequestReviewerState {
+    id: string;
+    name: string;
+    username?: string;
+    required?: boolean;
+    status: 'requested' | 'commented' | 'approved' | 'changes-requested' | 'waiting';
+    providerState?: string;
+    updatedAt?: string;
+}
+
+interface PullRequestReviewStateSummary {
+    overall: 'pending' | 'approved' | 'changes-requested';
+    reviewers: PullRequestReviewerState[];
+    requestedCount: number;
+    approvedCount: number;
+    commentedCount: number;
+    changesRequestedCount: number;
+    waitingCount: number;
+}
+
+interface PullRequestReviewStateQueryData {
+    reviewState: PullRequestReviewStateSummary | null;
+    error?: string | null;
+}
+
 interface QueryOptions {
     enabled?: boolean;
     staleTime?: number;
@@ -145,7 +182,7 @@ interface MutationCallbacks<TResult = unknown> {
 }
 
 interface MutationState<TInput> {
-    mutate: (input: TInput) => void;
+    mutate: (input: TInput, callbacks?: MutationCallbacks<unknown>) => void;
     isPending: boolean;
 }
 
@@ -183,12 +220,48 @@ interface AddPullRequestCommentInput {
     body: string;
 }
 
+interface AddPullRequestInlineCommentInput extends AddPullRequestCommentInput {
+    filePath: string;
+    line: number;
+    side: 'left' | 'right';
+    baseSha?: string;
+    startSha?: string;
+    headSha?: string;
+}
+
 interface TrpcUtilsShape {
     git: {
         getPullRequest: {
             invalidate: () => Promise<unknown>;
         };
     };
+    repo: {
+        collaboration: {
+            list: {
+                invalidate: () => Promise<unknown>;
+            };
+            activity: {
+                invalidate: () => Promise<unknown>;
+            };
+            reviewDashboard: {
+                invalidate: () => Promise<unknown>;
+            };
+        };
+    };
+}
+
+interface CompareBranchesData {
+    commits: Array<{ hash: string; message: string }>;
+    files: Array<{ status: string; path: string }>;
+    additions: number;
+    deletions: number;
+    error?: string | null;
+}
+
+interface GeneratePullRequestResult {
+    title?: string | null;
+    body?: string | null;
+    error?: string | null;
 }
 
 interface TrpcGitShape {
@@ -221,6 +294,12 @@ interface TrpcGitShape {
             options: QueryOptions
         ) => QueryState<PullRequestCommentsQueryData>;
     };
+    getPullRequestReviewState: {
+        useQuery: (
+            input: { repo: string; provider: PullRequestProvider; number: number },
+            options: QueryOptions
+        ) => QueryState<PullRequestReviewStateQueryData>;
+    };
     setPullRequestAuth: {
         useMutation: (callbacks: MutationCallbacks) => MutationState<PullRequestAuthForm>;
     };
@@ -237,6 +316,11 @@ interface TrpcGitShape {
         useMutation: (
             callbacks: MutationCallbacks<PullRequestMutationResult>
         ) => MutationState<AddPullRequestCommentInput>;
+    };
+    addPullRequestInlineComment: {
+        useMutation: (
+            callbacks: MutationCallbacks<PullRequestMutationResult>
+        ) => MutationState<AddPullRequestInlineCommentInput>;
     };
 }
 
@@ -258,6 +342,10 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
     const [mergeMethod, setMergeMethod] = useState<'merge' | 'squash' | 'rebase'>('merge');
     const [commentDraft, setCommentDraft] = useState('');
+    const [reviewRequestDraft, setReviewRequestDraft] = useState({ assigneeId: '', note: '' });
+    const [reviewThreadDraft, setReviewThreadDraft] = useState('');
+    const [fileReviewDrafts, setFileReviewDrafts] = useState<Record<string, string>>({});
+    const [expandedReviewFiles, setExpandedReviewFiles] = useState<Record<string, boolean>>({});
 
     const [prTitle, setPrTitle] = useState('');
     const [prBody, setPrBody] = useState('');
@@ -299,10 +387,28 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     }, [authQuery.data?.auth, didSeedAuthForm]);
 
     const detectedProvider = useMemo(
-        () => detectProvider(remoteData?.remotes.find((remote) => remote.name === 'origin')?.url),
+        () => detectPullRequestProvider(remoteData?.remotes.find((remote) => remote.name === 'origin')?.url),
         [remoteData?.remotes]
     );
     const provider = detectedProvider?.name ?? 'github';
+    const reviewRepoKey = useMemo(
+        () => deriveCollaborationRepoKey(remoteData?.remotes.find((remote) => remote.name === 'origin')?.url),
+        [remoteData?.remotes]
+    );
+    const selectedReviewTargetId = selectedPR
+        ? buildCollaborationPullRequestTargetId({
+              provider,
+              repoKey: reviewRepoKey,
+              pullRequestNumber: selectedPR.number,
+          })
+        : '';
+
+    useEffect(() => {
+        setReviewRequestDraft({ assigneeId: '', note: '' });
+        setReviewThreadDraft('');
+        setFileReviewDrafts({});
+        setExpandedReviewFiles({});
+    }, [selectedReviewTargetId]);
 
     const hasRequiredToken = useMemo(() => {
         switch (provider) {
@@ -349,10 +455,21 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             staleTime: 5_000,
         }
     );
+    const reviewStateQuery = typedTrpc.git.getPullRequestReviewState.useQuery(
+        {
+            repo: activeRepo ?? '',
+            provider,
+            number: selectedPR?.number ?? 0,
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'review' && !!selectedPR,
+            staleTime: 10_000,
+        }
+    );
     const reviewSummaryQuery = trpc.repo.review.summary.useQuery(
         {
             repo: activeRepo ?? '',
-            reviewId: selectedPR ? `${provider}:${String(selectedPR.number)}` : '',
+            reviewId: selectedReviewTargetId,
             baseRef: selectedPR?.base.ref ?? 'main',
             headRef: selectedPR?.head.ref ?? 'HEAD',
         },
@@ -365,13 +482,122 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo && open, staleTime: 10_000 }
     );
+    const collaborationMembersQuery = trpc.repo.collaboration.remoteMembers.useQuery(undefined, {
+        enabled: !!activeRepo && open && activeTab === 'review',
+        staleTime: 20_000,
+    });
+    const collaborationCommentsQuery = trpc.repo.collaboration.comments.useQuery(
+        {
+            targetType: 'pull-request',
+            targetId: selectedReviewTargetId,
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'review' && !!selectedPR,
+            staleTime: 5_000,
+        }
+    );
+    const collaborationAssignmentsQuery = trpc.repo.collaboration.assignments.useQuery(
+        {
+            targetType: 'pull-request',
+            targetId: selectedReviewTargetId,
+        },
+        {
+            enabled: !!activeRepo && open && activeTab === 'review' && !!selectedPR,
+            staleTime: 5_000,
+        }
+    );
+    const collaborationStateQuery = trpc.repo.collaboration.list.useQuery(undefined, {
+        enabled: !!activeRepo && open && activeTab === 'review' && !!selectedPR,
+        staleTime: 5_000,
+    });
     const reviewUpdateMutation = trpc.repo.review.update.useMutation();
     const reviewResetMutation = trpc.repo.review.reset.useMutation();
     const auditLogMutation = trpc.system.audit.log.useMutation();
+    const { notifySuccess, notifyError, notifyWarning } = useAppNotifications();
+    const addCollaborationCommentMutation = trpc.repo.collaboration.addComment.useMutation({
+        onSuccess: async () => {
+            await Promise.all([collaborationCommentsQuery.refetch(), collaborationStateQuery.refetch()]);
+        },
+    });
+    const deleteCollaborationCommentMutation = trpc.repo.collaboration.deleteComment.useMutation({
+        onSuccess: async () => {
+            await Promise.all([collaborationCommentsQuery.refetch(), collaborationStateQuery.refetch()]);
+        },
+    });
+    const importProviderCommentsMutation = trpc.repo.collaboration.importProviderComments.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationCommentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.list.invalidate(),
+                utils.repo.collaboration.activity.invalidate(),
+                utils.repo.collaboration.reviewDashboard.invalidate(),
+            ]);
+        },
+    });
+    const syncCollaborationCommentMutation = trpc.repo.collaboration.syncCommentToProvider.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationCommentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.list.invalidate(),
+                utils.repo.collaboration.activity.invalidate(),
+                utils.repo.collaboration.reviewDashboard.invalidate(),
+            ]);
+        },
+    });
+    const setProviderThreadResolvedMutation = trpc.repo.collaboration.setProviderThreadResolved.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationCommentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.activity.invalidate(),
+                utils.repo.collaboration.reviewDashboard.invalidate(),
+            ]);
+        },
+    });
+    const syncProviderReviewAssignmentsMutation = trpc.repo.collaboration.syncProviderReviewAssignments.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationAssignmentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                reviewStateQuery.refetch(),
+                utils.repo.collaboration.activity.invalidate(),
+                utils.repo.collaboration.reviewDashboard.invalidate(),
+            ]);
+        },
+    });
+    const assignReviewMutation = trpc.repo.collaboration.assignItem.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationAssignmentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.activity.invalidate(),
+            ]);
+        },
+    });
+    const updateReviewAssignmentMutation = trpc.repo.collaboration.updateAssignment.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationAssignmentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.activity.invalidate(),
+            ]);
+        },
+    });
+    const deleteReviewAssignmentMutation = trpc.repo.collaboration.deleteAssignment.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                collaborationAssignmentsQuery.refetch(),
+                collaborationStateQuery.refetch(),
+                utils.repo.collaboration.activity.invalidate(),
+            ]);
+        },
+    });
 
     const saveAuthMutation = typedTrpc.git.setPullRequestAuth.useMutation({
         onSuccess: () => {
-            toast.success('Pull request provider authentication updated');
+            notifySuccess('Pull request provider authentication updated');
             auditLogMutation.mutate({
                 scope: 'system',
                 action: 'pr-auth-save',
@@ -382,7 +608,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             void authQuery.refetch();
         },
         onError: (error: unknown) => {
-            toast.error('Failed to save provider authentication', {
+            notifyError('Failed to save provider authentication', {
                 description: getErrorMessage(error, 'Unable to save provider authentication'),
             });
         },
@@ -391,10 +617,10 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const createPRMutation = typedTrpc.git.createPullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
-                toast.error('Failed to create pull request', { description: result.error });
+                notifyError('Failed to create pull request', { description: result.error });
                 return;
             }
-            toast.success('Pull request created');
+            notifySuccess('Pull request created');
             auditLogMutation.mutate({
                 scope: 'review',
                 action: 'pr-create',
@@ -412,7 +638,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             await pullRequestQuery.refetch();
         },
         onError: (error: unknown) => {
-            toast.error('Failed to create pull request', {
+            notifyError('Failed to create pull request', {
                 description: getErrorMessage(error, 'Unable to create pull request'),
             });
         },
@@ -421,10 +647,10 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const mergePRMutation = typedTrpc.git.mergePullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
-                toast.error('Merge failed', { description: result.error });
+                notifyError('Merge failed', { description: result.error });
                 return;
             }
-            toast.success('Pull request merged');
+            notifySuccess('Pull request merged');
             auditLogMutation.mutate({
                 scope: 'review',
                 action: 'pr-merge',
@@ -441,17 +667,17 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             setSelectedPR(null);
         },
         onError: (error: unknown) => {
-            toast.error('Merge failed', { description: getErrorMessage(error, 'Unable to merge pull request') });
+            notifyError('Merge failed', { description: getErrorMessage(error, 'Unable to merge pull request') });
         },
     });
 
     const closePRMutation = typedTrpc.git.closePullRequest.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
-                toast.error('Close failed', { description: result.error });
+                notifyError('Close failed', { description: result.error });
                 return;
             }
-            toast.success('Pull request closed');
+            notifySuccess('Pull request closed');
             auditLogMutation.mutate({
                 scope: 'review',
                 action: 'pr-close',
@@ -466,13 +692,13 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             setSelectedPR(null);
         },
         onError: (error: unknown) => {
-            toast.error('Close failed', { description: getErrorMessage(error, 'Unable to close pull request') });
+            notifyError('Close failed', { description: getErrorMessage(error, 'Unable to close pull request') });
         },
     });
     const addCommentMutation = typedTrpc.git.addPullRequestComment.useMutation({
         onSuccess: async (result) => {
             if (result.error) {
-                toast.error('Failed to add comment', { description: result.error });
+                notifyError('Failed to add comment', { description: result.error });
                 return;
             }
             setCommentDraft('');
@@ -487,14 +713,14 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                     provider,
                 },
             });
-            toast.success('Comment posted');
+            notifySuccess('Comment posted');
         },
         onError: (error: unknown) => {
-            toast.error('Failed to add comment', { description: getErrorMessage(error, 'Unable to add comment') });
+            notifyError('Failed to add comment', { description: getErrorMessage(error, 'Unable to add comment') });
         },
     });
     const generateAIPRMutation = trpc.ai.generatePullRequest.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: GeneratePullRequestResult) => {
             if (result.title) {
                 setPrTitle(result.title);
             }
@@ -502,13 +728,13 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 setPrBody(result.body);
             }
             if (result.error) {
-                toast.warning('AI pull request draft used fallback', { description: result.error });
+                notifyWarning('AI pull request draft used fallback', { description: result.error });
                 return;
             }
-            toast.success('AI pull request draft generated');
+            notifySuccess('AI pull request draft generated', { persist: false });
         },
         onError: (error: unknown) => {
-            toast.error('Unable to generate AI pull request draft', {
+            notifyError('Unable to generate AI pull request draft', {
                 description: getErrorMessage(error, 'AI provider request failed'),
             });
         },
@@ -535,14 +761,15 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             toast.error('Fill in all required pull request fields');
             return;
         }
+        const body = prBody.trim();
         createPRMutation.mutate({
             repo: activeRepo,
             provider,
             title: prTitle.trim(),
-            body: prBody.trim() || undefined,
             head: prHead.trim(),
             base: prBase.trim(),
             draft: prDraft,
+            ...(body ? { body } : {}),
         });
     };
 
@@ -566,18 +793,20 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             return;
         }
 
-        const commits = (compareData.commits ?? []).slice(0, 50).map((commit) => ({
+        const compareResult = compareData as CompareBranchesData;
+
+        const commits = compareResult.commits.slice(0, 50).map((commit) => ({
             hash: commit.hash,
             subject: commit.message,
             body: '',
         }));
-        const changedFiles = (compareData.files ?? []).slice(0, 200).map((file) => `${file.status}\t${file.path}`);
+        const changedFiles = compareResult.files.slice(0, 200).map((file) => `${file.status}\t${file.path}`);
         const diffSummary = [
             `Branch compare: ${prHead.trim()} -> ${prBase.trim()}`,
-            `Commits: ${String(compareData.commits.length)}`,
-            `Files changed: ${String(compareData.files.length)}`,
-            `Additions: ${String(compareData.additions ?? 0)}`,
-            `Deletions: ${String(compareData.deletions ?? 0)}`,
+            `Commits: ${String(compareResult.commits.length)}`,
+            `Files changed: ${String(compareResult.files.length)}`,
+            `Additions: ${String(compareResult.additions ?? 0)}`,
+            `Deletions: ${String(compareResult.deletions ?? 0)}`,
             'Changed files:',
             ...changedFiles,
         ].join('\n');
@@ -613,9 +842,38 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
     const pullRequests = pullRequestQuery.data?.pullRequests ?? [];
     const queryError = pullRequestQuery.data?.error;
     const comments = commentsQuery.data?.comments ?? [];
+    const collaborationMembers = collaborationMembersQuery.data?.members ?? [];
+    const collaborationComments = (collaborationCommentsQuery.data?.comments ?? []) as CollaborationComment[];
+    const collaborationAssignments = collaborationAssignmentsQuery.data?.assignments ?? [];
+    const collaborationState = collaborationStateQuery.data;
     const reviewSummary = reviewSummaryQuery.data as ReviewSummaryData | undefined;
+    const providerReviewState = reviewStateQuery.data?.reviewState ?? null;
     const reviewProgress = reviewSummary?.progress;
     const reviewFiles = reviewSummary?.files ?? [];
+	    const fileReviewCommentsByTarget = useMemo(() => {
+	        const entries = (collaborationState?.comments ?? []) as CollaborationComment[];
+	        return entries.reduce((acc: Record<string, CollaborationComment[]>, comment) => {
+            if (comment.targetType !== 'pull-request-file') {
+                return acc;
+            }
+            if (getCollaborationReviewRootTargetId(comment.targetId) !== selectedReviewTargetId) {
+                return acc;
+            }
+            const parsedTarget = parseCollaborationReviewTargetId(comment.targetId);
+            if (!parsedTarget?.filePath) {
+                return acc;
+            }
+            const normalizedTargetId = buildCollaborationPullRequestFileTargetId({
+                provider,
+                repoKey: reviewRepoKey,
+                pullRequestNumber: selectedPR?.number ?? parsedTarget.pullRequestNumber,
+                filePath: parsedTarget.filePath,
+                ...(parsedTarget.side && parsedTarget.line ? { side: parsedTarget.side, line: parsedTarget.line } : {}),
+            });
+            acc[normalizedTargetId] = [...(acc[normalizedTargetId] ?? []), comment];
+            return acc;
+        }, {});
+    }, [collaborationState?.comments, provider, reviewRepoKey, selectedPR?.number, selectedReviewTargetId]);
 
     const handleAddComment = () => {
         if (!activeRepo || !selectedPR) return;
@@ -709,6 +967,263 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                     await reviewSummaryQuery.refetch();
                 },
             }
+        );
+    };
+
+    const handleAssignReviewer = () => {
+        if (!selectedPR || !selectedReviewTargetId) return;
+	        const member = collaborationMembers.find((entry: CollaborationMemberProfile) => entry.id === reviewRequestDraft.assigneeId);
+        if (!member) {
+            toast.error('Select a reviewer first');
+            return;
+        }
+        assignReviewMutation.mutate(
+            {
+                targetType: 'pull-request',
+                targetId: selectedReviewTargetId,
+                assigneeId: member.id,
+                assigneeName: member.displayName,
+                status: 'open',
+                note: reviewRequestDraft.note,
+            },
+            {
+                onSuccess: async () => {
+                    notifySuccess(`Review requested from ${member.displayName}`);
+                    auditLogMutation.mutate({
+                        scope: 'review',
+                        action: 'review-request',
+                        repo: activeRepo ?? null,
+                        status: 'success',
+                        summary: `Requested review for PR #${String(selectedPR.number)}`,
+                        metadata: {
+                            provider,
+                            assignee: member.displayName,
+                        },
+                    });
+                    setReviewRequestDraft({ assigneeId: '', note: '' });
+                },
+                onError: (error: unknown) => {
+                    notifyError('Failed to request review', {
+                        description: getErrorMessage(error, 'Unable to create a shared review request'),
+                    });
+                },
+            }
+        );
+    };
+
+    const handleReviewThreadComment = () => {
+        if (!selectedPR || !selectedReviewTargetId || !reviewThreadDraft.trim()) return;
+        addCollaborationCommentMutation.mutate(
+            {
+                targetType: 'pull-request',
+                targetId: selectedReviewTargetId,
+                body: reviewThreadDraft.trim(),
+            },
+            {
+                onSuccess: () => {
+                    notifySuccess('Review thread updated', { persist: false });
+                    setReviewThreadDraft('');
+                },
+                onError: (error: unknown) => {
+                    notifyError('Failed to add review thread comment', {
+                        description: getErrorMessage(error, 'Unable to save review discussion'),
+                    });
+                },
+            }
+        );
+    };
+
+    const handleFileReviewComment = (targetId: string, successLabel: string) => {
+        const draft = fileReviewDrafts[targetId]?.trim();
+        if (!selectedPR || !selectedReviewTargetId || !draft) return;
+        addCollaborationCommentMutation.mutate(
+            {
+                targetType: 'pull-request-file',
+                targetId,
+                body: draft,
+            },
+            {
+                onSuccess: () => {
+                    notifySuccess(`Shared review note added for ${successLabel}`, { persist: false });
+                    setFileReviewDrafts((current) => ({ ...current, [targetId]: '' }));
+                },
+                onError: (error: unknown) => {
+                    notifyError('Failed to add file review note', {
+                        description: getErrorMessage(error, 'Unable to save file-level review discussion'),
+                    });
+                },
+            }
+        );
+    };
+
+    const handleSyncCollaborationComment = (comment: CollaborationComment) => {
+        if (!activeRepo || !selectedPR) return;
+        syncCollaborationCommentMutation.mutate(
+            {
+                id: comment.id,
+                repo: activeRepo,
+                baseSha: selectedPR.reviewPosition?.baseSha ?? selectedPR.base.sha,
+                startSha: selectedPR.reviewPosition?.startSha,
+                headSha: selectedPR.reviewPosition?.headSha ?? selectedPR.head.sha,
+            },
+            {
+                onSuccess: (result: unknown) => {
+                    const mutationResult = result as { success?: boolean; error?: string | null };
+                    if (!mutationResult.success) {
+                        notifyError('Provider sync failed', {
+                            description: mutationResult.error ?? 'Unable to mirror the collaboration comment to the provider review thread',
+                        });
+                        return;
+                    }
+                    notifySuccess('Comment mirrored to provider', { persist: false });
+                },
+                onError: (error: unknown) => {
+                    notifyError('Provider sync failed', {
+                        description: getErrorMessage(error, 'Unable to mirror the collaboration comment to the provider review thread'),
+                    });
+                },
+            }
+        );
+    };
+
+    const handleImportProviderComments = () => {
+        if (!activeRepo || !selectedPR) return;
+        importProviderCommentsMutation.mutate(
+            {
+                repo: activeRepo,
+                provider,
+                number: selectedPR.number,
+            },
+            {
+                onSuccess: (result: unknown) => {
+                    const mutationResult = result as { success?: boolean; error?: string | null; imported?: number };
+                    if (!mutationResult.success) {
+                        notifyError('Provider import failed', {
+                            description: mutationResult.error ?? 'Unable to import provider review discussion',
+                        });
+                        return;
+                    }
+                    notifySuccess('Provider discussion imported', {
+                        description: `${String(mutationResult.imported ?? 0)} provider comment${mutationResult.imported === 1 ? '' : 's'} mirrored into shared collaboration threads.`,
+                        persist: false,
+                    });
+                },
+                onError: (error: unknown) => {
+                    notifyError('Provider import failed', {
+                        description: getErrorMessage(error, 'Unable to import provider review discussion'),
+                    });
+                },
+            }
+        );
+    };
+
+    const handleSyncProviderReviewAssignments = () => {
+        if (!activeRepo || !selectedPR) return;
+        syncProviderReviewAssignmentsMutation.mutate(
+            {
+                repo: activeRepo,
+                provider,
+                number: selectedPR.number,
+            },
+            {
+                onSuccess: (result: unknown) => {
+                    const mutationResult = result as { success?: boolean; error?: string | null; synced?: number; removed?: number };
+                    if (!mutationResult.success) {
+                        notifyError('Provider reviewer sync failed', {
+                            description: mutationResult.error ?? 'Unable to sync provider reviewer state into the shared review queue',
+                        });
+                        return;
+                    }
+                    notifySuccess('Provider reviewers synced', {
+                        description: `${String(mutationResult.synced ?? 0)} reviewer assignment${mutationResult.synced === 1 ? '' : 's'} synced${(mutationResult.removed ?? 0) > 0 ? `, ${String(mutationResult.removed ?? 0)} removed` : ''}.`,
+                        persist: false,
+                    });
+                },
+                onError: (error: unknown) => {
+                    notifyError('Provider reviewer sync failed', {
+                        description: getErrorMessage(error, 'Unable to sync provider reviewer state into the shared review queue'),
+                    });
+                },
+            }
+        );
+    };
+
+    const renderProviderSyncBadge = (comment: CollaborationComment) => {
+        if (!comment.providerSync) {
+            return null;
+        }
+        if (comment.providerSync.status === 'synced') {
+            return (
+                <>
+                    <Badge variant='outline' className='text-[10px]'>Synced to {comment.providerSync.provider}</Badge>
+                    {comment.providerSync.remoteThreadStatus && (
+                        <Badge variant='outline' className='text-[10px] capitalize'>
+                            Thread {comment.providerSync.remoteThreadStatus}
+                        </Badge>
+                    )}
+                </>
+            );
+        }
+        if (comment.providerSync.status === 'failed') {
+            return (
+                <Badge variant='outline' className='border-amber-500/35 text-[10px] text-amber-700 dark:text-amber-200'>
+                    Sync failed
+                </Badge>
+            );
+        }
+        return <Badge variant='outline' className='text-[10px]'>Syncing…</Badge>;
+    };
+
+    const renderProviderSyncAction = (comment: CollaborationComment) => (
+        <div className='flex items-center gap-1'>
+            {!comment.id.startsWith('provider-comment:') && (
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-10 px-2 text-xs'
+                    disabled={syncCollaborationCommentMutation.isPending}
+                    onClick={() => { handleSyncCollaborationComment(comment); }}>
+                    <Send className='mr-1.5 h-3.5 w-3.5' />
+                    {comment.providerSync?.status === 'synced' ? 'Resync' : 'Send'}
+                </Button>
+            )}
+            {comment.providerSync?.remoteThreadId && activeRepo && (comment.providerSync.provider === 'gitlab' || comment.providerSync.provider === 'azure') && (
+                <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-10 px-2 text-xs'
+                    disabled={setProviderThreadResolvedMutation.isPending}
+                    onClick={() => {
+                        setProviderThreadResolvedMutation.mutate({
+                            id: comment.id,
+                            repo: activeRepo,
+                            resolved: comment.providerSync?.remoteThreadStatus !== 'resolved',
+                        }, {
+                            onError: (error: unknown) => {
+                                notifyError('Failed to update provider thread', {
+                                    description: getErrorMessage(error, 'Unable to update provider thread state'),
+                                });
+                            },
+                        });
+                    }}>
+                    {comment.providerSync.remoteThreadStatus === 'resolved' ? 'Reopen' : 'Resolve'}
+                </Button>
+            )}
+        </div>
+    );
+
+    const renderProviderAssignmentBadge = (assignment: CollaborationAssignment) => {
+        const providerSync = assignment.providerSync;
+        if (!providerSync) {
+            return null;
+        }
+        const label = providerSync.reviewerStatus === 'changes-requested'
+            ? 'Changes Requested'
+            : providerSync.reviewerStatus.replace(/-/g, ' ');
+        return (
+            <Badge variant='outline' className='text-[10px] capitalize'>
+                {providerSync.provider} · {label}
+            </Badge>
         );
     };
 
@@ -1049,6 +1564,18 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 <p className='text-muted-foreground text-xs'>{selectedPR.head.ref} → {selectedPR.base.ref}</p>
                                             </div>
                                             <div className='flex gap-2'>
+                                                <Button
+                                                    variant='outline'
+                                                    size='sm'
+                                                    onClick={handleImportProviderComments}
+                                                    disabled={importProviderCommentsMutation.isPending}>
+                                                    {importProviderCommentsMutation.isPending ? (
+                                                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                                    ) : (
+                                                        <RefreshCw className='mr-2 h-4 w-4' />
+                                                    )}
+                                                    Import Provider Comments
+                                                </Button>
                                                 <Button variant='outline' size='sm' onClick={handleResetReview} disabled={reviewResetMutation.isPending}>
                                                     Reset
                                                 </Button>
@@ -1075,33 +1602,275 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 <p className='truncate text-sm font-semibold'>{reviewProgress?.lastViewedFile ?? 'None'}</p>
                                             </div>
                                         </div>
+                                        <div className='mt-4 rounded-xl border border-border/70 bg-background/70 p-3'>
+                                            <div className='flex flex-wrap items-center justify-between gap-3'>
+                                                <div>
+                                                    <p className='text-sm font-medium'>Provider Review State</p>
+                                                    <p className='mt-1 text-xs leading-5 text-muted-foreground'>
+                                                        Mirror provider reviewer state into the shared queue so team ownership reflects real PR state.
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    variant='outline'
+                                                    size='sm'
+                                                    onClick={handleSyncProviderReviewAssignments}
+                                                    disabled={syncProviderReviewAssignmentsMutation.isPending}>
+                                                    {syncProviderReviewAssignmentsMutation.isPending ? (
+                                                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                                                    ) : (
+                                                        <RefreshCw className='mr-2 h-4 w-4' />
+                                                    )}
+                                                    Sync Provider Reviewers
+                                                </Button>
+                                            </div>
+                                            {reviewStateQuery.data?.error ? (
+                                                <p className='mt-3 text-xs text-amber-700 dark:text-amber-200'>{reviewStateQuery.data.error}</p>
+                                            ) : providerReviewState ? (
+                                                <>
+                                                    <div className='mt-3 grid gap-2 sm:grid-cols-5'>
+                                                        <div className='rounded-lg border border-border/60 p-2'>
+                                                            <p className='text-[11px] uppercase tracking-[0.16em] text-muted-foreground'>Overall</p>
+                                                            <p className='mt-2 text-sm font-semibold capitalize'>{providerReviewState.overall.replace(/-/g, ' ')}</p>
+                                                        </div>
+                                                        <div className='rounded-lg border border-border/60 p-2'>
+                                                            <p className='text-[11px] uppercase tracking-[0.16em] text-muted-foreground'>Requested</p>
+                                                            <p className='mt-2 text-sm font-semibold tabular-nums'>{providerReviewState.requestedCount}</p>
+                                                        </div>
+                                                        <div className='rounded-lg border border-border/60 p-2'>
+                                                            <p className='text-[11px] uppercase tracking-[0.16em] text-muted-foreground'>Approved</p>
+                                                            <p className='mt-2 text-sm font-semibold tabular-nums'>{providerReviewState.approvedCount}</p>
+                                                        </div>
+                                                        <div className='rounded-lg border border-border/60 p-2'>
+                                                            <p className='text-[11px] uppercase tracking-[0.16em] text-muted-foreground'>Changes</p>
+                                                            <p className='mt-2 text-sm font-semibold tabular-nums'>{providerReviewState.changesRequestedCount}</p>
+                                                        </div>
+                                                        <div className='rounded-lg border border-border/60 p-2'>
+                                                            <p className='text-[11px] uppercase tracking-[0.16em] text-muted-foreground'>Commented</p>
+                                                            <p className='mt-2 text-sm font-semibold tabular-nums'>{providerReviewState.commentedCount}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className='mt-3 flex flex-wrap gap-2'>
+                                                        {providerReviewState.reviewers.length === 0 ? (
+                                                            <p className='text-xs text-muted-foreground'>No provider reviewers recorded for this pull request yet.</p>
+                                                        ) : (
+                                                            providerReviewState.reviewers.map((reviewer) => (
+                                                                <div key={reviewer.id} className='min-w-[180px] rounded-lg border border-border/60 bg-muted/20 px-3 py-2'>
+                                                                    <div className='flex flex-wrap items-center gap-2'>
+                                                                        <p className='text-xs font-medium'>{reviewer.name}</p>
+                                                                        <Badge variant='outline' className='text-[10px] capitalize'>
+                                                                            {reviewer.status.replace(/-/g, ' ')}
+                                                                        </Badge>
+                                                                        {reviewer.required && (
+                                                                            <Badge variant='secondary' className='text-[10px]'>
+                                                                                Required
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    {reviewer.updatedAt && (
+                                                                        <p className='mt-2 text-[11px] text-muted-foreground'>
+                                                                            Updated {new Date(reviewer.updatedAt).toLocaleString()}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <p className='mt-3 text-xs text-muted-foreground'>Provider review state will load when the review panel is active.</p>
+                                            )}
+                                        </div>
+                                        <div className='mt-4 rounded-xl border border-border/70 bg-muted/20 p-3'>
+                                            <div className='flex items-center gap-2'>
+                                                <ClipboardCheck className='h-4 w-4 text-muted-foreground' />
+                                                <p className='text-sm font-medium'>Shared Review Queue</p>
+                                            </div>
+                                            <p className='mt-2 text-xs leading-5 text-muted-foreground'>
+                                                Turn this pull request into shared team work with explicit reviewer ownership and discussion.
+                                            </p>
+                                            {collaborationMembers.length === 0 && (
+                                                <p className='mt-3 text-xs text-muted-foreground'>
+                                                    No shared collaborators available yet. Publish a collaboration session in Collaboration Center first.
+                                                </p>
+                                            )}
+                                            <CollaborationAssignmentPanel
+                                                title='Requested Reviewers'
+                                                assignments={collaborationAssignments}
+                                                members={collaborationMembers}
+                                                selectedAssigneeId={reviewRequestDraft.assigneeId}
+                                                noteDraft={reviewRequestDraft.note}
+                                                pending={
+                                                    assignReviewMutation.isPending ||
+                                                    updateReviewAssignmentMutation.isPending ||
+                                                    deleteReviewAssignmentMutation.isPending
+                                                }
+                                                onAssigneeChange={(value) => {
+                                                    setReviewRequestDraft((current) => ({ ...current, assigneeId: value }));
+                                                }}
+                                                onNoteChange={(value) => {
+                                                    setReviewRequestDraft((current) => ({ ...current, note: value }));
+                                                }}
+                                                onCreate={handleAssignReviewer}
+                                                onStatusChange={(assignmentId, status) => {
+                                                    updateReviewAssignmentMutation.mutate(
+                                                        { id: assignmentId, status },
+                                                        {
+                                                            onError: (error: unknown) => {
+                                                                notifyError('Failed to update reviewer status', {
+                                                                    description: getErrorMessage(error, 'Unable to update review queue item'),
+                                                                });
+                                                            },
+                                                        }
+                                                    );
+                                                }}
+                                                onDelete={(assignmentId) => {
+                                                    deleteReviewAssignmentMutation.mutate(
+                                                        { id: assignmentId },
+                                                        {
+                                                            onError: (error: unknown) => {
+                                                                notifyError('Failed to remove reviewer', {
+                                                                    description: getErrorMessage(error, 'Unable to remove review request'),
+                                                                });
+                                                            },
+                                                        }
+                                                    );
+                                                }}
+                                                renderAssignmentBadges={renderProviderAssignmentBadge}
+                                            />
+                                            <CollaborationCommentThread
+                                                title='Shared Review Thread'
+                                                comments={collaborationComments}
+                                                draft={reviewThreadDraft}
+                                                submitPending={addCollaborationCommentMutation.isPending || deleteCollaborationCommentMutation.isPending}
+                                                onDraftChange={setReviewThreadDraft}
+                                                onSubmit={handleReviewThreadComment}
+                                                onDelete={(commentId) => {
+                                                    deleteCollaborationCommentMutation.mutate(
+                                                        { id: commentId },
+                                                        {
+                                                            onError: (error: unknown) => {
+                                                                notifyError('Failed to delete review thread comment', {
+                                                                    description: getErrorMessage(error, 'Unable to remove review discussion'),
+                                                                });
+                                                            },
+                                                        }
+                                                    );
+                                                }}
+                                                renderCommentBadges={renderProviderSyncBadge}
+                                                renderCommentActions={renderProviderSyncAction}
+                                            />
+                                        </div>
                                     </div>
                                     <ScrollArea className='flex-1'>
                                         <div className='space-y-2 p-4'>
                                             {reviewFiles.map((filePath) => {
                                                 const reviewed = !(reviewProgress?.remainingFiles ?? reviewFiles).includes(filePath);
+                                                const fileTargetId = buildCollaborationPullRequestFileTargetId({
+                                                    provider,
+                                                    repoKey: reviewRepoKey,
+                                                    pullRequestNumber: selectedPR.number,
+                                                    filePath,
+                                                });
+                                                const fileComments = fileReviewCommentsByTarget[fileTargetId] ?? [];
+                                                const threadOpen = Boolean(expandedReviewFiles[fileTargetId]);
                                                 return (
-                                                    <div key={filePath} className='flex items-center justify-between gap-3 rounded-lg border p-3'>
-                                                        <div className='min-w-0'>
-                                                            <p className='truncate text-sm font-medium'>{filePath}</p>
-                                                            <p className='text-muted-foreground text-xs'>{reviewed ? 'Reviewed' : 'Needs review'}</p>
+                                                    <div key={filePath} className='rounded-lg border p-3'>
+                                                        <div className='flex items-center justify-between gap-3'>
+                                                            <div className='min-w-0'>
+                                                                <p className='truncate text-sm font-medium'>{filePath}</p>
+                                                                <p className='text-muted-foreground text-xs'>{reviewed ? 'Reviewed' : 'Needs review'}</p>
+                                                            </div>
+                                                            <div className='flex items-center gap-2'>
+                                                                <Button
+                                                                    size='sm'
+                                                                    variant='outline'
+                                                                    onClick={() => {
+                                                                        setExpandedReviewFiles((current) => ({
+                                                                            ...current,
+                                                                            [fileTargetId]: !current[fileTargetId],
+                                                                        }));
+                                                                    }}>
+                                                                    {threadOpen ? 'Hide Discussion' : `Discuss${fileComments.length > 0 ? ` (${String(fileComments.length)})` : ''}`}
+                                                                </Button>
+                                                                <Button
+                                                                    size='sm'
+                                                                    variant={reviewed ? 'outline' : 'default'}
+                                                                    onClick={() => {
+                                                                        handleMarkReviewFile(filePath);
+                                                                    }}
+                                                                    disabled={reviewed || reviewUpdateMutation.isPending}>
+                                                                    {reviewed ? (
+                                                                        <>
+                                                                            <Check className='mr-2 h-4 w-4' />
+                                                                            Reviewed
+                                                                        </>
+                                                                    ) : (
+                                                                        'Mark Reviewed'
+                                                                    )}
+                                                                </Button>
+                                                            </div>
                                                         </div>
-                                                        <Button
-                                                            size='sm'
-                                                            variant={reviewed ? 'outline' : 'default'}
-                                                            onClick={() => {
-                                                                handleMarkReviewFile(filePath);
-                                                            }}
-                                                            disabled={reviewed || reviewUpdateMutation.isPending}>
-                                                            {reviewed ? (
-                                                                <>
-                                                                    <Check className='mr-2 h-4 w-4' />
-                                                                    Reviewed
-                                                                </>
-                                                            ) : (
-                                                                'Mark Reviewed'
-                                                            )}
-                                                        </Button>
+                                                        {threadOpen && (
+                                                            <>
+                                                                <CollaborationCommentThread
+                                                                    title={`File thread · ${filePath}`}
+                                                                    comments={fileComments}
+                                                                    draft={fileReviewDrafts[fileTargetId] ?? ''}
+                                                                    submitPending={addCollaborationCommentMutation.isPending || deleteCollaborationCommentMutation.isPending}
+                                                                    onDraftChange={(value) => {
+                                                                        setFileReviewDrafts((current) => ({ ...current, [fileTargetId]: value }));
+                                                                    }}
+                                                                    onSubmit={() => handleFileReviewComment(fileTargetId, filePath)}
+                                                                    onDelete={(commentId) => {
+                                                                        deleteCollaborationCommentMutation.mutate(
+                                                                            { id: commentId },
+                                                                            {
+                                                                                onError: (error: unknown) => {
+                                                                                    notifyError('Failed to delete file review note', {
+                                                                                        description: getErrorMessage(error, 'Unable to remove file-level discussion'),
+                                                                                    });
+                                                                                },
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                    renderCommentBadges={renderProviderSyncBadge}
+                                                                    renderCommentActions={renderProviderSyncAction}
+                                                                />
+                                                                <ReviewDiffThread
+                                                                    repo={activeRepo ?? ''}
+                                                                    baseRef={selectedPR.base.ref}
+                                                                    headRef={selectedPR.head.ref}
+                                                                    filePath={filePath}
+                                                                    targetPrefix={fileTargetId}
+                                                                    commentsByTarget={fileReviewCommentsByTarget}
+                                                                    drafts={fileReviewDrafts}
+                                                                    expandedTargets={expandedReviewFiles}
+                                                                    submitPending={addCollaborationCommentMutation.isPending}
+                                                                    deletePending={deleteCollaborationCommentMutation.isPending}
+                                                                    onDraftChange={(targetId, value) => {
+                                                                        setFileReviewDrafts((current) => ({ ...current, [targetId]: value }));
+                                                                    }}
+                                                                    onToggleTarget={(targetId) => {
+                                                                        setExpandedReviewFiles((current) => ({ ...current, [targetId]: !current[targetId] }));
+                                                                    }}
+                                                                    onSubmit={(targetId) => handleFileReviewComment(targetId, filePath)}
+                                                                    onDelete={(commentId) => {
+                                                                        deleteCollaborationCommentMutation.mutate(
+                                                                            { id: commentId },
+                                                                            {
+                                                                                onError: (error: unknown) => {
+                                                                                    notifyError('Failed to delete line review note', {
+                                                                                        description: getErrorMessage(error, 'Unable to remove line-level discussion'),
+                                                                                    });
+                                                                                },
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                    renderCommentBadges={renderProviderSyncBadge}
+                                                                    renderCommentActions={renderProviderSyncAction}
+                                                                />
+                                                            </>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -1306,6 +2075,119 @@ function AuthField({
     );
 }
 
+function ReviewDiffThread({
+    repo,
+    baseRef,
+    headRef,
+    filePath,
+    targetPrefix,
+    commentsByTarget,
+    drafts,
+    expandedTargets,
+    submitPending,
+    deletePending,
+    onDraftChange,
+    onToggleTarget,
+    onSubmit,
+    onDelete,
+    renderCommentBadges,
+    renderCommentActions,
+}: {
+    repo: string;
+    baseRef: string;
+    headRef: string;
+    filePath: string;
+    targetPrefix: string;
+    commentsByTarget: Record<string, CollaborationComment[]>;
+    drafts: Record<string, string>;
+    expandedTargets: Record<string, boolean>;
+    submitPending?: boolean;
+    deletePending?: boolean;
+    onDraftChange: (targetId: string, value: string) => void;
+    onToggleTarget: (targetId: string) => void;
+    onSubmit: (targetId: string) => void;
+    onDelete: (commentId: string) => void;
+    renderCommentBadges?: (comment: CollaborationComment) => ReactNode;
+    renderCommentActions?: (comment: CollaborationComment) => ReactNode;
+}) {
+    const diffQuery = trpc.git.rangeFileDiff.useQuery(
+        { repo, baseRef, headRef, filePath },
+        { enabled: !!repo && !!baseRef && !!headRef && !!filePath, staleTime: 5_000 }
+    );
+
+    const parsed = useMemo(() => {
+        if (!diffQuery.data?.diff) {
+            return [];
+        }
+        return parseDiffWithInlineDiffs(diffQuery.data.diff).filter((line) => line.type !== 'context');
+    }, [diffQuery.data?.diff]);
+
+    if (diffQuery.isFetching && parsed.length === 0) {
+        return <div className='mt-3 rounded-lg border border-dashed border-border/70 px-3 py-4 text-xs text-muted-foreground'>Loading diff discussion…</div>;
+    }
+
+    if (diffQuery.data?.error) {
+        return <div className='mt-3 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-4 text-xs text-amber-700 dark:text-amber-200'>{diffQuery.data.error}</div>;
+    }
+
+    if (parsed.length === 0) {
+        return <div className='mt-3 rounded-lg border border-dashed border-border/70 px-3 py-4 text-xs text-muted-foreground'>No line-level diff available for this file.</div>;
+    }
+
+    return (
+        <div className='mt-3 space-y-2'>
+            {parsed.slice(0, 40).map((line) => {
+                const anchorLine = line.rightLineNum || line.leftLineNum;
+                const side = line.rightLineNum ? 'right' : 'left';
+                const targetId = `${targetPrefix}:${side}:${String(anchorLine)}`;
+                const threadOpen = Boolean(expandedTargets[targetId]);
+                const lineText =
+                    line.right?.chars.map((entry) => entry.char).join('') ??
+                    line.left?.chars.map((entry) => entry.char).join('') ??
+                    '';
+                return (
+                    <div key={targetId} className='rounded-lg border border-border/60 bg-background/70'>
+                        <button
+                            type='button'
+                            className='flex w-full items-start justify-between gap-3 px-3 py-2 text-left'
+                            onClick={() => onToggleTarget(targetId)}>
+                            <div className='min-w-0'>
+                                <p className='font-mono text-xs text-muted-foreground'>
+                                    {side === 'right' ? '+' : '-'}{anchorLine}
+                                </p>
+                                <p className='mt-1 truncate font-mono text-xs text-foreground/90'>{lineText || '(empty line)'}</p>
+                            </div>
+                            <Badge variant='outline'>
+                                {(commentsByTarget[targetId] ?? []).length}
+                            </Badge>
+                        </button>
+                        {threadOpen && (
+                            <div className='border-t border-border/60 px-3 pb-3'>
+                                <CollaborationCommentThread
+                                    title={`Line ${String(anchorLine)} discussion`}
+                                    comments={commentsByTarget[targetId] ?? []}
+                                    draft={drafts[targetId] ?? ''}
+                                    submitPending={submitPending || deletePending}
+                                    onDraftChange={(value) => onDraftChange(targetId, value)}
+                                    onSubmit={() => onSubmit(targetId)}
+                                    onDelete={onDelete}
+                                    {...(renderCommentBadges ? { renderCommentBadges } : {})}
+                                    {...(renderCommentActions ? { renderCommentActions } : {})}
+                                />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+            {parsed.length > 40 && (
+                <p className='text-xs text-muted-foreground'>
+                    Showing the first 40 changed lines for discussion.
+                </p>
+            )}
+        </div>
+    );
+}
+
 function getProviderIcon(provider: PullRequestProvider) {
     switch (provider) {
         case 'github':
@@ -1317,34 +2199,6 @@ function getProviderIcon(provider: PullRequestProvider) {
         default:
             return <GitPullRequest className='h-4 w-4' />;
     }
-}
-
-function detectProvider(remoteUrl?: string): PRProvider | null {
-    if (!remoteUrl) return null;
-    const url = remoteUrl.toLowerCase();
-
-    if (url.includes('github.com')) {
-        return { name: 'github', host: 'github.com' };
-    }
-
-    if (url.includes('gitlab.com') || url.includes('gitlab')) {
-        return { name: 'gitlab', host: extractHost(url) };
-    }
-
-    if (url.includes('bitbucket.org')) {
-        return { name: 'bitbucket', host: 'bitbucket.org' };
-    }
-
-    if (url.includes('dev.azure.com') || url.includes('visualstudio.com') || url.includes('ssh.dev.azure.com')) {
-        return { name: 'azure', host: extractHost(url) };
-    }
-
-    return null;
-}
-
-function extractHost(url: string): string {
-    const match = url.match(/@([^:]+):|https?:\/\/([^/]+)/);
-    return match ? (match[1] || match[2] || '') : '';
 }
 
 export default PullRequestIntegration;

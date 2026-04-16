@@ -1,9 +1,10 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
-import { GitCommit, Loader2, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { useAppStore } from '@/lib/store';
 import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
+import { trpc } from '@/trpc/client';
 
 const LazyGitGraph = lazy(async () => {
     const mod = await import('@/components/git-graph');
@@ -44,8 +45,41 @@ function GitGraphLoadingFallback() {
 
 export function GitGraphPage() {
     const activeRepo = useAppStore((state) => state.activeRepo);
-    const { isRepoLoading, isRepoBusy, repoLoadPhase, openRepositoryDialog } = useRepoActivation();
+    const openedRepos = useAppStore((state) => state.openedRepos);
+    const { activateRepoPath, isRepoLoading, isRepoBusy, repoLoadPhase, openRepositoryDialog } = useRepoActivation();
     const [openRepoError, setOpenRepoError] = useState<string | null>(null);
+    const repoList = trpc.repo.list.useQuery().data as { repos?: HomeStartRepoEntry[] } | undefined;
+    const recentRepos = trpc.repo.recent.useQuery().data as string[] | undefined;
+
+    const repoMetaByPath = useMemo(() => {
+        return new Map<string, HomeStartRepoEntry>((repoList?.repos ?? []).map((repo) => [repo.path, repo]));
+    }, [repoList?.repos]);
+
+    const knownRepoPaths = useMemo(() => new Set((repoList?.repos ?? []).map((repo) => repo.path)), [repoList?.repos]);
+
+    const openedRepoEntries = useMemo<HomeStartRepoEntry[]>(
+        () =>
+            openedRepos.map((path) => {
+                const meta = repoMetaByPath.get(path);
+                return {
+                    path,
+                    name: meta?.name ?? path.split('/').pop() ?? path,
+                };
+            }),
+        [openedRepos, repoMetaByPath]
+    );
+
+    const recentRepoEntries = useMemo<HomeStartRepoEntry[]>(
+        () =>
+            (recentRepos ?? []).map((path) => {
+                const meta = repoMetaByPath.get(path);
+                return {
+                    path,
+                    name: meta?.name ?? path.split('/').pop() ?? path,
+                };
+            }),
+        [recentRepos, repoMetaByPath]
+    );
 
     useEffect(() => {
         return scheduleGitGraphPreload({ delayMs: 700 });
@@ -65,40 +99,37 @@ export function GitGraphPage() {
         }
     };
 
+    const handleActivateRepo = async (path: string) => {
+        if (isRepoBusy) {
+            return;
+        }
+        void preloadGitGraph();
+        await activateRepoPath(path, {
+            ensureRegistered: !knownRepoPaths.has(path),
+            showErrorToast: false,
+            errorTitle: 'Failed to open repository',
+        });
+    };
+
     if (!activeRepo) {
         return (
-            <div className='flex flex-1 items-center justify-center'>
-                <div className='ui-surface ui-empty-state-shell max-w-md'>
-                    <div className='from-primary/20 to-primary/5 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br'>
-                        <GitCommit className='text-primary h-10 w-10' />
-                    </div>
-                    <h1 className='mb-2 text-2xl font-semibold'>Welcome to Git Graph</h1>
-                    <p className='text-muted-foreground mb-6'>
-                        Open a Git repository to visualize your commit history.
-                    </p>
-                    <Button
-                        size='lg'
-                        className='gap-2'
-                        onClick={() => void handleOpenRepository()}
-                        onPointerEnter={() => {
-                            void preloadGitGraph();
+            <div className='flex flex-1 items-center justify-center p-6'>
+                <div className='w-full'>
+                    <HomeStartSurface
+                        mode='hero'
+                        title='Open a repository or resume a workspace'
+                        description='Keep multi-repo navigation, review work, and recovery tools in one shell instead of scattering them across dialogs.'
+                        primaryActionLabel='Open Repository'
+                        primaryActionBusyLabel={repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Opening'}
+                        isPrimaryActionBusy={isRepoBusy || isRepoLoading}
+                        onPrimaryAction={() => void handleOpenRepository()}
+                        recentRepos={recentRepoEntries}
+                        openedRepos={openedRepoEntries}
+                        onActivateRepo={(path) => {
+                            void handleActivateRepo(path);
                         }}
-                        onFocus={() => {
-                            void preloadGitGraph();
-                        }}
-                        disabled={isRepoBusy}
-                        aria-busy={isRepoLoading}>
-                        {isRepoLoading ? <Loader2 className='h-5 w-5 animate-spin' /> : <Plus className='h-5 w-5' />}
-                        {repoLoadPhase === 'dialog-open'
-                            ? 'Choose Folder…'
-                            : isRepoLoading
-                              ? 'Opening…'
-                              : 'Open Repository'}
-                    </Button>
-                    {openRepoError && <p className='mt-3 text-xs text-red-500'>{openRepoError}</p>}
-                    <p className='text-muted-foreground mt-4 text-xs'>
-                        or use the sidebar to browse recent repositories
-                    </p>
+                    />
+                    {openRepoError && <p className='text-muted-foreground mt-3 text-xs text-red-500'>{openRepoError}</p>}
                 </div>
             </div>
         );

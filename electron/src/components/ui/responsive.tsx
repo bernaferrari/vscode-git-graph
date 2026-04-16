@@ -154,7 +154,7 @@ export function ResponsiveFlex({
 	direction?: 'row' | 'col';
 	gap?: number;
 }) {
-	const { isMobile, isTablet } = useResponsive();
+	const { isMobile } = useResponsive();
 	
 	const flexDirection = isMobile ? 'flex-col' : direction === 'row' ? 'flex-row' : 'flex-col';
 	const gapClass = `gap-${gap}`;

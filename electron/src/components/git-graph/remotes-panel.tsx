@@ -150,7 +150,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
             repo,
             name: newName,
             url: newUrl,
-            pushUrl: newPushUrl || undefined,
+            ...(newPushUrl ? { pushUrl: newPushUrl } : {}),
         });
     };
 
@@ -168,7 +168,7 @@ export function RemotesPanel({ repo }: RemotesPanelProps) {
             repo,
             name: editingRemote.name,
             url: editUrl,
-            pushUrl: editPushUrl || undefined,
+            ...(editPushUrl ? { pushUrl: editPushUrl } : {}),
         });
     };
 

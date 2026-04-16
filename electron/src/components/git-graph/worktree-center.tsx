@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
@@ -49,6 +50,28 @@ interface WorkspaceEntry {
     repos: Array<{ path: string }>;
 }
 
+interface WorktreeMutationResult {
+    error?: string | null;
+}
+
+interface WorktreeCheckoutResult extends WorktreeMutationResult {
+    branchCreated?: string | null;
+    path?: string | null;
+}
+
+interface WorktreeRemoveResult extends WorktreeMutationResult {
+    dirtyCount?: number;
+}
+
+interface WorktreePruneResult extends WorktreeMutationResult {
+    entries?: string[];
+}
+
+interface WorktreeRepairResult extends WorktreeMutationResult {
+    repaired?: string[];
+    pruned?: string[];
+}
+
 function isRemoteBranch(value: string): boolean {
     return value.startsWith('remotes/');
 }
@@ -62,6 +85,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
     const targetRepo = repo ?? activeRepo ?? '';
     const trpcUtils = trpc.useUtils();
+    const { notifySuccess, notifyError, notifyInfo } = useAppNotifications();
 
     const [activeTab, setActiveTab] = useState<'overview' | 'create' | 'cleanup'>('overview');
     const [mode, setMode] = useState<CreateMode>('existing');
@@ -110,22 +134,27 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
     const revealMutation = trpc.system.revealInFinder.useMutation();
     const prefsMutation = trpc.git.worktree.setViewPrefs.useMutation();
     const checkoutMutation = trpc.git.checkout.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeMutationResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree checkout failed', { description: result.error });
                 return;
             }
-            toast.success('Branch checked out');
+            notifySuccess('Branch checked out in worktree');
             await trpcUtils.git.worktree.list.invalidate({ repo: targetRepo });
         },
     });
     const addMutation = trpc.git.worktree.add.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeCheckoutResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree creation failed', { description: result.error });
                 return;
             }
-            toast.success('Worktree created');
+            const description = result.branchCreated
+                ? `Created branch ${result.branchCreated}`
+                : typeof result.path === 'string'
+                  ? result.path
+                  : undefined;
+            notifySuccess('Worktree created', description ? { description } : undefined);
             setCreatePath('');
             setNewBranch('');
             setBaseRef('');
@@ -134,40 +163,50 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
         },
     });
     const removeMutation = trpc.git.worktree.remove.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeRemoveResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree removal failed', { description: result.error });
                 return;
             }
-            toast.success('Worktree removed');
+            const description =
+                typeof result.dirtyCount === 'number' && result.dirtyCount > 0
+                    ? `Force-removed worktree with ${String(result.dirtyCount)} local change(s)`
+                    : undefined;
+            notifySuccess('Worktree removed', description ? { description } : undefined);
             await trpcUtils.git.worktree.list.invalidate({ repo: targetRepo });
         },
     });
     const lockMutation = trpc.git.worktree.lock.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeMutationResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree lock failed', { description: result.error });
                 return;
             }
+            notifySuccess('Worktree locked');
             await trpcUtils.git.worktree.list.invalidate({ repo: targetRepo });
         },
     });
     const unlockMutation = trpc.git.worktree.unlock.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeMutationResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree unlock failed', { description: result.error });
                 return;
             }
+            notifySuccess('Worktree unlocked');
             await trpcUtils.git.worktree.list.invalidate({ repo: targetRepo });
         },
     });
     const pruneMutation = trpc.git.worktree.prune.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreePruneResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree prune failed', { description: result.error });
                 return;
             }
-            toast.success('Prune completed');
+            const description =
+                Array.isArray(result.entries) && result.entries.length > 0
+                    ? `${String(result.entries.length)} entry${result.entries.length === 1 ? '' : 'ies'} updated`
+                    : 'No stale worktree entries found';
+            notifySuccess('Worktree prune completed', { description });
             await Promise.all([
                 trpcUtils.git.worktree.list.invalidate({ repo: targetRepo }),
                 prunePreviewQuery.refetch(),
@@ -175,12 +214,14 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
         },
     });
     const repairMutation = trpc.git.worktree.repair.useMutation({
-        onSuccess: async (result) => {
+        onSuccess: async (result: WorktreeRepairResult) => {
             if (result.error) {
-                toast.error(result.error);
+                notifyError('Worktree repair failed', { description: result.error });
                 return;
             }
-            toast.success('Repair completed');
+            notifySuccess('Worktree repair completed', {
+                description: `${String(result.repaired?.length ?? 0)} repaired, ${String(result.pruned?.length ?? 0)} pruned`,
+            });
             await Promise.all([
                 trpcUtils.git.worktree.list.invalidate({ repo: targetRepo }),
                 prunePreviewQuery.refetch(),
@@ -299,7 +340,9 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
             path: targetPath,
         });
         if (!resolved.valid) {
-            toast.error(resolved.error ?? 'Invalid worktree path');
+            notifyError('Failed to open worktree', {
+                description: resolved.error ?? 'Invalid worktree path',
+            });
             return;
         }
         const result = await activateRepoPath(resolved.resolvedPath ?? targetPath, {
@@ -307,6 +350,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
             errorTitle: 'Failed to open worktree',
         });
         if (result.root) {
+            notifyInfo('Opened worktree', { description: result.root, persist: false });
             onOpenChange(false);
         }
     };
@@ -726,7 +770,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                         </div>
                         <ScrollArea className='h-52'>
                             <div className='space-y-1 text-xs'>
-                                {(prunePreviewQuery.data?.entries ?? []).map((entry) => (
+                                {((prunePreviewQuery.data?.entries ?? []) as string[]).map((entry: string) => (
                                     <p key={entry} className='text-muted-foreground'>
                                         {entry}
                                     </p>

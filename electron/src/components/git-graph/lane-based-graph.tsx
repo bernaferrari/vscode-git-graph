@@ -32,12 +32,6 @@ interface LaneBasedGraphProps {
 	curveRadius?: number;
 }
 
-interface Lane {
-	id: number;
-	color: string;
-	active: boolean;
-}
-
 interface Edge {
 	fromX: number;
 	fromY: number;
@@ -70,7 +64,7 @@ const LANE_COLORS = [
 ];
 
 function getLaneColor(laneIndex: number): string {
-	return LANE_COLORS[laneIndex % LANE_COLORS.length];
+	return LANE_COLORS[laneIndex % LANE_COLORS.length]!;
 }
 
 export function LaneBasedGraph({
@@ -84,7 +78,7 @@ export function LaneBasedGraph({
 	rowHeight = 32,
 	laneWidth = 24,
 	nodeRadius = 5,
-	curveRadius = 12,
+	curveRadius: _curveRadius = 12,
 }: LaneBasedGraphProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -97,15 +91,17 @@ export function LaneBasedGraph({
 
 		// Lane assignment algorithm
 		const laneAssignments: Map<string, number> = new Map();
-		const activeLanes: Set<number> = new Set();
 		const lanePool: number[] = [];
 		const result: { lane: number; color: string }[] = [];
 		const edgeList: Edge[] = [];
 		let maxLane = 0;
 
 		// Initialize with first commit on lane 0
-		laneAssignments.set(commits[0].hash, 0);
-		activeLanes.add(0);
+		const firstCommit = commits[0];
+		if (!firstCommit) {
+			return { commitLanes: [], edges: [], maxLanes: 0 };
+		}
+		laneAssignments.set(firstCommit.hash, 0);
 		lanePool.push(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
 		commits.forEach((commit, index) => {
@@ -123,7 +119,6 @@ export function LaneBasedGraph({
 				laneAssignments.set(commit.hash, currentLane);
 			}
 
-			activeLanes.add(currentLane);
 			maxLane = Math.max(maxLane, currentLane);
 
 			result.push({
@@ -173,7 +168,6 @@ export function LaneBasedGraph({
 
 			// Release lane if this is a tip
 			if (commit.parents.length === 0 || index === commits.length - 1) {
-				activeLanes.delete(currentLane);
 				lanePool.unshift(currentLane);
 			}
 		});
@@ -250,6 +244,9 @@ export function LaneBasedGraph({
 			const y = index * rowHeight + rowHeight / 2 - scrollTop;
 
 			const commit = commits[index];
+			if (!commit) {
+				return;
+			}
 			const isSelected = index === selectedIndex;
 			const hasRefs = commit.heads?.length || commit.tags?.length || commit.remotes?.length;
 
@@ -348,8 +345,6 @@ export function LaneBasedGraphSVG({
 	layout,
 	selectedIndex,
 	scrollTop,
-	visibleStartIndex,
-	visibleEndIndex,
 	onSelectCommit,
 	rowHeight = 32,
 	laneWidth = 24,
@@ -367,7 +362,11 @@ export function LaneBasedGraphSVG({
 		const edgeList: Edge[] = [];
 		let maxLane = 0;
 
-		laneAssignments.set(commits[0].hash, 0);
+		const firstCommit = commits[0];
+		if (!firstCommit) {
+			return { commitLanes: [], edges: [], maxLanes: 0 };
+		}
+		laneAssignments.set(firstCommit.hash, 0);
 
 		commits.forEach((commit, index) => {
 			let currentLane = laneAssignments.get(commit.hash);
@@ -410,11 +409,6 @@ export function LaneBasedGraphSVG({
 	}, [commits, layout, rowHeight, laneWidth]);
 
 	const graphWidth = maxLanes * laneWidth + 20;
-	const visibleCommits = commits.slice(
-		Math.max(0, visibleStartIndex - 5),
-		Math.min(commits.length, visibleEndIndex + 5)
-	);
-
 	return (
 		<svg
 			className="lane-graph-svg"

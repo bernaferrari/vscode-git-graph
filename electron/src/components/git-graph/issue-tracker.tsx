@@ -10,7 +10,6 @@ import {
 	Search,
 	Plus,
 	Check,
-	X,
 	Loader2,
 	GitPullRequest,
 	LayoutGrid,
@@ -34,8 +33,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
 
@@ -188,7 +185,6 @@ export function IssueTrackerPanel({
 	commitHash: string;
 	commitMessage: string;
 }) {
-	const { activeRepo } = useAppStore();
 	const { config } = useIssueTrackerConfigState();
 
 	const [searchQuery, setSearchQuery] = useState('');

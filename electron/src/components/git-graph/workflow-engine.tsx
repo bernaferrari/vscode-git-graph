@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/lib/store';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { trpc } from '@/trpc/client';
 
 type WorkflowStepType = 'checkout' | 'fetch' | 'createBranch' | 'merge' | 'rebase' | 'push' | 'openPR' | 'runHook' | 'notify';
@@ -26,6 +27,36 @@ interface WorkflowTemplate {
 	guards?: Array<{ type: string; value?: string }>;
 	inputs?: Array<{ key: string; label: string; required?: boolean; defaultValue?: string }>;
 	steps: Array<{ id: string; type: WorkflowStepType; params: Record<string, unknown> }>;
+}
+
+interface WorkflowDefinition {
+	id: string;
+	name: string;
+	trigger?: 'manual' | 'onBranchChange' | 'onCommit' | 'onPush';
+	onFailure?: 'stop' | 'continue' | 'rollback';
+	guards?: Array<{ type: string; value?: string }>;
+	inputs?: Array<{ key: string; label: string; required?: boolean; defaultValue?: string }>;
+	steps: Array<{ id: string; type: WorkflowStepType; params: Record<string, unknown> }>;
+}
+
+interface WorkflowRunStep {
+	id: string;
+	type: string;
+	status: string;
+}
+
+interface WorkflowRun {
+	id: string;
+	workflowId: string;
+	status: string;
+	startedAt: string | number;
+	steps: WorkflowRunStep[];
+}
+
+interface WorkflowMutationResult {
+	error?: string | null;
+	success?: boolean;
+	workflow?: { id: string };
 }
 
 const WORKFLOW_STEP_TYPES: WorkflowStepType[] = [
@@ -171,6 +202,7 @@ export function WorkflowEngineDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const { activeRepo } = useAppStore();
+	const { notifySuccess, notifyError } = useAppNotifications();
 	const trpcUtils = trpc.useUtils();
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
 	const [newWorkflowName, setNewWorkflowName] = useState('');
@@ -188,49 +220,52 @@ export function WorkflowEngineDialog({
 
 	const listQuery = trpc.git.workflow.list.useQuery(undefined, { enabled: open });
 	const createMutation = trpc.git.workflow.create.useMutation({
-		onSuccess: async (result) => {
+		onSuccess: async (result: WorkflowMutationResult) => {
 			if (result.error) {
-				toast.error(result.error);
+				notifyError('Workflow create failed', { description: result.error });
 				return;
 			}
-			toast.success('Workflow created');
-			setSelectedWorkflowId(result.workflow.id);
+			notifySuccess('Workflow created');
+			if (result.workflow?.id) {
+				setSelectedWorkflowId(result.workflow.id);
+			}
 			await trpcUtils.git.workflow.list.invalidate();
 		},
 	});
 	const deleteMutation = trpc.git.workflow.delete.useMutation({
-		onSuccess: async (result) => {
+		onSuccess: async (result: WorkflowMutationResult) => {
 			if (!result.success) {
-				toast.error(result.error ?? 'Failed to delete workflow');
+				notifyError('Workflow delete failed', { description: result.error ?? 'Failed to delete workflow' });
 				return;
 			}
+			notifySuccess('Workflow deleted');
 			await trpcUtils.git.workflow.list.invalidate();
 		},
 	});
 	const updateMutation = trpc.git.workflow.update.useMutation({
-		onSuccess: async (result) => {
+		onSuccess: async (result: WorkflowMutationResult) => {
 			if (result.error) {
-				toast.error(result.error);
+				notifyError('Workflow update failed', { description: result.error });
 				return;
 			}
-			toast.success('Workflow updated');
+			notifySuccess('Workflow updated');
 			await trpcUtils.git.workflow.list.invalidate();
 		},
 	});
 	const dryRunMutation = trpc.git.workflow.dryRun.useMutation();
 	const executeMutation = trpc.git.workflow.execute.useMutation({
-		onSuccess: async (result) => {
+		onSuccess: async (result: WorkflowMutationResult) => {
 			if (result.error) {
-				toast.error(result.error);
+				notifyError('Workflow run failed', { description: result.error });
 				return;
 			}
-			toast.success('Workflow run completed');
+			notifySuccess('Workflow run completed');
 			await trpcUtils.git.workflow.list.invalidate();
 		},
 	});
 
-	const definitions = listQuery.data?.definitions ?? [];
-	const runs = listQuery.data?.runs ?? [];
+	const definitions: WorkflowDefinition[] = listQuery.data?.definitions ?? [];
+	const runs: WorkflowRun[] = listQuery.data?.runs ?? [];
 	const selectedWorkflow = useMemo(
 		() => definitions.find((workflow) => workflow.id === selectedWorkflowId) ?? definitions[0] ?? null,
 		[definitions, selectedWorkflowId]
@@ -255,12 +290,12 @@ export function WorkflowEngineDialog({
 			setEditorSteps([]);
 			return;
 		}
-		setEditorName(selectedWorkflow.name);
-		setEditorTrigger(selectedWorkflow.trigger);
-		setEditorOnFailure(selectedWorkflow.onFailure);
-		setEditorGuards(
-			(selectedWorkflow.guards ?? []).map((guard) => ({
-				type: normalizeGuardType(guard.type),
+			setEditorName(selectedWorkflow.name);
+			setEditorTrigger(selectedWorkflow.trigger ?? 'manual');
+			setEditorOnFailure(selectedWorkflow.onFailure ?? 'stop');
+			setEditorGuards(
+				(selectedWorkflow.guards ?? []).map((guard) => ({
+					type: normalizeGuardType(guard.type),
 				...(guard.value ? { value: guard.value } : {}),
 			}))
 		);
@@ -346,6 +381,9 @@ export function WorkflowEngineDialog({
 			}
 			const next = [...previous];
 			const [step] = next.splice(index, 1);
+			if (!step) {
+				return previous;
+			}
 			next.splice(targetIndex, 0, step);
 			return next;
 		});

@@ -47,13 +47,11 @@ export interface JiraUser {
 
 // Jira API client
 export class JiraClient {
-	private domain: string;
 	private email: string;
 	private apiToken: string;
 	private baseUrl: string;
 
 	constructor(domain: string, email: string, apiToken: string) {
-		this.domain = domain;
 		this.email = email;
 		this.apiToken = apiToken;
 		this.baseUrl = `https://${domain}.atlassian.net/rest/api/3`;

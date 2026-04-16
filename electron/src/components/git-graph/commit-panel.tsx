@@ -20,9 +20,8 @@ import {
     List,
     X,
 } from 'lucide-react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 
-import { FileTreeView } from './file-tree-view';
 import { InlineStagingDiff } from './inline-staging-diff';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,8 +54,6 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
     const [expandedStaged, setExpandedStaged] = useState(true);
     const [expandedUnstaged, setExpandedUnstaged] = useState(true);
     const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
-    const [selectedStagedFiles, setSelectedStagedFiles] = useState<Set<string>>(new Set());
-    const [selectedUnstagedFiles, setSelectedUnstagedFiles] = useState<Set<string>>(new Set());
     const [selectedFile, setSelectedFile] = useState<{ path: string; status: string; staged: boolean } | null>(null);
 
     // Get working tree status
@@ -69,9 +66,6 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
     const unstaged: FileStatus[] = statusData?.unstaged ?? [];
 
     // Auto-select all staged files
-    const stagedFileSet = useMemo(() => new Set(staged.map((f) => f.file)), [staged]);
-    const unstagedFileSet = useMemo(() => new Set(unstaged.map((f) => f.file)), [unstaged]);
-
     const handleStageFile = async (file: string) => {
         try {
             await gitOps.stage([file]);

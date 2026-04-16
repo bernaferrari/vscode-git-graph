@@ -7,10 +7,8 @@ import {
 	GitBranch,
 	Tag,
 	GitCommit,
-	FileText,
 	Search,
 	Globe,
-	Clock,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
@@ -37,6 +35,11 @@ interface SearchResult {
 	subtitle?: string;
 	icon: React.ElementType;
 	action: () => void;
+}
+
+interface SearchRefCommitResult {
+	hash: string;
+	message: string;
 }
 
 export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
@@ -79,10 +82,17 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 
 		const items: SearchResult[] = [];
 		const q = query.toLowerCase();
+		const typeOrder: Record<SearchResult['type'], number> = {
+			branch: 0,
+			tag: 1,
+			commit: 2,
+			file: 3,
+			recent: 4,
+		};
 
 		// Branches
-		const branches = repoInfo?.branches ?? [];
-		branches.forEach((branch) => {
+		const branches = (repoInfo?.branches ?? []) as string[];
+		branches.forEach((branch: string) => {
 			const name = branch.replace('remotes/', '');
 			if (name.toLowerCase().includes(q)) {
 				items.push({
@@ -99,8 +109,8 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 		});
 
 		// Tags
-		const tags = repoInfo?.tags ?? [];
-		tags.forEach((tag) => {
+		const tags = (repoInfo?.tags ?? []) as string[];
+		tags.forEach((tag: string) => {
 			if (tag.toLowerCase().includes(q)) {
 				items.push({
 					type: 'tag',
@@ -115,8 +125,8 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 		});
 
 		// Recent commits
-		const commits = recentCommits?.commits ?? [];
-		commits.forEach((commit) => {
+		const commits = (recentCommits?.commits ?? []) as SearchRefCommitResult[];
+		commits.forEach((commit: SearchRefCommitResult) => {
 			if (
 				commit.hash.toLowerCase().includes(q) ||
 				commit.message.toLowerCase().includes(q)
@@ -136,7 +146,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 
 		// Search results from backend
 		if (searchResults) {
-			searchResults.commits?.forEach((c) => {
+			((searchResults.commits ?? []) as SearchRefCommitResult[]).forEach((c: SearchRefCommitResult) => {
 				if (!items.some((i) => i.subtitle === c.hash.slice(0, 7))) {
 					items.push({
 						type: 'commit',
@@ -159,7 +169,6 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 			if (aExact && !bExact) return -1;
 			if (!aExact && bExact) return 1;
 
-			const typeOrder = { branch: 0, tag: 1, commit: 2, file: 3 };
 			return (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99);
 		});
 

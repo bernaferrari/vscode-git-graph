@@ -411,7 +411,7 @@ function SidebarGroupLabel({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "sidebar-group-label",
       sidebar: "group-label",
@@ -435,7 +435,7 @@ function SidebarGroupAction({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "sidebar-group-action",
       sidebar: "group-action",
@@ -514,6 +514,7 @@ function SidebarMenuButton({
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar()
+  const renderButton = render as Parameters<typeof useRender>[0]["render"] | undefined
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -522,7 +523,7 @@ function SidebarMenuButton({
       },
       props
     ),
-    render: !tooltip ? render : TooltipTrigger,
+    ...(renderButton ? { render: renderButton } : {}),
     state: {
       slot: "sidebar-menu-button",
       sidebar: "menu-button",
@@ -543,7 +544,7 @@ function SidebarMenuButton({
 
   return (
     <Tooltip>
-      {comp}
+      <TooltipTrigger asChild>{comp}</TooltipTrigger>
       <TooltipContent
         side="right"
         align="center"
@@ -576,7 +577,7 @@ function SidebarMenuAction({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "sidebar-menu-action",
       sidebar: "menu-action",
@@ -686,7 +687,7 @@ function SidebarMenuSubButton({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "sidebar-menu-sub-button",
       sidebar: "menu-sub-button",

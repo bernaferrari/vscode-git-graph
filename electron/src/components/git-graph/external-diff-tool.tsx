@@ -5,14 +5,8 @@
 
 import {
 	ExternalLink,
-	Settings,
 	Plus,
 	Trash2,
-	Edit,
-	Check,
-	FileCode,
-	FolderOpen,
-	Terminal,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -203,7 +197,6 @@ export function ExternalDiffConfig({
 }) {
 	const { config, persistConfig } = useExternalDiffConfigState();
 
-	const [editingTool, setEditingTool] = useState<DiffTool | null>(null);
 	const [isAddingCustom, setIsAddingCustom] = useState(false);
 	const [customTool, setCustomTool] = useState<Partial<DiffTool>>({
 		name: '',
@@ -215,7 +208,10 @@ export function ExternalDiffConfig({
 		return config.tools.find(t => t.id === config.selectedTool);
 	}, [config.tools, config.selectedTool]);
 
-	const handleSelectTool = (toolId: string) => {
+	const handleSelectTool = (toolId: string | null) => {
+		if (!toolId) {
+			return;
+		}
 		persistConfig({ ...config, selectedTool: toolId });
 	};
 

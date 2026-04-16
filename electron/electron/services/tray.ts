@@ -114,24 +114,19 @@ export class SystemTrayManager {
 		this.tray.setContextMenu(menu);
 	}
 
-	private buildRecentReposMenu(): Electron.MenuItem[] {
+	private buildRecentReposMenu(): Electron.MenuItemConstructorOptions[] {
 		// Get recent repos from store
 		const recentRepos = this.getRecentRepos();
 
 		if (recentRepos.length === 0) {
-			return [
-				{
-					label: 'No recent repositories',
-					enabled: false,
-				} as Electron.MenuItem,
-			];
+			return [{ label: 'No recent repositories', enabled: false }];
 		}
 
 		return recentRepos.slice(0, 5).map((repo, index) => ({
 			label: repo.name,
-			accelerator: index < 9 ? `CmdOrCtrl+${String(index + 1)}` : undefined,
+			...(index < 9 ? { accelerator: `CmdOrCtrl+${String(index + 1)}` } : {}),
 			click: () => { this.openRepo(repo.path); },
-		})) as Electron.MenuItem[];
+		}));
 	}
 
 	private getRecentRepos(): Array<{ name: string; path: string }> {
@@ -141,7 +136,7 @@ export class SystemTrayManager {
 
 	private showWindow(action?: string) {
 		if (!this.mainWindow) {
-			this.mainWindow = BrowserWindow.getAllWindows()[0];
+			this.mainWindow = BrowserWindow.getAllWindows()[0] ?? null;
 		}
 
 		if (this.mainWindow) {
@@ -184,7 +179,7 @@ export class SystemTrayManager {
 		if (!this.tray) return;
 
 		// On macOS, we can set a badge on the dock icon
-		if (process.platform === 'darwin') {
+		if (process.platform === 'darwin' && app.dock) {
 			app.dock.setBadge(count > 0 ? String(count) : '');
 		}
 

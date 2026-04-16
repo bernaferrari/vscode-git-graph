@@ -54,7 +54,7 @@ function ButtonGroupText({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "button-group-text",
     },

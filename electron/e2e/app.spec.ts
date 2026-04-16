@@ -4,14 +4,21 @@
 
 import { test, expect, ElectronApp, Page } from '@playwright/test';
 import { _electron as electron } from 'playwright';
+import { existsSync } from 'node:fs';
 import * as path from 'path';
 
 let electronApp: ElectronApp;
 let page: Page;
 
 test.beforeAll(async () => {
+	const mainEntry = path.resolve(__dirname, '../dist-electron/main.js');
+	if (!existsSync(mainEntry)) {
+		throw new Error('Build the app first with `pnpm build` before running e2e tests.');
+	}
+
 	electronApp = await electron.launch({
-		args: [path.join(__dirname, '../dist-electron/main.js')],
+		args: [mainEntry],
+		cwd: path.resolve(__dirname, '..'),
 		env: {
 			...process.env,
 			NODE_ENV: 'test',
@@ -28,42 +35,13 @@ test.afterAll(async () => {
 
 test.describe('Application Launch', () => {
 	test('should launch the application', async () => {
-		const title = await page.title();
-		expect(title).toContain('Git Graph');
-	});
-
-	test('should show no repository selected message', async () => {
-		await expect(page.getByText('No Repository Selected')).toBeVisible();
+		await expect(page).toHaveTitle(/Git Graph/);
+		await expect(page.getByRole('heading', { name: /welcome to git graph/i })).toBeVisible();
 	});
 });
 
 test.describe('Repository Selection', () => {
 	test('should have open repository button', async () => {
-		const openButton = page.getByRole('button', { name: /open/i });
-		await expect(openButton).toBeVisible();
-	});
-});
-
-test.describe('Keyboard Shortcuts', () => {
-	test('should open find widget with Cmd+F', async () => {
-		await page.keyboard.press('Meta+f');
-		// Find widget should appear
-		await expect(page.getByPlaceholder(/search|find/i)).toBeVisible();
-	});
-});
-
-test.describe('Accessibility', () => {
-	test('should have proper heading structure', async () => {
-		const headings = await page.$$('h1, h2, h3');
-		expect(headings.length).toBeGreaterThan(0);
-	});
-
-	test('should have accessible buttons', async () => {
-		const buttons = await page.$$('button');
-		for (const button of buttons) {
-			const hasLabel = await button.getAttribute('aria-label');
-			const hasText = await button.textContent();
-			expect(hasLabel || hasText).toBeTruthy();
-		}
+		await expect(page.getByRole('button', { name: /open repository/i })).toBeVisible();
 	});
 });

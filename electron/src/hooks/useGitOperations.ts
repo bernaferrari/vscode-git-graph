@@ -14,9 +14,82 @@ interface MutationResultShape {
     errors?: string[];
 }
 
+interface MutationErrorShape {
+    message: string;
+}
+
 interface GitErrorGuidanceRule {
     pattern: RegExp;
     suggestion: string;
+}
+
+interface CreateBranchVariables {
+    branchName: string;
+    commitHash: string;
+}
+
+interface DeleteBranchVariables {
+    branchName: string;
+    force: boolean;
+}
+
+interface CheckoutVariables {
+    ref: string;
+}
+
+interface ResetVariables {
+    mode: string;
+    commitHash: string;
+}
+
+interface FetchVariables {
+    remote?: string | null;
+    prune?: boolean;
+}
+
+interface PullVariables {
+    remote: string;
+    branchName: string;
+    fastForwardOnly?: boolean;
+    noFastForward?: boolean;
+}
+
+interface PushVariables {
+    force?: boolean;
+    remote: string;
+    branchName: string;
+    setUpstream?: boolean;
+}
+
+interface MergeVariables {
+    branch: string;
+    noFastForward?: boolean;
+    squash?: boolean;
+    noCommit?: boolean;
+}
+
+interface RebaseVariables {
+    onto: string;
+    interactive?: boolean;
+}
+
+interface CherryPickVariables {
+    commitHash: string;
+    noCommit?: boolean;
+}
+
+interface RevertVariables {
+    commitHash: string;
+    noCommit?: boolean;
+}
+
+interface CommitVariables {
+    amend?: boolean;
+    message: string;
+}
+
+interface UndoLastCommitVariables {
+    soft: boolean;
 }
 
 type LoggedOperation = Omit<OperationReceipt, 'id' | 'timestamp'>;
@@ -66,6 +139,11 @@ export function useGitOperations() {
     } = useAppStore();
     const utils = trpc.useUtils();
     const auditLogMutation = trpc.system.audit.log.useMutation();
+    const addNotificationMutation = trpc.config.addNotification.useMutation({
+        onSuccess: async () => {
+            await utils.config.notifications.invalidate();
+        },
+    });
     const logOperation = useCallback(
         (operation: LoggedOperation) => {
             useOperationLog.getState().addOperation(operation);
@@ -82,8 +160,12 @@ export function useGitOperations() {
                     affectedCommits: operation.affectedCommits,
                 },
             });
+            addNotificationMutation.mutate({
+                type: operation.status === 'failed' ? 'error' : 'success',
+                title: operation.description,
+            });
         },
-        [activeRepo, auditLogMutation]
+        [activeRepo, addNotificationMutation, auditLogMutation]
     );
     const { data: repoInfo } = trpc.git.repoInfo.useQuery(
         {
@@ -148,9 +230,14 @@ export function useGitOperations() {
 
     const notifyOperationError = useCallback(
         (title: string, message: string) => {
+            addNotificationMutation.mutate({
+                type: 'error',
+                title,
+                message,
+            });
             toast.error(title, { description: formatErrorWithGuidance(message) });
         },
-        [formatErrorWithGuidance]
+        [addNotificationMutation, formatErrorWithGuidance]
     );
 
     const runTrackedOperation = useCallback(
@@ -208,7 +295,7 @@ export function useGitOperations() {
 
     // Mutations
     const createBranch = trpc.git.createBranch.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: CreateBranchVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Failed to create branch', error);
@@ -230,13 +317,13 @@ export function useGitOperations() {
             });
             toast.success('Branch created');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Failed to create branch', error.message);
         },
     });
 
     const deleteBranch = trpc.git.deleteBranch.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: DeleteBranchVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Failed to delete branch', error);
@@ -254,13 +341,13 @@ export function useGitOperations() {
             });
             toast.success('Branch deleted');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Failed to delete branch', error.message);
         },
     });
 
     const checkout = trpc.git.checkout.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: CheckoutVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Checkout failed', error);
@@ -286,13 +373,13 @@ export function useGitOperations() {
             });
             toast.success('Checked out');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Checkout failed', error.message);
         },
     });
 
     const reset = trpc.git.reset.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: ResetVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Reset failed', error);
@@ -304,23 +391,19 @@ export function useGitOperations() {
                 description: `Reset ${variables.mode} to ${variables.commitHash.slice(0, 7)}`,
                 details: `${variables.mode}:${variables.commitHash}`,
                 gitCommands: [`git reset --${variables.mode} ${variables.commitHash}`],
-                undoAction: {
-                    type: 'hard-reset',
-                    command: 'ORIG_HEAD',
-                },
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [variables.commitHash],
                 status: 'success',
             });
             toast.success('Reset successful');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Reset failed', error.message);
         },
     });
 
     const fetch = trpc.git.fetch.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: FetchVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Fetch failed', error);
@@ -340,13 +423,13 @@ export function useGitOperations() {
             });
             toast.success('Fetched from remote');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Fetch failed', error.message);
         },
     });
 
     const pull = trpc.git.pull.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: PullVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Pull failed', error);
@@ -366,13 +449,13 @@ export function useGitOperations() {
             });
             toast.success('Pulled changes');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Pull failed', error.message);
         },
     });
 
     const push = trpc.git.push.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: PushVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Push failed', error);
@@ -392,13 +475,13 @@ export function useGitOperations() {
             });
             toast.success('Pushed changes');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Push failed', error.message);
         },
     });
 
     const createTag = trpc.git.tag.create.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Failed to create tag', error);
@@ -407,13 +490,13 @@ export function useGitOperations() {
             void safeInvalidateRepositoryData();
             toast.success('Tag created');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Failed to create tag', error.message);
         },
     });
 
     const deleteTag = trpc.git.tag.delete.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Failed to delete tag', error);
@@ -422,13 +505,13 @@ export function useGitOperations() {
             void safeInvalidateRepositoryData();
             toast.success('Tag deleted');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Failed to delete tag', error.message);
         },
     });
 
     const merge = trpc.git.merge.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: MergeVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Merge failed', error);
@@ -448,13 +531,13 @@ export function useGitOperations() {
             });
             toast.success('Merge successful');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Merge failed', error.message);
         },
     });
 
     const rebase = trpc.git.rebase.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: RebaseVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Rebase failed', error);
@@ -472,13 +555,13 @@ export function useGitOperations() {
             });
             toast.success('Rebase successful');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Rebase failed', error.message);
         },
     });
 
     const cherryPick = trpc.git.cherryPick.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: CherryPickVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Cherry-pick failed', error);
@@ -496,13 +579,13 @@ export function useGitOperations() {
             });
             toast.success('Cherry-pick successful');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Cherry-pick failed', error.message);
         },
     });
 
     const revert = trpc.git.revert.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: RevertVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Revert failed', error);
@@ -520,13 +603,13 @@ export function useGitOperations() {
             });
             toast.success('Revert successful');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Revert failed', error.message);
         },
     });
 
     const commit = trpc.git.commit.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: CommitVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Commit failed', error);
@@ -550,13 +633,13 @@ export function useGitOperations() {
             });
             toast.success('Committed');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Commit failed', error.message);
         },
     });
 
     const stage = trpc.git.stage.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Stage failed', error);
@@ -564,13 +647,13 @@ export function useGitOperations() {
             }
             void safeInvalidateWorkingTreeData();
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Stage failed', error.message);
         },
     });
 
     const unstage = trpc.git.unstage.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Unstage failed', error);
@@ -578,13 +661,13 @@ export function useGitOperations() {
             }
             void safeInvalidateWorkingTreeData();
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Unstage failed', error.message);
         },
     });
 
     const stashPush = trpc.git.stashPush.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Stash failed', error);
@@ -593,13 +676,13 @@ export function useGitOperations() {
             void safeInvalidateRepositoryData();
             toast.success('Stashed changes');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Stash failed', error.message);
         },
     });
 
     const stashPop = trpc.git.stashPop.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Stash pop failed', error);
@@ -608,13 +691,13 @@ export function useGitOperations() {
             void safeInvalidateRepositoryData();
             toast.success('Stash applied');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Stash pop failed', error.message);
         },
     });
 
     const stashApply = trpc.git.stashApply.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Stash apply failed', error);
@@ -622,13 +705,13 @@ export function useGitOperations() {
             }
             void safeInvalidateRepositoryData();
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Stash apply failed', error.message);
         },
     });
 
     const stashDrop = trpc.git.stashDrop.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: MutationResultShape) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Stash drop failed', error);
@@ -636,13 +719,13 @@ export function useGitOperations() {
             }
             void safeInvalidateRepositoryData();
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Stash drop failed', error.message);
         },
     });
 
     const undoLastCommit = trpc.git.undoLastCommit.useMutation({
-        onSuccess: (result, variables) => {
+        onSuccess: (result: MutationResultShape, variables: UndoLastCommitVariables) => {
             const error = getMutationError(result);
             if (error) {
                 notifyOperationError('Undo failed', error);
@@ -660,7 +743,7 @@ export function useGitOperations() {
             });
             toast.success('Undid last commit');
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             notifyOperationError('Undo failed', error.message);
         },
     });

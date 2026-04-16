@@ -119,13 +119,13 @@ export function ContextualTips({
 			return false;
 		});
 
-		// Pick a random tip from applicable ones
-		if (applicableTips.length > 0) {
-			const randomIndex = Math.floor(Math.random() * applicableTips.length);
-			setCurrentTip(applicableTips[randomIndex]);
-		} else {
-			setCurrentTip(null);
-		}
+			// Pick a random tip from applicable ones
+			if (applicableTips.length > 0) {
+				const randomIndex = Math.floor(Math.random() * applicableTips.length);
+				setCurrentTip(applicableTips[randomIndex] ?? null);
+			} else {
+				setCurrentTip(null);
+			}
 	}, [mode, hasChanges, hasConflicts, hasStash, dismissedTips]);
 
 	const handleDismiss = () => {

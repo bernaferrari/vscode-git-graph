@@ -446,7 +446,7 @@ class MenuManager {
 
 		return recentRepos.map((repo, i) => ({
 			label: repo,
-			accelerator: i < 9 ? `CmdOrCtrl+${String(i + 1)}` : undefined,
+			...(i < 9 ? { accelerator: `CmdOrCtrl+${String(i + 1)}` } : {}),
 			click: () => { this.openRepo(repo); },
 		}));
 	}
@@ -482,12 +482,17 @@ class MenuManager {
 
 	private showAbout() {
 		const window = this.mainWindow ?? BrowserWindow.getAllWindows()[0];
-		void dialog.showMessageBox(window, {
-			type: 'info',
+		const messageBoxOptions = {
+			type: 'info' as const,
 			title: 'About Git Graph',
 			message: 'Git Graph',
 			detail: `Version: ${app.getVersion()}\n\nA beautiful Git client for everyone.`,
-		});
+		};
+		if (window) {
+			void dialog.showMessageBox(window, messageBoxOptions);
+			return;
+		}
+		void dialog.showMessageBox(messageBoxOptions);
 	}
 }
 

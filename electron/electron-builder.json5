@@ -1,8 +1,8 @@
 // @see https://www.electron.build/configuration/configuration
 {
     $schema: 'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
-    appId: 'com.example.electron-template',
-    productName: 'Electron Template',
+    appId: 'com.gitgraph.desktop',
+    productName: 'Git Graph',
 
     files: ['dist', 'dist-electron'],
     asar: true,
@@ -34,7 +34,7 @@
         target: ['AppImage'],
         artifactName: '${productName}-Linux-${version}.${ext}',
     },
-    // Uncomment and configure when you're ready to set up auto-updates:
-    // Use HTTP if your certificate isn't trusted
+    // Auto-updates are intentionally not enabled here.
+    // Configure a publish target before enabling the updater at runtime.
     // publish: [{ provider: 'generic', url: 'https://your-generic-domain.tld' }],
 }

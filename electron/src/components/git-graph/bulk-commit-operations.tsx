@@ -150,13 +150,18 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
             setIsExecuting(true);
 
             try {
-                const assertMutationSuccess = (result: { error?: string | null; errors?: string[] }) => {
-                    if (typeof result.error === 'string' && result.error.length > 0) {
-                        throw new Error(result.error);
+                const getMutationError = (result: unknown): string | null => {
+                    if (!result || typeof result !== 'object') {
+                        return null;
                     }
-                    if (Array.isArray(result.errors) && result.errors.length > 0) {
-                        throw new Error(result.errors.join('\n'));
+                    const typed = result as { error?: string | null; errors?: string[] };
+                    if (typeof typed.error === 'string' && typed.error.length > 0) {
+                        return typed.error;
                     }
+                    if (Array.isArray(typed.errors) && typed.errors.length > 0) {
+                        return typed.errors.join('\n');
+                    }
+                    return null;
                 };
 
                 switch (action) {
@@ -165,7 +170,10 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                         const orderedCommits = [...selectedCommits].reverse();
                         for (const commit of orderedCommits) {
                             const result = await gitOps.cherryPick(commit.hash);
-                            assertMutationSuccess(result);
+                            const error = getMutationError(result);
+                            if (error) {
+                                throw new Error(error);
+                            }
                         }
                         toast.success(`Cherry-picked ${selectedHashes.size} commits`);
                         break;
@@ -174,7 +182,10 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                         // Revert commits in order (newest first for reverts)
                         for (const commit of selectedCommits) {
                             const result = await gitOps.revert(commit.hash);
-                            assertMutationSuccess(result);
+                            const error = getMutationError(result);
+                            if (error) {
+                                throw new Error(error);
+                            }
                         }
                         toast.success(`Reverted ${selectedHashes.size} commits`);
                         break;
@@ -184,13 +195,19 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                             const firstCommit = selectedCommits[0];
                             if (!firstCommit) break;
                             const createResult = await gitOps.createBranch(firstCommit.hash, targetBranch, true);
-                            assertMutationSuccess(createResult);
+                            const createError = getMutationError(createResult);
+                            if (createError) {
+                                throw new Error(createError);
+                            }
 
                             // Cherry-pick remaining commits
                             const remaining = selectedCommits.slice(1);
                             for (const commit of remaining) {
                                 const result = await gitOps.cherryPick(commit.hash);
-                                assertMutationSuccess(result);
+                                const error = getMutationError(result);
+                                if (error) {
+                                    throw new Error(error);
+                                }
                             }
                             toast.success(`Created branch ${targetBranch} with ${selectedHashes.size} commits`);
                         }

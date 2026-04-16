@@ -15,10 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import {
 	Star,
-	StarOff,
 	Pin,
 	PinOff,
-	Trash2,
 	MessageSquare,
 	User,
 	Calendar,
@@ -215,7 +213,10 @@ export function usePinnedCommits(repoId: string | null) {
         { enabled: !!repoId, staleTime: 10_000 }
     );
     const setPinnedCommitsMutation = trpc.repo.setPinnedCommits.useMutation({
-        onSuccess: async (_, variables) => {
+        onSuccess: async (
+			_result: unknown,
+			variables: { repo: string; commits: PinnedCommit[] }
+		) => {
             await utils.repo.pinnedCommits.invalidate({ repo: variables.repo });
         },
     });

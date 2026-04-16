@@ -5,11 +5,6 @@
 
 import {
 	Settings,
-	User,
-	Globe,
-	Key,
-	Palette,
-	Terminal,
 	Plus,
 	Trash2,
 	Edit,
@@ -50,6 +45,34 @@ interface ConfigKey {
 	value: string;
 	source: 'system' | 'global' | 'local';
 	modified?: boolean;
+}
+
+function buildConfigSections(result: Record<string, unknown>): ConfigSection[] {
+	const sectionMap = new Map<string, ConfigKey[]>();
+
+	Object.entries(result).forEach(([key, value]) => {
+		const [section, ...rest] = key.split('.');
+		if (!section) {
+			return;
+		}
+
+		const subKey = rest.join('.');
+		const keys = sectionMap.get(section) ?? [];
+		keys.push({
+			key: subKey,
+			value: String(value),
+			source: 'global',
+		});
+		sectionMap.set(section, keys);
+	});
+
+	const sections: ConfigSection[] = [];
+	sectionMap.forEach((keys, name) => {
+		sections.push({ name, keys });
+	});
+
+	sections.sort((a, b) => a.name.localeCompare(b.name));
+	return sections;
 }
 
 // Common config keys with descriptions
@@ -113,35 +136,8 @@ export function GitConfigEditor({
 		const loadConfig = async () => {
 			setIsLoading(true);
 			try {
-				const result = await trpc.git.configList.query({ repo: activeRepo });
-				
-				// Parse config into sections
-				const sections: ConfigSection[] = [];
-				const sectionMap = new Map<string, ConfigKey[]>();
-
-				Object.entries(result || {}).forEach(([key, value]) => {
-					const [section, ...rest] = key.split('.');
-					const subKey = rest.join('.');
-
-					if (!sectionMap.has(section)) {
-						sectionMap.set(section, []);
-					}
-
-					sectionMap.get(section)!.push({
-						key: subKey,
-						value: value as string,
-						source: 'global',
-					});
-				});
-
-				sectionMap.forEach((keys, name) => {
-					sections.push({ name, keys });
-				});
-
-				// Sort sections
-				sections.sort((a, b) => a.name.localeCompare(b.name));
-
-				setConfigSections(sections);
+				const result = (await trpc.git.configList.query({ repo: activeRepo })) as Record<string, unknown>;
+				setConfigSections(buildConfigSections(result));
 
 				// Also get raw config
 				const rawResult = await trpc.git.configRaw.query({ repo: activeRepo });
@@ -305,31 +301,8 @@ export function GitConfigEditor({
 		setModifiedKeys(new Set());
 		// Reload config
 		if (activeRepo) {
-			trpc.git.configList.query({ repo: activeRepo }).then(result => {
-				const sections: ConfigSection[] = [];
-				const sectionMap = new Map<string, ConfigKey[]>();
-
-				Object.entries(result || {}).forEach(([key, value]) => {
-					const [section, ...rest] = key.split('.');
-					const subKey = rest.join('.');
-
-					if (!sectionMap.has(section)) {
-						sectionMap.set(section, []);
-					}
-
-					sectionMap.get(section)!.push({
-						key: subKey,
-						value: value as string,
-						source: 'global',
-					});
-				});
-
-				sectionMap.forEach((keys, name) => {
-					sections.push({ name, keys });
-				});
-
-				sections.sort((a, b) => a.name.localeCompare(b.name));
-				setConfigSections(sections);
+			trpc.git.configList.query({ repo: activeRepo }).then((result: unknown) => {
+				setConfigSections(buildConfigSections((result ?? {}) as Record<string, unknown>));
 			});
 		}
 	};

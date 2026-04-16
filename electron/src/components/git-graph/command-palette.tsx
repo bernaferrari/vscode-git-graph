@@ -1,6 +1,6 @@
 /**
  * Command Palette
- * Quick access to all commands and actions (Cmd+Shift+P)
+ * Quick access to all commands and actions (Ctrl/Cmd+Shift+P)
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -40,7 +40,28 @@ import {
 	Shield,
 	Bell,
 	Siren,
+	Users,
 } from 'lucide-react';
+
+const isMacPlatform = () => {
+	if (typeof navigator === 'undefined') {
+		return false;
+	}
+	return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform ?? '');
+};
+
+const shortcutLabels = {
+	createBranch: isMacPlatform() ? '⌘B' : 'Ctrl+B',
+	createTag: isMacPlatform() ? '⌘T' : 'Ctrl+T',
+	searchCommits: isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F',
+	fuzzyFinder: isMacPlatform() ? '⌘K' : 'Ctrl+K',
+	terminal: isMacPlatform() ? '⌘P' : 'Ctrl+P',
+	statistics: isMacPlatform() ? '⌘⇧S' : 'Ctrl+Shift+S',
+	pinned: isMacPlatform() ? '⌘⇧P' : 'Ctrl+Shift+P',
+	remotes: isMacPlatform() ? '⌘⇧R' : 'Ctrl+Shift+R',
+	settings: isMacPlatform() ? '⌘,' : 'Ctrl+,',
+	refresh: isMacPlatform() ? '⌘R' : 'Ctrl+R',
+};
 
 interface Command {
 	id: string;
@@ -83,8 +104,9 @@ export interface CommandPaletteActions {
 		onFilters: () => void;
 		onPinned: () => void;
 		onLineStaging?: () => void;
-		onWorkspaces?: () => void;
-		onKeyboardHelp: () => void;
+	onWorkspaces?: () => void;
+	onCollaboration?: () => void;
+	onKeyboardHelp: () => void;
 		onKeyboardCustomize?: () => void;
 		onHealthCheck: () => void;
 		onFuzzyFinder: () => void;
@@ -152,7 +174,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Create Branch',
 			icon: <GitBranch className="h-4 w-4" />,
 			category: 'Git',
-			shortcut: '⌘B',
+			shortcut: shortcutLabels.createBranch,
 			action: actions.onCreateBranch,
 		},
 		{
@@ -160,7 +182,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Create Tag',
 			icon: <Plus className="h-4 w-4" />,
 			category: 'Git',
-			shortcut: '⌘T',
+			shortcut: shortcutLabels.createTag,
 			action: actions.onCreateTag,
 		},
 		{
@@ -183,7 +205,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Search All Commits',
 			icon: <Search className="h-4 w-4" />,
 			category: 'Tools',
-			shortcut: '⌘⇧F',
+			shortcut: shortcutLabels.searchCommits,
 			action: actions.onSearch,
 		},
 		{
@@ -191,7 +213,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Fuzzy Finder',
 			icon: <Command className="h-4 w-4" />,
 			category: 'Tools',
-			shortcut: '⌘K',
+			shortcut: shortcutLabels.fuzzyFinder,
 			action: actions.onFuzzyFinder,
 		},
 		{
@@ -199,12 +221,12 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Toggle Terminal',
 			icon: <Terminal className="h-4 w-4" />,
 			category: 'Tools',
-			shortcut: '⌘P',
+			shortcut: shortcutLabels.terminal,
 			action: actions.onTerminal,
 		},
 		{
 			id: 'finder',
-			label: 'Reveal in Finder',
+			label: 'Reveal in File Manager',
 			icon: <FolderOpen className="h-4 w-4" />,
 			category: 'Tools',
 			action: actions.onOpenInFinder ?? (() => {}),
@@ -228,7 +250,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Repository Statistics',
 			icon: <BarChart3 className="h-4 w-4" />,
 			category: 'Tools',
-			shortcut: '⌘⇧S',
+			shortcut: shortcutLabels.statistics,
 			action: actions.onStatistics,
 		},
 		{
@@ -250,7 +272,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Pinned Commits',
 			icon: <Pin className="h-4 w-4" />,
 			category: 'Tools',
-			shortcut: '⌘⇧P',
+			shortcut: shortcutLabels.pinned,
 			action: actions.onPinned,
 		},
 		// Settings
@@ -287,7 +309,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Manage Remotes',
 			icon: <Globe className="h-4 w-4" />,
 			category: 'Settings',
-			shortcut: '⌘⇧R',
+			shortcut: shortcutLabels.remotes,
 			action: actions.onRemotes,
 		},
 		{
@@ -295,7 +317,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Open Settings',
 			icon: <Settings className="h-4 w-4" />,
 			category: 'Settings',
-			shortcut: '⌘,',
+			shortcut: shortcutLabels.settings,
 			action: actions.onSettings,
 		},
 		// Integrations
@@ -348,6 +370,15 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			category: 'Integrations',
 			keywords: ['workspace', 'launchpad', 'repos'],
 			action: actions.onWorkspaces,
+		}] : []),
+		...(actions.onCollaboration ? [{
+			id: 'collaboration-center',
+			label: 'Collaboration Center',
+			description: 'Create workspace handoffs, deep links, and reusable patch shelf items',
+			icon: <Users className="h-4 w-4" />,
+			category: 'Integrations',
+			keywords: ['handoff', 'patch', 'share', 'workspace', 'collaboration'],
+			action: actions.onCollaboration,
 		}] : []),
 		...(actions.onRepoPolicy ? [{
 			id: 'repo-policy',
@@ -454,7 +485,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			label: 'Refresh Repository',
 			icon: <RefreshCw className="h-4 w-4" />,
 			category: 'Help',
-			shortcut: '⌘R',
+			shortcut: shortcutLabels.refresh,
 			action: actions.onRefresh,
 		},
 	], [actions]);

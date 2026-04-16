@@ -10,14 +10,17 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { appStore, instanceStore } from '@/app/backend/store';
+import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
 
 import { findGit } from '../../../services/gitExecutable';
 import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
 import {
     addPullRequestComment as addRemotePullRequestComment,
+    addPullRequestInlineComment as addRemotePullRequestInlineComment,
     closePullRequest as closeRemotePullRequest,
     createPullRequest as createRemotePullRequest,
     getPullRequest as getRemotePullRequest,
+    getPullRequestReviewState as getRemotePullRequestReviewState,
     listPullRequestComments as listRemotePullRequestComments,
     listPullRequests as listRemotePullRequests,
     mergePullRequest as mergeRemotePullRequest,
@@ -31,6 +34,71 @@ import { parseWorktreePorcelainRecords } from './worktree';
 
 // Singleton Git service instance
 let gitService: GitService | null = null;
+const providerGithubTokenSecretKey = 'providerAuth.githubToken';
+const providerGitlabTokenSecretKey = 'providerAuth.gitlabToken';
+const providerBitbucketTokenSecretKey = 'providerAuth.bitbucketToken';
+const providerAzureTokenSecretKey = 'providerAuth.azureToken';
+
+function readStoredString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function hydrateProviderAuthConfig(): ProviderAuthConfig {
+    const current = (appStore.get('providerAuth') ?? {}) as Partial<Record<string, unknown>>;
+    const githubToken = readSecretValue(providerGithubTokenSecretKey);
+    const gitlabToken = readSecretValue(providerGitlabTokenSecretKey);
+    const bitbucketToken = readSecretValue(providerBitbucketTokenSecretKey);
+    const azureToken = readSecretValue(providerAzureTokenSecretKey);
+
+    const currentGithubToken = readStoredString(current.githubToken);
+    const currentGitlabToken = readStoredString(current.gitlabToken);
+    const currentBitbucketToken = readStoredString(current.bitbucketToken);
+    const currentAzureToken = readStoredString(current.azureToken);
+    const currentBitbucketUsername = readStoredString(current.bitbucketUsername);
+
+    if (currentGithubToken || currentGitlabToken || currentBitbucketToken || currentAzureToken) {
+        setSecretValue(providerGithubTokenSecretKey, currentGithubToken);
+        setSecretValue(providerGitlabTokenSecretKey, currentGitlabToken);
+        setSecretValue(providerBitbucketTokenSecretKey, currentBitbucketToken);
+        setSecretValue(providerAzureTokenSecretKey, currentAzureToken);
+        appStore.set('providerAuth', {
+            githubToken: '',
+            gitlabToken: '',
+            bitbucketToken: '',
+            bitbucketUsername: currentBitbucketUsername,
+            azureToken: '',
+        });
+    }
+
+    const auth: ProviderAuthConfig = {};
+    const normalizedGithubToken = githubToken || currentGithubToken;
+    const normalizedGitlabToken = gitlabToken || currentGitlabToken;
+    const normalizedBitbucketToken = bitbucketToken || currentBitbucketToken;
+    const normalizedAzureToken = azureToken || currentAzureToken;
+
+    if (normalizedGithubToken) auth.githubToken = normalizedGithubToken;
+    if (normalizedGitlabToken) auth.gitlabToken = normalizedGitlabToken;
+    if (normalizedBitbucketToken) auth.bitbucketToken = normalizedBitbucketToken;
+    if (currentBitbucketUsername) auth.bitbucketUsername = currentBitbucketUsername;
+    if (normalizedAzureToken) auth.azureToken = normalizedAzureToken;
+
+    return auth;
+}
+
+function persistProviderAuthConfig(auth: ProviderAuthConfig): void {
+    setSecretValue(providerGithubTokenSecretKey, auth.githubToken ?? '');
+    setSecretValue(providerGitlabTokenSecretKey, auth.gitlabToken ?? '');
+    setSecretValue(providerBitbucketTokenSecretKey, auth.bitbucketToken ?? '');
+    setSecretValue(providerAzureTokenSecretKey, auth.azureToken ?? '');
+
+    appStore.set('providerAuth', {
+        githubToken: '',
+        gitlabToken: '',
+        bitbucketToken: '',
+        bitbucketUsername: auth.bitbucketUsername?.trim() ?? '',
+        azureToken: '',
+    });
+}
 
 function getGitService(): GitService {
     if (!gitService) {
@@ -145,6 +213,12 @@ interface SigningConfigUpdate {
     gpgProgram?: string;
     allowedSignersFile?: string;
     global?: boolean;
+}
+
+function withDefinedProps<T extends object>(value: T): Partial<{ [K in keyof T]: Exclude<T[K], undefined> }> {
+    return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<{
+        [K in keyof T]: Exclude<T[K], undefined>;
+    }>;
 }
 
 function parseSshPublicKey(rawContent: string): { algorithm: string; comment: string | null } | null {
@@ -498,14 +572,7 @@ function parseLfsTrackedFiles(lsFilesOutput: string | null): Array<{
 const pullRequestProviderSchema = z.enum(['github', 'gitlab', 'bitbucket', 'azure']);
 
 function getStoredProviderAuthConfig(): ProviderAuthConfig {
-    const storedAuth = appStore.get('providerAuth');
-    const auth: ProviderAuthConfig = {};
-    if (storedAuth.githubToken.trim()) auth.githubToken = storedAuth.githubToken.trim();
-    if (storedAuth.gitlabToken.trim()) auth.gitlabToken = storedAuth.gitlabToken.trim();
-    if (storedAuth.bitbucketToken.trim()) auth.bitbucketToken = storedAuth.bitbucketToken.trim();
-    if (storedAuth.bitbucketUsername.trim()) auth.bitbucketUsername = storedAuth.bitbucketUsername.trim();
-    if (storedAuth.azureToken.trim()) auth.azureToken = storedAuth.azureToken.trim();
-    return auth;
+    return hydrateProviderAuthConfig();
 }
 
 function resolveGlobalGitConfigPath(): string {
@@ -1549,6 +1616,31 @@ export const gitRouter = router({
                     input.repo
                 );
                 return { diff, error: null };
+            } catch (error) {
+                return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+    rangeFileDiff: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                baseRef: z.string(),
+                headRef: z.string(),
+                filePath: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { diff: '', error: initError };
+
+            try {
+                const service = getGitService();
+                const diff = await service.runGitCommandWithOutput(
+                    ['diff', `${input.baseRef}...${input.headRef}`, '--', input.filePath],
+                    input.repo
+                );
+                return { diff: diff ?? '', error: null };
             } catch (error) {
                 return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
             }
@@ -4456,11 +4548,13 @@ export const gitRouter = router({
                 const error = await applySigningConfig({
                     repo: input.repo,
                     enabled: input.enabled,
-                    method: input.method,
-                    key: input.key,
-                    gpgProgram: input.gpgProgram,
-                    allowedSignersFile: input.allowedSignersFile,
-                    global: input.global,
+                    ...withDefinedProps({
+                        method: input.method,
+                        key: input.key,
+                        gpgProgram: input.gpgProgram,
+                        allowedSignersFile: input.allowedSignersFile,
+                        global: input.global,
+                    }),
                 });
                 return { error };
             }),
@@ -4668,19 +4762,15 @@ export const gitRouter = router({
                     .filter(Boolean)
                     .map((line) => {
                         const [hash = '', ref = '', action = '', date = ''] = line.split('|');
-                        const undoSupported =
-                            action.includes('checkout') ||
-                            action.includes('reset') ||
-                            action.includes('rebase') ||
-                            action.includes('cherry-pick');
                         return {
                             id: hash,
                             ref,
                             action,
                             date,
-                            canUndo: undoSupported,
-                            undoSupported,
-                            undoReason: undoSupported ? null : 'Operation type is not safely reversible from reflog.',
+                            canUndo: false,
+                            undoSupported: false,
+                            undoReason:
+                                'Reflog-based undo is disabled because it can discard worktree state. Use explicit undo-safe operations instead.',
                         };
                     });
 
@@ -4706,14 +4796,11 @@ export const gitRouter = router({
             if (initError) return { error: initError, success: false };
 
             try {
-                const gitService = getGitService();
-                const error = await gitService.runGitCommand(['reset', '--hard', input.targetHash], input.repo);
-
-                if (error) {
-                    return { error, success: false };
-                }
-
-                return { error: null, success: true };
+                void input;
+                return {
+                    error: 'Unsafe reflog undo has been disabled. Use the operation timeline or explicit Git commands for recovery.',
+                    success: false,
+                };
             } catch (error) {
                 return { error: error instanceof Error ? error.message : 'Unknown error', success: false };
             }
@@ -5093,6 +5180,135 @@ export const gitRouter = router({
             }
         }),
 
+    insights: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                since: z.string().optional(),
+                until: z.string().optional(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) {
+                return {
+                    summary: null,
+                    activity: [] as Array<{ date: string; commits: number }>,
+                    hotspots: [] as Array<{ path: string; touches: number; additions: number; deletions: number }>,
+                    error: initError,
+                };
+            }
+
+            try {
+                const gitService = getGitService();
+                const args = ['log', '--all', '--numstat', '--date=short', '--pretty=format:__GG__|%H|%an|%ad|%s'];
+                if (input.since) args.push('--since', input.since);
+                if (input.until) args.push('--until', input.until);
+
+                const output = await gitService.runGitCommandWithOutput(args, input.repo);
+                const lines = (output ?? '').split('\n');
+                const dailyCommits = new Map<string, number>();
+                const authorCommits = new Map<string, number>();
+                const hotspots = new Map<string, { path: string; touches: number; additions: number; deletions: number }>();
+                let totalCommits = 0;
+                let mergeCommits = 0;
+                let revertCommits = 0;
+                let totalAdditions = 0;
+                let totalDeletions = 0;
+
+                for (const rawLine of lines) {
+                    const line = rawLine.trimEnd();
+                    if (!line) {
+                        continue;
+                    }
+                    if (line.startsWith('__GG__|')) {
+                        const [, hash, author, date, subject] = line.split('|');
+                        void hash;
+                        totalCommits += 1;
+                        if (date) {
+                            dailyCommits.set(date, (dailyCommits.get(date) ?? 0) + 1);
+                        }
+                        if (author) {
+                            authorCommits.set(author, (authorCommits.get(author) ?? 0) + 1);
+                        }
+                        const normalizedSubject = (subject ?? '').toLowerCase();
+                        if (normalizedSubject.startsWith('merge ')) {
+                            mergeCommits += 1;
+                        }
+                        if (normalizedSubject.startsWith('revert') || normalizedSubject.includes('rollback')) {
+                            revertCommits += 1;
+                        }
+                        continue;
+                    }
+
+                    const [addedRaw, deletedRaw, filePath] = line.split('\t');
+                    if (!filePath) {
+                        continue;
+                    }
+                    const additions = addedRaw === '-' ? 0 : Number.parseInt(addedRaw ?? '0', 10);
+                    const deletions = deletedRaw === '-' ? 0 : Number.parseInt(deletedRaw ?? '0', 10);
+                    totalAdditions += Number.isFinite(additions) ? additions : 0;
+                    totalDeletions += Number.isFinite(deletions) ? deletions : 0;
+                    const current = hotspots.get(filePath) ?? {
+                        path: filePath,
+                        touches: 0,
+                        additions: 0,
+                        deletions: 0,
+                    };
+                    current.touches += 1;
+                    current.additions += Number.isFinite(additions) ? additions : 0;
+                    current.deletions += Number.isFinite(deletions) ? deletions : 0;
+                    hotspots.set(filePath, current);
+                }
+
+                const activity = Array.from(dailyCommits.entries())
+                    .sort(([left], [right]) => left.localeCompare(right))
+                    .map(([date, commits]) => ({ date, commits }));
+                const hotspotList = Array.from(hotspots.values())
+                    .sort((left, right) => right.touches - left.touches || right.additions - left.additions)
+                    .slice(0, 12);
+                const authorCounts = Array.from(authorCommits.values()).sort((left, right) => right - left);
+                const topAuthorCommits = authorCounts[0] ?? 0;
+                const activeDays = activity.filter((day) => day.commits > 0).length;
+                const busiestDay = activity.reduce(
+                    (best, day) => (day.commits > best.commits ? day : best),
+                    { date: '', commits: 0 }
+                );
+                const midpoint = Math.max(1, Math.floor(activity.length / 2));
+                const previousWindow = activity.slice(0, midpoint).reduce((sum, day) => sum + day.commits, 0);
+                const currentWindow = activity.slice(midpoint).reduce((sum, day) => sum + day.commits, 0);
+                const velocityDeltaPct =
+                    previousWindow > 0 ? Math.round(((currentWindow - previousWindow) / previousWindow) * 100) : 0;
+
+                return {
+                    summary: {
+                        totalCommits,
+                        activeDays,
+                        mergeCommits,
+                        revertCommits,
+                        totalAdditions,
+                        totalDeletions,
+                        hotspotCount: hotspotList.length,
+                        topAuthorSharePct: totalCommits > 0 ? Math.round((topAuthorCommits / totalCommits) * 100) : 0,
+                        avgCommitsPerActiveDay:
+                            activeDays > 0 ? Number((totalCommits / activeDays).toFixed(1)) : 0,
+                        busiestDay,
+                        velocityDeltaPct,
+                    },
+                    activity,
+                    hotspots: hotspotList,
+                    error: null,
+                };
+            } catch (error) {
+                return {
+                    summary: null,
+                    activity: [] as Array<{ date: string; commits: number }>,
+                    hotspots: [] as Array<{ path: string; touches: number; additions: number; deletions: number }>,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        }),
+
     // ==================== Signing ====================
     getSigningConfig: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
         const initError = await ensureGitInitialized();
@@ -5153,10 +5369,12 @@ export const gitRouter = router({
                     repo: input.repo,
                     enabled: input.enabled,
                     method: input.method,
-                    key: input.key,
-                    gpgProgram: input.gpgProgram,
-                    allowedSignersFile: input.allowedSignersFile,
-                    global: input.global,
+                    ...withDefinedProps({
+                        key: input.key,
+                        gpgProgram: input.gpgProgram,
+                        allowedSignersFile: input.allowedSignersFile,
+                        global: input.global,
+                    }),
                 });
                 return { error };
             } catch (error) {
@@ -5387,7 +5605,12 @@ export const gitRouter = router({
 
                 const updated: WorkflowDefinition = {
                     ...current,
-                    ...input,
+                    ...(input.name !== undefined ? { name: input.name } : {}),
+                    ...(input.trigger !== undefined ? { trigger: input.trigger } : {}),
+                    ...(input.steps !== undefined ? { steps: input.steps } : {}),
+                    ...(input.inputs !== undefined ? { inputs: input.inputs } : {}),
+                    ...(input.guards !== undefined ? { guards: input.guards } : {}),
+                    ...(input.onFailure !== undefined ? { onFailure: input.onFailure } : {}),
                     id: current.id,
                     createdAt: current.createdAt,
                     updatedAt: Date.now(),
@@ -5531,7 +5754,6 @@ export const gitRouter = router({
                         id: step.id,
                         type: step.type,
                         status: 'pending',
-                        message: '',
                     })),
                 };
 
@@ -5541,7 +5763,15 @@ export const gitRouter = router({
                     message?: string
                 ) => {
                     run.steps = run.steps.map((entry) =>
-                        entry.id === stepId ? { ...entry, status, message: message ?? entry.message } : entry
+                        entry.id === stepId
+                            ? {
+                                  ...entry,
+                                  status,
+                                  ...withDefinedProps({
+                                      message: message ?? entry.message,
+                                  }),
+                              }
+                            : entry
                     );
                 };
 
@@ -6390,26 +6620,28 @@ export const gitRouter = router({
             })
         )
         .mutation(({ input }) => {
-            const current = appStore.get('providerAuth');
+            const current = hydrateProviderAuthConfig();
+            const next: ProviderAuthConfig = {};
+            const githubToken =
+                input.githubToken === undefined ? current.githubToken : (input.githubToken ?? '').trim();
+            const gitlabToken =
+                input.gitlabToken === undefined ? current.gitlabToken : (input.gitlabToken ?? '').trim();
+            const bitbucketToken =
+                input.bitbucketToken === undefined ? current.bitbucketToken : (input.bitbucketToken ?? '').trim();
+            const bitbucketUsername =
+                input.bitbucketUsername === undefined
+                    ? current.bitbucketUsername
+                    : (input.bitbucketUsername ?? '').trim();
+            const azureToken =
+                input.azureToken === undefined ? current.azureToken : (input.azureToken ?? '').trim();
 
-            const next = {
-                githubToken:
-                    input.githubToken === undefined ? current.githubToken : (input.githubToken ?? '').trim(),
-                gitlabToken:
-                    input.gitlabToken === undefined ? current.gitlabToken : (input.gitlabToken ?? '').trim(),
-                bitbucketToken:
-                    input.bitbucketToken === undefined
-                        ? current.bitbucketToken
-                        : (input.bitbucketToken ?? '').trim(),
-                bitbucketUsername:
-                    input.bitbucketUsername === undefined
-                        ? current.bitbucketUsername
-                        : (input.bitbucketUsername ?? '').trim(),
-                azureToken:
-                    input.azureToken === undefined ? current.azureToken : (input.azureToken ?? '').trim(),
-            };
+            if (githubToken !== undefined) next.githubToken = githubToken;
+            if (gitlabToken !== undefined) next.gitlabToken = gitlabToken;
+            if (bitbucketToken !== undefined) next.bitbucketToken = bitbucketToken;
+            if (bitbucketUsername !== undefined) next.bitbucketUsername = bitbucketUsername;
+            if (azureToken !== undefined) next.azureToken = azureToken;
 
-            appStore.set('providerAuth', next);
+            persistProviderAuthConfig(next);
             return {
                 success: true,
                 hasAuth: {
@@ -6859,6 +7091,36 @@ export const gitRouter = router({
             }
         }),
 
+    getPullRequestReviewState: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                provider: pullRequestProviderSchema,
+                number: z.number(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { reviewState: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { reviewState: null, error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                const reviewState = await getRemotePullRequestReviewState(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number
+                );
+                return { reviewState, error: null };
+            } catch (error) {
+                return { reviewState: null, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
     addPullRequestComment: publicProcedure
         .input(
             z.object({
@@ -6884,6 +7146,54 @@ export const gitRouter = router({
                     auth,
                     input.number,
                     input.body
+                );
+                return { comment, error: null };
+            } catch (error) {
+                return { comment: null, error: error instanceof Error ? error.message : 'Unknown error' };
+            }
+        }),
+
+    addPullRequestInlineComment: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                provider: pullRequestProviderSchema,
+                number: z.number(),
+                body: z.string().min(1),
+                filePath: z.string().min(1),
+                line: z.number().int().positive(),
+                side: z.enum(['left', 'right']),
+                baseSha: z.string().optional(),
+                startSha: z.string().optional(),
+                headSha: z.string().optional(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { comment: null, error: initError };
+
+            try {
+                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+                if (!remoteUrl) {
+                    return { comment: null, error: 'No remotes configured for this repository.' };
+                }
+                const auth = getStoredProviderAuthConfig();
+                const comment = await addRemotePullRequestInlineComment(
+                    remoteUrl,
+                    input.provider as PullRequestProvider,
+                    auth,
+                    input.number,
+                    {
+                        body: input.body,
+                        filePath: input.filePath,
+                        line: input.line,
+                        side: input.side,
+                        ...withDefinedProps({
+                            baseSha: input.baseSha,
+                            startSha: input.startSha,
+                            headSha: input.headSha,
+                        }),
+                    }
                 );
                 return { comment, error: null };
             } catch (error) {

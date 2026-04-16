@@ -85,6 +85,22 @@ interface OverflowMenuProps {
     onUndoLastCommit: () => void;
 }
 
+const isMacPlatform = () => {
+    if (typeof navigator === 'undefined') {
+        return false;
+    }
+    return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform ?? '');
+};
+
+const shortcutLabels = {
+    quickSwitch: isMacPlatform() ? '⌘K' : 'Ctrl+K',
+    toggleTerminal: isMacPlatform() ? '⌘P' : 'Ctrl+P',
+    searchCommits: isMacPlatform() ? '⌘⇧F' : 'Ctrl+Shift+F',
+    undoHistory: isMacPlatform() ? '⌘Z' : 'Ctrl+Z',
+    settings: isMacPlatform() ? '⌘,' : 'Ctrl+,',
+    commandPalette: isMacPlatform() ? '⌘⇧P' : 'Ctrl+Shift+P',
+};
+
 export function OverflowMenu({
     featureFlags,
     inlineBlameEnabled,
@@ -144,7 +160,7 @@ export function OverflowMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onOpenInFinder}>
                     <FileCode className='mr-2 h-4 w-4' />
-                    Open in Finder
+                    Reveal in File Manager
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onClone}>
                     <Download className='mr-2 h-4 w-4' />
@@ -154,7 +170,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onQuickSwitch}>
                     <Search className='mr-2 h-4 w-4' />
                     Quick Switch...
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘K</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.quickSwitch}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onFilterCommits}>
                     <Filter className='mr-2 h-4 w-4' />
@@ -167,7 +183,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onToggleTerminal}>
                     <Terminal className='mr-2 h-4 w-4' />
                     Toggle Terminal
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘P</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.toggleTerminal}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onStatistics}>
@@ -211,7 +227,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onSearchCommits}>
                     <Search className='mr-2 h-4 w-4' />
                     Search Commits
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘⇧F</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.searchCommits}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onLfs}>
                     <Package className='mr-2 h-4 w-4' />
@@ -284,7 +300,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onUndoStack}>
                     <History className='mr-2 h-4 w-4' />
                     Undo History
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘Z</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.undoHistory}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onConfigEditor}>
                     <Settings className='mr-2 h-4 w-4' />
@@ -314,7 +330,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onSettings}>
                     <Settings className='mr-2 h-4 w-4' />
                     Settings
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘,</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.settings}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onDiagnostics}>
                     <Activity className='mr-2 h-4 w-4' />
@@ -323,7 +339,7 @@ export function OverflowMenu({
                 <DropdownMenuItem onClick={onCommandPalette}>
                     <Search className='mr-2 h-4 w-4' />
                     Command Palette
-                    <span className='text-muted-foreground ml-auto text-xs'>⌘⇧P</span>
+                    <span className='text-muted-foreground ml-auto text-xs'>{shortcutLabels.commandPalette}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onUndoLastCommit}>

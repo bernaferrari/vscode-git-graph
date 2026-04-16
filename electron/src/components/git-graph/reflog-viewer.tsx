@@ -7,14 +7,12 @@ import {
 	History,
 	RotateCcw,
 	GitBranch,
-	Trash2,
 	Copy,
 	Check,
 	ArrowRight,
 	Loader2,
 } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {

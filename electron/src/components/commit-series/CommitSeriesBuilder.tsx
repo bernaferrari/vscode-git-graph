@@ -10,15 +10,9 @@ import {
 	ArrowUp,
 	ArrowDown,
 	Edit,
-	Copy,
-	Split,
-	Merge,
 	Check,
 	X,
-	FileCode,
-	FileText,
 	Sparkles,
-	Save,
 	Play,
 	Loader2,
 } from 'lucide-react';
@@ -32,15 +26,11 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface FileChange {
@@ -87,7 +77,7 @@ export function CommitSeriesBuilder({
 }: CommitSeriesBuilderProps) {
 	const [commits, setCommits] = useState<CommitInSeries[]>([]);
 	const [isGenerating, setIsGenerating] = useState(false);
-	const { generateCommitMessage, isGeneratingMessage } = useAIFeatures();
+	const { generateCommitMessage } = useAIFeatures();
 
 	// All available files
 	const allFiles = useMemo(() => [
@@ -122,17 +112,6 @@ export function CommitSeriesBuilder({
 		);
 	}, []);
 
-	// Assign files to a commit
-	const assignFilesToCommit = useCallback((commitId: string, files: FileChange[]) => {
-		setCommits(prev =>
-			prev.map(c =>
-				c.id === commitId
-					? { ...c, files, isValid: c.message.trim().length > 0 && files.length > 0 }
-					: c
-			)
-		);
-	}, []);
-
 	// Move commit up/down
 	const moveCommit = useCallback((id: string, direction: 'up' | 'down') => {
 		setCommits(prev => {
@@ -143,7 +122,10 @@ export function CommitSeriesBuilder({
 			if (newIndex < 0 || newIndex >= prev.length) return prev;
 			
 			const newCommits = [...prev];
-			[newCommits[index], newCommits[newIndex]] = [newCommits[newIndex], newCommits[index]];
+			const currentCommit = newCommits[index];
+			const targetCommit = newCommits[newIndex];
+			if (!currentCommit || !targetCommit) return prev;
+			[newCommits[index], newCommits[newIndex]] = [targetCommit, currentCommit];
 			return newCommits;
 		});
 	}, []);
@@ -172,6 +154,9 @@ export function CommitSeriesBuilder({
 		
 		grouped.forEach((files, dir) => {
 			const type = COMMIT_TYPES[commitIndex % COMMIT_TYPES.length];
+			if (!type) {
+				return;
+			}
 			newCommits.push({
 				id: `commit-${Date.now()}-${commitIndex}`,
 				message: `${type.prefix}: ${dir} changes`,
@@ -217,7 +202,6 @@ export function CommitSeriesBuilder({
 	}, [commits, onCommitSeries, onOpenChange]);
 
 	// Stats
-	const totalFiles = commits.reduce((sum, c) => sum + c.files.length, 0);
 	const validCommits = commits.filter(c => c.isValid).length;
 
 	return (

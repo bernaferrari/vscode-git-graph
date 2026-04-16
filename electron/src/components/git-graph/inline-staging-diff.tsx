@@ -17,8 +17,6 @@ import {
 	MinusCircle,
 	Check,
 	Loader2,
-	ListPlus,
-	ListX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -41,21 +39,16 @@ interface Hunk {
 interface InlineStagingDiffProps {
 	filePath: string;
 	fileStatus: string;
-	stagedContent?: string;
-	workingContent?: string;
 	onStaged?: () => void;
 }
 
 export function InlineStagingDiff({
 	filePath,
 	fileStatus,
-	stagedContent,
-	workingContent,
 	onStaged,
 }: InlineStagingDiffProps) {
 	const { activeRepo } = useAppStore();
 	const [stagingHunk, setStagingHunk] = useState<number | null>(null);
-	const [stagingLines, setStagingLines] = useState<Set<number>>(new Set());
 
 	// Get unstaged diff
 	const { data: unstagedDiff, isLoading: loadingUnstaged, refetch: refetchUnstaged } = trpc.git.fileDiff.useQuery(
@@ -98,7 +91,7 @@ export function InlineStagingDiff({
 			refetchStaged();
 			onStaged?.();
 		},
-		onError: (error) => {
+		onError: (error: { message: string }) => {
 			toast.error('Failed to stage', { description: error.message });
 		},
 	});
@@ -109,7 +102,7 @@ export function InlineStagingDiff({
 			refetchUnstaged();
 			refetchStaged();
 		},
-		onError: (error) => {
+		onError: (error: { message: string }) => {
 			toast.error('Failed to unstage', { description: error.message });
 		},
 	});
@@ -122,7 +115,10 @@ export function InlineStagingDiff({
 		try {
 			const hunks = isUnstaged ? unstagedHunks : stagedHunks;
 			const hunk = hunks[hunkIndex];
-			
+			if (!hunk) {
+				return;
+			}
+
 			if (isUnstaged) {
 				// Stage the hunk - use patch mode
 				await stageMutation.mutateAsync({
@@ -160,7 +156,7 @@ export function InlineStagingDiff({
 
 		// For simplicity, stage/unstage the whole hunk containing this line
 		const hunks = isUnstaged ? unstagedHunks : stagedHunks;
-		const hunkIndex = hunks.findIndex(h => 
+		const hunkIndex = hunks.findIndex((h) => 
 			lineIndex >= h.startLine && lineIndex <= h.endLine
 		);
 		
@@ -213,14 +209,13 @@ export function InlineStagingDiff({
 									<Check className="h-3 w-3" />
 									Staged Changes
 								</div>
-								{stagedHunks.map((hunk, hunkIndex) => (
-									<HunkDisplay
-										key={`staged-${hunkIndex}`}
-										hunk={hunk}
-										hunkIndex={hunkIndex}
-										isStaged={true}
-										onToggleHunk={() => handleStageHunk(hunkIndex, false)}
-										onToggleLine={(lineIdx) => handleToggleLine(lineIdx, false)}
+									{stagedHunks.map((hunk, hunkIndex) => (
+										<HunkDisplay
+											key={`staged-${hunkIndex}`}
+											hunk={hunk}
+											isStaged={true}
+											onToggleHunk={() => handleStageHunk(hunkIndex, false)}
+											onToggleLine={(lineIdx) => handleToggleLine(lineIdx, false)}
 										isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
@@ -234,14 +229,13 @@ export function InlineStagingDiff({
 									<Minus className="h-3 w-3" />
 									Unstaged Changes
 								</div>
-								{unstagedHunks.map((hunk, hunkIndex) => (
-									<HunkDisplay
-										key={`unstaged-${hunkIndex}`}
-										hunk={hunk}
-										hunkIndex={hunkIndex}
-										isStaged={false}
-										onToggleHunk={() => handleStageHunk(hunkIndex, true)}
-										onToggleLine={(lineIdx) => handleToggleLine(lineIdx, true)}
+									{unstagedHunks.map((hunk, hunkIndex) => (
+										<HunkDisplay
+											key={`unstaged-${hunkIndex}`}
+											hunk={hunk}
+											isStaged={false}
+											onToggleHunk={() => handleStageHunk(hunkIndex, true)}
+											onToggleLine={(lineIdx) => handleToggleLine(lineIdx, true)}
 										isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
@@ -343,14 +337,12 @@ function generateHunkPatch(hunk: Hunk, filePath: string, reverse: boolean = fals
 // Hunk display component
 function HunkDisplay({
 	hunk,
-	hunkIndex,
 	isStaged,
 	onToggleHunk,
 	onToggleLine,
 	isStaging,
 }: {
 	hunk: Hunk;
-	hunkIndex: number;
 	isStaged: boolean;
 	onToggleHunk: () => void;
 	onToggleLine: (lineIndex: number) => void;

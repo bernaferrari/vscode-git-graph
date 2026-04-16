@@ -22,7 +22,6 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { trpc } from '@/trpc/client';
 
@@ -109,12 +109,15 @@ export function WorkspacesManager({
     const [newWorkspaceName, setNewWorkspaceName] = useState('');
     const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+    const { notifySuccess, notifyError, notifyInfo } = useAppNotifications();
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
     const trpcUtils = trpc.useUtils();
     const workspaceListQuery = trpc.repo.workspace.list.useQuery(undefined, { enabled: open });
     const setAllWorkspacesMutation = trpc.repo.workspace.setAll.useMutation({
-        onError: (error) => {
-            toast.error('Failed to persist workspaces', { description: error.message });
+        onError: (error: unknown) => {
+            notifyError('Failed to persist workspaces', {
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
         },
         onSuccess: async () => {
             await trpcUtils.repo.workspace.list.invalidate();
@@ -122,17 +125,19 @@ export function WorkspacesManager({
     });
     const { mutateAsync: showOpenDialog } = trpc.system.showOpenDialog.useMutation();
     const fetchManyMutation = trpc.repo.fetchMany.useMutation({
-        onSuccess: (result) => {
-            const failed = result.results.filter((entry) => entry.error);
+        onSuccess: (result: { results: Array<{ error?: string | null }> }) => {
+            const failed = result.results.filter((entry: { error?: string | null }) => entry.error);
             if (failed.length === 0) {
-                toast.success('Fetched all workspace repositories');
+                notifySuccess('Fetched all workspace repositories');
             } else {
-                toast.error(`Fetched with ${failed.length} failures`);
+                notifyError(`Fetched with ${failed.length} failures`);
             }
             void launchpadQuery.refetch();
         },
-        onError: (error) => {
-            toast.error('Failed to fetch repositories', { description: error.message });
+        onError: (error: unknown) => {
+            notifyError('Failed to fetch repositories', {
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
         },
     });
     const selectedWorkspaceRepoPaths = useMemo(
@@ -141,11 +146,13 @@ export function WorkspacesManager({
     );
     const setLaunchpadStatusMap = trpc.git.launchpad.setStatusMap.useMutation({
         onSuccess: () => {
-            toast.success('Launchpad status mapping saved');
+            notifySuccess('Launchpad status mapping saved');
             void launchpadQuery.refetch();
         },
-        onError: (error) => {
-            toast.error('Failed to save status mapping', { description: error.message });
+        onError: (error: unknown) => {
+            notifyError('Failed to save status mapping', {
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
         },
     });
     const launchpadQuery = trpc.repo.launchpad.useQuery(
@@ -199,7 +206,7 @@ export function WorkspacesManager({
         saveWorkspaces([...workspaces, workspace]);
         setNewWorkspaceName('');
         setIsCreating(false);
-        toast.success(`Created workspace "${workspace.name}"`);
+        notifySuccess(`Created workspace "${workspace.name}"`);
     };
 
     // Delete workspace
@@ -211,7 +218,7 @@ export function WorkspacesManager({
         if (selectedWorkspace?.id === id) {
             setSelectedWorkspace(null);
         }
-        toast.success('Workspace deleted');
+        notifySuccess('Workspace deleted');
     };
 
     // Rename workspace
@@ -222,7 +229,7 @@ export function WorkspacesManager({
             workspaces.map((w) => (w.id === id ? { ...w, name: editName.trim(), updatedAt: Date.now() } : w))
         );
         setEditingWorkspace(null);
-        toast.success('Workspace renamed');
+        notifySuccess('Workspace renamed');
     };
 
     // Add repo to workspace
@@ -251,7 +258,7 @@ export function WorkspacesManager({
             )
         );
 
-        toast.success(`Added "${name}" to workspace`);
+        notifySuccess(`Added "${name}" to workspace`);
     };
 
     // Remove repo from workspace
@@ -305,7 +312,7 @@ export function WorkspacesManager({
 
     const handleFetchWorkspace = async (workspace: Workspace) => {
         if (workspace.repos.length === 0) {
-            toast.info('No repositories in this workspace');
+            notifyInfo('No repositories in this workspace', { persist: false });
             return;
         }
         fetchManyMutation.mutate({

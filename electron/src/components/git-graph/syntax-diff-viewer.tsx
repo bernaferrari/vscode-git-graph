@@ -10,7 +10,6 @@ import { Eye, EyeOff } from 'lucide-react';
 import {
 	parseDiffWithInlineDiffs,
 	DiffCharRenderer,
-	type LineDiff,
 } from '@/lib/diff-utils';
 
 interface SyntaxDiffViewerProps {
@@ -34,7 +33,7 @@ function highlightSyntax(content: string, filename?: string): string {
 		go: ['func', 'var', 'const', 'if', 'else', 'for', 'range', 'return', 'import', 'package', 'struct', 'interface', 'type', 'go', 'defer', 'chan', 'select', 'case', 'default', 'true', 'false', 'nil'],
 	};
 
-	const langKeywords = keywords[ext || ''] || keywords['ts'];
+	const langKeywords = (keywords[ext ?? 'ts'] ?? keywords.ts) as string[];
 	
 	let result = content
 		// Escape HTML
@@ -92,9 +91,6 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 					</colgroup>
 					<tbody>
 						{lines.map((line, index) => {
-							const isHeader = line.type === 'context' && 
-								(!line.left?.chars?.length || line.left?.chars?.length === 0);
-							
 							return (
 								<tr
 									key={index}

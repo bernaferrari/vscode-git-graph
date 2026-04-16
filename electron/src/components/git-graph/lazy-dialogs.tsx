@@ -17,9 +17,9 @@ function DialogLoader() {
 
 // Wrapper for lazy loading dialogs
 function createLazyDialog<T extends object>(
-	importFn: () => Promise<{ default: React.ComponentType<T> }>
+	importFn: () => Promise<unknown>
 ) {
-	const LazyComponent = lazy(importFn);
+	const LazyComponent = lazy(importFn as () => Promise<{ default: React.ComponentType<T> }>);
 
 	return function LazyDialog(props: T & { open: boolean }) {
 		if (!props.open) return null;

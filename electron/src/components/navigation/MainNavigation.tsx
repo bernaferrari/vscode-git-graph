@@ -4,10 +4,8 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
 	Sheet,
 	SheetContent,
@@ -50,7 +48,6 @@ import {
 	ChevronDown,
 	ChevronRight,
 	Sparkles,
-	ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -161,7 +158,7 @@ interface MainNavigationProps {
 }
 
 export function MainNavigation({ activeItem, onItemSelect, className }: MainNavigationProps) {
-	const { mode, isGuided, isCraft, isControl } = useLensMode();
+	const { mode } = useLensMode();
 	const [expandedSections, setExpandedSections] = useState<Set<string>>(
 		new Set(NAV_SECTIONS.filter(s => s.defaultExpanded).map(s => s.id))
 	);
@@ -263,15 +260,13 @@ export function MainNavigation({ activeItem, onItemSelect, className }: MainNavi
 export function NavigationSheet({
 	children,
 }: {
-	children: React.ReactNode;
+	children: React.ReactElement;
 }) {
 	const [open, setOpen] = useState(false);
 
 	return (
 		<Sheet open={open} onOpenChange={setOpen}>
-			<SheetTrigger asChild>
-				{children}
-			</SheetTrigger>
+			<SheetTrigger render={children} />
 			<SheetContent side="left" className="w-72 p-0">
 				<SheetHeader className="p-4 border-b">
 					<SheetTitle className="flex items-center gap-2">

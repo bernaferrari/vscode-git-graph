@@ -19,16 +19,10 @@ import {
 	Check,
 	X,
 	AlertTriangle,
-	HardDrive,
-	GitBranch,
-	Upload,
-	Download,
-	Trash2,
 	Loader2,
 	RefreshCw,
 	Activity,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface HealthCheck {
 	id: string;
@@ -98,7 +92,7 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		});
 
 		// Check 3: Default branch
-		const hasMain = branchData?.branches?.some(b => b.name === 'main' || b.name === 'master');
+		const hasMain = branchData?.branches?.some((branch: { name: string }) => branch.name === 'main' || branch.name === 'master');
 		newChecks.push({
 			id: 'default-branch',
 			label: 'Default Branch',
@@ -144,7 +138,6 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 		// Calculate score
 		const passCount = newChecks.filter(c => c.status === 'pass').length;
 		const warnCount = newChecks.filter(c => c.status === 'warn').length;
-		const failCount = newChecks.filter(c => c.status === 'fail').length;
 		const calculatedScore = Math.round((passCount * 100 + warnCount * 50) / newChecks.length);
 		setScore(calculatedScore);
 

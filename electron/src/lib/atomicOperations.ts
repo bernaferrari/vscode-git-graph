@@ -87,8 +87,8 @@ export const useAtomicOperations = create<AtomicOperationState>()(
 							? {
 								...op,
 								status: success ? 'applied' : 'failed',
-								error,
-								appliedAt: success ? Date.now() : undefined,
+								...(error ? { error } : {}),
+								...(success ? { appliedAt: Date.now() } : {}),
 							  }
 							: op
 					),
@@ -152,7 +152,7 @@ export function buildAtomicOperation(
 	oldTips: Record<string, string>,
 	newTips: Record<string, string>,
 	gitCommands: string[]
-): Omit<AtomicOperation, 'id' | 'timestamp'> {
+): Omit<AtomicOperation, 'id' | 'timestamp' | 'status'> {
 	// Build undo commands (reverse the operations)
 	const undoCommands: string[] = [];
 	const sourceTip = oldTips[plan.sourceBranch] ?? 'HEAD';
@@ -173,7 +173,6 @@ export function buildAtomicOperation(
 		},
 		gitCommands,
 		undoCommands,
-		status: 'pending',
 	};
 }
 

@@ -59,6 +59,8 @@ const OPERATION_ICONS: Record<string, React.ElementType> = {
     amend: GitCommit,
 };
 
+const SAFE_UNDO_ACTION_TYPES = new Set(['undo-last-commit', 'checkout', 'delete-branch']);
+
 interface OperationTimelineProps {
     children?: ReactElement;
 }
@@ -72,7 +74,6 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
 
     const undoLastCommit = trpc.git.undoLastCommit.useMutation();
     const checkout = trpc.git.checkout.useMutation();
-    const reset = trpc.git.reset.useMutation();
     const deleteBranch = trpc.git.deleteBranch.useMutation();
 
     const handleUndo = useCallback(
@@ -91,15 +92,6 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                         const result = await checkout.mutateAsync({
                             repo: activeRepo,
                             ref: operation.undoAction.command,
-                        });
-                        if (result.error) throw new Error(result.error);
-                        break;
-                    }
-                    case 'hard-reset': {
-                        const result = await reset.mutateAsync({
-                            repo: activeRepo,
-                            commitHash: operation.undoAction.command,
-                            mode: 'hard',
                         });
                         if (result.error) throw new Error(result.error);
                         break;
@@ -142,7 +134,6 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
             checkout,
             deleteBranch,
             markAsUndone,
-            reset,
             undoLastCommit,
             utils.git.aheadBehind,
             utils.git.aheadBehindAll,
@@ -230,7 +221,9 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                                 <OperationItem
                                     key={op.id}
                                     operation={op}
-                                    {...(op.undoAction && op.status === 'success'
+                                    {...(op.undoAction &&
+                                    SAFE_UNDO_ACTION_TYPES.has(op.undoAction.type) &&
+                                    op.status === 'success'
                                         ? {
                                               onUndo: () => {
                                                   void handleUndo(op);

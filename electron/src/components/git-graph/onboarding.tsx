@@ -5,7 +5,6 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
 	Dialog,
 	DialogContent,
@@ -25,7 +24,6 @@ import {
 	Terminal,
 	Search,
 	Sparkles,
-	X,
 } from 'lucide-react';
 import { trpc } from '@/trpc/client';
 
@@ -245,7 +243,10 @@ export function OnboardingDialog({
 		completeOnboarding();
 	};
 
-	const step = steps[currentStep];
+	const step = steps[currentStep] ?? steps[0];
+	if (!step) {
+		return null;
+	}
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>

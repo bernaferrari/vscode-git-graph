@@ -3,7 +3,6 @@
  * Right-click menu for commit actions
  */
 
-import { useAppStore } from '@/lib/store';
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -20,13 +19,10 @@ import {
 	Copy,
 	RotateCcw,
 	GitMerge,
-	GitCommit,
 	ArrowRightLeft,
 	ArrowLeft,
-	Trash2,
 	Scissors,
 	History,
-	ExternalLink,
 } from 'lucide-react';
 import { useGitOperations } from '@/hooks/useGitOperations';
 
@@ -55,7 +51,6 @@ export function CommitContextMenu({
 	onCherryPick,
 	onRevert,
 }: CommitContextMenuProps) {
-	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 
 	const handleCopyHash = () => {

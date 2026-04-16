@@ -26,6 +26,7 @@ export function useGitGraphShellPanels() {
     const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [recentReposOpen, setRecentReposOpen] = useState(false);
     const [workspacesOpen, setWorkspacesOpen] = useState(false);
+    const [collaborationOpen, setCollaborationOpen] = useState(false);
     const [stashManageOpen, setStashManageOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general');
@@ -69,6 +70,8 @@ export function useGitGraphShellPanels() {
         setRecentReposOpen,
         workspacesOpen,
         setWorkspacesOpen,
+        collaborationOpen,
+        setCollaborationOpen,
         stashManageOpen,
         setStashManageOpen,
         settingsOpen,

@@ -58,6 +58,9 @@ const RecentRepositories = lazy(() =>
     import('./recent-repositories').then((mod) => ({ default: mod.RecentRepositories }))
 );
 const WorkspacesManager = lazy(() => import('./workspaces').then((mod) => ({ default: mod.WorkspacesManager })));
+const CollaborationCenter = lazy(() =>
+    import('./collaboration-center').then((mod) => ({ default: mod.CollaborationCenter }))
+);
 const StashManagement = lazy(() => import('./stash-management').then((mod) => ({ default: mod.StashManagement })));
 const SettingsDialog = lazy(() => import('./settings-dialog').then((mod) => ({ default: mod.SettingsDialog })));
 const CommandPalette = lazy(() => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })));
@@ -82,7 +85,7 @@ interface FeatureDialogCommit {
     parents: string[];
 }
 
-function DialogLoadingFallback() {
+export function DialogLoadingFallback() {
     return (
         <div className='pointer-events-none fixed inset-0 z-[70] flex items-center justify-center'>
             <div className='ui-surface text-muted-foreground flex items-center gap-2 px-3 py-2 text-xs'>
@@ -113,6 +116,7 @@ export function GitGraphFeatureDialogs({
     onboarding,
     recentRepos,
     workspaces,
+    collaboration,
     cloneRepository,
     onCloned,
     stashManagement,
@@ -158,6 +162,7 @@ export function GitGraphFeatureDialogs({
     onboarding: OpenState;
     recentRepos: OpenState;
     workspaces: OpenState;
+    collaboration: OpenState;
     cloneRepository: OpenState;
     onCloned: (repoPath: string) => Promise<void>;
     stashManagement: OpenState;
@@ -271,6 +276,14 @@ export function GitGraphFeatureDialogs({
             {workspaces.open && (
                 <Suspense fallback={<DialogLoadingFallback />}>
                     <WorkspacesManager open={workspaces.open} onOpenChange={workspaces.onOpenChange} />
+                </Suspense>
+            )}
+            {collaboration.open && (
+                <Suspense fallback={<DialogLoadingFallback />}>
+                    <CollaborationCenter
+                        open={collaboration.open}
+                        onOpenChange={collaboration.onOpenChange}
+                    />
                 </Suspense>
             )}
             {cloneRepository.open && (

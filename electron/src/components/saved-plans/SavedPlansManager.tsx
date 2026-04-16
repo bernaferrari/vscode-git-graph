@@ -11,14 +11,8 @@ import {
 	Trash2,
 	Edit,
 	Copy,
-	Download,
-	Upload,
 	Clock,
-	Check,
-	X,
 	GitBranch,
-	MoreHorizontal,
-	ExternalLink,
 } from 'lucide-react';
 import { Play } from 'lucide-react';
 import { useState, useCallback } from 'react';
@@ -27,24 +21,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
 	Sheet,
 	SheetContent,
 	SheetHeader,
 	SheetTitle,
-	SheetTrigger,
 } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -156,15 +139,6 @@ export function SavedPlansManager({
 			shared: false,
 		};
 		setPlans(prev => [...prev, newPlan]);
-	}, []);
-
-	// Toggle share
-	const toggleShare = useCallback((id: string) => {
-		setPlans(prev =>
-			prev.map(p =>
-				p.id === id ? { ...p, shared: !p.shared, updatedAt: Date.now() } : p
-			)
-		);
 	}, []);
 
 	const statusColors = {

@@ -5,7 +5,6 @@ import {
   DayPicker,
   getDefaultClassNames,
   type DayButton,
-  type Locale,
 } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
@@ -162,8 +161,12 @@ function Calendar({
             <HugeiconsIcon icon={ArrowDownIcon} strokeWidth={2} className={cn("size-4", className)} {...props} />
           )
         },
-        DayButton: ({ ...props }) => (
-          <CalendarDayButton locale={locale} {...props} />
+        DayButton: ({ style, ...props }) => (
+          <CalendarDayButton
+            localeCode={locale?.code ?? ""}
+            {...(style !== undefined ? { style } : {})}
+            {...props}
+          />
         ),
         WeekNumber: ({ children, ...props }) => {
           return (
@@ -181,13 +184,22 @@ function Calendar({
   )
 }
 
+type CalendarDayButtonProps = Omit<
+  React.ComponentProps<typeof DayButton>,
+  "locale" | "style"
+> & {
+  localeCode: string
+  style?: React.CSSProperties
+}
+
 function CalendarDayButton({
   className,
   day,
   modifiers,
-  locale,
+  localeCode,
+  style,
   ...props
-}: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
+}: CalendarDayButtonProps) {
   const defaultClassNames = getDefaultClassNames()
 
   const ref = React.useRef<HTMLButtonElement>(null)
@@ -199,7 +211,7 @@ function CalendarDayButton({
     <Button
       variant="ghost"
       size="icon"
-      data-day={day.date.toLocaleDateString(locale?.code)}
+      data-day={day.date.toLocaleDateString(localeCode || undefined)}
       data-selected-single={
         modifiers.selected &&
         !modifiers.range_start &&
@@ -214,6 +226,7 @@ function CalendarDayButton({
         defaultClassNames.day,
         className
       )}
+      {...(style !== undefined ? { style } : {})}
       {...props}
     />
   )

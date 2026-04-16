@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { GitRepoState } from '../types/state';
 
 // ==================== Types ====================
@@ -147,8 +147,7 @@ const initialState: AppState = {
 };
 
 export const useAppStore = create<AppState & AppActions>()(
-    persist(
-        subscribeWithSelector((set, _get) => ({
+    subscribeWithSelector((set, _get) => ({
             ...initialState,
 
             // Repository actions
@@ -335,29 +334,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
             // Reset
             reset: () => set(initialState),
-        })),
-        {
-            name: 'git-graph-ui-state',
-            version: 2,
-            storage: typeof window !== 'undefined' ? createJSONStorage(() => localStorage) : undefined,
-            migrate: (persistedState, version) => {
-                if (version < 2 && persistedState && typeof persistedState === 'object') {
-                    const state = persistedState as Record<string, unknown>;
-                    return {
-                        ...state,
-                        activeRepo: null,
-                    };
-                }
-                return persistedState as AppState;
-            },
-            partialize: (state) => ({
-                recentRepos: state.recentRepos,
-                openedRepos: state.openedRepos,
-                sidebarOpen: state.sidebarOpen,
-                repoNavMode: state.repoNavMode,
-            }),
-        }
-    )
+        }))
 );
 
 // Selectors

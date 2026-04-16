@@ -331,8 +331,6 @@ export class GraphLayoutCalculator {
 		}
 
 		let lastPoint = vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint();
-		let curPoint: Point | null;
-		let curVertex: Vertex;
 
 		// Check for merge between two vertices already on branches
 		if (
@@ -349,15 +347,19 @@ export class GraphLayoutCalculator {
 				return;
 			}
 			for (i = startAt + 1; i < this.vertices.length; i++) {
-				curVertex = this.vertices[i];
+				const curVertex = this.vertices[i];
+				if (!curVertex) continue;
 
-				curPoint = curVertex.getPointConnectingTo(parentVertex, parentBranch);
-				if (curPoint !== null) {
-					foundPointToParent = true;
-				} else {
-					curPoint = curVertex.getNextPoint();
-				}
-				parentBranch.addLine(lastPoint, curPoint, vertex.isCommitted, !foundPointToParent && curVertex !== parentVertex ? lastPoint.x < curPoint.x : true);
+				const connectedPoint = curVertex.getPointConnectingTo(parentVertex, parentBranch);
+				const curPoint = connectedPoint ?? curVertex.getNextPoint();
+				foundPointToParent = connectedPoint !== null;
+
+				parentBranch.addLine(
+					lastPoint,
+					curPoint,
+					vertex.isCommitted,
+					!foundPointToParent && curVertex !== parentVertex ? lastPoint.x < curPoint.x : true
+				);
 				curVertex.registerUnavailablePoint(curPoint.x, parentVertex, parentBranch);
 				lastPoint = curPoint;
 
@@ -373,9 +375,10 @@ export class GraphLayoutCalculator {
 			vertex.registerUnavailablePoint(lastPoint.x, vertex, branch);
 
 			for (i = startAt + 1; i < this.vertices.length; i++) {
-				curVertex = this.vertices[i];
+				const curVertex = this.vertices[i];
+				if (!curVertex) continue;
 
-				curPoint = parentVertex === curVertex && !curVertex.isNotOnBranch()
+				const curPoint = parentVertex === curVertex && !curVertex.isNotOnBranch()
 					? curVertex.getPoint()
 					: curVertex.getNextPoint();
 

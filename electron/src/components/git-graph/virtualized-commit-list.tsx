@@ -225,7 +225,7 @@ const CommitRow = memo(function CommitRow({
                         isSelected ? 'opacity-100' : 'opacity-45 group-hover:opacity-85'
                     }`}>
                     <span className='w-24 truncate font-medium'>{commit.author}</span>
-                    <CIStatusMini commitHash={commit.hash} repo={repo} />
+                    <CIStatusMini commitHash={commit.hash} {...(repo ? { repo } : {})} />
                     <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
                         {commit.hash.slice(0, 7)}
                     </span>
@@ -407,7 +407,7 @@ export function VirtualizedCommitList({
                                 }
                                 showAvatar={showAvatars}
                                 hideRefs={hideRefs}
-                                repo={repo}
+                                {...(repo ? { repo } : {})}
                                 {...(onContextMenu
                                     ? { onContextMenu: (e: React.MouseEvent) => onContextMenu(virtualRow.index, e) }
                                     : {})}

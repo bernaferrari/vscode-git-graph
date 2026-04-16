@@ -161,7 +161,7 @@ function readAddTagType(record: Record<string, unknown> | null, fallback: AddTag
 	return value === 'annotated' || value === 'lightweight' ? value : fallback;
 }
 
-function toDateFormat(value: string): DateFormat {
+function toDateFormat(value: string | null): DateFormat {
 	if (
 		value === 'dateAndTime' ||
 		value === 'dateOnly' ||
@@ -174,22 +174,22 @@ function toDateFormat(value: string): DateFormat {
 	return 'dateAndTime';
 }
 
-function toDateType(value: string): DateType {
+function toDateType(value: string | null): DateType {
 	return value === 'commit' ? 'commit' : 'author';
 }
 
-function toGraphStyle(value: string): GraphStyle {
+function toGraphStyle(value: string | null): GraphStyle {
 	return value === 'angular' ? 'angular' : 'rounded';
 }
 
-function toResetCommitMode(value: string): ResetCommitMode {
+function toResetCommitMode(value: string | null): ResetCommitMode {
 	if (value === 'soft' || value === 'mixed' || value === 'hard') {
 		return value;
 	}
 	return 'mixed';
 }
 
-function toAddTagType(value: string): AddTagType {
+function toAddTagType(value: string | null): AddTagType {
 	return value === 'lightweight' ? 'lightweight' : 'annotated';
 }
 

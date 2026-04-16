@@ -3,20 +3,16 @@
  * Support for working with multiple repositories simultaneously
  */
 
-import { useState, useMemo } from 'react';
-import { trpc } from '@/trpc/client';
-import { useAppStore } from '@/lib/store';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
 	Plus,
 	X,
-	Folder,
 	FolderGit2,
 	Star,
 	StarOff,
 	MoreHorizontal,
-	Settings,
 } from 'lucide-react';
 import {
 	DropdownMenu,
@@ -148,7 +144,7 @@ export function useRepoTabs() {
 		setTabs((prev) => prev.filter((t) => t.id !== tabId));
 		if (activeTabId === tabId) {
 			const remaining = tabs.filter((t) => t.id !== tabId);
-			setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null);
+			setActiveTabId(remaining[remaining.length - 1]?.id ?? null);
 		}
 	};
 

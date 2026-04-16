@@ -8,18 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
 	GitBranch,
-	GitPullRequest,
 	Cloud,
 	CloudOff,
 	AlertCircle,
 	CheckCircle2,
 	ArrowUp,
 	ArrowDown,
-	Minus,
 	RefreshCw,
-	Loader2,
-	Shield,
-	ShieldAlert,
 	ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

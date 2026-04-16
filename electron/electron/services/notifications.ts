@@ -60,8 +60,8 @@ class NotificationsManager {
 			title: options.title,
 			body: options.body,
 			icon: options.icon ? nativeImage.createFromPath(options.icon) : this.getDefaultIcon(),
-			sound: options.sound ?? this.soundEnabled,
-			actions: options.actions,
+			silent: !(options.sound ?? this.soundEnabled),
+			...(options.actions ? { actions: options.actions } : {}),
 		});
 
 		if (options.onClick) {

@@ -119,7 +119,12 @@ export function StashPanel({ repo }: StashPanelProps) {
     const [includeUntracked, setIncludeUntracked] = useState(true);
 
     const handleStash = () => {
-        pushMutation.mutate({ repo, message: message || undefined, includeUntracked });
+        if (message.trim()) {
+            pushMutation.mutate({ repo, message, includeUntracked });
+            setMessage('');
+            return;
+        }
+        pushMutation.mutate({ repo, includeUntracked });
         setMessage('');
     };
 

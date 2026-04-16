@@ -15,16 +15,14 @@ import {
 	Eye,
 	EyeOff,
 } from 'lucide-react';
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Toggle } from '@/components/ui/toggle';
 import {
 	parseDiffWithInlineDiffs,
-	computeInlineDiff,
 	type LineDiff,
-	type DiffChar,
 	DiffCharRenderer,
 } from '@/lib/diff-utils';
 import { useAppStore } from '@/lib/store';

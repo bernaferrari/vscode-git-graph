@@ -6,7 +6,6 @@
 import { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileText, Folder, Plus, Minus, RotateCcw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
 
 interface FileTreeItem {
 	file: string;
@@ -42,21 +41,22 @@ export function FileTreeView({ files, selectedFiles, onToggle, onToggleFolder }:
 			parts.forEach((part, index) => {
 				const isFile = index === parts.length - 1;
 				const path = parts.slice(0, index + 1).join('/');
-				
-				let child = current.children.find((c) => c.name === part);
-				
-				if (!child) {
-					child = {
-						name: part,
-						path,
-						isFolder: !isFile,
-						children: [],
-						status: isFile ? file.status : undefined,
-					};
-					current.children.push(child);
+
+				const existingChild = current.children.find((c) => c.name === part);
+				if (existingChild) {
+					current = existingChild;
+					return;
 				}
-				
-				current = child;
+
+				const nextChild: TreeNode = {
+					name: part,
+					path,
+					isFolder: !isFile,
+					children: [],
+					...(isFile ? { status: file.status } : {}),
+				};
+				current.children.push(nextChild);
+				current = nextChild;
 			});
 		});
 

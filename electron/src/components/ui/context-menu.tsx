@@ -91,7 +91,12 @@ ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName
 
 const ContextMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
+  Omit<
+    React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>,
+    "checked"
+  > & {
+    checked?: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>["checked"]
+  }
 >(({ className, children, checked, ...props }, ref) => (
     <ContextMenuPrimitive.CheckboxItem
       ref={ref}
@@ -99,7 +104,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/60 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
-    checked={checked}
+    {...(checked !== undefined ? { checked } : {})}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

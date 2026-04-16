@@ -3,8 +3,10 @@
  * Fetch author avatars from Gravatar, GitHub, etc.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
+
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -32,7 +34,7 @@ function getGravatarUrl(email: string, size: number = 40): string {
 	// const url = `https://www.gravatar.com/avatar/${hashedEmail}?s=${size}&d=retro`;
 	
 	// Use UI Avatars as fallback
-	const name = email.split('@')[0];
+	const name = email.split('@')[0] ?? email;
 	const url = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${size}&background=random&bold=true`;
 	
 	avatarCache.set(cacheKey, url);
@@ -49,13 +51,13 @@ function extractGitHubUsername(email: string): string | null {
 	// Pattern: username@users.noreply.github.com
 	const githubMatch = email.match(/^(.+)@users\.noreply\.github\.com$/);
 	if (githubMatch) {
-		return githubMatch[1];
+		return githubMatch[1] ?? null;
 	}
 	
 	// Pattern: username@github.com
 	const githubMatch2 = email.match(/^(.+)@github\.com$/);
 	if (githubMatch2) {
-		return githubMatch2[1];
+		return githubMatch2[1] ?? null;
 	}
 	
 	return null;
@@ -124,19 +126,17 @@ export function Avatar({ email, name, size = 'md', className }: AvatarProps) {
 	);
 }
 
-// Avatar with tooltip showing full name and email
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from '@/components/ui/tooltip';
-
 export function AvatarWithTooltip({ email, name, size = 'md', className }: AvatarProps) {
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<span>
-					<Avatar email={email} name={name} size={size} className={className} />
+					<Avatar
+						{...(email !== undefined ? { email } : {})}
+						{...(name !== undefined ? { name } : {})}
+						size={size}
+						{...(className !== undefined ? { className } : {})}
+					/>
 				</span>
 			</TooltipTrigger>
 			<TooltipContent>
@@ -170,8 +170,8 @@ export function AvatarStack({ authors, max = 3, size = 'sm' }: AvatarStackProps)
 					style={{ zIndex: displayAuthors.length - index }}
 				>
 					<Avatar
-						email={author.email}
-						name={author.name}
+						{...(author.email !== undefined ? { email: author.email } : {})}
+						{...(author.name !== undefined ? { name: author.name } : {})}
 						size={size}
 					/>
 				</div>

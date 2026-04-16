@@ -3,7 +3,7 @@
  * Full-text search across commit messages, authors, files
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,13 @@ interface SearchAllCommitsProps {
 	onSelectCommit?: (hash: string) => void;
 }
 
+interface SearchCommit {
+	hash: string;
+	date: number;
+	message: string;
+	author: string;
+}
+
 export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchAllCommitsProps) {
 	const { activeRepo } = useAppStore();
 	const [query, setQuery] = useState('');
@@ -61,7 +68,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 		}
 	);
 
-	const results = searchResults?.commits ?? [];
+	const results: SearchCommit[] = searchResults?.commits ?? [];
 
 	const formatDate = (timestamp: number) => {
 		return new Date(timestamp * 1000).toLocaleDateString();
@@ -146,7 +153,7 @@ export function SearchAllCommits({ open, onOpenChange, onSelectCommit }: SearchA
 							<p className="text-xs text-muted-foreground px-1">
 								{results.length} result{results.length !== 1 ? 's' : ''}
 							</p>
-							{results.map((commit) => (
+							{results.map((commit: SearchCommit) => (
 								<button
 									key={commit.hash}
 									className="w-full text-left p-3 rounded-lg border hover:bg-accent/50 transition-colors"

@@ -17,20 +17,14 @@ import {
 	Play,
 	Save,
 	Eye,
-	AlertTriangle,
 	CheckCircle2,
 	XCircle,
-	Info,
-	Sparkles,
-	DragIndicator,
-	Collapse,
-	Expand,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -39,11 +33,8 @@ import {
 	SheetContent,
 	SheetHeader,
 	SheetTitle,
-	SheetTrigger,
 } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type RewriteOpType = 
@@ -152,7 +143,6 @@ export function RewritePlanEditor({
 	onOpenChange,
 	sourceBranch,
 	baseBranch,
-	commits,
 	onApplyPlan,
 	onSaveDraft,
 }: RewritePlanEditorProps) {
@@ -160,7 +150,6 @@ export function RewritePlanEditor({
 	const [operations, setOperations] = useState<RewriteOp[]>([]);
 	const [isValidating, setIsValidating] = useState(false);
 	const [validationResults, setValidationResults] = useState<{ valid: boolean; message: string } | null>(null);
-	const [showPreview, setShowPreview] = useState(false);
 
 	// Add a new operation
 	const addOperation = useCallback((type: RewriteOpType, commit?: { hash: string; message: string }) => {
@@ -197,7 +186,10 @@ export function RewritePlanEditor({
 			if (newIndex < 0 || newIndex >= prev.length) return prev;
 			
 			const newOps = [...prev];
-			[newOps[index], newOps[newIndex]] = [newOps[newIndex], newOps[index]];
+			const currentOp = newOps[index]!;
+			const targetOp = newOps[newIndex]!;
+			newOps[index] = targetOp;
+			newOps[newIndex] = currentOp;
 			return newOps;
 		});
 	}, []);

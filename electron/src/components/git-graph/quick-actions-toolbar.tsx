@@ -50,7 +50,7 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
         },
         { enabled: !!activeRepo }
     );
-    const currentBranch = repoInfo?.head ?? undefined;
+    const currentBranch = repoInfo?.head ?? null;
     const configAllQuery = trpc.config.getAll.useQuery(undefined, { staleTime: 10_000 });
     const aiProdEnabled = Boolean(
         (configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
@@ -58,7 +58,7 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
 
     // Get ahead/behind
     const { data: aheadBehindData, refetch: refetchAheadBehind } = trpc.git.aheadBehind.useQuery(
-        { repo: activeRepo ?? '', branch: currentBranch },
+        { repo: activeRepo ?? '', branch: currentBranch ?? undefined },
         { enabled: !!activeRepo && !!currentBranch }
     );
 
@@ -97,14 +97,16 @@ export function QuickActionsToolbar({ className, onCreateBranch, onCreateTag, on
             toast.info('Enable AI provider in Settings first');
             return;
         }
-        const stagedFiles = (statusData?.staged ?? []).map((entry) => entry.file).filter((entry): entry is string => Boolean(entry));
+        const stagedFiles = (statusData?.staged ?? [])
+            .map((entry: { file?: string | null }) => entry.file)
+            .filter((entry: string | null | undefined): entry is string => Boolean(entry));
         if (stagedFiles.length === 0) {
             toast.info('Stage files before generating a commit message');
             return;
         }
 
         const diffParts = await Promise.all(
-            stagedFiles.map(async (filePath) => {
+            stagedFiles.map(async (filePath: string) => {
                 const result = await trpcUtils.git.workingTreeFileDiff.fetch({
                     repo: activeRepo,
                     filePath,

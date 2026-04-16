@@ -4,20 +4,14 @@
  */
 
 import { useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-	GitCommit,
-	GitBranch,
 	ArrowRight,
 	Plus,
 	Minus,
 	RefreshCw,
 	Eye,
 	EyeOff,
-	Merge,
-	RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -149,7 +143,7 @@ export function GraphOverlay({
 					<div className="flex-1 min-w-[200px]">
 						<p className="text-xs text-muted-foreground mb-2 font-medium">Before</p>
 						<div className="space-y-1">
-							{before.slice(0, 6).map((commit, i) => {
+					{before.slice(0, 6).map((commit) => {
 								const change = changes.find(c => c.commit.hash === commit.hash);
 								const action = change?.action || 'unchanged';
 								const isHighlighted = highlightCommits.includes(commit.hash);
@@ -192,7 +186,7 @@ export function GraphOverlay({
 					<div className="flex-1 min-w-[200px]">
 						<p className="text-xs text-muted-foreground mb-2 font-medium">After</p>
 						<div className="space-y-1">
-							{after.slice(0, 6).map((commit, i) => {
+					{after.slice(0, 6).map((commit) => {
 								const change = changes.find(c => c.commit.hash === commit.hash);
 								const action = change?.action || 'unchanged';
 								const isHighlighted = highlightCommits.includes(commit.hash);
@@ -257,7 +251,6 @@ export function GraphOverlay({
 // Compact version for inline use
 export function CompactGraphDiff({
 	stats,
-	showDetails,
 }: {
 	stats: { unchanged: number; new: number; rewritten: number; dropped: number };
 	showDetails?: boolean;

@@ -5,11 +5,12 @@
 import { z } from 'zod';
 
 import { appStore } from '@/app/backend/store';
+import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
 import { publicProcedure, router } from '@/app/backend/trpc/init';
 
-type AIFeatureName = 'commitMessage' | 'pullRequest' | 'conflictExplain' | 'explainCommit';
+type AIFeatureName = 'commitMessage' | 'pullRequest' | 'conflictExplain' | 'explainCommit' | 'reviewDiff';
 
-let runtimeApiKey: string | null = null;
+const runtimeApiKeySecretKey = 'ai.runtimeApiKey';
 
 interface AIConfig {
 	enabled: boolean;
@@ -44,7 +45,8 @@ async function callOpenAICompatible(prompt: string, feature: AIFeatureName): Pro
 	if (!config.baseUrl.trim()) {
 		throw new Error('AI baseUrl is not configured');
 	}
-	if (!runtimeApiKey?.trim()) {
+	const runtimeApiKey = readSecretValue(runtimeApiKeySecretKey);
+	if (!runtimeApiKey.trim()) {
 		throw new Error('AI runtime API key is not set');
 	}
 
@@ -109,12 +111,60 @@ function fallbackCommitMessage(diff: string): string {
 	return `chore(${scope}): update ${Math.max(1, changedFiles.length)} file(s)`;
 }
 
+function fallbackReviewDiff(files: string[], diff: string): {
+	summary: string;
+	risks: string[];
+	suggestions: string[];
+	tests: string[];
+} {
+	const normalizedDiff = diff.toLowerCase();
+	const risks: string[] = [];
+	const suggestions: string[] = [];
+	const tests: string[] = [];
+	const hasTestChanges = files.some((file) => /test|spec|__tests__/i.test(file));
+	const hasConfigChanges = files.some((file) => /config|settings|env|workflow/i.test(file));
+	const hasCriticalPath = files.some((file) => /auth|security|payment|permissions|deploy/i.test(file));
+
+	if (hasCriticalPath) {
+		risks.push('Touches a sensitive path; check auth, permissions, or production side effects.');
+		tests.push('Run targeted regression checks for auth, permissions, and edge-case failures.');
+	}
+	if (hasConfigChanges || normalizedDiff.includes('process.env') || normalizedDiff.includes('featureflag')) {
+		risks.push('Configuration or environment behavior changed; verify defaults and rollout safety.');
+		tests.push('Verify configuration defaults and production-like environment values.');
+	}
+	if (!hasTestChanges) {
+		suggestions.push('Consider adding or updating tests for the changed behavior.');
+		tests.push('Exercise the changed flow manually if automated coverage is missing.');
+	}
+	if (normalizedDiff.includes('async') || normalizedDiff.includes('await ') || normalizedDiff.includes('promise')) {
+		risks.push('Async behavior changed; watch for loading-state, retry, and race-condition regressions.');
+	}
+
+	if (risks.length === 0) {
+		risks.push('Review boundary conditions, empty states, and fallback paths before merging.');
+	}
+	if (suggestions.length === 0) {
+		suggestions.push('Check whether naming, comments, and UX copy still match the behavior change.');
+	}
+	if (tests.length === 0) {
+		tests.push('Run the most relevant unit and integration coverage for the touched files.');
+	}
+
+	return {
+		summary: `Changed ${String(files.length)} file(s). Review correctness, tests, and rollout safety before merge.`,
+		risks,
+		suggestions,
+		tests,
+	};
+}
+
 export const aiRouter = router({
 	getConfig: publicProcedure.query(() => {
 		const config = getAIConfig();
 		return {
 			...config,
-			hasRuntimeKey: Boolean(runtimeApiKey),
+			hasRuntimeKey: Boolean(readSecretValue(runtimeApiKeySecretKey)),
 		};
 	}),
 
@@ -135,6 +185,7 @@ export const aiRouter = router({
 						pullRequest: z.boolean().optional(),
 						conflictExplain: z.boolean().optional(),
 						explainCommit: z.boolean().optional(),
+						reviewDiff: z.boolean().optional(),
 					})
 					.optional(),
 			})
@@ -159,7 +210,7 @@ export const aiRouter = router({
 			})
 		)
 		.mutation(({ input }) => {
-			runtimeApiKey = input.apiKey.trim();
+			setSecretValue(runtimeApiKeySecretKey, input.apiKey.trim());
 			return { success: true };
 		}),
 
@@ -262,6 +313,64 @@ export const aiRouter = router({
 				return {
 					explanation: 'Conflict requires manual resolution.',
 					suggestions: [],
+					error: error instanceof Error ? error.message : 'AI request failed',
+				};
+			}
+		}),
+
+	reviewDiff: publicProcedure
+		.input(
+			z.object({
+				title: z.string().optional(),
+				files: z.array(z.string()).max(200),
+				diff: z.string().max(2_000_000),
+			})
+		)
+		.mutation(async ({ input }) => {
+			if (!isFeatureEnabled('reviewDiff')) {
+				return {
+					summary: null,
+					risks: [] as string[],
+					suggestions: [] as string[],
+					tests: [] as string[],
+					error: 'AI review assistance is disabled.',
+				};
+			}
+
+			try {
+				const prompt = [
+					'Review this code diff and respond as JSON.',
+					'JSON shape: {"summary":"...","risks":["..."],"suggestions":["..."],"tests":["..."]}',
+					input.title ? `Context: ${input.title}` : '',
+					'Touched files:',
+					...input.files.slice(0, 80).map((file) => `- ${file}`),
+					'Diff excerpt:',
+					input.diff.slice(0, 40_000),
+				]
+					.filter(Boolean)
+					.join('\n');
+				const output = await callOpenAICompatible(prompt, 'reviewDiff');
+				const parsed = JSON.parse(output) as {
+					summary?: string;
+					risks?: string[];
+					suggestions?: string[];
+					tests?: string[];
+				};
+				const fallback = fallbackReviewDiff(input.files, input.diff);
+				return {
+					summary: parsed.summary ?? fallback.summary,
+					risks: Array.isArray(parsed.risks) && parsed.risks.length > 0 ? parsed.risks : fallback.risks,
+					suggestions:
+						Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0
+							? parsed.suggestions
+							: fallback.suggestions,
+					tests: Array.isArray(parsed.tests) && parsed.tests.length > 0 ? parsed.tests : fallback.tests,
+					error: null,
+				};
+			} catch (error) {
+				const fallback = fallbackReviewDiff(input.files, input.diff);
+				return {
+					...fallback,
 					error: error instanceof Error ? error.message : 'AI request failed',
 				};
 			}

@@ -17,10 +17,8 @@ import {
 import {
 	GitMerge,
 	Check,
-	X,
 	ArrowLeft,
 	ArrowRight,
-	Copy,
 	Loader2,
 	AlertTriangle,
 } from 'lucide-react';
@@ -44,9 +42,7 @@ interface ThreeWayMergeEditorProps {
 
 export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }: ThreeWayMergeEditorProps) {
 	const { activeRepo } = useAppStore();
-	const [selectedHunks, setSelectedHunks] = useState<Set<number>>(new Set());
 	const [resolutions, setResolutions] = useState<Map<number, 'ours' | 'theirs' | 'both' | 'manual'>>(new Map());
-	const [manualContent, setManualContent] = useState<Map<number, string>>(new Map());
 	const [isSaving, setIsSaving] = useState(false);
 
 	// Parse conflict markers from file content
@@ -58,6 +54,9 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
+			if (line === undefined) {
+				continue;
+			}
 
 			if (line.startsWith('<<<<<<<')) {
 				currentHunk = { startLine: i, ours: [], theirs: [] };
@@ -83,7 +82,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 	};
 
 	// Get file content with conflicts
-	const { data: fileData, isLoading, refetch } = trpc.git.readFile.useQuery(
+	const { data: fileData, isLoading } = trpc.git.readFile.useQuery(
 		{ repo: activeRepo ?? '', path: filePath },
 		{ enabled: !!activeRepo && open && !!filePath }
 	);
@@ -99,24 +98,6 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 			next.set(index, resolution);
 			return next;
 		});
-		setSelectedHunks(prev => {
-			const next = new Set(prev);
-			next.add(index);
-			return next;
-		});
-	};
-
-	const handleManualEdit = (index: number, content: string) => {
-		setManualContent(prev => {
-			const next = new Map(prev);
-			next.set(index, content);
-			return next;
-		});
-		setResolutions(prev => {
-			const next = new Map(prev);
-			next.set(index, 'manual');
-			return next;
-		});
 	};
 
 	const handleResolveAll = (resolution: 'ours' | 'theirs') => {
@@ -125,7 +106,6 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 			newResolutions.set(index, resolution);
 		});
 		setResolutions(newResolutions);
-		setSelectedHunks(new Set(conflicts.map((_, i) => i)));
 	};
 
 	const generateResolvedContent = (): string => {
@@ -141,6 +121,9 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 			const conflictIndex = conflicts.findIndex(c => c.startLine === i);
 			if (conflictIndex >= 0) {
 				const conflict = conflicts[conflictIndex];
+				if (!conflict) {
+					continue;
+				}
 				const resolution = resolutions.get(conflictIndex);
 
 				if (resolution === 'ours') {
@@ -149,9 +132,6 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 					result.push(...conflict.theirs);
 				} else if (resolution === 'both') {
 					result.push(...conflict.ours, ...conflict.theirs);
-				} else if (resolution === 'manual') {
-					const manual = manualContent.get(conflictIndex) || '';
-					result.push(...manual.split('\n'));
 				} else {
 					// Not resolved, keep conflict markers
 					result.push('<<<<<<< OURS');

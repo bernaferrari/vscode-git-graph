@@ -50,7 +50,7 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
     // Get file counts
     const stagedCount = statusData?.staged?.length ?? 0;
     const unstagedCount = statusData?.unstaged?.length ?? 0;
-    const untrackedCount = statusData?.unstaged?.filter((f) => f.status === 'U').length ?? 0;
+    const untrackedCount = statusData?.unstaged?.filter((f: { status: string }) => f.status === 'U').length ?? 0;
     const conflictedCount: number = workingDirStatus?.conflicted?.length ?? 0;
 
     const ahead = aheadBehindData?.ahead ?? 0;

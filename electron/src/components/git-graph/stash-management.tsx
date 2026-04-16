@@ -9,7 +9,6 @@ import {
 	Trash2,
 	Download,
 	Check,
-	Clock,
 	Loader2,
 	GitBranch,
 	AlertCircle,
@@ -27,7 +26,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useGitOperations } from '@/hooks/useGitOperations';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -47,7 +45,6 @@ interface StashManagementProps {
 
 export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	const { activeRepo } = useAppStore();
-	const gitOps = useGitOperations();
 	const [newStashMessage, setNewStashMessage] = useState('');
 	const [viewingStash, setViewingStash] = useState<number | null>(null);
 
@@ -66,8 +63,8 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 			setNewStashMessage('');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to create stash', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to create stash', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -77,8 +74,8 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 			toast.success('Stash applied');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to apply stash', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to apply stash', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -88,8 +85,8 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 			toast.success('Stash dropped');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to drop stash', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to drop stash', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -99,16 +96,17 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 			toast.success('Stash popped and applied');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to pop stash', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to pop stash', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
 	const handleCreateStash = () => {
-		createMutation.mutate({
-			repo: activeRepo ?? '',
-			message: newStashMessage || undefined,
-		});
+		createMutation.mutate(
+			newStashMessage
+				? { repo: activeRepo ?? '', message: newStashMessage }
+				: { repo: activeRepo ?? '' }
+		);
 	};
 
 	const handleApplyStash = (index: number, keepInList: boolean) => {

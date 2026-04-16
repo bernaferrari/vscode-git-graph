@@ -11,13 +11,10 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import {
-	GitCommit,
 	GitMerge,
 	GitBranch,
 	Tag,
-	User,
 	Circle,
-	Square,
 	Info,
 } from 'lucide-react';
 

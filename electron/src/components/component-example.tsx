@@ -95,7 +95,7 @@ function CardExample() {
         </CardHeader>
         <CardFooter>
           <AlertDialog>
-            <AlertDialogTrigger asChild>
+            <AlertDialogTrigger>
               <Button>
                 <PlusIcon data-icon="inline-start" />
                 Show Dialog

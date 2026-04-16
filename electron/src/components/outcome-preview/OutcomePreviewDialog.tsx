@@ -3,13 +3,10 @@
  * Shows what will happen before merge/rebase operations
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
 	Dialog,
 	DialogContent,
@@ -19,25 +16,18 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog';
 import {
-	GitBranch,
 	GitCommit,
 	Merge,
 	RotateCcw,
 	AlertTriangle,
 	CheckCircle2,
-	XCircle,
 	ArrowRight,
-	ArrowLeft,
-	Eye,
-	EyeOff,
-	Clock,
 	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	AlertCircle,
 	Files,
-	GitPullRequest,
-	Spinner,
+	Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OutcomePreview } from '@/lib/outcomePreview';
@@ -121,8 +111,8 @@ export function OutcomePreviewDialog({
 									</div>
 									{preview.riskReasons.length > 0 && (
 										<ul className="text-sm text-muted-foreground space-y-1">
-											{preview.riskReasons.map((reason, i) => (
-												<li key={i} className="flex items-center gap-2">
+										{preview.riskReasons.map((reason, index) => (
+											<li key={index} className="flex items-center gap-2">
 													<AlertTriangle className="h-3 w-3 text-amber-500" />
 													{reason}
 												</li>
@@ -226,7 +216,7 @@ export function OutcomePreviewDialog({
 									<div className="flex-1">
 										<p className="text-xs text-muted-foreground mb-2">Before</p>
 										<div className="space-y-1">
-											{preview.commits.slice(0, 5).map((commit, i) => (
+											{preview.commits.slice(0, 5).map((commit) => (
 												<div
 													key={commit.hash}
 													className={cn(
@@ -250,7 +240,9 @@ export function OutcomePreviewDialog({
 									<div className="flex-1">
 										<p className="text-xs text-muted-foreground mb-2">After</p>
 										<div className="space-y-1">
-											{preview.commits.slice(0, 5).map((commit, i) => (
+											{preview.commits.slice(0, 5).map((commit) => {
+												const newHash = (commit as { newHash?: string }).newHash;
+												return (
 												<div
 													key={commit.hash}
 													className={cn(
@@ -269,12 +261,13 @@ export function OutcomePreviewDialog({
 													<span className="font-mono truncate">
 														{commit.action === 'unchanged' 
 															? commit.hash.substring(0, 7)
-															: commit.newHash?.substring(0, 7) || '(new)'
+															: newHash?.substring(0, 7) || '(new)'
 														}
 													</span>
 													<span className="truncate">{commit.message.substring(0, 30)}</span>
 												</div>
-											))}
+												);
+											})}
 										</div>
 									</div>
 								</div>
@@ -309,8 +302,8 @@ export function OutcomePreviewDialog({
 						</CardHeader>
 						<CardContent>
 							<pre className="text-xs font-mono bg-muted p-3 rounded-lg overflow-x-auto">
-								{preview.gitCommands.map((cmd, i) => (
-									<div key={i} className="text-muted-foreground">
+								{preview.gitCommands.map((cmd, index) => (
+									<div key={index} className="text-muted-foreground">
 										$ {cmd}
 									</div>
 								))}
@@ -330,7 +323,7 @@ export function OutcomePreviewDialog({
 					>
 						{isLoading ? (
 							<>
-								<Spinner className="h-4 w-4 mr-2 animate-spin" />
+								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 								Applying...
 							</>
 						) : (

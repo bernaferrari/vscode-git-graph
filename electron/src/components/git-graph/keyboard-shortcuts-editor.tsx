@@ -7,7 +7,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import {
 	Dialog,
 	DialogContent,
@@ -16,13 +15,10 @@ import {
 } from '@/components/ui/dialog';
 import {
 	Keyboard,
-	Plus,
-	Trash2,
 	RotateCcw,
 	Search,
 	AlertTriangle,
 	Check,
-	X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { trpc } from '@/trpc/client';
@@ -91,7 +87,7 @@ export function KeyboardShortcutsEditor({
 	const [conflicts, setConflicts] = useState<Set<string>>(new Set());
 	const keybindingQuery = trpc.config.keybindings.useQuery(undefined, { enabled: open });
 	const setKeybindings = trpc.config.setKeybindings.useMutation({
-		onError: (error) => {
+		onError: (error: { message: string }) => {
 			toast.error('Failed to save shortcuts', { description: error.message });
 		},
 	});
@@ -99,7 +95,7 @@ export function KeyboardShortcutsEditor({
 	// Load shortcuts
 	useEffect(() => {
 		const overrides = keybindingQuery.data?.overrides ?? {};
-		setShortcuts(DEFAULT_SHORTCUTS.map(s => ({
+		setShortcuts(DEFAULT_SHORTCUTS.map((s) => ({
 			...s,
 			customKey: overrides[s.id],
 		})));
@@ -110,7 +106,7 @@ export function KeyboardShortcutsEditor({
 		const keyMap = new Map<string, string[]>();
 		const conflictSet = new Set<string>();
 
-		shortcuts.forEach(s => {
+		shortcuts.forEach((s) => {
 			const key = s.customKey || s.defaultKey;
 			if (!key) return;
 
@@ -128,7 +124,7 @@ export function KeyboardShortcutsEditor({
 
 	// Filter shortcuts
 	const filteredShortcuts = searchQuery
-		? shortcuts.filter(s =>
+		? shortcuts.filter((s) =>
 				s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				s.category.toLowerCase().includes(searchQuery.toLowerCase())
 			)
@@ -136,8 +132,8 @@ export function KeyboardShortcutsEditor({
 
 	// Group by category
 	const grouped = filteredShortcuts.reduce((acc, s) => {
-		if (!acc[s.category]) acc[s.category] = [];
-		acc[s.category].push(s);
+		const bucket = acc[s.category] ?? (acc[s.category] = []);
+		bucket.push(s);
 		return acc;
 	}, {} as Record<string, ShortcutAction[]>);
 
@@ -150,9 +146,13 @@ export function KeyboardShortcutsEditor({
 
 	// Reset shortcut
 	const handleReset = (id: string) => {
-		setShortcuts(prev => prev.map(s =>
-			s.id === id ? { ...s, customKey: undefined } : s
-		));
+		setShortcuts((prev) =>
+			prev.map((s) =>
+				s.id === id
+					? (({ customKey: _removed, ...rest }) => rest)(s)
+					: s
+			)
+		);
 	};
 
 	// Reset all
@@ -164,7 +164,7 @@ export function KeyboardShortcutsEditor({
 	// Save
 	const handleSave = () => {
 		const custom: Record<string, string> = {};
-		shortcuts.forEach(s => {
+		shortcuts.forEach((s) => {
 			if (s.customKey) {
 				custom[s.id] = s.customKey;
 			}
@@ -206,7 +206,7 @@ export function KeyboardShortcutsEditor({
 			handleUpdate(id, combo);
 			setEditingId(null);
 		}
-	}, []);
+	}, [handleUpdate]);
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>

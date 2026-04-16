@@ -31,6 +31,13 @@ const mockElectron = {
 	nativeTheme: {
 		shouldUseDarkColors: false,
 	},
+	safeStorage: {
+		isEncryptionAvailable: vi.fn(() => true),
+		encryptString: vi.fn((value: string) => Buffer.from(value, 'utf8')),
+		decryptString: vi.fn((value: Buffer | string) =>
+			Buffer.isBuffer(value) ? value.toString('utf8') : Buffer.from(value).toString('utf8')
+		),
+	},
 	dialog: {
 		showOpenDialog: vi.fn(),
 		showSaveDialog: vi.fn(),

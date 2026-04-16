@@ -56,8 +56,8 @@ export function BranchCompare({
 		{ enabled: !!activeRepo && !!fromBranch && !!toBranch && open }
 	);
 
-	const commits = compareData?.commits ?? [];
-	const files = compareData?.files ?? [];
+	const commits = (compareData?.commits ?? []) as Array<{ hash: string; message: string }>;
+	const files = (compareData?.files ?? []) as Array<{ status: string; path: string }>;
 	const additions = compareData?.additions ?? 0;
 	const deletions = compareData?.deletions ?? 0;
 
@@ -130,7 +130,7 @@ export function BranchCompare({
 										Commits ({commits.length})
 									</h4>
 									<div className="space-y-1">
-										{commits.map((commit) => (
+										{commits.map((commit: { hash: string; message: string }) => (
 											<div
 												key={commit.hash}
 												className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-accent/50 text-sm"
@@ -153,7 +153,7 @@ export function BranchCompare({
 										Changed Files ({files.length})
 									</h4>
 									<div className="space-y-1">
-										{files.map((file, i) => (
+										{files.map((file: { status: string; path: string }, i: number) => (
 											<div
 												key={i}
 												className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-accent/50 text-sm"

@@ -1,8 +1,8 @@
 {
-    "name": "electron-vite-react-template",
+    "name": "git-graph-desktop",
     "private": true,
     "version": "0.0.0-alpha.1+custom-extra-name",
-    "description": "Base Electron + Vite + React template with tRPC IPC, TanStack Router/Query/Form/Virtual, and TailwindCSS",
+    "description": "Git Graph desktop client for repository navigation, code review, and workflow automation.",
     "author": "",
     "type": "module",
     "main": "dist-electron/main.js",
@@ -25,8 +25,10 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:release": "vitest run -c vitest.release.config.ts",
-        "release:hardening": "pnpm run typecheck:release && pnpm test && pnpm run test:release && pnpm run build",
-        "gg": "node scripts/gg.mjs"
+        "e2e": "pnpm build && playwright test -c playwright.config.ts",
+        "release:hardening": "pnpm run typecheck && pnpm test && pnpm run test:release && pnpm run e2e && pnpm run build",
+        "gg": "node scripts/gg.mjs",
+        "collaboration:server": "tsx scripts/collaboration-sync-server.ts"
     },
     "dependencies": {
         "@base-ui/react": "^1.1.0",

@@ -12,9 +12,6 @@ import {
 	ChevronRight,
 	Hash,
 	Clock,
-	Search,
-	Filter,
-	Globe,
 	Loader2,
 	PanelRightClose,
 	PanelRightOpen,
@@ -22,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 
-import { Avatar, AvatarWithTooltip } from './avatar';
+import { Avatar } from './avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,7 +59,6 @@ export function FileAnnotationsPanel({
 	const { activeRepo } = useAppStore();
 	const [isLoading, setIsLoading] = useState(false);
 	const [annotations, setAnnotations] = useState<AnnotationLine[]>([]);
-	const [content, setContent] = useState<string>('');
 	const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
 	const [showAuthorColumn, setShowAuthorColumn] = useState(true);
 	const [showDateColumn, setShowDateColumn] = useState(true);
@@ -77,28 +73,36 @@ export function FileAnnotationsPanel({
 			setIsLoading(true);
 			try {
 				// Get file content
-				const fileContent = await trpc.git.showFile.query({
-					repo: activeRepo,
-					commitHash,
-					filePath,
-				});
-				setContent(fileContent || '');
+					const fileContent = await trpc.git.showFile.query({
+						repo: activeRepo,
+						commitHash,
+						filePath,
+					});
 
-				// Get blame info
-				const blameResult = await trpc.git.blameFile.query({
-					repo: activeRepo,
-					filePath,
-					commitHash,
-				});
+					// Get blame info
+					const blameResult = await trpc.git.blameFile.query({
+						repo: activeRepo,
+						filePath,
+						commitHash,
+					});
 
-				if (blameResult?.lines) {
-					const lines = fileContent.split('\n');
-					const annotationLines: AnnotationLine[] = lines.map((line, index) => {
-						const blame = blameResult.lines[index];
-						return {
-							lineNumber: index + 1,
-							content: line,
-							commitHash: blame?.hash || '',
+					if (blameResult?.lines) {
+						const lines = String(fileContent ?? '').split('\n');
+						const blameLines = blameResult.lines as Array<
+							Partial<{
+								hash: string;
+								author: string;
+								email: string;
+								timestamp: number;
+								summary: string;
+							}>
+						>;
+						const annotationLines: AnnotationLine[] = lines.map((line: string, index: number) => {
+							const blame = blameLines[index];
+							return {
+								lineNumber: index + 1,
+								content: line,
+								commitHash: blame?.hash || '',
 							author: blame?.author || 'Unknown',
 							email: blame?.email || '',
 							date: blame?.timestamp || 0,
@@ -120,7 +124,7 @@ export function FileAnnotationsPanel({
 	// Group lines by commit
 	const commitGroups = useMemo(() => {
 		const groups = new Map<string, AnnotationLine[]>();
-		annotations.forEach(line => {
+		annotations.forEach((line) => {
 			if (line.commitHash) {
 				const existing = groups.get(line.commitHash) || [];
 				existing.push(line);
@@ -142,19 +146,20 @@ export function FileAnnotationsPanel({
 			'bg-orange-100 dark:bg-orange-900/30 border-l-orange-400',
 			'bg-indigo-100 dark:bg-indigo-900/30 border-l-indigo-400',
 		];
-		const colorMap = new Map<string, string>();
-		let colorIndex = 0;
-		commitGroups.forEach((_, hash) => {
-			colorMap.set(hash, colors[colorIndex % colors.length]);
-			colorIndex++;
-		});
+			const colorMap = new Map<string, string>();
+			let colorIndex = 0;
+			commitGroups.forEach((_, hash) => {
+				const color = colors[colorIndex % colors.length]!;
+				colorMap.set(hash, color);
+				colorIndex++;
+			});
 		return colorMap;
 	}, [commitGroups]);
 
 	// Navigate to previous/next commit
 	const navigateCommit = (direction: 'prev' | 'next') => {
 		if (!selectedCommit) return;
-		const commitHashes = Array.from(commitGroups.keys());
+			const commitHashes = Array.from(commitGroups.keys());
 		const currentIndex = commitHashes.indexOf(selectedCommit);
 		if (currentIndex === -1) return;
 
@@ -162,7 +167,10 @@ export function FileAnnotationsPanel({
 			? Math.max(0, currentIndex - 1)
 			: Math.min(commitHashes.length - 1, currentIndex + 1);
 
-		setSelectedCommit(commitHashes[newIndex]);
+			const nextCommit = commitHashes[newIndex];
+			if (nextCommit) {
+				setSelectedCommit(nextCommit);
+			}
 	};
 
 	return (

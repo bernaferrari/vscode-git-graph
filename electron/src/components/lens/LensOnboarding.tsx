@@ -3,7 +3,7 @@
  * Explains the lens system to new users
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -13,13 +13,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Compass, Wand2, Terminal, ArrowRight, Check, Sparkles, Keyboard, Shield, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLensMode, type LensMode } from '@/components/lens';
-import { useSettings } from '@/components/git-graph/useSettings';
+import { trpc } from '@/trpc/client';
 
 interface LensOnboardingProps {
     open: boolean;
@@ -80,14 +77,34 @@ const LENS_DETAILS = [
 export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
     const { mode, setLensMode } = useLensMode();
     const [selectedLens, setSelectedLens] = useState<LensMode>(mode);
+    const utils = trpc.useUtils();
+    const setOnboardingStateMutation = trpc.config.setOnboardingState.useMutation({
+        onSuccess: async () => {
+            await utils.config.onboardingState.invalidate();
+        },
+    });
+
+    useEffect(() => {
+        if (open) {
+            setSelectedLens(mode);
+        }
+    }, [mode, open]);
 
     const handleConfirm = () => {
         setLensMode(selectedLens);
+        setOnboardingStateMutation.mutate({ lensOnboardingSeen: true });
         onOpenChange(false);
     };
 
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setOnboardingStateMutation.mutate({ lensOnboardingSeen: true });
+        }
+        onOpenChange(nextOpen);
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
                 <DialogHeader>
                     <DialogTitle className='flex items-center gap-2 text-xl'>
@@ -181,17 +198,20 @@ export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
 // Hook to manage lens onboarding state
 export function useLensOnboarding() {
     const [showOnboarding, setShowOnboarding] = useState(false);
-    const { settings } = useSettings();
+    const onboardingQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
+    const shouldShow = useMemo(
+        () =>
+            Boolean(
+                onboardingQuery.data &&
+                    onboardingQuery.data.state.gitGraphCompleted &&
+                    !onboardingQuery.data.state.lensOnboardingSeen
+            ),
+        [onboardingQuery.data]
+    );
 
     useEffect(() => {
-        // Show onboarding if user hasn't selected a preferred lens yet
-        // and this is first run or they've been using default
-        const hasSeenOnboarding = localStorage.getItem('git-graph-lens-onboarding-seen');
-        if (!hasSeenOnboarding) {
-            setShowOnboarding(true);
-            localStorage.setItem('git-graph-lens-onboarding-seen', 'true');
-        }
-    }, []);
+        setShowOnboarding(shouldShow);
+    }, [shouldShow]);
 
     const dismissOnboarding = () => {
         setShowOnboarding(false);

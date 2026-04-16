@@ -85,6 +85,7 @@ interface GitGraphToolbarProps {
     onRefresh: () => void;
     onToggleSidePanel: () => void;
     onOpenPinnedCommits: () => void;
+    notifications?: ReactNode;
 }
 
 export function GitGraphToolbar({
@@ -113,6 +114,7 @@ export function GitGraphToolbar({
     onRefresh,
     onToggleSidePanel,
     onOpenPinnedCommits,
+    notifications,
 }: GitGraphToolbarProps) {
     return (
         <div className='ui-toolbar flex items-center gap-2 px-2 py-1.5'>
@@ -211,6 +213,7 @@ export function GitGraphToolbar({
             <ToolbarButton icon={Search} label='Find' shortcut='⌘F' onClick={onFind} />
             <ToolbarButton icon={RefreshCw} label='Refresh' shortcut='⌘R' onClick={onRefresh} />
             <ToolbarButton icon={PanelLeft} label='Toggle Panel' onClick={onToggleSidePanel} />
+            {notifications}
 
             <Button
                 variant='ghost'

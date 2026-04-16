@@ -3,11 +3,10 @@
  * Drag and drop commits onto branches to cherry-pick
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { trpc } from '@/trpc/client';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
 	Dialog,
 	DialogContent,
@@ -23,7 +22,6 @@ import {
 	Check,
 	Loader2,
 	Copy,
-	X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,12 +29,6 @@ interface DragCommitProps {
 	commitHash: string;
 	commitMessage: string;
 	onComplete?: () => void;
-}
-
-interface DropTarget {
-	type: 'branch' | 'commit' | 'tag';
-	name: string;
-	value: string;
 }
 
 // Drag state
@@ -88,11 +80,9 @@ export function DraggableCommit({
 
 // Drop zone for branches
 export function BranchDropZone({
-	branchName,
 	onDrop,
 	children,
 }: {
-	branchName: string;
 	onDrop: (commitHash: string) => void;
 	children: React.ReactNode;
 }) {

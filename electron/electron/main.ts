@@ -79,13 +79,19 @@ function createWindow(): BrowserWindow {
         minWidth: 960,
         minHeight: 540,
         show: false, // Prevent flash before maximize
-        // macOS vibrancy - gives that beautiful translucent blur effect
-        vibrancy: isMac ? 'content' : undefined,
-        // Windows 11 material effect
-        backgroundMaterial: isWindows ? 'mica' : undefined,
         // Frame configuration for modern look
         titleBarStyle: isMac ? 'hiddenInset' : 'default',
-        trafficLightPosition: isMac ? { x: 16, y: 16 } : undefined,
+        ...(isMac
+            ? {
+                  vibrancy: 'content' as const,
+                  trafficLightPosition: { x: 16, y: 16 },
+              }
+            : {}),
+        ...(isWindows
+            ? {
+                  backgroundMaterial: 'mica' as const,
+              }
+            : {}),
         // Don't use transparent with vibrancy - they conflict
         webPreferences: {
             preload: path.join(__dirname, 'preload.mjs'),

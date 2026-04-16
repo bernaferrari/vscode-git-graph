@@ -58,10 +58,10 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
         { enabled: !!activeRepo && !!baseBranch && !!compareBranch }
     );
 
-    const branches = (repoInfo?.branches ?? []).filter((b) => !b.startsWith('remotes/'));
+    const branches = ((repoInfo?.branches ?? []) as string[]).filter((b: string) => !b.startsWith('remotes/'));
     const ahead = compareData?.commits?.length ?? 0;
     const behind = reverseCompareData?.commits?.length ?? 0;
-    const files = compareData?.files ?? [];
+    const files = (compareData?.files ?? []) as Array<{ status: string; path: string }>;
 
     const totalChanges = files.length;
     const additions = compareData?.additions ?? 0;
@@ -97,7 +97,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                             value={baseBranch}
                             onChange={(e) => setBaseBranch(e.target.value)}>
                             <option value=''>Select base branch...</option>
-                            {branches.map((b) => (
+                            {branches.map((b: string) => (
                                 <option key={b} value={b}>
                                     {b}
                                 </option>
@@ -113,8 +113,8 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                             onChange={(e) => setCompareBranch(e.target.value)}>
                             <option value=''>Select branch to compare...</option>
                             {branches
-                                .filter((b) => b !== baseBranch)
-                                .map((b) => (
+                                .filter((b: string) => b !== baseBranch)
+                                .map((b: string) => (
                                     <option key={b} value={b}>
                                         {b}
                                     </option>

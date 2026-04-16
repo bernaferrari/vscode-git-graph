@@ -164,7 +164,15 @@ export const systemRouter = router({
 				})
 			)
 			.mutation(({ input }) => {
-				const nextEntry = appendAuditEntry(input);
+				const nextEntry = appendAuditEntry({
+					scope: input.scope,
+					action: input.action,
+					status: input.status,
+					summary: input.summary,
+					...(input.repo !== undefined ? { repo: input.repo } : {}),
+					...(input.details !== undefined ? { details: input.details } : {}),
+					...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+				});
 				return { success: true, entry: nextEntry };
 			}),
 

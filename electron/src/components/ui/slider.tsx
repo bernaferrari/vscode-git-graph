@@ -11,8 +11,13 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  ref,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: Omit<SliderPrimitive.Root.Props, "defaultValue" | "value"> & {
+  defaultValue?: SliderPrimitive.Root.Props["defaultValue"]
+  value?: SliderPrimitive.Root.Props["value"]
+  ref?: SliderPrimitive.Root.Props["ref"]
+}) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -23,16 +28,21 @@ function Slider({
     [value, defaultValue, min, max]
   )
 
+  const rootProps: any = {
+    min,
+    max,
+    thumbAlignment: "edge",
+    ...(ref !== undefined ? { ref } : {}),
+    ...(defaultValue !== undefined ? { defaultValue } : {}),
+    ...(value !== undefined ? { value } : {}),
+    ...props,
+  }
+
   return (
     <SliderPrimitive.Root
       className={cn("data-horizontal:w-full data-vertical:h-full", className)}
       data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
-      min={min}
-      max={max}
-      thumbAlignment="edge"
-      {...props}
+      {...rootProps}
     >
       <SliderPrimitive.Control className="data-vertical:min-h-40 relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:w-auto data-vertical:flex-col">
         <SliderPrimitive.Track

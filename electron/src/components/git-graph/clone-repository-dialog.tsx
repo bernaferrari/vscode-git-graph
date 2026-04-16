@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAppNotifications } from '@/hooks/useAppNotifications';
 import { trpc } from '@/trpc/client';
 
 type RepoProvider = 'github' | 'gitlab' | 'bitbucket' | 'azure';
@@ -179,6 +180,7 @@ function getProviderIcon(provider: RepoProvider) {
 
 export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRepositoryDialogProps) {
     const typedTrpc = trpc as unknown as TrpcClientShape;
+    const { notifySuccess, notifyError } = useAppNotifications();
     const [activeTab, setActiveTab] = useState<CloneDialogTab>('url');
     const [provider, setProvider] = useState<RepoProvider>('github');
     const [url, setUrl] = useState('');
@@ -215,12 +217,12 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
 
     const saveAuthMutation = typedTrpc.git.setPullRequestAuth.useMutation({
         onSuccess: () => {
-            toast.success('Provider credentials updated');
+            notifySuccess('Provider credentials updated');
             void authQuery.refetch();
             void listRepositoriesQuery.refetch();
         },
         onError: (error: unknown) => {
-            toast.error('Failed to save provider credentials', {
+            notifyError('Failed to save provider credentials', {
                 description: getErrorMessage(error, 'Unable to save provider credentials'),
             });
         },
@@ -229,17 +231,17 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
     const cloneMutation = typedTrpc.repo.clone.useMutation({
         onSuccess: async (result) => {
             if (result.error || !result.root) {
-                toast.error('Clone failed', { description: result.error ?? 'Unknown error' });
+                notifyError('Clone failed', { description: result.error ?? 'Unknown error' });
                 return;
             }
-            toast.success(`Repository cloned to ${result.root}`);
+            notifySuccess('Repository cloned', { description: result.root });
             if (onCloned) {
                 await Promise.resolve(onCloned(result.root));
             }
             onOpenChange(false);
         },
         onError: (error: unknown) => {
-            toast.error('Clone failed', { description: getErrorMessage(error, 'Unable to clone repository') });
+            notifyError('Clone failed', { description: getErrorMessage(error, 'Unable to clone repository') });
         },
     });
 
@@ -292,12 +294,23 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
             return;
         }
 
-        cloneMutation.mutate({
+        const cloneRequest: {
+            url: string;
+            destination: string;
+            branch?: string;
+            depth?: number;
+        } = {
             url: cloneUrl,
             destination: destinationPath,
-            branch: cloneBranch.trim() || undefined,
-            depth: parsedDepth ?? undefined,
-        });
+        };
+        if (cloneBranch.trim()) {
+            cloneRequest.branch = cloneBranch.trim();
+        }
+        if (parsedDepth !== null) {
+            cloneRequest.depth = parsedDepth;
+        }
+
+        cloneMutation.mutate(cloneRequest);
     };
 
     const saveProviderCredential = () => {

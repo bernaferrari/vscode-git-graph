@@ -10,7 +10,6 @@ import {
 	Flame,
 	Check,
 	ChevronDown,
-	GitPullRequest,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,13 +25,10 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useGitOperations } from '@/hooks/useGitOperations';
-import { useAppStore } from '@/lib/store';
-import { trpc } from '@/trpc/client';
 
 interface GitFlowToolbarProps {
 	currentBranch: string;
@@ -41,7 +37,6 @@ interface GitFlowToolbarProps {
 type FlowType = 'feature' | 'release' | 'hotfix';
 
 export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
-	const { activeRepo } = useAppStore();
 	const gitOps = useGitOperations();
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [flowType, setFlowType] = useState<FlowType>('feature');
@@ -200,13 +195,11 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 			{/* Dialog */}
 			<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 				<DialogContent className="sm:max-w-md ui-surface">
-					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							{FLOW_CONFIG[flowType].icon && (
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
 								<FlowIcon type={flowType} className={`h-5 w-5 ${FLOW_CONFIG[flowType].color}`} />
-							)}
-							{action === 'start' ? 'Start' : 'Finish'} {FLOW_CONFIG[flowType].label}
-						</DialogTitle>
+								{action === 'start' ? 'Start' : 'Finish'} {FLOW_CONFIG[flowType].label}
+							</DialogTitle>
 					</DialogHeader>
 					<div className="space-y-4 py-4">
 						<div className="space-y-2">

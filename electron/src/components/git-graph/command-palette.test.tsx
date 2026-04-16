@@ -2,8 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CommandPalette } from './command-palette';
 
-function createActions(overrides?: Partial<Parameters<typeof CommandPalette>[0]['actions']>) {
-    return {
+type CommandPaletteActions = Parameters<typeof CommandPalette>[0]['actions'];
+
+function createActions(
+    overrides?: Partial<CommandPaletteActions>,
+    omit: Array<keyof CommandPaletteActions> = []
+) {
+    const actions: CommandPaletteActions = {
         onCreateBranch: vi.fn(),
         onCreateTag: vi.fn(),
         onFetch: vi.fn(),
@@ -33,6 +38,12 @@ function createActions(overrides?: Partial<Parameters<typeof CommandPalette>[0][
         onFuzzyFinder: vi.fn(),
         ...overrides,
     };
+
+    for (const key of omit) {
+        delete actions[key];
+    }
+
+    return actions;
 }
 
 describe('CommandPalette', () => {
@@ -55,7 +66,7 @@ describe('CommandPalette', () => {
 
     it('does not render fast-forward-only pull command when action is omitted', () => {
         const onOpenChange = vi.fn();
-        const actions = createActions({ onPullFfOnly: undefined });
+        const actions = createActions(undefined, ['onPullFfOnly']);
 
         render(<CommandPalette open={true} onOpenChange={onOpenChange} actions={actions} />);
 
@@ -64,7 +75,7 @@ describe('CommandPalette', () => {
 
     it('does not render optional worktree/workflow commands when callbacks are omitted', () => {
         const onOpenChange = vi.fn();
-        const actions = createActions({ onWorktrees: undefined, onWorkflows: undefined, onCopyDeepLink: undefined });
+        const actions = createActions(undefined, ['onWorktrees', 'onWorkflows', 'onCopyDeepLink']);
 
         render(<CommandPalette open={true} onOpenChange={onOpenChange} actions={actions} />);
 

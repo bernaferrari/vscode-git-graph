@@ -35,6 +35,10 @@ interface BlameOnHoverProps {
 	side?: 'top' | 'bottom' | 'left' | 'right';
 }
 
+interface BlameQueryResult {
+	blame?: string | null;
+}
+
 // Cache for blame data
 const blameCache = new Map<string, Map<number, BlameInfo>>();
 
@@ -72,16 +76,22 @@ export function BlameOnHover({
 			path: filePath,
 			commitHash,
 		})
-			.then((result) => {
+			.then((result: BlameQueryResult) => {
 				const blameText = result.blame;
 				if (blameText) {
 					// Parse using shared utility
-					const parsedLines = parseGitBlame(blameText);
+					const parsedLines = parseGitBlame(blameText) as Array<{
+						hash: string;
+						author: string;
+						authorEmail: string;
+						date: string;
+						summary: string;
+					}>;
 
 					// Build cache for this file
 					const newFileCache = new Map<number, BlameInfo>();
 
-					parsedLines.forEach((line, index) => {
+					parsedLines.forEach((line, index: number) => {
 						newFileCache.set(index + 1, {
 							hash: line.hash,
 							author: line.author,
@@ -274,15 +284,21 @@ export function usePrefetchBlame(filePath: string, commitHash?: string) {
 			path: filePath,
 			commitHash,
 		})
-			.then((result) => {
+			.then((result: BlameQueryResult) => {
 				const blameText = result.blame;
 				if (blameText) {
 					// Parse using shared utility
-					const parsedLines = parseGitBlame(blameText);
+					const parsedLines = parseGitBlame(blameText) as Array<{
+						hash: string;
+						author: string;
+						authorEmail: string;
+						date: string;
+						summary: string;
+					}>;
 
 					const fileCache = new Map<number, BlameInfo>();
 
-					parsedLines.forEach((line, index) => {
+					parsedLines.forEach((line, index: number) => {
 						fileCache.set(index + 1, {
 							hash: line.hash,
 							author: line.author,

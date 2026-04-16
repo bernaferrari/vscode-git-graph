@@ -78,7 +78,7 @@ export function MergeConflictEditor({
 		(configAllQuery.data?.ui as { featureFlags?: { aiProd?: boolean } } | undefined)?.featureFlags?.aiProd
 	);
 	const explainConflictMutation = trpc.ai.explainConflict.useMutation({
-		onSuccess: (result) => {
+		onSuccess: (result: { explanation?: string; suggestions?: string[]; error?: string }) => {
 			if (!result.explanation) {
 				toast.warning(result.error ?? 'No explanation available');
 				return;
@@ -91,7 +91,7 @@ export function MergeConflictEditor({
 				toast.success('Conflict explanation ready');
 			}
 		},
-		onError: (error) => {
+		onError: (error: unknown) => {
 			toast.error(error instanceof Error ? error.message : 'Unable to explain conflict');
 		},
 	});

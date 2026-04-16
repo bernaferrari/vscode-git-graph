@@ -53,7 +53,7 @@ function BreadcrumbLink({
       },
       props
     ),
-    render,
+    ...(render ? { render } : {}),
     state: {
       slot: "breadcrumb-link",
     },

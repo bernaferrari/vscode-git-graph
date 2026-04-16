@@ -1,24 +1,27 @@
 /**
  * Lens Mode Hook
- * Provides access to the current lens mode and helpers
- * Now uses standalone zustand store to avoid circular dependencies
+ * Provides access to the current lens mode and helpers.
+ * Lens selection is persisted through backend-managed settings.
  */
 
-import { useLensStore, type LensMode, type LensConfig, LENS_CONFIGS } from '@/lib/lensStore';
-import { useMemo, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+
+import { useSettings } from '@/components/git-graph/useSettings';
+import { LENS_CONFIGS, type LensConfig, type LensMode } from '@/lib/lensStore';
 
 export type { LensMode, LensConfig };
 
 export function useLensMode() {
-	const { mode, setMode } = useLensStore();
+	const { settings, updateSetting } = useSettings();
+	const mode = settings.lensMode;
 
 	const config = useMemo(() => LENS_CONFIGS[mode], [mode]);
 
 	const setLensMode = useCallback(
 		(newMode: LensMode) => {
-			setMode(newMode);
+			updateSetting('lensMode', newMode);
 		},
-		[setMode]
+		[updateSetting]
 	);
 
 	const isGuided = mode === 'guided';

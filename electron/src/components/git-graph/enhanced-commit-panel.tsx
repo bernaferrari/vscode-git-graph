@@ -14,7 +14,6 @@ import {
 	FileText,
 	Image,
 	Binary,
-	Folder,
 	ExternalLink,
 	Copy,
 	Check,
@@ -25,8 +24,6 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
-import { InlineBlame } from './inline-blame';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
 	Collapsible,

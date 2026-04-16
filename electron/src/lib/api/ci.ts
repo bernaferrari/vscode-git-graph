@@ -46,7 +46,7 @@ export interface CIStatus {
 export interface CICheck {
 	id: string;
 	name: string;
-	status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+	status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'cancelled';
 	description?: string;
 	url?: string;
 	startedAt?: string;
@@ -212,6 +212,8 @@ export class CIService {
 		sha: string
 	): Promise<CIStatus> {
 		const checks: CICheck[] = [];
+		void this.circleci;
+		void this.gitlab;
 
 		// GitHub
 		if (this.github) {
@@ -221,30 +223,40 @@ export class CIService {
 					this.github.getCheckRuns(owner, repo, sha),
 				]);
 
-				// Add commit statuses
-				status.statuses.forEach(s => {
-					checks.push({
-						id: String(s.id),
-						name: s.context,
-						status: this.mapGitHubStatus(s.state),
-						description: s.description,
-						url: s.target_url,
+					// Add commit statuses
+					status.statuses.forEach(s => {
+						const check: CICheck = {
+							id: String(s.id),
+							name: s.context,
+							status: this.mapGitHubStatus(s.state),
+						};
+						if (s.description !== undefined) {
+							check.description = s.description;
+						}
+						if (s.target_url !== undefined) {
+							check.url = s.target_url;
+						}
+						checks.push(check);
 					});
-				});
 
-				// Add check runs
-				checkRuns.check_runs.forEach(run => {
-					checks.push({
-						id: String(run.id),
-						name: run.name,
-						status: this.mapGitHubCheckStatus(run.status, run.conclusion),
-						url: run.html_url,
-						startedAt: run.started_at,
-						finishedAt: run.completed_at,
+					// Add check runs
+					checkRuns.check_runs.forEach(run => {
+						const check: CICheck = {
+							id: String(run.id),
+							name: run.name,
+							status: this.mapGitHubCheckStatus(run.status, run.conclusion),
+							url: run.html_url,
+						};
+						if (run.started_at !== undefined) {
+							check.startedAt = run.started_at;
+						}
+						if (run.completed_at !== undefined) {
+							check.finishedAt = run.completed_at;
+						}
+						checks.push(check);
 					});
-				});
-			} catch (error) {
-				console.error('Failed to fetch GitHub status:', error);
+				} catch (error) {
+					console.error('Failed to fetch GitHub status:', error);
 			}
 		}
 
@@ -263,11 +275,17 @@ export class CIService {
 	// Get pipelines for a branch
 	async getPipelines(owner: string, repo: string, branch?: string): Promise<CIPipeline[]> {
 		const pipelines: CIPipeline[] = [];
+		void this.circleci;
+		void this.gitlab;
 
 		// GitHub Actions
 		if (this.github) {
 			try {
-				const runs = await this.github.listWorkflowRuns(owner, repo, { branch });
+				const runs = await this.github.listWorkflowRuns(
+					owner,
+					repo,
+					branch === undefined ? {} : { branch }
+				);
 				
 				runs.workflow_runs.forEach(run => {
 					pipelines.push({

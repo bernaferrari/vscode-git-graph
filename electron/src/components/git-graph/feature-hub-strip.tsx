@@ -5,6 +5,7 @@ import {
     FolderGit2,
     Shield,
     Siren,
+    Users,
     Workflow,
 } from 'lucide-react';
 import type { ElementType } from 'react';
@@ -19,6 +20,12 @@ interface FeatureHubStripProps {
     workflowFailureCount: number;
     auditCount: number;
     protocolRegistered: boolean;
+    collaborationSummary: {
+        workspaceShares: number;
+        patchShelf: number;
+        syncEnabled: boolean;
+        lastSyncStatus: string;
+    };
     prSummary: {
         openPullRequests: number;
         needsAttention: boolean;
@@ -33,6 +40,7 @@ interface FeatureHubStripProps {
     onOpenWorktrees: () => void;
     onOpenWorkflows: () => void;
     onOpenPullRequests: () => void;
+    onOpenCollaboration: () => void;
     onOpenRepoPolicy: () => void;
     onOpenDiagnostics: () => void;
 }
@@ -98,11 +106,13 @@ export function FeatureHubStrip({
     workflowFailureCount,
     auditCount,
     protocolRegistered,
+    collaborationSummary,
     prSummary,
     repoPolicy,
     onOpenWorktrees,
     onOpenWorkflows,
     onOpenPullRequests,
+    onOpenCollaboration,
     onOpenRepoPolicy,
     onOpenDiagnostics,
 }: FeatureHubStripProps) {
@@ -118,7 +128,7 @@ export function FeatureHubStrip({
         <div className='border-border/60 bg-muted/20 border-t border-b px-3 py-3'>
             <div className='mb-2 flex items-center justify-between gap-3'>
                 <div>
-                    <p className='text-sm font-semibold'>Power Features</p>
+                    <p className='text-sm font-semibold'>Review and automation</p>
                     <p className='text-muted-foreground text-xs'>
                         High-value workflows and safeguards surfaced directly in the main shell.
                     </p>
@@ -127,7 +137,7 @@ export function FeatureHubStrip({
             <div className='flex gap-3 overflow-x-auto pb-1'>
                 <FeatureCard
                     title='Worktrees'
-                    subtitle={`${worktreeCount} linked checkout${worktreeCount === 1 ? '' : 's'} available`}
+                    subtitle={`${worktreeCount} linked checkout${worktreeCount === 1 ? '' : 's'} ready for focused changes`}
                     icon={FolderGit2}
                     statusLabel={
                         worktreeAttentionCount > 0 ? `${worktreeAttentionCount} attention` : 'healthy'
@@ -138,7 +148,7 @@ export function FeatureHubStrip({
                 />
                 <FeatureCard
                     title='Workflow Engine'
-                    subtitle={`${workflowCount} saved automation${workflowCount === 1 ? '' : 's'}`}
+                    subtitle={`${workflowCount} saved automation${workflowCount === 1 ? '' : 's'} for repetitive Git work`}
                     icon={Workflow}
                     statusLabel={workflowFailureCount > 0 ? `${workflowFailureCount} failed run${workflowFailureCount === 1 ? '' : 's'}` : 'ready'}
                     tone={workflowFailureCount > 0 ? 'attention' : 'default'}
@@ -165,6 +175,27 @@ export function FeatureHubStrip({
                     tone={prSummary.needsAttention || prSummary.stale ? 'attention' : 'default'}
                     actionLabel='Open Pull Requests'
                     onAction={onOpenPullRequests}
+                />
+                <FeatureCard
+                    title='Collaboration'
+                    subtitle={`${collaborationSummary.workspaceShares} handoff${collaborationSummary.workspaceShares === 1 ? '' : 's'} · ${collaborationSummary.patchShelf} patch${collaborationSummary.patchShelf === 1 ? '' : 'es'} on shelf${collaborationSummary.syncEnabled ? ' · remote sync ready' : ''}`}
+                    icon={Users}
+                    statusLabel={
+                        collaborationSummary.syncEnabled
+                            ? collaborationSummary.lastSyncStatus
+                            : collaborationSummary.workspaceShares + collaborationSummary.patchShelf > 0
+                                ? 'active'
+                                : 'empty'
+                    }
+                    tone={
+                        collaborationSummary.lastSyncStatus === 'error'
+                            ? 'attention'
+                            : collaborationSummary.syncEnabled || collaborationSummary.workspaceShares + collaborationSummary.patchShelf > 0
+                                ? 'success'
+                                : 'default'
+                    }
+                    actionLabel='Open Collaboration Center'
+                    onAction={onOpenCollaboration}
                 />
                 <FeatureCard
                     title='Repo Policy'

@@ -1,6 +1,5 @@
 import { Outlet } from '@tanstack/react-router';
 import {
-    Clock,
     ChevronLeft,
     ChevronRight,
     FolderGit2,
@@ -15,9 +14,11 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph';
 import { useAppStore } from '@/lib/store';
+import { useAppShellPersistence } from '@/layouts/use-app-shell-persistence';
 import { trpc } from '@/trpc/client';
 
 
@@ -65,9 +66,10 @@ function MainViewLoadingFallback() {
 }
 
 export default function AppLayout() {
+    useAppShellPersistence();
+
     const {
         activeRepo,
-        addRecentRepo,
         setSidebarOpen,
         sidebarOpen,
         openedRepos,
@@ -123,17 +125,17 @@ export default function AppLayout() {
         return () => { mediaQuery.removeEventListener('change', applyUiTheme); };
     }, [uiSettings.enhancedAccessibility, uiSettings.theme]);
 
-    const { data: repoList } = trpc.repo.list.useQuery();
-    const { data: recentRepos } = trpc.repo.recent.useQuery();
-    const { data: lastActiveRepo } = trpc.repo.lastActive.useQuery();
+    const repoList = trpc.repo.list.useQuery().data as { repos?: HomeStartRepoEntry[] } | undefined;
+    const recentRepos = trpc.repo.recent.useQuery().data as string[] | undefined;
+    const lastActiveRepo = trpc.repo.lastActive.useQuery().data as string | null | undefined;
     const { mutate: setLastActive } = trpc.repo.setLastActive.useMutation();
+    const repoEntries = useMemo(() => repoList?.repos ?? [], [repoList?.repos]);
 
     useEffect(() => {
         if (activeRepo) {
             setLastActive({ repo: activeRepo });
-            addRecentRepo(activeRepo);
         }
-    }, [activeRepo, setLastActive, addRecentRepo]);
+    }, [activeRepo, setLastActive]);
 
     useEffect(() => {
         if (!repoLoading) {
@@ -156,11 +158,11 @@ export default function AppLayout() {
     }, [repoLoading]);
 
     useEffect(() => {
-        if (!repoList) {
+        if (repoEntries.length === 0) {
             return;
         }
 
-        const knownRepos = repoList.repos.map((repo) => repo.path);
+        const knownRepos = repoEntries.map((repo) => repo.path);
         if (knownRepos.length === 0) {
             return;
         }
@@ -184,16 +186,16 @@ export default function AppLayout() {
                 errorTitle: 'Failed to restore repository',
             });
         }
-    }, [activeRepo, activateRepoPath, repoList, openedRepos, lastActiveRepo, repoLoading]);
+    }, [activeRepo, activateRepoPath, openedRepos, lastActiveRepo, repoLoading, repoEntries]);
 
-    const knownRepoPaths = useMemo(() => new Set((repoList?.repos ?? []).map((repo) => repo.path)), [repoList?.repos]);
+    const knownRepoPaths = useMemo(() => new Set(repoEntries.map((repo) => repo.path)), [repoEntries]);
 
     const repoMetaByPath = useMemo(() => {
-        return new Map((repoList?.repos ?? []).map((repo) => [repo.path, repo]));
-    }, [repoList?.repos]);
+        return new Map<string, HomeStartRepoEntry>(repoEntries.map((repo) => [repo.path, repo]));
+    }, [repoEntries]);
 
     const openedRepoEntries = useMemo(() => {
-        const knownPaths = new Set((repoList?.repos ?? []).map((repo) => repo.path));
+        const knownPaths = new Set(repoEntries.map((repo) => repo.path));
         const validOpened = openedRepos.filter((path) => knownPaths.has(path));
         const withActive =
             activeRepo && knownPaths.has(activeRepo) && !validOpened.includes(activeRepo)
@@ -207,7 +209,7 @@ export default function AppLayout() {
                 name: meta?.name ?? path.split('/').pop() ?? path,
             };
         });
-    }, [openedRepos, repoMetaByPath, repoList?.repos, activeRepo]);
+    }, [openedRepos, repoMetaByPath, repoEntries, activeRepo]);
 
     const openedRepoPathSet = useMemo(() => new Set(openedRepoEntries.map((repo) => repo.path)), [openedRepoEntries]);
 
@@ -236,15 +238,15 @@ export default function AppLayout() {
     const recentRepoPathSet = useMemo(() => new Set(recentRepoEntries.map((repo) => repo.path)), [recentRepoEntries]);
 
     const groupedRepos = useMemo(() => {
-        if (!repoList?.repos?.length) {
+        if (repoEntries.length === 0) {
             return {};
         }
 
-        const remainingRepos = repoList.repos.filter(
+        const remainingRepos = repoEntries.filter(
             (repo) => !openedRepoPathSet.has(repo.path) && !recentRepoPathSet.has(repo.path)
         );
 
-        return remainingRepos.reduce<Record<string, typeof repoList.repos>>((acc, repo) => {
+        return remainingRepos.reduce<Record<string, HomeStartRepoEntry[]>>((acc, repo) => {
             const normalizedPath = repo.path.replace(/\\/g, '/');
             const parentFolder = normalizedPath.split('/').slice(-2, -1)[0] ?? 'Other';
             if (!acc[parentFolder]) {
@@ -253,7 +255,7 @@ export default function AppLayout() {
             acc[parentFolder].push(repo);
             return acc;
         }, {});
-    }, [repoList?.repos, openedRepoPathSet, recentRepoPathSet]);
+    }, [repoEntries, openedRepoPathSet, recentRepoPathSet]);
 
     const handleOpenFolder = async () => {
         if (isRepoBusy) {
@@ -342,100 +344,27 @@ export default function AppLayout() {
 
                     {sidebarOpen && (
                         <>
-                            <div className='p-2'>
-                                <Button
-                                    variant='outline'
-                                    className='h-9 w-full justify-start gap-2'
-                                    onClick={handleOpenFolder}
-                                    onPointerEnter={() => {
-                                        void preloadGitGraph();
+                            <div className='border-sidebar-border border-b p-2'>
+                                <HomeStartSurface
+                                    mode='sidebar'
+                                    title={activeRepo ? 'Switch repositories quickly' : 'Open a repository'}
+                                    description={
+                                        activeRepo
+                                            ? 'Keep opened repositories and recent work within reach while the graph stays focused.'
+                                            : 'Open a folder once, then jump back into recent repositories without rebuilding your workspace.'
+                                    }
+                                    primaryActionLabel='Open Repository'
+                                    primaryActionBusyLabel={repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Opening'}
+                                    isPrimaryActionBusy={isRepoBusy || isRepoLoading}
+                                    onPrimaryAction={handleOpenFolder}
+                                    recentRepos={recentRepoEntries}
+                                    openedRepos={openedRepoEntries}
+                                    activeRepoPath={activeRepo}
+                                    onActivateRepo={(path) => {
+                                        void handleActivateRepo(path);
                                     }}
-                                    onFocus={() => {
-                                        void preloadGitGraph();
-                                    }}
-                                    disabled={isRepoBusy}
-                                    aria-label='Open repository'>
-                                    {isRepoLoading ? (
-                                        <Loader2 className='h-4 w-4 animate-spin' />
-                                    ) : (
-                                        <Plus className='h-4 w-4' />
-                                    )}
-                                    <span>{isRepoLoading ? 'Opening…' : 'Open Repository'}</span>
-                                </Button>
+                                />
                             </div>
-
-                            {openedRepoEntries.length > 0 && (
-                                <div className='px-2 pb-2'>
-                                    <div className='text-muted-foreground mb-1.5 flex items-center gap-1.5 px-2 pt-1 text-xs font-medium'>
-                                        <PanelTop className='h-3 w-3' />
-                                        <span>Opened</span>
-                                    </div>
-                                    <div className='space-y-0.5'>
-                                        {openedRepoEntries.slice(0, 8).map((repo) => (
-                                            <div
-                                                key={repo.path}
-                                                role='button'
-                                                tabIndex={0}
-                                                className={`group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                                                    activeRepo === repo.path
-                                                        ? 'bg-accent text-accent-foreground'
-                                                        : 'text-foreground hover:bg-accent/50'
-                                                }`}
-                                                onClick={() => {
-                                                    void handleActivateRepo(repo.path);
-                                                }}
-                                                onKeyDown={(event) => {
-                                                    if (event.key === 'Enter' || event.key === ' ') {
-                                                        event.preventDefault();
-                                                        void handleActivateRepo(repo.path);
-                                                    }
-                                                }}>
-                                                <FolderGit2 className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-                                                <span className='flex-1 truncate'>{repo.name}</span>
-                                                <button
-                                                    type='button'
-                                                    className='hover:bg-accent/80 text-muted-foreground hover:text-foreground h-6 w-6 rounded p-0 opacity-0 transition-opacity group-hover:opacity-100'
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        handleCloseOpenedRepo(repo.path);
-                                                    }}
-                                                    aria-label={`Close ${repo.name}`}>
-                                                    <X className='mx-auto h-3 w-3' />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {recentRepoEntries.length > 0 && (
-                                <div className='px-2 pb-2'>
-                                    <div className='text-muted-foreground mb-1.5 flex items-center gap-1.5 px-2 pt-1 text-xs font-medium'>
-                                        <Clock className='h-3 w-3' />
-                                        <span>Recent</span>
-                                    </div>
-                                    <div className='space-y-0.5'>
-                                        {recentRepoEntries.slice(0, 5).map((repo) => (
-                                            <button
-                                                key={repo.path}
-                                                type='button'
-                                                className={`w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-                                                    activeRepo === repo.path
-                                                        ? 'bg-accent text-accent-foreground'
-                                                        : 'hover:bg-accent/50 text-foreground'
-                                                }`}
-                                                onClick={() => {
-                                                    void handleActivateRepo(repo.path);
-                                                }}>
-                                                <div className='flex items-center gap-2'>
-                                                    <FolderGit2 className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-                                                    <span className='truncate'>{repo.name}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
                             <ScrollArea className='flex-1 px-2'>
                                 {Object.keys(groupedRepos).length > 0 && (
@@ -474,7 +403,7 @@ export default function AppLayout() {
                                     </div>
                                 )}
 
-                                {!repoList || repoList.repos.length === 0 ? (
+                                {repoEntries.length === 0 ? (
                                     <div className='empty-state ui-reveal'>
                                         <FolderOpen className='text-muted-foreground h-6 w-6' />
                                         <div className='text-foreground font-medium'>No repositories yet</div>

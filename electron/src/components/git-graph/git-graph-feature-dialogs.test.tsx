@@ -18,6 +18,7 @@ vi.mock('./keyboard-shortcuts-editor', () => ({ KeyboardShortcutsEditor: () => <
 vi.mock('./onboarding', () => ({ OnboardingDialog: () => <div>Onboarding</div> }));
 vi.mock('./recent-repositories', () => ({ RecentRepositories: () => <div>Recent Repos</div> }));
 vi.mock('./workspaces', () => ({ WorkspacesManager: () => <div>Workspaces</div> }));
+vi.mock('./collaboration-center', () => ({ CollaborationCenter: () => <div>Collaboration Center</div> }));
 vi.mock('./clone-repository-dialog', () => ({ CloneRepositoryDialog: () => <div>Clone Repository</div> }));
 vi.mock('./stash-management', () => ({ StashManagement: () => <div>Stash Management</div> }));
 vi.mock('./settings-dialog', () => ({ SettingsDialog: () => <div>Settings Dialog</div> }));
@@ -65,6 +66,7 @@ describe('GitGraphFeatureDialogs', () => {
                 onboarding={getOpenState(false)}
                 recentRepos={getOpenState(false)}
                 workspaces={getOpenState(false)}
+                collaboration={getOpenState(false)}
                 cloneRepository={getOpenState(false)}
                 onCloned={vi.fn(async () => undefined)}
                 stashManagement={getOpenState(false)}
@@ -74,7 +76,7 @@ describe('GitGraphFeatureDialogs', () => {
                 onLineStagingChange={vi.fn()}
                 onLineStaged={vi.fn()}
                 commandPalette={getOpenState(false)}
-                commandPaletteActions={{}}
+                commandPaletteActions={{} as any}
                 gitFlow={getOpenState(false)}
                 healthCheck={getOpenState(false)}
                 bisect={getOpenState(false)}

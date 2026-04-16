@@ -2,7 +2,7 @@
  * Tests for Disposable utility
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Disposable, toDisposable, combineDisposables } from './disposable';
 
 describe('Disposable', () => {
@@ -51,11 +51,15 @@ describe('Disposable', () => {
 	it('should immediately dispose if already disposed', () => {
 		let disposed = false;
 
-		class TestDisposable extends Disposable {}
+		class TestDisposable extends Disposable {
+			addChild(disposable: ReturnType<typeof toDisposable>) {
+				this.registerDisposable(disposable);
+			}
+		}
 		const parent = new TestDisposable();
 		parent.dispose();
 
-		parent.registerDisposable(toDisposable(() => { disposed = true; }));
+		parent.addChild(toDisposable(() => { disposed = true; }));
 
 		expect(disposed).toBe(true);
 	});

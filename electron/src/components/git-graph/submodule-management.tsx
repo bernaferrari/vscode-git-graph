@@ -11,10 +11,8 @@ import {
 	ExternalLink,
 	Loader2,
 	GitBranch,
-	Check,
 	AlertCircle,
 	Download,
-	Upload,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -70,8 +68,8 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 			setNewSubmodule({ url: '', path: '', branch: '' });
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to add submodule', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to add submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -81,8 +79,8 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 			toast.success('Submodule updated');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to update submodule', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to update submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -92,8 +90,8 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 			toast.success('Submodule removed');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to remove submodule', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to remove submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 
@@ -103,8 +101,8 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 			toast.success('Submodule synced');
 			refetch();
 		},
-		onError: (error) => {
-			toast.error('Failed to sync submodule', { description: error.message });
+		onError: (error: unknown) => {
+			toast.error('Failed to sync submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
 		},
 	});
 

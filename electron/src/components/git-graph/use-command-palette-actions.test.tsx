@@ -7,6 +7,8 @@ describe('useCommandPaletteActions', () => {
     it('opens line staging for the first available changed file', () => {
         const setStagingFile = vi.fn();
         const setLineStagingOpen = vi.fn();
+        const setAnnotationsFile = vi.fn();
+        const setFileAnnotationsOpen = vi.fn();
 
         const { result } = renderHook(() =>
             useCommandPaletteActions({
@@ -54,6 +56,7 @@ describe('useCommandPaletteActions', () => {
                     setStagingFile,
                     setLineStagingOpen,
                     setWorkspacesOpen: vi.fn(),
+                    setCollaborationOpen: vi.fn(),
                     setKeyboardHelpOpen: vi.fn(),
                     setKeyboardEditorOpen: vi.fn(),
                     setHealthCheckOpen: vi.fn(),
@@ -63,8 +66,8 @@ describe('useCommandPaletteActions', () => {
                     setExternalDiffOpen: vi.fn(),
                     setIssueTrackerOpen: vi.fn(),
                     setBulkOpsOpen: vi.fn(),
-                    setAnnotationsFile: vi.fn(),
-                    setFileAnnotationsOpen: vi.fn(),
+                    setAnnotationsFile,
+                    setFileAnnotationsOpen,
                     setActivityHeatmapOpen: vi.fn(),
                 },
             })
@@ -76,6 +79,13 @@ describe('useCommandPaletteActions', () => {
 
         expect(setStagingFile).toHaveBeenCalledWith('src/app.ts');
         expect(setLineStagingOpen).toHaveBeenCalledWith(true);
+
+        act(() => {
+            result.current.onFileAnnotations?.();
+        });
+
+        expect(setAnnotationsFile).toHaveBeenCalledWith('src/app.ts');
+        expect(setFileAnnotationsOpen).toHaveBeenCalledWith(true);
     });
 
     it('omits deep-link action when the feature flag is disabled', () => {
@@ -93,7 +103,6 @@ describe('useCommandPaletteActions', () => {
                     worktreePro: false,
                     workflowEngine: false,
                 },
-                workingTreeStatus: undefined,
                 openSettingsAt: vi.fn(),
                 handleRefreshAll: vi.fn(),
                 openers: {
@@ -122,6 +131,7 @@ describe('useCommandPaletteActions', () => {
                     setStagingFile: vi.fn(),
                     setLineStagingOpen: vi.fn(),
                     setWorkspacesOpen: vi.fn(),
+                    setCollaborationOpen: vi.fn(),
                     setKeyboardHelpOpen: vi.fn(),
                     setKeyboardEditorOpen: vi.fn(),
                     setHealthCheckOpen: vi.fn(),

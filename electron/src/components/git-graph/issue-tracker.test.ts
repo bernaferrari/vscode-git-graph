@@ -2,7 +2,7 @@
  * Issue Tracker Tests
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { detectIssueKeys, PROVIDER_CONFIG, STATUS_CONFIG } from './issue-tracker';
 
 describe('Issue Tracker', () => {

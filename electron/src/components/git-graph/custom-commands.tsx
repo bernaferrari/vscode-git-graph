@@ -9,14 +9,10 @@ import {
 	Trash2,
 	Play,
 	Edit,
-	Save,
 	Search,
 	Copy,
-	Check,
-	Clock,
-	AlertCircle,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -46,8 +42,6 @@ interface CustomCommandsProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }
-
-const STORAGE_KEY = 'git-graph-custom-commands';
 
 const DEFAULT_COMMANDS: CustomCommand[] = [
 	{
@@ -96,23 +90,27 @@ const DEFAULT_COMMANDS: CustomCommand[] = [
 
 export function useCustomCommands() {
 	const [commands, setCommands] = useState<CustomCommand[]>([]);
+	const utils = trpc.useUtils();
+	const commandsQuery = trpc.config.customCommands.useQuery(undefined, { staleTime: 10_000 });
+	const setCommandsMutation = trpc.config.setCustomCommands.useMutation({
+		onSuccess: async () => {
+			await utils.config.customCommands.invalidate();
+		},
+	});
 
 	useEffect(() => {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) {
-			try {
-				setCommands(JSON.parse(stored));
-			} catch {
-				setCommands(DEFAULT_COMMANDS);
-			}
-		} else {
-			setCommands(DEFAULT_COMMANDS);
+		const stored = commandsQuery.data?.commands;
+		if (stored && stored.length > 0) {
+			setCommands(stored);
+			return;
 		}
-	}, []);
+		setCommands(DEFAULT_COMMANDS);
+	}, [commandsQuery.data?.commands]);
 
-	useEffect(() => {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(commands));
-	}, [commands]);
+	const persistCommands = (nextCommands: CustomCommand[]) => {
+		setCommands(nextCommands);
+		setCommandsMutation.mutate({ commands: nextCommands });
+	};
 
 	const addCommand = (command: Omit<CustomCommand, 'id' | 'useCount'>) => {
 		const newCommand: CustomCommand = {
@@ -120,23 +118,21 @@ export function useCustomCommands() {
 			id: Date.now().toString(),
 			useCount: 0,
 		};
-		setCommands(prev => [...prev, newCommand]);
+		persistCommands([...commands, newCommand]);
 	};
 
 	const updateCommand = (id: string, updates: Partial<CustomCommand>) => {
-		setCommands(prev => prev.map(c => 
-			c.id === id ? { ...c, ...updates } : c
-		));
+		persistCommands(commands.map((c) => (c.id === id ? { ...c, ...updates } : c)));
 	};
 
 	const deleteCommand = (id: string) => {
-		setCommands(prev => prev.filter(c => c.id !== id));
+		persistCommands(commands.filter((c) => c.id !== id));
 	};
 
 	const incrementUseCount = (id: string) => {
-		setCommands(prev => prev.map(c =>
-			c.id === id ? { ...c, useCount: c.useCount + 1, lastUsed: Date.now() } : c
-		));
+		persistCommands(
+			commands.map((c) => (c.id === id ? { ...c, useCount: c.useCount + 1, lastUsed: Date.now() } : c))
+		);
 	};
 
 	return {

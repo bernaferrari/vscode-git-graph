@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -46,6 +46,7 @@ interface UndoStackContextType {
     operations: GitOperation[];
     canUndo: boolean;
     canRedo: boolean;
+    isUndoing: boolean;
     pushOperation: (operation: Omit<GitOperation, 'id' | 'timestamp'>) => void;
     undo: () => Promise<void>;
     redo: () => Promise<void>;
@@ -55,45 +56,124 @@ interface UndoStackContextType {
 }
 
 const UndoStackContext = createContext<UndoStackContextType | null>(null);
-const STORAGE_KEY = 'git-graph-undo-stack';
+
+function isSupportedUndoOperation(operation: GitOperation): boolean {
+    if (!operation.undoable || operation.undone) {
+        return false;
+    }
+
+    switch (operation.type) {
+        case 'commit':
+        case 'amend':
+        case 'branch_create':
+        case 'checkout':
+        case 'stash_push':
+            return true;
+        default:
+            return false;
+    }
+}
+
+function getCompatMutation<TInput extends Record<string, unknown>, TResult extends { error?: string | null }>(
+    hookFactory: (() => { mutateAsync?: (input: TInput) => Promise<TResult> }) | undefined,
+    legacyMutation?: { mutate?: (input: TInput) => TResult | Promise<TResult> }
+): { mutateAsync: (input: TInput) => Promise<TResult> } {
+    const hooked = hookFactory?.();
+    if (hooked?.mutateAsync) {
+        return { mutateAsync: hooked.mutateAsync };
+    }
+
+    return {
+        mutateAsync: async (input: TInput) => {
+            const result = await legacyMutation?.mutate?.(input);
+            return (result ?? ({ error: null } as TResult)) as TResult;
+        },
+    };
+}
 
 export function UndoStackProvider({ children }: { children: ReactNode }) {
     const { activeRepo } = useAppStore();
     const [operations, setOperations] = useState<GitOperation[]>([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [isUndoing, setIsUndoing] = useState(false);
+    const lastHydratedSnapshotRef = useRef<string | null>(null);
+    const utils = trpc.useUtils();
+    const undoHistoryQuery = trpc.repo.undoHistory.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: Boolean(activeRepo), staleTime: 10_000 }
+    );
+    const setUndoHistoryMutation = trpc.repo.setUndoHistory.useMutation({
+        onSuccess: async () => {
+            if (!activeRepo) {
+                return;
+            }
+            await utils.repo.undoHistory.invalidate({ repo: activeRepo });
+        },
+    });
+    const undoLastCommitMutation = getCompatMutation(
+        trpc.git.undoLastCommit?.useMutation,
+        trpc.git.undoLastCommit as { mutate?: (input: { repo: string; soft: boolean }) => Promise<{ error?: string | null }> }
+    );
+    const deleteBranchMutation = getCompatMutation(
+        trpc.git.deleteBranch?.useMutation,
+        trpc.git.deleteBranch as {
+            mutate?: (input: { repo: string; branchName: string; force: boolean }) => Promise<{ error?: string | null }>;
+        }
+    );
+    const checkoutMutation = getCompatMutation(
+        trpc.git.checkout?.useMutation,
+        trpc.git.checkout as { mutate?: (input: { repo: string; ref: string }) => Promise<{ error?: string | null }> }
+    );
+    const stashDropMutation = getCompatMutation(
+        trpc.git.stashDrop?.useMutation,
+        trpc.git.stashDrop as { mutate?: (input: { repo: string; index: number }) => Promise<{ error?: string | null }> }
+    );
 
     useEffect(() => {
         if (!activeRepo) {
             setOperations([]);
             setCurrentIndex(-1);
+            lastHydratedSnapshotRef.current = null;
             return;
         }
 
-        const stored = localStorage.getItem(`${STORAGE_KEY}-${activeRepo}`);
-        if (!stored) {
+        const history = undoHistoryQuery.data?.history;
+        if (!history) {
             setOperations([]);
             setCurrentIndex(-1);
             return;
         }
 
-        try {
-            const parsed = JSON.parse(stored) as { operations?: GitOperation[]; currentIndex?: number };
-            setOperations(parsed.operations || []);
-            setCurrentIndex(parsed.currentIndex ?? -1);
-        } catch {
-            setOperations([]);
-            setCurrentIndex(-1);
-        }
-    }, [activeRepo]);
+        const nextOperations = history.operations ?? [];
+        const nextCurrentIndex = history.currentIndex ?? -1;
+        lastHydratedSnapshotRef.current = JSON.stringify({
+            operations: nextOperations,
+            currentIndex: nextCurrentIndex,
+        });
+        setOperations(nextOperations);
+        setCurrentIndex(nextCurrentIndex);
+    }, [activeRepo, undoHistoryQuery.data?.history]);
 
     useEffect(() => {
         if (!activeRepo) {
             return;
         }
 
-        localStorage.setItem(`${STORAGE_KEY}-${activeRepo}`, JSON.stringify({ operations, currentIndex }));
-    }, [activeRepo, currentIndex, operations]);
+        const snapshot = JSON.stringify({ operations, currentIndex });
+        if (lastHydratedSnapshotRef.current === null) {
+            return;
+        }
+        if (snapshot === lastHydratedSnapshotRef.current) {
+            return;
+        }
+
+        lastHydratedSnapshotRef.current = snapshot;
+        setUndoHistoryMutation.mutate({
+            repo: activeRepo,
+            operations,
+            currentIndex,
+        });
+    }, [activeRepo, currentIndex, operations, setUndoHistoryMutation]);
 
     const pushOperation = useCallback(
         (operation: Omit<GitOperation, 'id' | 'timestamp'>) => {
@@ -120,7 +200,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
             if (!activeRepo) return;
 
             const operation = operations.find((op) => op.id === operationId);
-            if (!operation || !operation.undoable) {
+            if (!operation || !isSupportedUndoOperation(operation)) {
                 toast.error('This operation cannot be undone');
                 return;
             }
@@ -130,57 +210,59 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
                 switch (operation.type) {
                     case 'commit':
                     case 'amend':
-                        await trpc.git.reset.mutate({ repo: activeRepo, mode: 'soft', commit: 'HEAD~1' });
+                        {
+                            const result = await undoLastCommitMutation.mutateAsync({ repo: activeRepo, soft: true });
+                            if (result.error) {
+                                throw new Error(result.error);
+                            }
+                        }
                         break;
                     case 'branch_create':
-                        await trpc.git.deleteBranch.mutate({
-                            repo: activeRepo,
-                            branch: operation.details.branchName as string,
-                        });
-                        break;
-                    case 'branch_delete':
-                        if (operation.reflogEntry) {
-                            await trpc.git.createBranch.mutate({
+                        {
+                            const branchName = String(operation.details.branchName ?? '');
+                            const result = await deleteBranchMutation.mutateAsync({
                                 repo: activeRepo,
-                                name: operation.details.branchName as string,
-                                commitHash: operation.reflogEntry,
+                                branchName,
+                                force: true,
                             });
+                            if (result.error) {
+                                throw new Error(result.error);
+                            }
                         }
                         break;
                     case 'checkout':
-                        await trpc.git.checkout.mutate({
-                            repo: activeRepo,
-                            branch: operation.details.previousBranch as string,
-                        });
+                        {
+                            const previousBranch = String(operation.details.previousBranch ?? '');
+                            if (!previousBranch) {
+                                throw new Error('No previous branch recorded for this checkout.');
+                            }
+                            const result = await checkoutMutation.mutateAsync({
+                                repo: activeRepo,
+                                ref: previousBranch,
+                            });
+                            if (result.error) {
+                                throw new Error(result.error);
+                            }
+                        }
                         break;
                     case 'stash_push':
-                        await trpc.git.stashDrop.mutate({
-                            repo: activeRepo,
-                            index: operation.details.stashIndex as number,
-                        });
-                        break;
-                    case 'stash_pop':
-                    case 'stash_drop':
-                        toast.warning('Stash operations cannot be fully undone');
-                        break;
-                    case 'reset':
-                        if (operation.reflogEntry) {
-                            await trpc.git.reset.mutate({
+                        {
+                            const stashIndex = Number(operation.details.stashIndex);
+                            if (!Number.isInteger(stashIndex) || stashIndex < 0) {
+                                throw new Error('No stash index recorded for this stash operation.');
+                            }
+                            const result = await stashDropMutation.mutateAsync({
                                 repo: activeRepo,
-                                mode: 'hard',
-                                commit: operation.reflogEntry,
+                                index: stashIndex,
                             });
+                            if (result.error) {
+                                throw new Error(result.error);
+                            }
                         }
                         break;
                     default:
-                        toast.info(`Undo for ${operation.type} uses reflog`);
-                        if (operation.reflogEntry) {
-                            await trpc.git.reset.mutate({
-                                repo: activeRepo,
-                                mode: 'mixed',
-                                commit: operation.reflogEntry,
-                            });
-                        }
+                        toast.error(`Undo is not supported for ${operation.type}`);
+                        return;
                 }
 
                 setOperations((prev) => prev.map((op) => (op.id === operationId ? { ...op, undone: true } : op)));
@@ -194,7 +276,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
                 setIsUndoing(false);
             }
         },
-        [activeRepo, operations]
+        [activeRepo, checkoutMutation, deleteBranchMutation, operations, stashDropMutation, undoLastCommitMutation]
     );
 
     const undo = useCallback(async () => {
@@ -233,6 +315,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
                 operations,
                 canUndo,
                 canRedo,
+                isUndoing,
                 pushOperation,
                 undo,
                 redo,

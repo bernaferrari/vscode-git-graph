@@ -45,7 +45,7 @@ export function useRepoCommitFilters(activeRepo: string | null) {
     );
     const utils = trpc.useUtils();
     const setFiltersMutation = trpc.repo.setCommitFilters.useMutation({
-        onSuccess: async (_, variables) => {
+        onSuccess: async (_result: unknown, variables: { repo: string }) => {
             await utils.repo.commitFilters.invalidate({ repo: variables.repo });
         },
     });

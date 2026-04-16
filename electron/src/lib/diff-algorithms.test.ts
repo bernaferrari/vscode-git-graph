@@ -62,7 +62,7 @@ describe('Diff Algorithms', () => {
 			const oldWithSpaces = 'hello  world';
 			const newWithSpaces = 'hello world';
 			
-			const diffWithWhitespace = computeDiff(oldWithSpaces, newWithSpaces, { ignoreWhitespace: false });
+			computeDiff(oldWithSpaces, newWithSpaces, { ignoreWhitespace: false });
 			const diffWithoutWhitespace = computeDiff(oldWithSpaces, newWithSpaces, { ignoreWhitespace: true });
 			
 			expect(diffWithoutWhitespace.every(line => line.type === 'context')).toBe(true);

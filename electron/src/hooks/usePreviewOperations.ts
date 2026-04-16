@@ -8,6 +8,15 @@ import { useAppStore } from '@/lib/store';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
+interface MutationErrorShape {
+    message: string;
+}
+
+interface UndoOperationResult {
+    success: boolean;
+    error?: string | null;
+}
+
 export function usePreviewOperations() {
     const { activeRepo } = useAppStore();
     const utils = trpc.useUtils();
@@ -50,14 +59,14 @@ export function usePreviewOperations() {
 
     // Undo operation mutation
     const undoOperation = trpc.git.undoOperation.useMutation({
-        onSuccess: (result) => {
+        onSuccess: (result: UndoOperationResult) => {
             if (result.success) {
                 toast.success('Operation undone');
             } else {
                 toast.error('Failed to undo operation', { description: result.error || 'Unknown error' });
             }
         },
-        onError: (error) => {
+        onError: (error: MutationErrorShape) => {
             toast.error('Undo failed', { description: error.message });
         },
     });

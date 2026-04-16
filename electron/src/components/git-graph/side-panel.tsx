@@ -6,7 +6,6 @@
 import { AlertTriangle, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGitOperations } from '@/hooks/useGitOperations';
@@ -244,12 +243,15 @@ export function SidePanel({
     const aheadBehindLookup = useMemo(
         () =>
             new Map<string, AheadBehindEntry>(
-                (aheadBehindData?.branches ?? []).map((entry) => [entry.branch, entry])
+                (aheadBehindData?.branches ?? []).map((entry: AheadBehindEntry) => [entry.branch, entry])
             ),
         [aheadBehindData?.branches]
     );
     const smartBranchesLookup = useMemo(
-        () => new Map<string, SmartBranchEntry>((smartBranchesData?.branches ?? []).map((entry) => [entry.name, entry])),
+        () =>
+            new Map<string, SmartBranchEntry>(
+                (smartBranchesData?.branches ?? []).map((entry: SmartBranchEntry) => [entry.name, entry])
+            ),
         [smartBranchesData?.branches]
     );
     const displayedLocalBranches = useMemo(() => {
@@ -271,6 +273,47 @@ export function SidePanel({
         }
         return base;
     }, [aheadBehindLookup, branchChip, filteredLocalBranches, pinnedBranches, smartBranchesLookup]);
+
+    const branchesSectionProps = {
+        expanded: !!expandedSections.branches,
+        onToggle: () => {
+            toggleSection('branches');
+        },
+        branchChip,
+        setBranchChip,
+        enableBranchPinning,
+        displayedLocalBranches,
+        currentHead,
+        pinnedBranches,
+        aheadBehindLookup,
+        onCheckout: (branch) => {
+            void gitOps.checkout(branch);
+        },
+        onDelete: (branch) => {
+            void gitOps.deleteBranch(branch, false);
+        },
+        onPinToggle: (branch, pinned) => {
+            if (!enableBranchPinning) {
+                return;
+            }
+            if (pinned) {
+                unpinMutation.mutate({ repo: activeRepo, branch });
+            } else {
+                pinMutation.mutate({ repo: activeRepo, branch });
+            }
+        },
+        renderBranchItem: (props) => <BranchItem key={props.branch} {...props} />,
+    } as Parameters<typeof BranchesSection>[0];
+
+    if (onCreateBranch) {
+        branchesSectionProps.onCreateBranch = onCreateBranch;
+    }
+    if (onBranchSelect) {
+        branchesSectionProps.onBranchSelect = onBranchSelect;
+    }
+    if (onMergeBranch) {
+        branchesSectionProps.onMergeBranch = onMergeBranch;
+    }
 
     return (
         <div className='ui-surface flex h-full w-64 shrink-0 flex-col rounded-none border-r-0'>
@@ -300,44 +343,14 @@ export function SidePanel({
 
             <ScrollArea className='flex-1'>
                 <div className='ui-reveal space-y-1 p-2'>
-                    <BranchesSection
-                        expanded={!!expandedSections.branches}
-                        onToggle={() => { toggleSection('branches'); }}
-                        onCreateBranch={onCreateBranch}
-                        branchChip={branchChip}
-                        setBranchChip={setBranchChip}
-                        enableBranchPinning={enableBranchPinning}
-                        displayedLocalBranches={displayedLocalBranches}
-                        currentHead={currentHead}
-                        pinnedBranches={pinnedBranches}
-                        aheadBehindLookup={aheadBehindLookup}
-                        onBranchSelect={onBranchSelect}
-                        onCheckout={(branch) => {
-                            void gitOps.checkout(branch);
-                        }}
-                        onDelete={(branch) => {
-                            void gitOps.deleteBranch(branch, false);
-                        }}
-                        onMergeBranch={onMergeBranch}
-                        onPinToggle={(branch, pinned) => {
-                            if (!enableBranchPinning) {
-                                return;
-                            }
-                            if (pinned) {
-                                unpinMutation.mutate({ repo: activeRepo, branch });
-                            } else {
-                                pinMutation.mutate({ repo: activeRepo, branch });
-                            }
-                        }}
-                        renderBranchItem={(props) => <BranchItem key={props.branch} {...props} />}
-                    />
+                    <BranchesSection {...branchesSectionProps} />
 
                     <RemoteBranchesSection
                         expanded={!!expandedSections.remotes}
                         onToggle={() => { toggleSection('remotes'); }}
                         remoteBranches={remoteBranches}
                         filteredRemoteBranches={filteredRemoteBranches}
-                        onBranchSelect={onBranchSelect}
+                        {...(onBranchSelect ? { onBranchSelect } : {})}
                         onCheckout={(branch) => {
                             void gitOps.checkout(branch);
                         }}
@@ -353,7 +366,7 @@ export function SidePanel({
                         expanded={!!expandedSections.tags}
                         onToggle={() => { toggleSection('tags'); }}
                         filteredTags={filteredTags}
-                        onCreateTag={onCreateTag}
+                        {...(onCreateTag ? { onCreateTag } : {})}
                         renderTagItem={(tag) => (
                             <TagItem
                                 key={tag}
@@ -396,7 +409,7 @@ export function SidePanel({
                         expanded={!!expandedSections.worktrees}
                         onToggle={() => { toggleSection('worktrees'); }}
                         worktrees={worktrees}
-                        onOpenWorktrees={onOpenWorktrees}
+                        {...(onOpenWorktrees ? { onOpenWorktrees } : {})}
                         onReveal={(path) => {
                             revealMutation.mutate({ path });
                         }}

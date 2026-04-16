@@ -10,7 +10,7 @@ import { autoUpdater, type ProgressInfo } from 'electron-updater';
 let mainWindow: BrowserWindow | null = null;
 
 export function initAutoUpdater(): void {
-    if (!app.isPackaged && process.env['UPDATER_ENABLED'] !== '1') {
+    if (!app.isPackaged || process.env['UPDATER_ENABLED'] !== '1') {
         return;
     }
 

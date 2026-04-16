@@ -7,14 +7,10 @@ import {
     Loader2,
     GitBranch,
     Download,
-    Search,
     Plus,
-    ChevronDown,
     Tag,
     GitCommit,
     X,
-    Globe,
-    Filter,
     ArrowUp,
     ArrowDown,
     Activity,
@@ -26,6 +22,7 @@ import { toast } from 'sonner';
 import { BranchDropdown } from './branch-dropdown';
 import { CommitGraph } from './commit-graph';
 import { CommitGraphLegend } from './commit-graph-legend';
+import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { CommitContextMenuOverlay } from './commit-context-menu-overlay';
 import { CommitFiltersDialog } from './commit-filters-dialog';
 import { DragCommitHandler } from './drag-commit-to-branch';
@@ -33,7 +30,9 @@ import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
 import { FeatureHubStrip } from './feature-hub-strip';
 import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
+import { GitGraphShellOverlays } from './git-graph-shell-overlays';
 import { GitGraphToolbar } from './git-graph-toolbar';
+import { NotificationCenter } from './notification-center';
 import { OperationStatusBar } from './operation-status-bar';
 import { OverflowMenu } from './overflow-menu';
 import { PinnedCommitsDialog, usePinnedCommits, type PinnedCommit } from './pinned-commits';
@@ -42,6 +41,9 @@ import { RepoBranchSwitcher } from './repo-branch-switcher';
 import { SidePanel } from './side-panel';
 import { useCommandPaletteActions } from './use-command-palette-actions';
 import { useFeatureHubData } from './use-feature-hub-data';
+import { useCollaborationPresence } from './use-collaboration-presence';
+import { useCollaborationRealtime } from './use-collaboration-realtime';
+import { useGitGraphCommitActions } from './use-git-graph-commit-actions';
 import { useGitGraphShellPanels } from './use-git-graph-shell-panels';
 import { useRepoCommitFilters } from './use-repo-commit-filters';
 
@@ -52,25 +54,18 @@ import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
 import { UndoStackProvider } from './undo-stack-provider';
 import { useActionPreview, type ActionPreview } from '@/components/action-preview';
 import { LensSwitcher, useLensMode } from '@/components/lens';
+import { useLensOnboarding } from '@/components/lens/LensOnboarding';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
 import { DEFAULT_GRAPH_CONFIG } from '@/lib/graph/layout';
 import { useGraphLayoutWorker } from '@/lib/graph/useGraphLayoutWorker';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
-import type { CommitFilter } from './commit-history-filters';
 import type { FindOptions } from './find-widget';
 
 // Type for commits returned by tRPC
@@ -99,6 +94,17 @@ interface QueryPerfSummary {
     counts?: Record<string, number>;
     error?: boolean;
     refsDeferred?: boolean;
+}
+
+interface SimpleMutationResult {
+    success?: boolean;
+    error?: string | null;
+}
+
+interface CommitsQueryResultShape {
+    commits?: ClientCommit[];
+    refsDeferred?: boolean;
+    head?: string | null;
 }
 
 type PerfHistoryKey = 'repoInfo' | 'commits' | 'refs';
@@ -272,29 +278,8 @@ function perfTrendBadgeClass(level: PerfTrendLevel): string {
 }
 
 const CommitDetailsPanel = lazy(() => import('./commit-details').then((mod) => ({ default: mod.CommitDetailsPanel })));
-const InteractiveRebase = lazy(() =>
-    import('./interactive-rebase').then((mod) => ({ default: mod.InteractiveRebase }))
-);
-const Statistics = lazy(() => import('./statistics').then((mod) => ({ default: mod.Statistics })));
-const MergeConflictEditor = lazy(() =>
-    import('./merge-conflict-editor').then((mod) => ({ default: mod.MergeConflictEditor }))
-);
-const RemoteManageDialog = lazy(() =>
-    import('./remote-manage-dialog').then((mod) => ({ default: mod.RemoteManageDialog }))
-);
-const BranchCompare = lazy(() => import('./branch-compare').then((mod) => ({ default: mod.BranchCompare })));
 const CloneRepositoryDialog = lazy(() =>
     import('./clone-repository-dialog').then((mod) => ({ default: mod.CloneRepositoryDialog }))
-);
-const HooksManageDialog = lazy(() =>
-    import('./hooks-manage-dialog').then((mod) => ({ default: mod.HooksManageDialog }))
-);
-const TerminalPanel = lazy(() => import('./terminal-panel').then((mod) => ({ default: mod.TerminalPanel })));
-const VisualRebaseTodoEditor = lazy(() =>
-    import('./visual-rebase-todo').then((mod) => ({ default: mod.VisualRebaseTodoEditor }))
-);
-const CommitSigningDialog = lazy(() =>
-    import('./commit-signing-dialog').then((mod) => ({ default: mod.CommitSigningDialog }))
 );
 const ProfileSwitcher = lazy(() => import('@/components/profile').then((mod) => ({ default: mod.ProfileSwitcher })));
 const OperationTimeline = lazy(() =>
@@ -304,15 +289,6 @@ const StackedBranchesPanel = lazy(() =>
     import('@/components/stacked-branches').then((mod) => ({ default: mod.StackedBranchesPanel }))
 );
 const FindWidget = lazy(() => import('./find-widget').then((mod) => ({ default: mod.FindWidget })));
-const FuzzyFinder = lazy(() => import('./fuzzy-finder').then((mod) => ({ default: mod.FuzzyFinder })));
-const CreateBranchDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.CreateBranchDialog })));
-const AddTagDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.AddTagDialog })));
-const ResetDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.ResetDialog })));
-const DeleteBranchDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.DeleteBranchDialog })));
-const MergeDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.MergeDialog })));
-const RebaseDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.RebaseDialog })));
-const CherryPickDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.CherryPickDialog })));
-const RevertDialog = lazy(() => import('./dialogs').then((mod) => ({ default: mod.RevertDialog })));
 
 function DialogLoadingFallback() {
     return (
@@ -358,7 +334,6 @@ export function GitGraph() {
 
     // New feature states
     const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
-    const [interactiveRebaseOpen, setInteractiveRebaseOpen] = useState(false);
     const [rebaseTodoOpen, setRebaseTodoOpen] = useState(false);
     const [statisticsOpen, setStatisticsOpen] = useState(false);
     const [terminalOpen, setTerminalOpen] = useState(false);
@@ -419,6 +394,8 @@ export function GitGraph() {
         setRecentReposOpen,
         workspacesOpen,
         setWorkspacesOpen,
+        collaborationOpen,
+        setCollaborationOpen,
         stashManageOpen,
         setStashManageOpen,
         settingsOpen,
@@ -473,21 +450,10 @@ export function GitGraph() {
     const { templates, setTemplates } = useCommitTemplates();
     const { commitFilters, setCommitFilters } = useRepoCommitFilters(activeRepo);
     const actionPreview = useActionPreview();
+    const { LensOnboardingDialog } = useLensOnboarding();
 
     // Refs
     // Note: ScrollArea handles scrolling internally
-
-    // Dialog state
-    const [createBranchOpen, setCreateBranchOpen] = useState(false);
-    const [addTagOpen, setAddTagOpen] = useState(false);
-    const [resetOpen, setResetOpen] = useState(false);
-    const [deleteBranchOpen, setDeleteBranchOpen] = useState(false);
-    const [mergeOpen, setMergeOpen] = useState(false);
-    const [rebaseOpen, setRebaseOpen] = useState(false);
-    const [cherryPickOpen, setCherryPickOpen] = useState(false);
-    const [revertOpen, setRevertOpen] = useState(false);
-    const [targetCommit, setTargetCommit] = useState<string>('');
-    const [targetBranch, setTargetBranch] = useState<string>('');
 
     // Git operations hook
     const gitOps = useGitOperations();
@@ -609,12 +575,12 @@ export function GitGraph() {
                 repo: activeRepo,
                 path: filePath,
             })
-                .then((result) => {
+                .then((result: SimpleMutationResult) => {
                     if (!result.success) {
                         toast.error('error' in result ? result.error : 'Failed to reveal conflict file');
                     }
                 })
-                .catch((error) => {
+                .catch((error: unknown) => {
                     toast.error(error instanceof Error ? error.message : 'Failed to reveal conflict file');
                 });
         },
@@ -639,7 +605,7 @@ export function GitGraph() {
             writeConflictFile.mutate(
                 { repo: activeRepo, path, content },
                 {
-                    onSuccess: (result) => {
+                    onSuccess: (result: { error?: string | null }) => {
                         if (result.error) {
                             toast.error('Failed to save conflict resolution', {
                                 description: result.error,
@@ -650,7 +616,7 @@ export function GitGraph() {
                         stageConflictFile.mutate(
                             { repo: activeRepo, files: [path] },
                             {
-                                onSuccess: (stageResult) => {
+                                onSuccess: (stageResult: { error?: string | null }) => {
                                     if (stageResult.error) {
                                         toast.error('Failed to stage resolved file', {
                                             description: stageResult.error,
@@ -730,6 +696,8 @@ export function GitGraph() {
         { enabled: !!activeRepo && !!repoInfo?.head, staleTime: 5000, refetchOnWindowFocus: false }
     );
     const currentHead = repoInfo?.head ?? 'main';
+    useCollaborationPresence(activeRepo, repoInfo?.head ?? null);
+    useCollaborationRealtime();
     const { data: workingTreeStatus } = trpc.git.workingTreeStatus.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo, staleTime: 5000, refetchOnWindowFocus: false }
@@ -743,7 +711,7 @@ export function GitGraph() {
         enabled: !!activeRepo,
         staleTime: 10000,
         refetchOnWindowFocus: false,
-        placeholderData: (previous) => previous,
+        placeholderData: (previous: CommitsQueryResultShape | undefined) => previous,
     });
     const { data: refsData, isFetching: refsFetching } = trpc.git.refs.useQuery(
         {
@@ -755,16 +723,48 @@ export function GitGraph() {
         },
         { enabled: !!activeRepo && !!commitsData?.refsDeferred, staleTime: 5000, refetchOnWindowFocus: false }
     );
-
     const { mutateAsync: revealInFinder } = trpc.system.revealInFinder.useMutation();
     const { mutateAsync: openTerminalInRepo } = trpc.system.openTerminal.useMutation();
     const createDeepLinkMutation = trpc.app.deeplink.create.useMutation();
 
     const handleRefreshAll = useCallback(() => {
-        void gitUtils.git.invalidate().catch((error) => {
+        void gitUtils.git.invalidate().catch((error: unknown) => {
             console.error('[git-graph] Refresh failed:', error);
         });
     }, [gitUtils]);
+    const commitActionGitOps = useMemo(
+        () => ({
+            createBranch: (commitHash: string, branchName: string, checkout?: boolean) => {
+                void gitOps.createBranch(commitHash, branchName, checkout ?? false);
+            },
+            createTag: (commitHash: string, name: string, message?: string) => {
+                void gitOps.createTag(commitHash, name, message);
+            },
+            reset: (commitHash: string, mode: 'soft' | 'mixed' | 'hard') => {
+                void gitOps.reset(commitHash, mode);
+            },
+            merge: (branchName: string, options: { noFastForward: boolean; squash: boolean; noCommit: boolean }) => {
+                void gitOps.merge(branchName, options);
+            },
+            rebase: (onto: string, interactive?: boolean, todoContent?: string) =>
+                gitOps.rebase(onto, interactive, todoContent),
+            cherryPick: (commitHash: string, noCommit?: boolean) => {
+                void gitOps.cherryPick(commitHash, noCommit);
+            },
+            revert: (commitHash: string, noCommit?: boolean) => {
+                void gitOps.revert(commitHash, noCommit);
+            },
+        }),
+        [gitOps]
+    );
+    const commitActionController = useGitGraphCommitActions({
+        activeRepo,
+        commits: commitsData?.commits,
+        currentHead,
+        gitOps: commitActionGitOps,
+        actionPreview,
+        onRefreshAll: handleRefreshAll,
+    });
 
     // Load more commits handler
     const handleLoadMore = useCallback(() => {
@@ -1061,7 +1061,7 @@ export function GitGraph() {
 
     const commitGraphCommits = useMemo(
         () =>
-            layoutCommits.map((c) => ({
+            layoutCommits.map((c: ClientCommit) => ({
                 hash: c.hash,
                 author: c.author,
                 email: c.email,
@@ -1199,42 +1199,27 @@ export function GitGraph() {
             event.preventDefault();
             const commit = commitsData?.commits[index];
             if (commit) {
-                setTargetCommit(commit.hash);
+                commitActionController.setTargetCommit(commit.hash);
                 setSelectedCommitIndex(index);
                 setSelectedCommit(commit.hash);
                 setContextMenuPosition({ x: event.clientX, y: event.clientY });
                 setContextMenuOpen(true);
             }
         },
-        [commitsData, setSelectedCommit]
+        [commitActionController, commitsData, setSelectedCommit]
     );
-
-    // Get current commit for context menu
-    const selectedCommitData = useMemo(() => {
-        if (!targetCommit || !commitsData?.commits) return null;
-        return commitsData.commits.find((c: ClientCommit) => c.hash === targetCommit);
-    }, [targetCommit, commitsData?.commits]);
-
-    const interactiveRebaseCommits = useMemo(() => {
-        if (!targetCommit || !commitsData?.commits?.length) return [];
-
-        const targetIndex = commitsData.commits.findIndex((c: ClientCommit) => c.hash === targetCommit);
-        if (targetIndex < 0) return [];
-
-        return commitsData.commits.slice(0, targetIndex);
-    }, [targetCommit, commitsData?.commits]);
 
     // Handle pin commit
     const handlePinCommit = useCallback(() => {
-        if (selectedCommitData) {
+        if (commitActionController.selectedCommitData) {
             pinCommit({
-                hash: selectedCommitData.hash,
-                message: selectedCommitData.message,
-                author: selectedCommitData.author,
-                date: new Date(selectedCommitData.date * 1000).toISOString(),
+                hash: commitActionController.selectedCommitData.hash,
+                message: commitActionController.selectedCommitData.message,
+                author: commitActionController.selectedCommitData.author,
+                date: new Date(commitActionController.selectedCommitData.date * 1000).toISOString(),
             });
         }
-    }, [selectedCommitData, pinCommit]);
+    }, [commitActionController.selectedCommitData, pinCommit]);
 
     const handleAuthorFilter = useCallback(
         (author: string) => {
@@ -1358,9 +1343,8 @@ export function GitGraph() {
     );
 
     const handleCreateBranchFromHash = useCallback((hash: string) => {
-        setTargetCommit(hash);
-        setCreateBranchOpen(true);
-    }, []);
+        commitActionController.openCreateBranch(hash);
+    }, [commitActionController]);
 
     const handleOpenInFinder = useCallback(() => {
         if (!activeRepo) {
@@ -1370,12 +1354,12 @@ export function GitGraph() {
         void revealInFinder({
             path: activeRepo,
         })
-            .then((result) => {
+            .then((result: SimpleMutationResult) => {
                 if (!result.success) {
                     toast.error('error' in result ? result.error : 'Failed to open repository in finder');
                 }
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
                 toast.error(error instanceof Error ? error.message : 'Failed to open repository in finder');
             });
     }, [activeRepo, revealInFinder]);
@@ -1394,8 +1378,8 @@ export function GitGraph() {
             panel?: 'worktree' | 'diff' | 'blame';
         } = {
             repo: activeRepo,
-            branch: repoInfo?.head ?? undefined,
-            commit: selectedCommit || undefined,
+            ...(repoInfo?.head ? { branch: repoInfo.head } : {}),
+            ...(selectedCommit ? { commit: selectedCommit } : {}),
         };
 
         if (featureFlags.worktreePro && worktreeOpen) {
@@ -1431,8 +1415,20 @@ export function GitGraph() {
         openSettingsAt,
         handleRefreshAll,
         openers: {
-            setCreateBranchOpen,
-            setAddTagOpen,
+            setCreateBranchOpen: (open) => {
+                if (open) {
+                    commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
+                    return;
+                }
+                commitActionController.setCreateBranchOpen(false);
+            },
+            setAddTagOpen: (open) => {
+                if (open) {
+                    commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
+                    return;
+                }
+                commitActionController.setAddTagOpen(false);
+            },
             setSearchCommitsOpen,
             setTerminalOpen,
             setCloneDialogOpen,
@@ -1456,6 +1452,7 @@ export function GitGraph() {
             setStagingFile,
             setLineStagingOpen,
             setWorkspacesOpen,
+            setCollaborationOpen,
             setKeyboardHelpOpen,
             setKeyboardEditorOpen,
             setHealthCheckOpen,
@@ -1479,12 +1476,12 @@ export function GitGraph() {
         void openTerminalInRepo({
             path: activeRepo,
         })
-            .then((result) => {
+            .then((result: SimpleMutationResult) => {
                 if (!result.success) {
                     toast.error('error' in result ? result.error : 'Failed to open terminal');
                 }
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
                 toast.error(error instanceof Error ? error.message : 'Failed to open terminal');
             });
     }, [activeRepo, openTerminalInRepo]);
@@ -1532,14 +1529,12 @@ export function GitGraph() {
             } else if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 if (selectedCommit) {
-                    setTargetCommit(selectedCommit);
-                    setCreateBranchOpen(true);
+                    commitActionController.openCreateBranch(selectedCommit);
                 }
             } else if (e.key === 't' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 if (selectedCommit) {
-                    setTargetCommit(selectedCommit);
-                    setAddTagOpen(true);
+                    commitActionController.openCreateTag(selectedCommit);
                 }
             } else if (e.key === 'Escape') {
                 setCommitDetailsOpen(false);
@@ -1650,17 +1645,17 @@ export function GitGraph() {
         scrollOffsetRef.current = 0;
         startTransition(() => {
             setSelectedBranches(['__all__']);
-            setCommitFilters({});
-            setMaxCommits(baselineInitialMaxCommits);
-            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-            setExpandedCommit(null);
-            setSelectedCommitIndex(null);
-            setTargetCommit('');
-            setVisibleStartIndex(0);
-            setVisibleEndIndex(120);
-            setCommitListScrollOffset(0);
-        });
-    }, [activeRepo, baselineInitialMaxCommits]);
+        setCommitFilters({});
+        setMaxCommits(baselineInitialMaxCommits);
+        setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+        setExpandedCommit(null);
+        setSelectedCommitIndex(null);
+        commitActionController.setTargetCommit('');
+        setVisibleStartIndex(0);
+        setVisibleEndIndex(120);
+        setCommitListScrollOffset(0);
+    });
+    }, [activeRepo, baselineInitialMaxCommits, commitActionController]);
 
     useEffect(() => {
         if (!activeRepo) {
@@ -1827,194 +1822,10 @@ export function GitGraph() {
         },
         [actionPreview, aheadBehindData?.ahead, currentHead, gitOps]
     );
-
-    const handlePreviewedReset = useCallback(
-        async (mode: 'soft' | 'mixed' | 'hard') => {
-            if (!activeRepo) return;
-
-            const targetIndex = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === targetCommit) ?? -1;
-            const commitDelta = targetIndex >= 0 ? targetIndex + 1 : undefined;
-            const stats = await gitUtils.git.diffStats.fetch({
-                repo: activeRepo,
-                from: 'HEAD',
-                to: targetCommit,
-            });
-            const fileCount = stats?.stats?.files ?? undefined;
-
-            const modeRisk =
-                mode === 'hard'
-                    ? 'Hard reset will discard uncommitted changes in tracked files.'
-                    : mode === 'mixed'
-                      ? 'Mixed reset will unstage changes in your working tree.'
-                      : 'Soft reset keeps all changes staged but rewrites commit history.';
-
-            const preview: ActionPreview = {
-                type: 'reset',
-                title: `Reset ${mode} to ${targetCommit.slice(0, 7)}`,
-                description: 'Reset the current branch pointer to a selected commit.',
-                willChange: {
-                    ...(commitDelta !== undefined ? { commits: commitDelta } : {}),
-                    ...(fileCount !== undefined ? { files: fileCount } : {}),
-                    ...(currentHead ? { branches: [currentHead] } : {}),
-                },
-                risks: [modeRisk, 'Collaborators may need to sync manually if this branch is shared.'],
-                undoAvailable: true,
-                gitCommands: [`git reset --${mode} ${targetCommit}`],
-            };
-
-            actionPreview.showPreview(preview, () => {
-                void gitOps.reset(targetCommit, mode);
-                setResetOpen(false);
-            });
-        },
-        [activeRepo, actionPreview, commitsData?.commits, currentHead, gitOps, gitUtils.git.diffStats, targetCommit]
-    );
-
-    const handlePreviewedMerge = useCallback(
-        async (options: { noFastForward: boolean; squash: boolean; noCommit: boolean }) => {
-            if (!activeRepo) return;
-
-            const previewResult = await gitUtils.git.mergePreview.fetch({
-                repo: activeRepo,
-                source: targetBranch,
-                target: currentHead,
-            });
-            if (previewResult && 'error' in previewResult && previewResult.error) {
-                toast.error('Unable to preview merge', {
-                    description: previewResult.error,
-                });
-                return;
-            }
-
-            const mergePreviewData =
-                previewResult && 'aheadCommits' in previewResult && 'files' in previewResult ? previewResult : null;
-            const previewConflicts =
-                mergePreviewData && 'conflicts' in mergePreviewData && Array.isArray(mergePreviewData.conflicts)
-                    ? mergePreviewData.conflicts
-                    : [];
-
-            const preview: ActionPreview = {
-                type: options.squash ? 'squash' : 'merge',
-                title: `Merge ${targetBranch} into ${currentHead}`,
-                description: 'Review merge impact before applying it.',
-                willChange: {
-                    commits: mergePreviewData?.aheadCommits?.length ?? 0,
-                    files: mergePreviewData?.files?.length ?? 0,
-                    branches: [targetBranch, currentHead],
-                },
-                risks: [
-                    ...(previewConflicts.length ? [`${previewConflicts.length} conflict file(s) likely.`] : []),
-                    ...(options.squash ? ['Squash merge combines all commits into one.'] : []),
-                    ...(options.noCommit ? ['No-commit mode stages changes without creating a commit.'] : []),
-                ],
-                undoAvailable: true,
-                gitCommands: [
-                    `git merge${options.noFastForward ? ' --no-ff' : ''}${options.squash ? ' --squash' : ''}${options.noCommit ? ' --no-commit' : ''} ${targetBranch}`,
-                ],
-            };
-
-            actionPreview.showPreview(preview, () => {
-                void gitOps.merge(targetBranch, options);
-                setMergeOpen(false);
-            });
-        },
-        [activeRepo, actionPreview, currentHead, gitOps, gitUtils.git.mergePreview, targetBranch]
-    );
-
-    const handlePreviewedRebase = useCallback(
-        async (interactive: boolean) => {
-            if (!activeRepo) return;
-
-            if (interactive) {
-                setRebaseOpen(false);
-                setInteractiveRebaseOpen(true);
-                return;
-            }
-
-            const previewResult = await gitUtils.git.rebasePreview.fetch({
-                repo: activeRepo,
-                branch: currentHead,
-                onto: targetCommit,
-            });
-            if ('error' in previewResult && previewResult.error) {
-                toast.error('Unable to preview rebase', {
-                    description: previewResult.error,
-                });
-                return;
-            }
-
-            const preview: ActionPreview = {
-                type: 'rebase',
-                title: `Rebase ${currentHead} onto ${targetCommit.slice(0, 7)}`,
-                description: 'This rewrites commit hashes for rebased commits.',
-                willChange: {
-                    commits: previewResult?.commits?.length ?? 0,
-                    ...(currentHead ? { branches: [currentHead] } : {}),
-                },
-                risks: [...(previewResult?.warnings ?? []), 'Rebase can require conflict resolution commit-by-commit.'],
-                undoAvailable: true,
-                gitCommands: [`git rebase ${targetCommit}`],
-            };
-
-            actionPreview.showPreview(preview, () => {
-                void gitOps.rebase(targetCommit, false);
-                setRebaseOpen(false);
-            });
-        },
-        [activeRepo, actionPreview, currentHead, gitOps, gitUtils.git.rebasePreview, targetCommit]
-    );
-
-    const handlePreviewedCherryPick = useCallback(
-        (noCommit: boolean) => {
-            const pickedCommit = commitsData?.commits?.find((c: ClientCommit) => c.hash === targetCommit);
-            const preview: ActionPreview = {
-                type: 'cherry-pick',
-                title: `Cherry-pick ${targetCommit.slice(0, 7)}`,
-                description: pickedCommit?.message ?? 'Apply a commit from another branch onto the current branch.',
-                willChange: {
-                    commits: noCommit ? 0 : 1,
-                    ...(currentHead ? { branches: [currentHead] } : {}),
-                },
-                risks: ['Cherry-pick may produce conflicts if code has diverged.'],
-                undoAvailable: true,
-                gitCommands: [`git cherry-pick${noCommit ? ' --no-commit' : ''} ${targetCommit}`],
-            };
-
-            actionPreview.showPreview(preview, () => {
-                void gitOps.cherryPick(targetCommit, noCommit);
-                setCherryPickOpen(false);
-            });
-        },
-        [actionPreview, commitsData?.commits, currentHead, gitOps, targetCommit]
-    );
-
-    const handlePreviewedRevert = useCallback(
-        (noCommit: boolean) => {
-            const revertedCommit = commitsData?.commits?.find((c: ClientCommit) => c.hash === targetCommit);
-            const preview: ActionPreview = {
-                type: 'revert',
-                title: `Revert ${targetCommit.slice(0, 7)}`,
-                description: revertedCommit?.message ?? 'Create a new commit that reverts a previous commit.',
-                willChange: {
-                    commits: noCommit ? 0 : 1,
-                    ...(currentHead ? { branches: [currentHead] } : {}),
-                },
-                risks: ['Reverting can conflict if dependent commits were added later.'],
-                undoAvailable: true,
-                gitCommands: [`git revert${noCommit ? ' --no-commit' : ''} ${targetCommit}`],
-            };
-
-            actionPreview.showPreview(preview, () => {
-                void gitOps.revert(targetCommit, noCommit);
-                setRevertOpen(false);
-            });
-        },
-        [actionPreview, commitsData?.commits, currentHead, gitOps, targetCommit]
-    );
     const normalizedBranchSearch = branchSearch.trim().toLowerCase();
     const localBranches = useMemo(() => {
-        const list = (repoInfo?.branches ?? []).filter((branch) => !branch.startsWith('remotes/'));
-        return list.sort((a, b) => {
+        const list = (repoInfo?.branches ?? []).filter((branch: string) => !branch.startsWith('remotes/'));
+        return list.sort((a: string, b: string) => {
             if (a === currentHead) return -1;
             if (b === currentHead) return 1;
             return a.localeCompare(b);
@@ -2022,16 +1833,16 @@ export function GitGraph() {
     }, [repoInfo?.branches, currentHead]);
     const remoteBranches = useMemo(() => {
         return (repoInfo?.branches ?? [])
-            .filter((branch) => branch.startsWith('remotes/') && !branch.endsWith('/HEAD'))
-            .sort((a, b) => a.localeCompare(b));
+            .filter((branch: string) => branch.startsWith('remotes/') && !branch.endsWith('/HEAD'))
+            .sort((a: string, b: string) => a.localeCompare(b));
     }, [repoInfo?.branches]);
     const filteredLocalBranches = useMemo(() => {
         if (!normalizedBranchSearch) return localBranches;
-        return localBranches.filter((branch) => branch.toLowerCase().includes(normalizedBranchSearch));
+        return localBranches.filter((branch: string) => branch.toLowerCase().includes(normalizedBranchSearch));
     }, [localBranches, normalizedBranchSearch]);
     const filteredRemoteBranches = useMemo(() => {
         if (!normalizedBranchSearch) return remoteBranches;
-        return remoteBranches.filter((branch) => branch.toLowerCase().includes(normalizedBranchSearch));
+        return remoteBranches.filter((branch: string) => branch.toLowerCase().includes(normalizedBranchSearch));
     }, [remoteBranches, normalizedBranchSearch]);
     const branchResults = useMemo(
         () => [...filteredLocalBranches, ...filteredRemoteBranches],
@@ -2161,6 +1972,7 @@ export function GitGraph() {
                                 onUndoLastCommit={() => gitOps.undoLastCommit()}
                             />
                         }
+                        notifications={<NotificationCenter />}
                         onSync={async () => {
                             await gitOps.fetch();
                             await gitOps.pull(currentHead, 'origin', false, false);
@@ -2181,12 +1993,10 @@ export function GitGraph() {
                             void gitOps.pull(currentHead, 'origin', false, true);
                         }}
                         onCreateBranch={() => {
-                            setTargetCommit(selectedCommit ?? 'HEAD');
-                            setCreateBranchOpen(true);
+                            commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
                         }}
                         onCreateTag={() => {
-                            setTargetCommit(selectedCommit ?? 'HEAD');
-                            setAddTagOpen(true);
+                            commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
                         }}
                         onStash={() => {
                             setStashManageOpen(true);
@@ -2213,12 +2023,10 @@ export function GitGraph() {
                     <QuickActionsToolbar
                         className='border-border/60 border-t'
                         onCreateBranch={() => {
-                            setTargetCommit(selectedCommit ?? 'HEAD');
-                            setCreateBranchOpen(true);
+                            commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
                         }}
                         onCreateTag={() => {
-                            setTargetCommit(selectedCommit ?? 'HEAD');
-                            setAddTagOpen(true);
+                            commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
                         }}
                         onStash={() => {
                             setStashManageOpen(true);
@@ -2232,6 +2040,7 @@ export function GitGraph() {
                         workflowFailureCount={featureHubData.workflowFailureCount}
                         auditCount={featureHubData.auditCount}
                         protocolRegistered={featureHubData.protocolRegistered}
+                        collaborationSummary={featureHubData.collaborationSummary}
                         prSummary={featureHubData.prSummary}
                         repoPolicy={featureHubData.repoPolicy}
                         onOpenWorktrees={() => {
@@ -2250,6 +2059,9 @@ export function GitGraph() {
                         }}
                         onOpenPullRequests={() => {
                             setPrIntegrationOpen(true);
+                        }}
+                        onOpenCollaboration={() => {
+                            setCollaborationOpen(true);
                         }}
                         onOpenRepoPolicy={() => {
                             openSettingsAt('integrations');
@@ -2281,25 +2093,22 @@ export function GitGraph() {
                             <SidePanel
                                 onBranchSelect={handleBranchFilter}
                                 onCreateBranch={() => {
-                                    setTargetCommit(selectedCommit ?? 'HEAD');
-                                    setCreateBranchOpen(true);
+                                    commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
                                 }}
                                 onCreateTag={() => {
-                                    setTargetCommit(selectedCommit ?? 'HEAD');
-                                    setAddTagOpen(true);
+                                    commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
                                 }}
                                 onMergeBranch={(branch) => {
-                                    setTargetBranch(branch);
-                                    setMergeOpen(true);
+                                    commitActionController.openMerge(branch);
                                 }}
                                 enableBranchPinning={featureFlags.branchPinning}
-                                onOpenWorktrees={
-                                    featureFlags.worktreePro
-                                        ? () => {
+                                {...(featureFlags.worktreePro
+                                    ? {
+                                          onOpenWorktrees: () => {
                                               setWorktreeOpen(true);
-                                          }
-                                        : undefined
-                                }
+                                          },
+                                      }
+                                    : {})}
                             />
                         )}
 
@@ -2438,12 +2247,10 @@ export function GitGraph() {
                                         onFilterByAuthor={handleAuthorFilter}
                                         onCreateBranch={handleCreateBranchFromHash}
                                         onCreateTag={(hash) => {
-                                            setTargetCommit(hash);
-                                            setAddTagOpen(true);
+                                            commitActionController.openCreateTag(hash);
                                         }}
                                         onReset={(hash) => {
-                                            setTargetCommit(hash);
-                                            setResetOpen(true);
+                                            commitActionController.openReset(hash);
                                         }}
                                         onFileHistoryNavigate={handleNavigateToCommit}
                                     />
@@ -2654,191 +2461,78 @@ export function GitGraph() {
                         </Dialog>
                     )}
 
-                    {/* Dialogs */}
-                    {createBranchOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CreateBranchDialog
-                                open={createBranchOpen}
-                                onOpenChange={setCreateBranchOpen}
-                                onCreate={(name, checkout) => {
-                                    gitOps.createBranch(targetCommit, name, checkout);
-                                    setCreateBranchOpen(false);
-                                }}
-                                targetCommit={targetCommit}
-                            />
-                        </Suspense>
-                    )}
+                    <GitGraphCommitActionDialogs
+                        createBranchOpen={commitActionController.createBranchOpen}
+                        onCreateBranchOpenChange={commitActionController.setCreateBranchOpen}
+                        onCreateBranch={(name, checkout) => {
+                            gitOps.createBranch(commitActionController.targetCommit, name, checkout);
+                            commitActionController.setCreateBranchOpen(false);
+                        }}
+                        addTagOpen={commitActionController.addTagOpen}
+                        onAddTagOpenChange={commitActionController.setAddTagOpen}
+                        onAddTag={(name, type) => {
+                            gitOps.createTag(
+                                commitActionController.targetCommit,
+                                name,
+                                type === 'annotated' ? name : undefined
+                            );
+                            commitActionController.setAddTagOpen(false);
+                        }}
+                        resetOpen={commitActionController.resetOpen}
+                        onResetOpenChange={commitActionController.setResetOpen}
+                        onReset={(mode) => {
+                            void commitActionController.handlePreviewedReset(mode);
+                        }}
+                        mergeOpen={commitActionController.mergeOpen}
+                        onMergeOpenChange={commitActionController.setMergeOpen}
+                        onMerge={(options) => {
+                            void commitActionController.handlePreviewedMerge(options);
+                        }}
+                        rebaseOpen={commitActionController.rebaseOpen}
+                        onRebaseOpenChange={commitActionController.setRebaseOpen}
+                        onRebase={(interactive) => {
+                            void commitActionController.handlePreviewedRebase(interactive);
+                        }}
+                        cherryPickOpen={commitActionController.cherryPickOpen}
+                        onCherryPickOpenChange={commitActionController.setCherryPickOpen}
+                        onCherryPick={(noCommit) => {
+                            commitActionController.handlePreviewedCherryPick(noCommit);
+                        }}
+                        revertOpen={commitActionController.revertOpen}
+                        onRevertOpenChange={commitActionController.setRevertOpen}
+                        onRevert={(noCommit) => {
+                            commitActionController.handlePreviewedRevert(noCommit);
+                        }}
+                        interactiveRebaseOpen={commitActionController.interactiveRebaseOpen}
+                        onInteractiveRebaseOpenChange={commitActionController.setInteractiveRebaseOpen}
+                        targetCommit={commitActionController.targetCommit}
+                        targetBranch={commitActionController.targetBranch}
+                        interactiveRebaseCommits={commitActionController.interactiveRebaseCommits}
+                        onInteractiveRebaseComplete={commitActionController.handleInteractiveRebaseComplete}
+                        actionPreviewDialog={commitActionController.actionPreviewDialog}
+                    />
 
-                    {addTagOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <AddTagDialog
-                                open={addTagOpen}
-                                onOpenChange={setAddTagOpen}
-                                onAdd={(name, type, _push) => {
-                                    gitOps.createTag(targetCommit, name, type === 'annotated' ? name : undefined);
-                                    setAddTagOpen(false);
-                                }}
-                                targetCommit={targetCommit}
-                            />
-                        </Suspense>
-                    )}
-
-                    {resetOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <ResetDialog
-                                open={resetOpen}
-                                onOpenChange={setResetOpen}
-                                onReset={(mode) => {
-                                    void handlePreviewedReset(mode);
-                                }}
-                                targetCommit={targetCommit}
-                            />
-                        </Suspense>
-                    )}
-
-                    {deleteBranchOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <DeleteBranchDialog
-                                open={deleteBranchOpen}
-                                onOpenChange={setDeleteBranchOpen}
-                                onDelete={(force) => {
-                                    gitOps.deleteBranch(targetBranch, force);
-                                    setDeleteBranchOpen(false);
-                                }}
-                                branchName={targetBranch}
-                            />
-                        </Suspense>
-                    )}
-
-                    {mergeOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <MergeDialog
-                                open={mergeOpen}
-                                onOpenChange={setMergeOpen}
-                                onMerge={(options) => {
-                                    void handlePreviewedMerge(options);
-                                }}
-                                branchName={targetBranch}
-                            />
-                        </Suspense>
-                    )}
-
-                    {rebaseOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <RebaseDialog
-                                open={rebaseOpen}
-                                onOpenChange={setRebaseOpen}
-                                onRebase={(interactive) => {
-                                    void handlePreviewedRebase(interactive);
-                                }}
-                                onto={targetCommit}
-                            />
-                        </Suspense>
-                    )}
-
-                    {cherryPickOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CherryPickDialog
-                                open={cherryPickOpen}
-                                onOpenChange={setCherryPickOpen}
-                                onCherryPick={(noCommit) => {
-                                    handlePreviewedCherryPick(noCommit);
-                                }}
-                                commitHash={targetCommit}
-                            />
-                        </Suspense>
-                    )}
-
-                    {revertOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <RevertDialog
-                                open={revertOpen}
-                                onOpenChange={setRevertOpen}
-                                onRevert={(noCommit) => {
-                                    handlePreviewedRevert(noCommit);
-                                }}
-                                commitHash={targetCommit}
-                            />
-                        </Suspense>
-                    )}
-
-                    {actionPreview.Dialog}
-
-                    {/* New Feature Dialogs */}
-                    {fuzzyFinderOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <FuzzyFinder open={fuzzyFinderOpen} onOpenChange={setFuzzyFinderOpen} />
-                        </Suspense>
-                    )}
-
-                    {interactiveRebaseOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <InteractiveRebase
-                                open={interactiveRebaseOpen}
-                                onOpenChange={setInteractiveRebaseOpen}
-                                baseCommit={targetCommit}
-                                commits={interactiveRebaseCommits}
-                                onComplete={handleRefreshAll}
-                            />
-                        </Suspense>
-                    )}
-
-                    {statisticsOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <Statistics open={statisticsOpen} onClose={() => { setStatisticsOpen(false); }} />
-                        </Suspense>
-                    )}
-
-                    {remoteManageOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <RemoteManageDialog open={remoteManageOpen} onOpenChange={setRemoteManageOpen} />
-                        </Suspense>
-                    )}
-
-                    {branchCompareOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <BranchCompare
-                                open={branchCompareOpen}
-                                onOpenChange={setBranchCompareOpen}
-                                branches={repoInfo?.branches ?? []}
-                                initialFrom={repoInfo?.head ?? ''}
-                            />
-                        </Suspense>
-                    )}
-
-                    {hooksManageOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <HooksManageDialog open={hooksManageOpen} onOpenChange={setHooksManageOpen} />
-                        </Suspense>
-                    )}
-
-                    {mergeConflictOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <MergeConflictEditor
-                                open={mergeConflictOpen}
-                                onOpenChange={handleCloseConflictEditor}
-                                conflict={conflictFile}
-                                onResolve={handleResolveConflictFile}
-                            />
-                        </Suspense>
-                    )}
-
-                    {terminalOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <TerminalPanel
-                                open={terminalOpen}
-                                onOpenChange={setTerminalOpen}
-                                cwd={activeRepo ?? undefined}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Commit Signing Dialog */}
-                    {commitSigningOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <CommitSigningDialog open={commitSigningOpen} onOpenChange={setCommitSigningOpen} />
-                        </Suspense>
-                    )}
+                    <GitGraphShellOverlays
+                        fuzzyFinder={{ open: fuzzyFinderOpen, onOpenChange: setFuzzyFinderOpen }}
+                        statistics={{ open: statisticsOpen, onClose: () => { setStatisticsOpen(false); } }}
+                        remoteManage={{ open: remoteManageOpen, onOpenChange: setRemoteManageOpen }}
+                        branchCompare={{
+                            open: branchCompareOpen,
+                            onOpenChange: setBranchCompareOpen,
+                            branches: repoInfo?.branches ?? [],
+                            initialFrom: repoInfo?.head ?? '',
+                        }}
+                        hooksManage={{ open: hooksManageOpen, onOpenChange: setHooksManageOpen }}
+                        mergeConflict={{
+                            open: mergeConflictOpen,
+                            onOpenChange: handleCloseConflictEditor,
+                            conflict: conflictFile,
+                            onResolve: handleResolveConflictFile,
+                        }}
+                        terminal={{ open: terminalOpen, onOpenChange: setTerminalOpen, cwd: activeRepo ?? undefined }}
+                        commitSigning={{ open: commitSigningOpen, onOpenChange: setCommitSigningOpen }}
+                        rebaseTodo={{ open: rebaseTodoOpen, onOpenChange: setRebaseTodoOpen }}
+                    />
 
                     {/* Pinned Commits Dialog */}
                     <PinnedCommitsDialog
@@ -2871,49 +2565,43 @@ export function GitGraph() {
                         open={contextMenuOpen}
                         position={contextMenuPosition}
                         selectedCommit={
-                            selectedCommitData
+                            commitActionController.selectedCommitData
                                 ? {
-                                      hash: selectedCommitData.hash,
-                                      message: selectedCommitData.message,
-                                      author: selectedCommitData.author,
+                                      hash: commitActionController.selectedCommitData.hash,
+                                      message: commitActionController.selectedCommitData.message,
+                                      author: commitActionController.selectedCommitData.author,
                                   }
                                 : null
                         }
                         onClose={() => { setContextMenuOpen(false); }}
                         onCreateBranch={() => {
-                            if (!selectedCommitData) return;
-                            setTargetCommit(selectedCommitData.hash);
-                            setCreateBranchOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openCreateBranch(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                         onCreateTag={() => {
-                            if (!selectedCommitData) return;
-                            setTargetCommit(selectedCommitData.hash);
-                            setAddTagOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openCreateTag(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                         onMerge={() => {
-                            if (!selectedCommitData) return;
-                            setTargetBranch(selectedCommitData.hash);
-                            setMergeOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openMerge(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                         onRebase={() => {
-                            if (!selectedCommitData) return;
-                            setTargetCommit(selectedCommitData.hash);
-                            setRebaseOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openRebase(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                         onCherryPick={() => {
-                            if (!selectedCommitData) return;
-                            setTargetCommit(selectedCommitData.hash);
-                            setCherryPickOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openCherryPick(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                         onRevert={() => {
-                            if (!selectedCommitData) return;
-                            setTargetCommit(selectedCommitData.hash);
-                            setRevertOpen(true);
+                            if (!commitActionController.selectedCommitData) return;
+                            commitActionController.openRevert(commitActionController.selectedCommitData.hash);
                             setContextMenuOpen(false);
                         }}
                     />
@@ -2958,6 +2646,7 @@ export function GitGraph() {
                         onboarding={{ open: onboardingOpen, onOpenChange: setOnboardingOpen }}
                         recentRepos={{ open: recentReposOpen, onOpenChange: setRecentReposOpen }}
                         workspaces={{ open: workspacesOpen, onOpenChange: setWorkspacesOpen }}
+                        collaboration={{ open: collaborationOpen, onOpenChange: setCollaborationOpen }}
                         cloneRepository={{ open: cloneDialogOpen, onOpenChange: setCloneDialogOpen }}
                         onCloned={async (repoPath) => {
                             await activateRepoPath(repoPath, {
@@ -2982,7 +2671,7 @@ export function GitGraph() {
                         onLineStaged={() => {
                             void gitUtils.git.workingTreeStatus
                                 .invalidate({ repo: activeRepo ?? '' })
-                                .catch((error) => {
+                                .catch((error: unknown) => {
                                     console.error('[git-graph] Failed to refresh working tree status:', error);
                                 });
                         }}
@@ -3009,6 +2698,8 @@ export function GitGraph() {
                         annotationsFile={annotationsFile}
                         activityHeatmap={{ open: activityHeatmapOpen, onOpenChange: setActivityHeatmapOpen }}
                     />
+
+                    <LensOnboardingDialog />
 
                     {/* Drag Cherry-Pick Handler */}
                     {dragCommit && (
@@ -3037,12 +2728,6 @@ export function GitGraph() {
                                 }
                             }}
                         />
-                    )}
-
-                    {rebaseTodoOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <VisualRebaseTodoEditor open={rebaseTodoOpen} onOpenChange={setRebaseTodoOpen} />
-                        </Suspense>
                     )}
                 </div>
             </TooltipProvider>
