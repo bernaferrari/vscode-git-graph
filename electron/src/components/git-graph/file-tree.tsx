@@ -59,7 +59,7 @@ function buildTree(files: FileTreeProps['files']): FileNode[] {
 			const existing = current.find((n) => n.name === part);
 
 			if (existing) {
-				current = existing.children!;
+				current = existing.children ?? [];
 			} else {
 				const node: FileNode = {
 					name: part,
@@ -71,7 +71,7 @@ function buildTree(files: FileTreeProps['files']): FileNode[] {
 					status: isFile ? file.status : undefined,
 				};
 				current.push(node);
-				current = node.children!;
+				current = node.children ?? [];
 			}
 		}
 	}
@@ -137,7 +137,7 @@ function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
 							"flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-accent/50",
 							isSelected && "bg-accent"
 						)}
-						style={{ paddingLeft: `${level * 12 + 8}px` }}
+						style={{ paddingLeft: `${String(level * 12 + 8)}px` }}
 					>
 						{isOpen ? (
 							<ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -176,7 +176,7 @@ function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
 				"flex items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-accent/50 group",
 				isSelected && "bg-accent"
 			)}
-			style={{ paddingLeft: `${level * 12 + 28}px` }}
+			style={{ paddingLeft: `${String(level * 12 + 28)}px` }}
 			onClick={() => onFileClick?.(node.path)}
 		>
 			{getFileIcon(node.name)}

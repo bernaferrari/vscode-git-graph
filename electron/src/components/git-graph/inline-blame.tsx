@@ -12,8 +12,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 
 interface BlameLine {
 	lineNumber: number;
@@ -96,7 +96,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 		if (!activeRepo || !filePath) return;
 
 		setIsLoading(true);
-		trpcClient.git.blame.query({
+		void trpcClient.git.blame.query({
 			repo: activeRepo,
 			path: filePath,
 		}).then((result: { error?: string | null; blame?: string | null }) => {
@@ -127,15 +127,15 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 
 		if (diffDays === 0) return 'Today';
 		if (diffDays === 1) return 'Yesterday';
-		if (diffDays < 7) return `${diffDays} days ago`;
-		if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-		if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-		return `${Math.floor(diffDays / 365)} years ago`;
+		if (diffDays < 7) return `${String(diffDays)} days ago`;
+		if (diffDays < 30) return `${String(Math.floor(diffDays / 7))} weeks ago`;
+		if (diffDays < 365) return `${String(Math.floor(diffDays / 30))} months ago`;
+		return `${String(Math.floor(diffDays / 365))} years ago`;
 	};
 
 	const handleCopyHash = (hash: string, e: React.MouseEvent) => {
 		e.stopPropagation();
-		navigator.clipboard.writeText(hash);
+		void navigator.clipboard.writeText(hash);
 		setCopiedHash(hash);
 		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};
@@ -256,8 +256,8 @@ export function BlamePill({ hash, author, date, summary, onClick }: BlamePillPro
 
 		if (diffDays === 0) return 'Today';
 		if (diffDays === 1) return 'Yesterday';
-		if (diffDays < 7) return `${diffDays}d ago`;
-		if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+		if (diffDays < 7) return `${String(diffDays)}d ago`;
+		if (diffDays < 30) return `${String(Math.floor(diffDays / 7))}w ago`;
 		return d.toLocaleDateString();
 	};
 

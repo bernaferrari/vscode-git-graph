@@ -41,7 +41,7 @@ function createActions(
     };
 
     for (const key of omit) {
-        delete actions[key];
+        Reflect.deleteProperty(actions, key);
     }
 
     return actions;

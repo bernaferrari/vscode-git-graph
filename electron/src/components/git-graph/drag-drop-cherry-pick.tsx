@@ -58,7 +58,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 	// Cherry-pick mutation
 	const cherryPickMutation = trpc.git.cherryPick.useMutation({
 		onSuccess: () => {
-			toast.success(`Cherry-picked ${sourceCommit?.hash.slice(0, 7)} onto ${targetBranch}`);
+			toast.success(`Cherry-picked ${sourceCommit?.hash.slice(0, 7) ?? ''} onto ${targetBranch}`);
 			onOpenChange(false);
 			setTargetBranch('');
 		},

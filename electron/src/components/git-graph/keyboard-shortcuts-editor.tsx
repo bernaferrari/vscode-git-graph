@@ -150,7 +150,8 @@ export function KeyboardShortcutsEditor({
 		setShortcuts((prev) =>
 			prev.map((s) =>
 				s.id === id
-					? (({ customKey: _removed, ...rest }) => rest)(s)
+					? // eslint-disable-next-line @typescript-eslint/no-unused-vars
+					  (({ customKey: _, ...rest }) => rest)(s)
 					: s
 			)
 		);

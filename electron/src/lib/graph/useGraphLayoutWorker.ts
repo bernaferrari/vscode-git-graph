@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { GraphLayoutCalculator, type GraphConfig, type GraphLayout } from '@/lib/graph/layout';
+import type { GraphConfig, GraphLayout } from '@/lib/graph/layout';
 
 interface LayoutCommit {
     hash: string;
@@ -30,6 +30,19 @@ interface WorkerErrorMessage {
     error: string;
 }
 
+interface WorkerRequestMessage {
+    id: number;
+    commits: LayoutCommit[];
+    head: string | null;
+    commitLookup: Record<string, number>;
+    onlyFollowFirstParent: boolean;
+    config: GraphConfig;
+    muteConfig: {
+        mergeCommits: boolean;
+        commitsNotAncestorsOfHead: boolean;
+    };
+}
+
 export function useGraphLayoutWorker({
     commits,
     head,
@@ -43,25 +56,20 @@ export function useGraphLayoutWorker({
     const [error, setError] = useState<string | null>(null);
     const requestIdRef = useRef(0);
     const latestRequestIdRef = useRef(0);
+    const workerRef = useRef<Worker | null>(null);
 
     const stableCommits = useMemo(() => commits ?? [], [commits]);
 
     useEffect(() => {
-        if (stableCommits.length === 0) {
-            setLayout(null);
-            setError(null);
-            setIsCalculating(false);
+        if (typeof Worker === 'undefined') {
             return;
         }
 
-        const requestId = ++requestIdRef.current;
-        latestRequestIdRef.current = requestId;
-        setIsCalculating(true);
-
-        if (typeof Worker !== 'undefined') {
+        try {
             const worker = new Worker(new URL('../../workers/graph-layout.worker.ts', import.meta.url), {
                 type: 'module',
             });
+            workerRef.current = worker;
 
             worker.onmessage = (event: MessageEvent<WorkerSuccessMessage | WorkerErrorMessage>) => {
                 const payload = event.data;
@@ -81,14 +89,35 @@ export function useGraphLayoutWorker({
             };
 
             worker.onerror = (workerError) => {
-                if (latestRequestIdRef.current !== requestId) {
-                    return;
-                }
                 setError(workerError.message || 'Graph worker failed');
                 setIsCalculating(false);
             };
+        } catch {
+            workerRef.current = null;
+        }
 
-            worker.postMessage({
+        return () => {
+            const worker = workerRef.current;
+            workerRef.current = null;
+            worker?.terminate();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (stableCommits.length === 0) {
+            setLayout(null);
+            setError(null);
+            setIsCalculating(false);
+            return;
+        }
+
+        const requestId = ++requestIdRef.current;
+        latestRequestIdRef.current = requestId;
+        setIsCalculating(true);
+
+        const worker = workerRef.current;
+        if (worker) {
+            const request: WorkerRequestMessage = {
                 id: requestId,
                 commits: stableCommits,
                 head,
@@ -96,18 +125,21 @@ export function useGraphLayoutWorker({
                 onlyFollowFirstParent,
                 config,
                 muteConfig,
-            });
-
-            return () => {
-                worker.terminate();
             };
+            worker.postMessage(request);
+            return;
         }
 
         let timeoutId: number | null = null;
         let idleId: number | null = null;
+        let disposed = false;
 
-        const computeInMainThread = () => {
+        const computeInMainThread = async () => {
             try {
+                const { GraphLayoutCalculator } = await import('@/lib/graph/layout');
+                if (disposed || latestRequestIdRef.current !== requestId) {
+                    return;
+                }
                 const calculator = new GraphLayoutCalculator(config, muteConfig);
                 const nextLayout = calculator.calculate(stableCommits, head, commitLookup, onlyFollowFirstParent);
                 if (latestRequestIdRef.current !== requestId) {
@@ -136,17 +168,18 @@ export function useGraphLayoutWorker({
         if (typeof requestIdleCallbackFn === 'function') {
             idleId = requestIdleCallbackFn(
                 () => {
-                    computeInMainThread();
+                    void computeInMainThread();
                 },
                 { timeout: 350 }
             );
         } else {
             timeoutId = window.setTimeout(() => {
-                computeInMainThread();
+                void computeInMainThread();
             }, 0);
         }
 
         return () => {
+            disposed = true;
             if (timeoutId !== null) {
                 window.clearTimeout(timeoutId);
             }

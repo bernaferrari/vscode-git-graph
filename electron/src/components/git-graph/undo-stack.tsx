@@ -108,9 +108,9 @@ export function UndoStackDialog({
         const diffDays = Math.floor(diffHours / 24);
 
         if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMins < 60) return `${String(diffMins)}m ago`;
+        if (diffHours < 24) return `${String(diffHours)}h ago`;
+        if (diffDays < 7) return `${String(diffDays)}d ago`;
         return date.toLocaleDateString();
     };
 
@@ -164,7 +164,7 @@ export function UndoStackDialog({
                                             <Button
                                                 variant='outline'
                                                 size='sm'
-                                                onClick={() => undoOperation(operation.id)}
+                                                onClick={() => { void undoOperation(operation.id); }}
                                                 disabled={isUndoing}>
                                                 {isUndoing ? (
                                                     <Loader2 className='h-3 w-3 animate-spin' />
@@ -249,7 +249,7 @@ export function UndoRedoButtons() {
                 variant='ghost'
                 size='sm'
                 className='h-7 w-7 p-0'
-                onClick={handleUndo}
+                onClick={() => { void handleUndo(); }}
                 disabled={!canUndo || isLoading}
                 title='Undo (⌘Z)'>
                 <Undo className='h-4 w-4' />
@@ -258,7 +258,7 @@ export function UndoRedoButtons() {
                 variant='ghost'
                 size='sm'
                 className='h-7 w-7 p-0'
-                onClick={handleRedo}
+                onClick={() => { void handleRedo(); }}
                 disabled={!canRedo || isLoading}
                 title='Redo (⌘⇧Z)'>
                 <Redo className='h-4 w-4' />

@@ -10,9 +10,9 @@ import { useAppStore } from '@/lib/store';
 
 vi.mock('@/hooks/useGitOperations', () => ({
 	useGitOperations: () => ({
-		cherryPick: vi.fn(async () => ({ error: null })),
-		revert: vi.fn(async () => ({ error: null })),
-		createBranch: vi.fn(async () => ({ error: null })),
+		cherryPick: vi.fn(() => ({ error: null })),
+		revert: vi.fn(() => ({ error: null })),
+		createBranch: vi.fn(() => ({ error: null })),
 	}),
 }));
 
@@ -106,7 +106,7 @@ describe('Bulk Commit Operations', () => {
 			);
 
 			// Click on first commit
-			fireEvent.click(screen.getByText('First commit').closest('div')!);
+			fireEvent.click(screen.getByText('First commit').closest('div') ?? document.createElement('div'));
 
 			await waitFor(() => {
 				expect(screen.getByText('1 selected')).toBeDefined();
@@ -188,6 +188,7 @@ describe('Bulk Commit Operations', () => {
 				/>
 			);
 
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 			expect(screen.getByText('Copy Hashes')).toBeDisabled();
 		});
 	});

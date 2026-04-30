@@ -222,8 +222,10 @@ export class RepoFileWatcher extends Disposable {
         const targets = [dotGitPath];
 
         try {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             const dotGitStats = fs.statSync(dotGitPath);
             if (dotGitStats.isFile()) {
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 const dotGitContents = fs.readFileSync(dotGitPath, 'utf8').trim();
                 const gitDirPrefix = 'gitdir:';
                 if (dotGitContents.toLowerCase().startsWith(gitDirPrefix)) {

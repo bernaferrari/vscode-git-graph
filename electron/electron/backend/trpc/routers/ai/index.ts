@@ -108,7 +108,7 @@ function fallbackCommitMessage(diff: string): string {
 		.map((line) => line.slice(6))
 		.filter(Boolean);
 	const scope = changedFiles[0]?.split('/')[0] ?? 'repo';
-	return `chore(${scope}): update ${Math.max(1, changedFiles.length)} file(s)`;
+	return `chore(${scope}): update ${String(Math.max(1, changedFiles.length))} file(s)`;
 }
 
 function fallbackReviewDiff(files: string[], diff: string): {

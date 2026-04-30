@@ -23,6 +23,7 @@ const ResponsiveContext = createContext<ResponsiveContextValue>({
 	isWide: false,
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useResponsive() {
 	return useContext(ResponsiveContext);
 }
@@ -106,7 +107,7 @@ export function Show({ children, above, below }: ShowProps) {
 	
 	if (!visible) return null;
 	
-	return <>{children}</>;
+	return children;
 }
 
 // Hide component (opposite of Show)
@@ -118,7 +119,7 @@ export function Hide({ children, breakpoint }: { children: React.ReactNode; brea
 	
 	if (currentIndex >= hideIndex) return null;
 	
-	return <>{children}</>;
+	return children;
 }
 
 // Container with responsive max-width
@@ -157,7 +158,7 @@ export function ResponsiveFlex({
 	const { isMobile } = useResponsive();
 	
 	const flexDirection = isMobile ? 'flex-col' : direction === 'row' ? 'flex-row' : 'flex-col';
-	const gapClass = `gap-${gap}`;
+	const gapClass = `gap-${String(gap)}`;
 	
 	return (
 		<div className={`flex ${flexDirection} ${gapClass}`}>
@@ -176,7 +177,7 @@ export function ResponsiveGrid({
 }) {
 	const { isMobile, isTablet } = useResponsive();
 	
-	let cols = `grid-cols-${columns}`;
+	let cols = `grid-cols-${String(columns)}`;
 	if (isMobile) {
 		cols = 'grid-cols-1';
 	} else if (isTablet) {

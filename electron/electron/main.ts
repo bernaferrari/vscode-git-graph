@@ -44,7 +44,7 @@ function dispatchDeepLinkToRenderer(url: string): void {
             `window.__gitGraphPendingDeepLink = ${payload}; window.dispatchEvent(new CustomEvent('git-graph:deeplink', { detail: ${payload} }));`,
             true
         )
-        .catch((error) => {
+        .catch((error: unknown) => {
             logUnhandledError(error, 'deeplink.dispatch');
         });
 }
@@ -55,7 +55,7 @@ function logUnhandledError(error: unknown, source: string): void {
 }
 
 function openExternalSafely(url: string): void {
-    void shell.openExternal(url).catch((error) => {
+    void shell.openExternal(url).catch((error: unknown) => {
         logUnhandledError(error, `openExternal:${url}`);
     });
 }
@@ -109,13 +109,13 @@ function createWindow(): BrowserWindow {
     // preventing the blank flash that occurs with simpler approaches like 'ready-to-show'.
 
     if (isDev) {
-        void win.loadURL(VITE_DEV_SERVER_URL).catch((error) => {
+        void win.loadURL(VITE_DEV_SERVER_URL).catch((error: unknown) => {
             logUnhandledError(error, 'loadURL');
         });
         // Detached devtools avoids layout interference during development
         win.webContents.openDevTools({ mode: 'detach' });
     } else {
-        void win.loadFile(path.join(__dirname, '../dist/index.html')).catch((error) => {
+        void win.loadFile(path.join(__dirname, '../dist/index.html')).catch((error: unknown) => {
             logUnhandledError(error, 'loadFile');
         });
     }
@@ -254,7 +254,7 @@ void app
 
         initAutoUpdater();
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
         logUnhandledError(error, 'app.whenReady');
     });
 

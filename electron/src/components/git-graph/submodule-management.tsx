@@ -63,7 +63,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 			toast.success('Submodule added successfully');
 			setIsAdding(false);
 			setNewSubmodule({ url: '', path: '', branch: '' });
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to add submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -74,7 +74,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 	const updateMutation = trpc.git.submodule.update.useMutation({
 		onSuccess: () => {
 			toast.success('Submodule updated');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to update submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -85,7 +85,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 	const removeMutation = trpc.git.submodule.remove.useMutation({
 		onSuccess: () => {
 			toast.success('Submodule removed');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to remove submodule', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -102,6 +102,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 					path: entry.path,
 					currentCommit: entry.currentCommit ?? undefined,
 					branch: entry.branch ?? undefined,
+					// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 					status: entry.status ?? 'unknown',
 				},
 			];
@@ -126,6 +127,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 	};
 
 	const handleRemoveSubmodule = (path: string) => {
+		// eslint-disable-next-line no-alert
 		if (confirm(`Remove submodule at ${path}?`)) {
 			removeMutation.mutate({ repo: activeRepo ?? '', path });
 		}

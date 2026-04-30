@@ -50,7 +50,7 @@ export function GitGraphPage() {
     const { activateRepoPath, isRepoLoading, isRepoBusy, repoLoadPhase, openRepositoryDialog } = useRepoActivation();
     const [openRepoError, setOpenRepoError] = useState<string | null>(null);
     const repoList = trpc.repo.list.useQuery().data as { repos?: HomeStartRepoEntry[] } | undefined;
-    const recentRepos = trpc.repo.recent.useQuery().data as string[] | undefined;
+    const recentRepos = trpc.repo.recent.useQuery().data;
 
     const repoMetaByPath = useMemo(() => {
         return new Map<string, HomeStartRepoEntry>((repoList?.repos ?? []).map((repo) => [repo.path, repo]));
@@ -91,7 +91,7 @@ export function GitGraphPage() {
             return;
         }
         setOpenRepoError(null);
-        void preloadGitGraph().catch((error) => {
+        void preloadGitGraph().catch((error: unknown) => {
             console.warn('[preload] Failed to warm Git Graph before open:', error);
         });
         const result = await openRepositoryDialog('Open Repository');
@@ -114,12 +114,12 @@ export function GitGraphPage() {
 
     if (!activeRepo) {
         return (
-            <div className='flex flex-1 items-center justify-center p-6'>
-                <div className='w-full'>
+            <div className='flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8'>
+                <div className='mx-auto flex w-full justify-center'>
                     <HomeStartSurface
                         mode='hero'
-                        title='Open a repository or resume a workspace'
-                        description='Keep multi-repo navigation, review work, and recovery tools in one shell instead of scattering them across dialogs.'
+                        title='Open a repository.'
+                        description='Pick a folder. Git Graph will open on the commit graph with your changes, branches, and sync state ready.'
                         primaryActionLabel='Open Repository'
                         primaryActionBusyLabel={repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Opening'}
                         isPrimaryActionBusy={isRepoBusy || isRepoLoading}

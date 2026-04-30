@@ -18,13 +18,13 @@ export function useRerere() {
 
 	// Query for rerere status
 	const rerereStatus = trpc.git.rerereStatus.useQuery(
-		{ repo: activeRepo! },
+		{ repo: activeRepo ?? '' },
 		{ enabled: !!activeRepo }
 	);
 
 	// Query for recorded resolutions
 	const rerereList = trpc.git.rerereList.useQuery(
-		{ repo: activeRepo! },
+		{ repo: activeRepo ?? '' },
 		{ enabled: !!activeRepo }
 	);
 
@@ -32,7 +32,7 @@ export function useRerere() {
 	const enableRerere = trpc.git.rerereEnable.useMutation({
 		onSuccess: () => {
 			toast.success('Rerere enabled', { description: 'Conflict resolutions will be remembered' });
-			rerereStatus.refetch();
+			void rerereStatus.refetch();
 		},
 		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to enable rerere', { description: error.message });
@@ -43,7 +43,7 @@ export function useRerere() {
 	const disableRerere = trpc.git.rerereDisable.useMutation({
 		onSuccess: () => {
 			toast.success('Rerere disabled');
-			rerereStatus.refetch();
+			void rerereStatus.refetch();
 		},
 		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to disable rerere', { description: error.message });
@@ -54,7 +54,7 @@ export function useRerere() {
 	const clearRerere = trpc.git.rerereClear.useMutation({
 		onSuccess: () => {
 			toast.success('Rerere cache cleared');
-			rerereList.refetch();
+			void rerereList.refetch();
 		},
 		onError: (error: MutationErrorShape) => {
 			toast.error('Failed to clear rerere', { description: error.message });
@@ -78,9 +78,9 @@ export function useRerere() {
 		isLoading: rerereStatus.isLoading || rerereList.isLoading,
 
 		// Actions
-		enableRerere: () => activeRepo && enableRerere.mutate({ repo: activeRepo }),
-		disableRerere: () => activeRepo && disableRerere.mutate({ repo: activeRepo }),
-		clearRerere: () => activeRepo && clearRerere.mutate({ repo: activeRepo }),
+		enableRerere: () => { if (activeRepo) enableRerere.mutate({ repo: activeRepo }); },
+		disableRerere: () => { if (activeRepo) disableRerere.mutate({ repo: activeRepo }); },
+		clearRerere: () => { if (activeRepo) clearRerere.mutate({ repo: activeRepo }); },
 		toggleRerere,
 	};
 }

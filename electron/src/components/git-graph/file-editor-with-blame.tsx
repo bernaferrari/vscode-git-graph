@@ -149,7 +149,7 @@ export function FileEditorWithBlame({
 			}
 		};
 
-		loadData();
+		void loadData();
 	}, [open, filePath, activeRepo, commitHash, utils]);
 
 	const hasChanges = content !== originalContent;
@@ -167,7 +167,7 @@ export function FileEditorWithBlame({
 			setOriginalContent(content);
 			setIsEditing(false);
 			toast.success('File saved');
-		} catch (error) {
+		} catch {
 			toast.error('Failed to save file');
 		} finally {
 			setIsSaving(false);
@@ -188,12 +188,12 @@ export function FileEditorWithBlame({
 
 		if (diffDays === 0) return 'Today';
 		if (diffDays === 1) return 'Yesterday';
-		if (diffDays < 7) return `${diffDays} days ago`;
-		if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+		if (diffDays < 7) return `${String(diffDays)} days ago`;
+		if (diffDays < 30) return `${String(Math.floor(diffDays / 7))} weeks ago`;
 		return date.toLocaleDateString();
 	};
 
-	const getShortHash = (hash: string) => hash?.substring(0, 7) || '';
+	const getShortHash = (hash: string) => hash.substring(0, 7) || '';
 
 	const lineNumbers = useMemo(() => {
 		return content.split('\n').map((_, i) => i + 1);
@@ -219,6 +219,7 @@ export function FileEditorWithBlame({
 				currentGroup.count++;
 			}
 		});
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (currentGroup) groups.push(currentGroup);
 
 		return groups;
@@ -255,7 +256,7 @@ export function FileEditorWithBlame({
 									<Button
 										variant="default"
 										size="sm"
-										onClick={handleSave}
+										onClick={() => { void handleSave(); }}
 										disabled={!hasChanges || isSaving}
 									>
 										{isSaving ? (
@@ -282,9 +283,9 @@ export function FileEditorWithBlame({
 								<div className="divide-y divide-border/50">
 									{blameGroups.map((group) => (
 										<div
-											key={`${group.hash}-${group.startLine}`}
+											key={`${group.hash}-${String(group.startLine)}`}
 											className="px-2 py-1 hover:bg-accent/50"
-											style={{ minHeight: `${group.count * 20}px` }}
+											style={{ minHeight: `${String(group.count * 20)}px` }}
 										>
 											<div className="flex items-center gap-2 mb-1">
 												<code className="text-blue-600 font-mono">

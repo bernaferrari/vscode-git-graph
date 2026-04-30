@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SigningConfig } from './signing-config';
 
 const mocks = vi.hoisted(() => ({
-    signingStatus: null as any,
+    signingStatus: null as unknown as Record<string, unknown>,
     configureMutate: vi.fn(),
     invalidate: vi.fn(),
 }));
@@ -71,7 +71,7 @@ describe('SigningConfig (SSH)', () => {
         });
 
         expect(screen.getByText('Allowed Signers File (optional)')).toBeDefined();
-		const keyPathInput = screen.getByPlaceholderText('~/.ssh/id_ed25519.pub') as HTMLInputElement;
+		const keyPathInput = screen.getByPlaceholderText<HTMLInputElement>('~/.ssh/id_ed25519.pub');
 		expect(keyPathInput.value).toBe('/Users/test/.ssh/id_ed25519.pub');
 	});
 
@@ -120,8 +120,10 @@ describe('SigningConfig (SSH)', () => {
         mocks.signingStatus = {
             enabled: true,
             method: 'gpg',
+            // eslint-disable-next-line no-secrets/no-secrets
             key: 'ABCDEF1234567890',
             gpgProgram: '/usr/bin/gpg',
+            // eslint-disable-next-line no-secrets/no-secrets
             gpgKeys: [{ id: 'ABCDEF1234567890', userId: 'Dev User <dev@test>' }],
             sshKeys: [],
             allowedSignersFile: '/Users/test/.config/git/allowed_signers',
@@ -162,7 +164,9 @@ describe('SigningConfig (SSH)', () => {
             expect(screen.getByText('A signing key is required while commit signing is enabled.')).toBeDefined();
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('Save for Repo')).toBeDisabled();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('Save Global')).toBeDisabled();
     });
 });

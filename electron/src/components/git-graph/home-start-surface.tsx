@@ -1,11 +1,8 @@
-import { ArrowRight, CircleDotDashed, GitPullRequest, Layers3, ListTree, Sparkles } from 'lucide-react';
-
+import { ArrowRight, CircleDotDashed, FolderOpen, ListTree } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-import type { ElementType } from 'react';
 
 export interface HomeStartRepoEntry {
     path: string;
@@ -20,36 +17,19 @@ interface HomeStartSurfaceProps {
     primaryActionBusyLabel?: string;
     isPrimaryActionBusy?: boolean;
     onPrimaryAction: () => void;
+    secondaryActionLabel?: string;
+    secondaryActionBusyLabel?: string;
+    isSecondaryActionBusy?: boolean;
+    onSecondaryAction?: () => void;
+    footerHint?: string;
     recentRepos: HomeStartRepoEntry[];
     openedRepos: HomeStartRepoEntry[];
     activeRepoPath?: string | null;
     onActivateRepo: (path: string) => void;
 }
 
-interface ValueCardProps {
-    icon: ElementType;
-    title: string;
-    description: string;
-    badge: string;
-}
-
 function getPathTail(path: string) {
     return path.split(/[\\/]/).pop() ?? path;
-}
-
-function ValueCard({ icon: Icon, title, description, badge }: ValueCardProps) {
-    return (
-        <div className='bg-background/75 border-border/70 rounded-xl border p-3'>
-            <div className='mb-2 flex items-center gap-2'>
-                <Icon className='text-primary h-4 w-4' />
-                <p className='text-sm font-semibold'>{title}</p>
-            </div>
-            <p className='text-muted-foreground text-xs'>{description}</p>
-            <Badge variant='outline' className='mt-3 border-border/70 bg-background/80 text-muted-foreground'>
-                {badge}
-            </Badge>
-        </div>
-    );
 }
 
 function RepoButton({
@@ -68,7 +48,7 @@ function RepoButton({
     return (
         <Button
             variant='ghost'
-            className={`h-auto w-full justify-start rounded-xl border px-3 py-2 text-left ${
+            className={`h-auto min-h-11 w-full justify-start rounded-lg border px-3 py-2 text-left ${
                 active ? 'border-primary/30 bg-primary/10' : 'border-border/60 hover:bg-accent/50'
             } ${compact ? 'gap-2' : 'gap-3'}`}
             onClick={() => {
@@ -133,21 +113,77 @@ export function HomeStartSurface({
     primaryActionBusyLabel,
     isPrimaryActionBusy = false,
     onPrimaryAction,
+    secondaryActionLabel,
+    secondaryActionBusyLabel,
+    isSecondaryActionBusy = false,
+    onSecondaryAction,
+    footerHint,
     recentRepos,
     openedRepos,
     activeRepoPath,
     onActivateRepo,
 }: HomeStartSurfaceProps) {
     const buttonLabel = isPrimaryActionBusy ? primaryActionBusyLabel ?? `${primaryActionLabel}…` : primaryActionLabel;
+    const secondaryButtonLabel =
+        isSecondaryActionBusy ? secondaryActionBusyLabel ?? `${secondaryActionLabel ?? ''}…` : secondaryActionLabel;
     const currentActiveRepoPath = activeRepoPath ?? null;
     const openedRepoEntries = openedRepos.filter((repo) => repo.path !== currentActiveRepoPath);
     const recentRepoEntries = recentRepos.filter(
         (repo) => repo.path !== currentActiveRepoPath && !openedRepoEntries.some((openedRepo) => openedRepo.path === repo.path)
     );
+    const resumeRepos = [...openedRepoEntries, ...recentRepoEntries].slice(0, 4);
+
+    if (mode === 'hero') {
+        return (
+            <section className='mx-auto w-full max-w-3xl'>
+                <div className='rounded-lg border border-border/70 bg-card/80 p-7 shadow-[0_30px_90px_-65px_rgba(0,0,0,0.7)]'>
+                    <Badge variant='outline' className='mb-4 border-border/70 text-muted-foreground'>
+                        No repository selected
+                    </Badge>
+                    <h1 className='text-foreground text-3xl font-semibold leading-tight'>{title}</h1>
+                    <p className='text-muted-foreground mt-2 max-w-xl text-sm leading-6'>{description}</p>
+
+                    <div className='mt-6 flex flex-wrap items-center gap-2'>
+                        <Button
+                            size='lg'
+                            className='min-w-40 gap-2'
+                            onClick={onPrimaryAction}
+                            disabled={isPrimaryActionBusy}
+                            aria-label={primaryActionLabel}>
+                            <FolderOpen className='h-4 w-4' />
+                            {buttonLabel}
+                        </Button>
+                        {secondaryActionLabel && onSecondaryAction && (
+                            <Button
+                                size='lg'
+                                variant='outline'
+                                className='min-w-36'
+                                onClick={onSecondaryAction}
+                                disabled={isSecondaryActionBusy}
+                                aria-label={secondaryActionLabel}>
+                                {secondaryButtonLabel}
+                            </Button>
+                        )}
+                    </div>
+
+                    {resumeRepos.length > 0 && (
+                        <div className='mt-7 border-t border-border/70 pt-5'>
+                            <RepoSection
+                                title='Recent'
+                                repos={resumeRepos}
+                                activeRepoPath={currentActiveRepoPath}
+                                onActivateRepo={onActivateRepo}
+                            />
+                        </div>
+                    )}
+                </div>
+            </section>
+        );
+    }
 
     return (
-        <Card className={mode === 'hero' ? 'w-full max-w-6xl shadow-[0_30px_80px_-50px_rgba(0,0,0,0.45)]' : 'w-full'}>
-            <CardHeader className={mode === 'hero' ? 'px-5 pt-5' : 'px-3 pt-3'}>
+        <Card className='w-full'>
+            <CardHeader className='px-3 pt-3'>
                 <div className='flex flex-wrap items-center gap-2'>
                     <Badge variant='secondary' className='border-border/70 bg-primary/10 text-primary'>
                         Start here
@@ -156,13 +192,11 @@ export function HomeStartSurface({
                         Multi-repo
                     </Badge>
                 </div>
-                <CardTitle className={mode === 'hero' ? 'text-2xl' : 'text-base'}>{title}</CardTitle>
-                <CardDescription className={mode === 'hero' ? 'max-w-2xl text-sm' : 'text-xs'}>
-                    {description}
-                </CardDescription>
+                <CardTitle className='text-base'>{title}</CardTitle>
+                <CardDescription className='text-xs'>{description}</CardDescription>
             </CardHeader>
-            <CardContent className={mode === 'hero' ? 'px-5 pb-5' : 'px-3 pb-3'}>
-                <div className={mode === 'hero' ? 'grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]' : 'space-y-4'}>
+            <CardContent className='px-3 pb-3'>
+                <div className='space-y-4'>
                     <div className='space-y-4'>
                         <div className='flex flex-wrap gap-2'>
                             <Button
@@ -170,10 +204,22 @@ export function HomeStartSurface({
                                 className='gap-2'
                                 onClick={onPrimaryAction}
                                 aria-label={primaryActionLabel}>
-                                <Sparkles className='h-4 w-4' />
+                                <FolderOpen className='h-4 w-4' />
                                 {buttonLabel}
                             </Button>
+                            {secondaryActionLabel && onSecondaryAction && (
+                                <Button
+                                    size='lg'
+                                    variant='outline'
+                                    className='gap-2'
+                                    onClick={onSecondaryAction}
+                                    disabled={isSecondaryActionBusy}
+                                    aria-label={secondaryActionLabel}>
+                                    {secondaryButtonLabel}
+                                </Button>
+                            )}
                         </div>
+                        {footerHint && <p className='text-muted-foreground text-xs'>{footerHint}</p>}
 
                         <div className='space-y-3'>
                             <RepoSection
@@ -181,17 +227,17 @@ export function HomeStartSurface({
                                 repos={openedRepoEntries}
                                 activeRepoPath={currentActiveRepoPath}
                                 onActivateRepo={onActivateRepo}
-                                compact={mode === 'sidebar'}
+                                compact
                             />
                             <RepoSection
                                 title='Recent repositories'
                                 repos={recentRepoEntries}
                                 activeRepoPath={currentActiveRepoPath}
                                 onActivateRepo={onActivateRepo}
-                                compact={mode === 'sidebar'}
+                                compact
                             />
                             {openedRepoEntries.length === 0 && recentRepoEntries.length === 0 && (
-                                <div className='border-border/60 bg-muted/20 rounded-xl border border-dashed px-3 py-4 text-sm'>
+                                <div className='border-border/60 bg-muted/20 rounded-lg border border-dashed px-3 py-4 text-sm'>
                                     <div className='flex items-center gap-2 font-medium'>
                                         <CircleDotDashed className='text-muted-foreground h-4 w-4' />
                                         No repositories to resume yet
@@ -203,29 +249,6 @@ export function HomeStartSurface({
                             )}
                         </div>
                     </div>
-
-                    {mode === 'hero' && (
-                        <div className='grid gap-3'>
-                            <ValueCard
-                                icon={Layers3}
-                                title='Multi-repo focus'
-                                description='Opened and recent repositories stay close at hand, so you can move between branches, clones, and workspaces without hunting through dialogs.'
-                                badge='Resume faster'
-                            />
-                            <ValueCard
-                                icon={GitPullRequest}
-                                title='Review focus'
-                                description='Pull requests, comments, merge actions, and collaboration stay visible once a repository is active.'
-                                badge='Review ready'
-                            />
-                            <ValueCard
-                                icon={CircleDotDashed}
-                                title='Safer recovery'
-                                description='History-changing actions are easier to understand when the shell gives you a clear place to resume work and inspect changes.'
-                                badge='Less modal drift'
-                            />
-                        </div>
-                    )}
                 </div>
             </CardContent>
         </Card>

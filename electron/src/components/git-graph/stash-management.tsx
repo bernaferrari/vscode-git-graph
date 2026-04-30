@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGitOperations } from '@/hooks/useGitOperations';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
@@ -45,8 +46,11 @@ interface StashManagementProps {
 
 export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	const { activeRepo } = useAppStore();
+	const gitOps = useGitOperations();
 	const [newStashMessage, setNewStashMessage] = useState('');
 	const [viewingStash, setViewingStash] = useState<number | null>(null);
+	const [branchDrafts, setBranchDrafts] = useState<Record<number, string>>({});
+	const [branchComposerIndex, setBranchComposerIndex] = useState<number | null>(null);
 
 	// Fetch stashes
 	const { data: stashData, isLoading, refetch } = trpc.git.stashList.useQuery(
@@ -61,7 +65,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 		onSuccess: () => {
 			toast.success('Stash created');
 			setNewStashMessage('');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to create stash', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -72,7 +76,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	const applyMutation = trpc.git.stashApply.useMutation({
 		onSuccess: () => {
 			toast.success('Stash applied');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to apply stash', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -83,7 +87,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	const dropMutation = trpc.git.stashDrop.useMutation({
 		onSuccess: () => {
 			toast.success('Stash dropped');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to drop stash', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -94,7 +98,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	const popMutation = trpc.git.stashPop.useMutation({
 		onSuccess: () => {
 			toast.success('Stash popped and applied');
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to pop stash', { description: error instanceof Error ? error.message : 'Unknown error' });
@@ -118,8 +122,30 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 	};
 
 	const handleDropStash = (index: number) => {
-		if (confirm(`Drop stash@{${index}}?`)) {
+				// eslint-disable-next-line no-alert
+		if (confirm(`Drop stash@{${String(index)}}?`)) {
 			dropMutation.mutate({ repo: activeRepo ?? '', index });
+		}
+	};
+
+	const handleCreateBranchFromStash = async (index: number) => {
+		const branchName = branchDrafts[index]?.trim();
+		if (!branchName) {
+			toast.error('Enter a branch name first');
+			return;
+		}
+
+		try {
+			await gitOps.stashBranch(index, branchName);
+			setBranchDrafts((current) =>
+				Object.fromEntries(
+					Object.entries(current).filter(([key]) => key !== String(index))
+				) as Record<number, string>
+			);
+			setBranchComposerIndex((current) => (current === index ? null : current));
+			void refetch();
+		} catch {
+			// Error is surfaced by the mutation toast.
 		}
 	};
 
@@ -192,7 +218,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 											<div className="flex-1 min-w-0">
 												<div className="flex items-center gap-2 mb-1">
 													<span className="font-medium text-sm">
-														{stash.message || `stash@{${stash.index}}`}
+														{stash.message || `stash@{${String(stash.index)}}`}
 													</span>
 													{stash.branch && (
 														<span className="text-xs px-1.5 py-0.5 rounded bg-muted flex items-center gap-1">
@@ -202,7 +228,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 													)}
 												</div>
 												<div className="flex items-center gap-2 text-xs text-muted-foreground">
-													<span className="font-mono">{stash.hash?.slice(0, 7)}</span>
+													<span className="font-mono">{stash.hash.slice(0, 7)}</span>
 													<span>•</span>
 													<span>{formatDate(stash.date)}</span>
 												</div>
@@ -214,6 +240,23 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 													onClick={() => { setViewingStash(viewingStash === idx ? null : idx); }}
 												>
 													<Eye className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => {
+														setBranchComposerIndex((current) =>
+															current === stash.index ? null : stash.index
+														);
+														setBranchDrafts((current) => ({
+															...current,
+															[stash.index]: current[stash.index] ?? stash.branch,
+														}));
+													}}
+													aria-label={`Create branch from stash ${String(stash.index)}`}
+													title="Create branch from stash"
+												>
+													<GitBranch className="h-4 w-4" />
 												</Button>
 												<Button
 													variant="ghost"
@@ -245,8 +288,43 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 											</div>
 										</div>
 
+										{branchComposerIndex === stash.index && (
+											<div className="mt-3 border-t pt-3">
+												<div className="flex flex-col gap-2 sm:flex-row">
+													<Input
+														value={branchDrafts[stash.index] ?? ''}
+														onChange={(e) => {
+															const value = e.target.value;
+															setBranchDrafts((current) => ({
+																...current,
+																[stash.index]: value,
+															}));
+														}}
+														placeholder="feature/recover-stashed-work"
+														className="flex-1"
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																void handleCreateBranchFromStash(stash.index);
+															}
+														}}
+													/>
+													<Button
+														size="sm"
+														onClick={() => { void handleCreateBranchFromStash(stash.index); }}
+														disabled={gitOps.isLoading || !(branchDrafts[stash.index] ?? '').trim()}
+													>
+														<GitBranch className="mr-1 h-4 w-4" />
+														Create Branch
+													</Button>
+												</div>
+												<p className="mt-2 text-xs text-muted-foreground">
+													This checks out a new branch, applies the stash, and removes it when successful.
+												</p>
+											</div>
+										)}
+
 										{/* Files in stash */}
-										{viewingStash === idx && stash.files?.length > 0 && (
+										{viewingStash === idx && stash.files.length > 0 && (
 											<div className="mt-3 pt-3 border-t">
 												<p className="text-xs text-muted-foreground mb-2">
 													{stash.files.length} file{stash.files.length !== 1 ? 's' : ''} changed

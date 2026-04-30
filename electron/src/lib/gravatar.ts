@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-secrets/no-secrets
 const hexChars = '0123456789abcdef';
 const gravatarCache = new Map<string, string>();
 

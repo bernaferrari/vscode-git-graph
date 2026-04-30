@@ -24,8 +24,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 
 
 interface QuickLookState {
@@ -91,6 +91,7 @@ function getFileIcon(path: string) {
 }
 
 // Hook to use Quick Look state
+// eslint-disable-next-line react-refresh/only-export-components
 export function useQuickLook() {
 	const [, forceUpdate] = useState({});
 
@@ -142,7 +143,7 @@ export function useQuickLook() {
 						isLoading: false,
 					});
 				}
-		} catch (error) {
+		} catch {
 			toast.error('Failed to load file preview');
 			updateState({
 				isOpen: false,
@@ -198,7 +199,7 @@ export function QuickLookButton({
 					className="h-6 w-6 p-0"
 					onClick={(e) => {
 						e.stopPropagation();
-						openQuickLook(filePath, commitHash);
+						void openQuickLook(filePath, commitHash);
 					}}
 				>
 					<Eye className="h-3.5 w-3.5" />
@@ -291,7 +292,7 @@ export function QuickLookPanel() {
 							alt={filePath}
 							className="max-w-full max-h-full object-contain transition-transform"
 							style={{
-								transform: `scale(${zoom}) rotate(${rotation}deg)`,
+								transform: `scale(${String(zoom)}) rotate(${String(rotation)}deg)`,
 							}}
 						/>
 					) : (
@@ -314,6 +315,7 @@ export function QuickLookPanel() {
 }
 
 // Keyboard shortcut handler
+// eslint-disable-next-line react-refresh/only-export-components
 export function useQuickLookKeyboard() {
 	const { isOpen, closeQuickLook, setZoom, zoom } = useQuickLook();
 

@@ -53,9 +53,13 @@ interface Issue {
 }
 
 interface IssueLink {
+	id: string;
 	commitHash: string;
 	issueKey: string;
 	provider: IssueProvider;
+	title: string;
+	status: Issue['status'];
+	url: string;
 	addedAt: number;
 }
 
@@ -72,6 +76,7 @@ interface IssueTrackerConfig {
 	patterns: string[];
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNode; color: string }> = {
 	github: { name: 'GitHub', icon: <GitPullRequest className="h-4 w-4" />, color: 'text-gray-700 dark:text-gray-300' },
 	jira: { name: 'Jira', icon: <ListTodo className="h-4 w-4" />, color: 'text-blue-600' },
@@ -82,6 +87,7 @@ export const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.
 	notion: { name: 'Notion', icon: <Globe className="h-4 w-4" />, color: 'text-gray-800' },
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React.ReactNode }> = {
 	open: { color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30', icon: <AlertCircle className="h-3 w-3" /> },
 	in_progress: { color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30', icon: <Clock className="h-3 w-3" /> },
@@ -133,37 +139,8 @@ function useIssueTrackerConfigState() {
     return { config, persistConfig };
 }
 
-// Mock issue fetcher (in production, would call actual APIs)
-function fetchIssues(provider: IssueProvider, query: string): Promise<Issue[]> {
-	// Simulated API response
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			const mockIssues: Issue[] = [
-				{
-					id: '1',
-					key: `${provider.toUpperCase()}-123`,
-					title: `Sample issue matching "${query}"`,
-					status: 'open',
-					provider,
-					url: `https://${provider}.example.com/issue/123`,
-					labels: ['bug', 'priority-high'],
-				},
-				{
-					id: '2',
-					key: `${provider.toUpperCase()}-456`,
-					title: `Another issue about ${query}`,
-					status: 'in_progress',
-					provider,
-					url: `https://${provider}.example.com/issue/456`,
-					labels: ['feature'],
-				},
-			];
-			resolve(query ? mockIssues : []);
-		}, 300);
-	});
-}
-
 // Detect issue keys in commit message
+// eslint-disable-next-line react-refresh/only-export-components
 export function detectIssueKeys(message: string, patterns: string[]): string[] {
 	const keys: string[] = [];
 	
@@ -186,12 +163,28 @@ export function IssueTrackerPanel({
 	commitMessage: string;
 }) {
 	const { config } = useIssueTrackerConfigState();
+	const utils = trpc.useUtils();
 
 	const [searchQuery, setSearchQuery] = useState('');
 	const [searchResults, setSearchResults] = useState<Issue[]>([]);
-	const [isSearching, setIsSearching] = useState(false);
-	const [linkedIssues, setLinkedIssues] = useState<IssueLink[]>([]);
+	const [searchErrors, setSearchErrors] = useState<Array<{ provider: IssueProvider; message: string }>>([]);
 	const [showSearch, setShowSearch] = useState(false);
+	const issueLinksQuery = trpc.config.issueLinks.useQuery({ commitHash }, { staleTime: 10_000 });
+	const issueSearchQuery = trpc.config.issueSearch.useQuery(
+		{ query: searchQuery.trim() || ' ' },
+		{ enabled: false, retry: false }
+	);
+	const linkIssueMutation = trpc.config.linkIssue.useMutation({
+		onSuccess: async () => {
+			await utils.config.issueLinks.invalidate({ commitHash });
+		},
+	});
+	const unlinkIssueMutation = trpc.config.unlinkIssue.useMutation({
+		onSuccess: async () => {
+			await utils.config.issueLinks.invalidate({ commitHash });
+		},
+	});
+	const linkedIssues = issueLinksQuery.data?.links ?? [];
 
 	// Auto-detect issues from commit message
 	const detectedKeys = useMemo(() => {
@@ -203,65 +196,57 @@ export function IssueTrackerPanel({
 	const handleSearch = useCallback(async () => {
 		if (!searchQuery.trim()) {
 			setSearchResults([]);
+			setSearchErrors([]);
 			return;
 		}
 
-		setIsSearching(true);
 		try {
-			const enabledProviders = Object.entries(config.providers)
-				.filter(([_, p]) => p.enabled)
-				.map(([key]) => key as IssueProvider);
-
-			const results = await Promise.all(
-				enabledProviders.map(p => fetchIssues(p, searchQuery))
-			);
-
-			setSearchResults(results.flat());
+			const result = await issueSearchQuery.refetch();
+			const data = result.data;
+			setSearchResults((data?.issues ?? []) as Issue[]);
+			setSearchErrors((data?.errors ?? []) as Array<{ provider: IssueProvider; message: string }>);
+			if ((data?.errors.length ?? 0) > 0) {
+				toast.warning('Some issue providers could not be searched');
+			}
 		} catch (error) {
-			toast.error('Failed to search issues');
-		} finally {
-			setIsSearching(false);
+			toast.error('Failed to search issues', {
+				description: error instanceof Error ? error.message : 'Unknown error',
+			});
 		}
-	}, [searchQuery, config.providers]);
+	}, [issueSearchQuery, searchQuery]);
 
 	// Link issue to commit
-	const handleLinkIssue = useCallback((issue: Issue) => {
-		const link: IssueLink = {
+	const handleLinkIssue = useCallback(async (issue: Issue) => {
+		await linkIssueMutation.mutateAsync({
 			commitHash,
-			issueKey: issue.key,
-			provider: issue.provider,
-			addedAt: Date.now(),
-		};
-
-		setLinkedIssues(prev => {
-			if (prev.some(l => l.issueKey === issue.key)) return prev;
-			return [...prev, link];
+			issue,
 		});
 
-		// In production, would save to git notes or external storage
 		toast.success(`Linked ${issue.key}`);
 		setShowSearch(false);
 		setSearchQuery('');
 		setSearchResults([]);
-	}, [commitHash]);
+		setSearchErrors([]);
+	}, [commitHash, linkIssueMutation]);
 
 	// Unlink issue
-	const handleUnlinkIssue = useCallback((issueKey: string) => {
-		setLinkedIssues(prev => prev.filter(l => l.issueKey !== issueKey));
-		toast.success(`Unlinked ${issueKey}`);
-	}, []);
+	const handleUnlinkIssue = useCallback(async (link: IssueLink) => {
+		await unlinkIssueMutation.mutateAsync({ commitHash, linkId: link.id });
+		toast.success(`Unlinked ${link.issueKey}`);
+	}, [commitHash, unlinkIssueMutation]);
 
 	// Get issue details
 	const getIssueFromLink = useCallback((link: IssueLink): Issue => {
 		return {
-			id: link.issueKey,
+			id: link.id,
 			key: link.issueKey,
-			title: `Issue ${link.issueKey}`,
-			status: 'open',
+			title: link.title,
+			status: link.status,
 			provider: link.provider,
-			url: `https://${link.provider}.example.com/issue/${link.issueKey}`,
+			url: link.url,
 		};
 	}, []);
+	const isSearching = issueSearchQuery.isFetching;
 
 	return (
 		<div className="border rounded-lg overflow-hidden">
@@ -290,11 +275,11 @@ export function IssueTrackerPanel({
 								placeholder="Search issues..."
 								value={searchQuery}
 								onChange={(e) => { setSearchQuery(e.target.value); }}
-								onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+								onKeyDown={(e) => { if (e.key === 'Enter') void handleSearch(); }}
 								className="pl-9"
 							/>
 						</div>
-						<Button size="sm" onClick={handleSearch} disabled={isSearching}>
+						<Button size="sm" onClick={() => { void handleSearch(); }} disabled={isSearching}>
 							{isSearching ? (
 								<Loader2 className="h-4 w-4 animate-spin" />
 							) : (
@@ -303,6 +288,16 @@ export function IssueTrackerPanel({
 						</Button>
 					</div>
 
+					{searchErrors.length > 0 && (
+						<div className='space-y-1'>
+							{searchErrors.map((error) => (
+								<p key={error.provider} className='text-xs text-amber-600 dark:text-amber-300'>
+									{PROVIDER_CONFIG[error.provider].name}: {error.message}
+								</p>
+							))}
+						</div>
+					)}
+
 					{searchResults.length > 0 && (
 						<ScrollArea className="h-40">
 							<div className="space-y-1">
@@ -310,7 +305,7 @@ export function IssueTrackerPanel({
 									<div
 										key={issue.id}
 										className="flex items-center gap-2 p-2 rounded hover:bg-accent/50 cursor-pointer"
-										onClick={() => { handleLinkIssue(issue); }}
+										onClick={() => { void handleLinkIssue(issue); }}
 									>
 										<span className={PROVIDER_CONFIG[issue.provider].color}>
 											{PROVIDER_CONFIG[issue.provider].icon}
@@ -380,7 +375,7 @@ export function IssueTrackerPanel({
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0 text-red-600"
-										onClick={() => { handleUnlinkIssue(link.issueKey); }}
+										onClick={() => { void handleUnlinkIssue(link); }}
 									>
 										<Unlink className="h-3 w-3" />
 									</Button>

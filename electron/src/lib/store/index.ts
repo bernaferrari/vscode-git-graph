@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
-import type { GitRepoState } from '../types/state';
+import type { GitRepoState } from '@/lib/types/state';
 
 // ==================== Types ====================
 
@@ -148,7 +148,7 @@ const initialState: AppState = {
 };
 
 export const useAppStore = create<AppState & AppActions>()(
-    subscribeWithSelector((set, _get) => ({
+    subscribeWithSelector((set) => ({
             ...initialState,
 
             // Repository actions
@@ -161,7 +161,8 @@ export const useAppStore = create<AppState & AppActions>()(
 
             removeRepo: (path) =>
                 { set((s) => {
-                    const { [path]: _, ...rest } = s.repos;
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const { [path]: _removed, ...rest } = s.repos;
                     return {
                         repos: rest,
                         activeRepo: s.activeRepo === path ? null : s.activeRepo,

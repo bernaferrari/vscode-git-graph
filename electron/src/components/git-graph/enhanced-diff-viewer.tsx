@@ -64,6 +64,7 @@ export function EnhancedDiffViewer({
 			repo: activeRepo ?? '',
 			commitHash: commitHash ?? 'HEAD',
 			filePath: file.path,
+			...(file.from ? { previousFilePath: file.from } : {}),
 		},
 		{ enabled: !!activeRepo && !!file.path }
 	);
@@ -92,8 +93,8 @@ export function EnhancedDiffViewer({
 		
 		const results: number[] = [];
 		parsedDiff.forEach((line, index) => {
-			const leftText = line.left?.chars?.map(c => c.char).join('') || '';
-			const rightText = line.right?.chars?.map(c => c.char).join('') || '';
+			const leftText = line.left?.chars.map(c => c.char).join('') || '';
+			const rightText = line.right?.chars.map(c => c.char).join('') || '';
 			if (leftText.toLowerCase().includes(query.toLowerCase()) ||
 				rightText.toLowerCase().includes(query.toLowerCase())) {
 				results.push(index);
@@ -117,7 +118,7 @@ export function EnhancedDiffViewer({
 
 	// Copy diff to clipboard
 	const handleCopy = () => {
-		navigator.clipboard.writeText(diffData?.diff ?? '');
+		void navigator.clipboard.writeText(diffData?.diff ?? '');
 		setCopied(true);
 		setTimeout(() => { setCopied(false); }, 2000);
 	};

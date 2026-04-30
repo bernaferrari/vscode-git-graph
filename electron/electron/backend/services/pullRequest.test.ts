@@ -18,7 +18,7 @@ describe('pull request inline comments', () => {
 	it('sends GitHub inline review comments with commit, path, line, and side', async () => {
 		fetchMock.mockResolvedValue({
 			ok: true,
-			json: async () => ({
+			json: () => ({
 				id: 42,
 				body: 'Needs a null guard',
 				html_url: 'https://github.com/acme/repo/pull/12#discussion_r42',
@@ -67,7 +67,7 @@ describe('pull request inline comments', () => {
 	it('sends GitLab inline discussions with diff position metadata', async () => {
 		fetchMock.mockResolvedValue({
 			ok: true,
-			json: async () => ({
+			json: () => ({
 				id: 'discussion-1',
 				notes: [
 					{
@@ -127,7 +127,7 @@ describe('pull request inline comments', () => {
 		fetchMock
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => [
+				json: () => [
 					{
 						id: 1,
 						body: 'General PR note',
@@ -140,7 +140,7 @@ describe('pull request inline comments', () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => [
+				json: () => [
 					{
 						id: 2,
 						body: 'Inline review note',
@@ -176,7 +176,7 @@ describe('pull request inline comments', () => {
 		fetchMock
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => [
+				json: () => [
 					{
 						id: 11,
 						body: 'Top-level MR comment',
@@ -188,7 +188,7 @@ describe('pull request inline comments', () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => [
+				json: () => [
 					{
 						id: 'discussion-1',
 						notes: [
@@ -230,7 +230,7 @@ describe('pull request inline comments', () => {
 	it('updates a GitLab discussion thread to resolved state', async () => {
 		fetchMock.mockResolvedValueOnce({
 			ok: true,
-			json: async () => ({
+			json: () => ({
 				id: 'discussion-1',
 				resolved: true,
 			}),
@@ -247,6 +247,7 @@ describe('pull request inline comments', () => {
 
 		expect(threadState).toEqual({ threadId: 'discussion-1', status: 'resolved' });
 		expect(fetchMock).toHaveBeenCalledWith(
+			// eslint-disable-next-line no-secrets/no-secrets
 			'https://gitlab.example.com/api/v4/projects/acme%2Frepo/merge_requests/9/discussions/discussion-1?resolved=true',
 			expect.objectContaining({ method: 'PUT' })
 		);
@@ -256,7 +257,7 @@ describe('pull request inline comments', () => {
 		fetchMock
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => ({
+				json: () => ({
 					requested_reviewers: [
 						{ id: 1, login: 'ada' },
 					],
@@ -264,7 +265,7 @@ describe('pull request inline comments', () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: async () => [
+				json: () => [
 					{
 						id: 10,
 						state: 'APPROVED',
@@ -301,7 +302,7 @@ describe('pull request inline comments', () => {
 	it('maps Azure reviewer votes into normalized review states', async () => {
 		fetchMock.mockResolvedValueOnce({
 			ok: true,
-			json: async () => ({
+			json: () => ({
 				value: [
 					{
 						id: '1',

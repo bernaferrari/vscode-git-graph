@@ -28,7 +28,7 @@ export interface CreateAuditEntryInput {
 }
 
 export function listAuditEntries(repo?: string | null, limit: number = 100): AuditEntry[] {
-	return (instanceStore.get('auditLog') ?? [])
+	return instanceStore.get('auditLog')
 		.map((entry) => auditEntrySchema.safeParse(entry))
 		.filter((result): result is { success: true; data: AuditEntry } => result.success)
 		.map((result) => result.data)

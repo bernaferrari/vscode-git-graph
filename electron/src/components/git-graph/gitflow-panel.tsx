@@ -35,15 +35,15 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 
 	const startMutation = trpc.git.flow.start.useMutation({
 		onSuccess: () => {
-			utils.git.flow.status.invalidate();
-			utils.git.repoInfo.invalidate();
+			void utils.git.flow.status.invalidate();
+			void utils.git.repoInfo.invalidate();
 		},
 	});
 
 	const finishMutation = trpc.git.flow.finish.useMutation({
 		onSuccess: () => {
-			utils.git.flow.status.invalidate();
-			utils.git.repoInfo.invalidate();
+			void utils.git.flow.status.invalidate();
+			void utils.git.repoInfo.invalidate();
 		},
 	});
 
@@ -136,7 +136,7 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 						<div className="space-y-2">
 							<Label className="text-xs">Start New Branch</Label>
 							<div className="flex gap-2">
-								<Select value={branchType} onValueChange={(v) => v && setBranchType(v as FlowBranch)}>
+								<Select value={branchType} onValueChange={(v) => { if (v) setBranchType(v as FlowBranch); }}>
 									<SelectTrigger className="w-24 h-8">
 										<SelectValue />
 									</SelectTrigger>
@@ -163,8 +163,9 @@ export function GitFlowPanel({ repo }: GitFlowPanelProps) {
 						{/* Active branches */}
 						<div className="space-y-2">
 							<Label className="text-xs">Active Branches</Label>
-							{Object.entries(activeBranches as Record<string, string[]>).map(([type, branches]) => (
-								branches && branches.length > 0 && (
+						{Object.entries(activeBranches as Record<string, string[]>).map(([type, branches]) => (
+							// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+							branches && branches.length > 0 && (
 									<div key={type} className="space-y-1">
 										<div className="text-xs font-medium capitalize">{type}</div>
 										{branches.map((branch: string) => (

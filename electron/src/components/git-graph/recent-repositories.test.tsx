@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidateRecentRepoDetails = vi.fn(async () => undefined);
+const invalidateRecentRepoDetails = vi.fn(() => undefined);
 const mutateRecentRepoDetails = vi.fn();
 let recentRepoData: { repos: Array<{ path: string; name: string; lastOpened: number; openCount: number; pinned: boolean; currentBranch?: string }> } | undefined;
 
@@ -51,11 +51,13 @@ describe('useRecentRepos', () => {
     it('persists repo additions and pin toggles through backend mutations', async () => {
         render(<Harness />);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTestId('recent-count')).toHaveTextContent('1');
 
         fireEvent.click(screen.getByText('Add Repo'));
         await waitFor(() => {
             expect(mutateRecentRepoDetails).toHaveBeenCalledWith({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 repos: expect.arrayContaining([
                     expect.objectContaining({ path: '/tmp/new-repo', currentBranch: 'main' }),
                     expect.objectContaining({ path: '/tmp/existing' }),
@@ -66,6 +68,7 @@ describe('useRecentRepos', () => {
         fireEvent.click(screen.getByText('Pin Existing'));
         await waitFor(() => {
             expect(mutateRecentRepoDetails).toHaveBeenCalledWith({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 repos: expect.arrayContaining([expect.objectContaining({ path: '/tmp/existing', pinned: true })]),
             });
         });

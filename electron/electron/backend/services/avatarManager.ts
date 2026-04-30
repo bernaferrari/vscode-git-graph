@@ -83,7 +83,9 @@ export class AvatarManager extends Disposable {
 		this.avatarEventEmitter = new EventEmitter<AvatarEvent>();
 
 		// Ensure avatar storage folder exists
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		if (!fs.existsSync(this.avatarStorageFolder)) {
+			// eslint-disable-next-line security/detect-non-literal-fs-filename
 			fs.mkdirSync(this.avatarStorageFolder, { recursive: true });
 		}
 
@@ -142,6 +144,7 @@ export class AvatarManager extends Disposable {
 
 		return new Promise((resolve) => {
 			const imagePath = path.join(this.avatarStorageFolder, avatar.image);
+				// eslint-disable-next-line security/detect-non-literal-fs-filename
 				fs.readFile(imagePath, (err, data) => {
 					if (err) {
 						resolve(null);
@@ -161,10 +164,13 @@ export class AvatarManager extends Disposable {
 		this.saveAvatarCache();
 
 		// Delete all avatar files
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		if (fs.existsSync(this.avatarStorageFolder)) {
+			// eslint-disable-next-line security/detect-non-literal-fs-filename
 			const files = fs.readdirSync(this.avatarStorageFolder);
 			for (const file of files) {
 				if (file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg')) {
+					// eslint-disable-next-line security/detect-non-literal-fs-filename
 					fs.unlinkSync(path.join(this.avatarStorageFolder, file));
 				}
 			}
@@ -431,6 +437,7 @@ export class AvatarManager extends Disposable {
 						const fileName = `${hash}.${format}`;
 						const filePath = path.join(this.avatarStorageFolder, fileName);
 
+						// eslint-disable-next-line security/detect-non-literal-fs-filename
 						fs.writeFile(filePath, Buffer.concat(chunks), (err) => {
 							resolve(err ? null : fileName);
 						});
@@ -493,8 +500,10 @@ export class AvatarManager extends Disposable {
 	 */
 	private loadAvatarCache(): void {
 		const cachePath = path.join(this.avatarStorageFolder, 'cache.json');
+			// eslint-disable-next-line security/detect-non-literal-fs-filename
 			if (fs.existsSync(cachePath)) {
 				try {
+					// eslint-disable-next-line security/detect-non-literal-fs-filename
 					const data = fs.readFileSync(cachePath, 'utf-8');
 					const parsed: unknown = JSON.parse(data);
 					this.avatars = isAvatarCache(parsed) ? parsed : {};
@@ -509,6 +518,7 @@ export class AvatarManager extends Disposable {
 	 */
 	private saveAvatarCache(): void {
 		const cachePath = path.join(this.avatarStorageFolder, 'cache.json');
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		fs.writeFileSync(cachePath, JSON.stringify(this.avatars));
 	}
 

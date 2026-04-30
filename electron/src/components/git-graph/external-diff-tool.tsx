@@ -31,8 +31,8 @@ import {
 import {
 	Switch,
 } from '@/components/ui/switch';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 import { trpc } from '@/trpc/client';
 
 
@@ -227,7 +227,7 @@ export function ExternalDiffConfig({
 		}
 
 		const newTool: DiffTool = {
-			id: `custom-${Date.now()}`,
+			id: `custom-${String(Date.now())}`,
 			name: customTool.name,
 			command: customTool.command,
 			args: customTool.args || '$LOCAL $REMOTE',
@@ -304,7 +304,7 @@ export function ExternalDiffConfig({
 						<div className="bg-muted/50 rounded-lg p-4 space-y-3">
 							<div className="flex items-center justify-between">
 								<span className="font-medium">{selectedToolInfo.name}</span>
-								<Button variant="outline" size="sm" onClick={handleTestTool}>
+								<Button variant="outline" size="sm" onClick={() => { void handleTestTool(); }}>
 									Test
 								</Button>
 							</div>
@@ -495,7 +495,7 @@ export function OpenInExternalDiffButton({
 	};
 
 	return (
-		<Button variant={variant} size="sm" onClick={handleOpen}>
+		<Button variant={variant} size="sm" onClick={() => { void handleOpen(); }}>
 			<ExternalLink className="h-4 w-4 mr-1" />
 			Open Externally
 		</Button>
@@ -503,6 +503,7 @@ export function OpenInExternalDiffButton({
 }
 
 // Hook to get current diff tool
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDiffTool() {
     const configQuery = trpc.config.externalDiffConfig.useQuery(undefined, { staleTime: 10_000 });
 	return useMemo(() => {

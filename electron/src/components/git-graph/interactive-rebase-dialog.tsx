@@ -64,8 +64,8 @@ export function InteractiveRebaseDialog({
 
 	const rebaseMutation = trpc.git.rebase.useMutation({
 		onSuccess: () => {
-			utils.git.commits.invalidate();
-			utils.git.repoInfo.invalidate();
+			void utils.git.commits.invalidate();
+			void utils.git.repoInfo.invalidate();
 		},
 	});
 
@@ -128,7 +128,7 @@ export function InteractiveRebaseDialog({
 				todos: todoContent,
 			});
 
-			if (result?.error) {
+			if (result.error) {
 				toast.error(result.error);
 				return;
 			}
@@ -221,7 +221,7 @@ export function InteractiveRebaseDialog({
 							Cancel
 						</Button>
 						<Button
-							onClick={handleRebase}
+							onClick={() => { void handleRebase(); }}
 							disabled={isSubmitting || rebaseMutation.isPending}
 						>
 							{isSubmitting || rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}

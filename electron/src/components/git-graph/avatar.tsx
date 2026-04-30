@@ -7,6 +7,7 @@ import { User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getGravatarUrl as buildGravatarUrl } from '@/lib/gravatar';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -19,31 +20,22 @@ interface AvatarProps {
 // Cache for avatars to avoid repeated lookups
 const avatarCache = new Map<string, string>();
 
-// Generate Gravatar URL
 function getGravatarUrl(email: string, size: number = 40): string {
-	const hash = email.trim().toLowerCase();
-	// Simple hash simulation - in production, use proper MD5
-	const cacheKey = `gravatar-${hash}-${size}`;
+	const normalizedEmail = email.trim().toLowerCase();
+	const cacheKey = `gravatar-${normalizedEmail}-${String(size)}`;
 	
 	if (avatarCache.has(cacheKey)) {
-		return avatarCache.get(cacheKey)!;
+		return avatarCache.get(cacheKey) ?? '';
 	}
 	
-	// For now, use a placeholder - in production, would use actual Gravatar API
-	// const hashedEmail = md5(hash);
-	// const url = `https://www.gravatar.com/avatar/${hashedEmail}?s=${size}&d=retro`;
-	
-	// Use UI Avatars as fallback
-	const name = email.split('@')[0] ?? email;
-	const url = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${size}&background=random&bold=true`;
-	
+	const url = buildGravatarUrl(normalizedEmail, size);
 	avatarCache.set(cacheKey, url);
 	return url;
 }
 
 // Get GitHub avatar from username
 function getGitHubAvatar(username: string, size: number = 40): string {
-	return `https://avatars.githubusercontent.com/${username}?size=${size}`;
+	return `https://avatars.githubusercontent.com/${username}?size=${String(size)}`;
 }
 
 // Extract GitHub username from email (common patterns)
@@ -69,14 +61,29 @@ const sizeMap = {
 	lg: 48,
 };
 
+function getInitials(value?: string): string {
+	if (!value) {
+		return '';
+	}
+	const words = value
+		.replace(/@.+$/, '')
+		.split(/[\s._-]+/)
+		.filter(Boolean);
+	return words
+		.slice(0, 2)
+		.map((word) => word[0]?.toUpperCase() ?? '')
+		.join('');
+}
+
 export function Avatar({ email, name, size = 'md', className }: AvatarProps) {
 	const [imageUrl, setImageUrl] = useState<string | null>(null);
 	const [hasError, setHasError] = useState(false);
 
 	const pixelSize = sizeMap[size];
+	const initials = getInitials(name ?? email);
 
 	useEffect(() => {
-		if (!email && !name) {
+		if (!email) {
 			setImageUrl(null);
 			return;
 		}
@@ -90,27 +97,27 @@ export function Avatar({ email, name, size = 'md', className }: AvatarProps) {
 			}
 		}
 
-		// Fall back to Gravatar or UI Avatars
-		if (email) {
-			setImageUrl(getGravatarUrl(email, pixelSize * 2));
-		} else if (name) {
-			setImageUrl(`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=${pixelSize * 2}&background=random&bold=true`);
-		}
-	}, [email, name, pixelSize]);
+		// Fall back to Gravatar; render local initials if the image cannot load.
+		setImageUrl(getGravatarUrl(email, pixelSize * 2));
+	}, [email, pixelSize]);
 
 	if (hasError || !imageUrl) {
 		return (
 			<div
 				className={cn(
-					"rounded-full bg-muted flex items-center justify-center",
+					"rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium",
 					className
 				)}
 				style={{ width: pixelSize, height: pixelSize }}
 			>
-				<User
-					className="text-muted-foreground"
-					style={{ width: pixelSize * 0.6, height: pixelSize * 0.6 }}
-				/>
+				{initials ? (
+					<span style={{ fontSize: Math.max(10, pixelSize * 0.38) }}>{initials}</span>
+				) : (
+					<User
+						className="text-muted-foreground"
+						style={{ width: pixelSize * 0.6, height: pixelSize * 0.6 }}
+					/>
+				)}
 			</div>
 		);
 	}

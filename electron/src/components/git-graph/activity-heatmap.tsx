@@ -55,8 +55,9 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
             showRemoteBranches: false,
             hideRemotes: [],
         },
-        { enabled: !!open && !!activeRepo }
+        { enabled: Boolean(open && activeRepo) }
     );
+    const commits = commitsResult?.commits ?? [];
 
     // Generate full year of days
     const yearDays = useMemo(() => {
@@ -68,7 +69,7 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
     const activityData = useMemo(() => {
         const data = new Map<string, DayActivity>();
 
-        for (const commit of commitsResult?.commits ?? []) {
+        for (const commit of commits) {
             const commitDate = new Date(commit.date * 1000);
             if (commitDate.getFullYear() !== year) continue;
 
@@ -92,7 +93,7 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
         }
 
         return data;
-    }, [commitsResult?.commits, year]);
+    }, [commits, year]);
 
     // Calculate statistics
     const stats = useMemo(() => {
@@ -268,11 +269,11 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
                                             className='text-muted-foreground text-xs'
                                             style={{
                                                 position: 'relative',
-                                                left: `${(weekIndex / weeks.length) * 100}%`,
+                                                left: `${String((weekIndex / weeks.length) * 100)}%`,
                                                 marginRight: (() => {
                                                     const next = monthPositions[i + 1];
                                                     if (!next) return undefined;
-                                                    return `${((next.weekIndex - weekIndex) / weeks.length) * 100}%`;
+                                                    return `${String(((next.weekIndex - weekIndex) / weeks.length) * 100)}%`;
                                                 })(),
                                             }}>
                                             {MONTHS[month]}
@@ -297,24 +298,24 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
 
                                 {/* Grid */}
                                 <div className='flex-1 overflow-x-auto'>
-                                    <div className='flex gap-0.5' style={{ width: `${weeks.length * 14}px` }}>
+                                    <div className='flex gap-0.5' style={{ width: `${String(weeks.length * 14)}px` }}>
                                         {weeks.map((week, weekIndex) => (
                                             <div key={weekIndex} className='flex flex-col gap-0.5'>
                                                 {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => {
                                                     const day = week[dayIndex];
                                                     if (!day) return <div key={dayIndex} className='h-3 w-3' />;
 
-                                                    const color = getHeatColor(day.commits);
+                                                    const color = getHeatColor(day.commits) ?? '';
 
                                                     return (
                                                         <div
                                                             key={dayIndex}
-                                                            className={`h-3 w-3 cursor-pointer rounded-sm ${color} transition-transform hover:scale-125`}
-                                                            title={`${format(day.date, 'MMM d, yyyy')} - ${day.commits} ${
+                                                            className={`h-3 w-3 rounded-sm ${color}`}
+                                                            title={`${format(day.date, 'MMM d, yyyy')} - ${String(day.commits)} ${
                                                                 day.commits === 1 ? 'commit' : 'commits'
                                                             }${
                                                                 day.authors.size > 0
-                                                                    ? ` by ${day.authors.size} ${
+                                                                    ? ` by ${String(day.authors.size)} ${
                                                                           day.authors.size === 1 ? 'author' : 'authors'
                                                                       }`
                                                                     : ''

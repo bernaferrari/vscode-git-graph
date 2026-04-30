@@ -85,7 +85,7 @@ export function FindWidget({
 			{/* Match Count */}
 			{query && (
 				<span className="text-xs text-muted-foreground px-2 min-w-[50px] text-center">
-					{totalMatches > 0 ? `${currentIndex + 1}/${totalMatches}` : 'No matches'}
+					{totalMatches > 0 ? `${String(currentIndex + 1)}/${String(totalMatches)}` : 'No matches'}
 				</span>
 			)}
 

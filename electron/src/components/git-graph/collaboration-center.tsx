@@ -69,12 +69,14 @@ interface CollaborationImportBundleResult {
 	assignmentsImported: number;
 }
 
+		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface CollaborationSyncMutationResult extends CollaborationUpdateResult {}
 
 interface CollaborationSyncMutationVariables {
 	direction: 'push' | 'pull' | 'roundtrip';
 }
 
+		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface CollaborationWorkspaceQueryItem extends CollaborationWorkspaceOption {}
 
 const DEFAULT_SYNC_CONFIG: SyncConfigState = {
@@ -94,7 +96,8 @@ const DEFAULT_SYNC_CONFIG: SyncConfigState = {
 	teamId: '',
 	teamName: '',
 	avatarUrl: '',
-	deviceLabel: globalThis.navigator?.platform || 'desktop',
+		// eslint-disable-next-line @typescript-eslint/no-deprecated
+	deviceLabel: globalThis.navigator.platform || 'desktop',
 	presenceEnabled: true,
 	liveSyncEnabled: true,
 	realtimeEnabled: true,
@@ -318,7 +321,7 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 	const importBundleMutation = trpc.repo.collaboration.importBundle.useMutation({
 		onSuccess: async (result: CollaborationImportBundleResult) => {
 			notifySuccess('Collaboration bundle imported', {
-				description: `${result.workspaceSharesImported} handoff${result.workspaceSharesImported === 1 ? '' : 's'}, ${result.patchSharesImported} patch${result.patchSharesImported === 1 ? '' : 'es'}, ${result.commentsImported} comment${result.commentsImported === 1 ? '' : 's'}, and ${result.assignmentsImported} assignment${result.assignmentsImported === 1 ? '' : 's'} applied`,
+				description: `${String(result.workspaceSharesImported)} handoff${result.workspaceSharesImported === 1 ? '' : 's'}, ${String(result.patchSharesImported)} patch${result.patchSharesImported === 1 ? '' : 'es'}, ${String(result.commentsImported)} comment${result.commentsImported === 1 ? '' : 's'}, and ${String(result.assignmentsImported)} assignment${result.assignmentsImported === 1 ? '' : 's'} applied`,
 			});
 			await invalidateCollaboration();
 		},
@@ -398,30 +401,30 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 			return;
 		}
 		setSyncConfig({
-			enabled: Boolean(config.enabled),
+			enabled: config.enabled,
 			provider: 'self-host',
-			endpointUrl: config.endpointUrl ?? '',
-			projectId: config.projectId ?? 'default',
-			authToken: config.authToken ?? '',
-			memberId: config.memberId ?? '',
-			memberApiKey: config.memberApiKey ?? '',
-			displayName: config.displayName ?? '',
-			email: config.email ?? '',
-			role: config.role ?? 'developer',
-			permissionLevel: config.permissionLevel ?? 'member',
-			organizationId: config.organizationId ?? '',
-			organizationName: config.organizationName ?? '',
-			teamId: config.teamId ?? '',
-			teamName: config.teamName ?? '',
-			avatarUrl: config.avatarUrl ?? '',
-			deviceLabel: config.deviceLabel ?? DEFAULT_SYNC_CONFIG.deviceLabel,
-			presenceEnabled: Boolean(config.presenceEnabled ?? true),
-			liveSyncEnabled: Boolean(config.liveSyncEnabled ?? true),
-			realtimeEnabled: Boolean(config.realtimeEnabled ?? true),
+			endpointUrl: config.endpointUrl,
+			projectId: config.projectId,
+			authToken: config.authToken,
+			memberId: config.memberId,
+			memberApiKey: config.memberApiKey,
+			displayName: config.displayName,
+			email: config.email,
+			role: config.role,
+			permissionLevel: config.permissionLevel,
+			organizationId: config.organizationId,
+			organizationName: config.organizationName,
+			teamId: config.teamId,
+			teamName: config.teamName,
+			avatarUrl: config.avatarUrl,
+			deviceLabel: config.deviceLabel,
+			presenceEnabled: config.presenceEnabled,
+			liveSyncEnabled: config.liveSyncEnabled,
+			realtimeEnabled: config.realtimeEnabled,
 			timeoutMs: Number.isFinite(config.timeoutMs) ? config.timeoutMs : DEFAULT_SYNC_CONFIG.timeoutMs,
-			autoSyncOnOpen: Boolean(config.autoSyncOnOpen),
+			autoSyncOnOpen: config.autoSyncOnOpen,
 			lastSyncedAt: typeof config.lastSyncedAt === 'number' ? config.lastSyncedAt : null,
-			lastSyncStatus: config.lastSyncStatus ?? 'idle',
+			lastSyncStatus: config.lastSyncStatus,
 			lastSyncError: config.lastSyncError ?? null,
 		});
 	}, [collaborationConfigQuery.data?.config]);
@@ -578,7 +581,7 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 	const handleAssignmentCreate = useCallback(async (targetType: 'workspace-share' | 'patch-share' | 'pull-request', targetId: string) => {
 		const targetKey = `${targetType}:${targetId}`;
 		const draft = assignmentDrafts[targetKey];
-		const assigneeId = draft?.assigneeId?.trim();
+		const assigneeId = draft?.assigneeId.trim();
 		if (!assigneeId) {
 			return;
 		}
@@ -745,22 +748,22 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						onShareNameChange={setWorkspaceShareName}
 						onShareNoteChange={setWorkspaceShareNote}
 						onCreate={() =>
-							createWorkspaceShare.mutate({
+							{ createWorkspaceShare.mutate({
 								workspaceId: selectedWorkspaceId,
 								name: workspaceShareName.trim() || 'Workspace handoff',
 								note: workspaceShareNote,
-							})
+							}); }
 						}
-						onDelete={(id) => deleteWorkspaceShare.mutate({ id })}
+						onDelete={(id) => { deleteWorkspaceShare.mutate({ id }); }}
 						onCopyLink={(value) => void handleCopy(value, 'Deep link copied')}
 						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetType, targetId) => void handleCommentSubmit(targetType, targetId)}
-						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
+						onCommentDelete={(id) => { deleteCommentMutation.mutate({ id }); }}
 						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
 						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetType, targetId) => void handleAssignmentCreate(targetType, targetId)}
-						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
-						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
+						onAssignmentStatusChange={(assignmentId, status) => { updateAssignmentMutation.mutate({ id: assignmentId, status }); }}
+						onAssignmentDelete={(id) => { deleteAssignmentMutation.mutate({ id }); }}
 					/>
 
 					<PatchShelfTab
@@ -786,25 +789,26 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						onPatchBaseRefChange={setPatchBaseRef}
 						onPatchHeadRefChange={setPatchHeadRef}
 						onCreate={() =>
-							activeRepo
+			// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+							{ activeRepo
 								? createPatchShare.mutate({
 										repo: activeRepo,
 										name: patchName.trim() || 'Review patch',
 										baseRef: patchBaseRef.trim(),
 										headRef: patchHeadRef.trim(),
 								  })
-								: notifyInfo('Open a repository first', { persist: false })
+								: notifyInfo('Open a repository first', { persist: false }); }
 						}
-						onDelete={(id) => deletePatchShare.mutate({ id })}
+						onDelete={(id) => { deletePatchShare.mutate({ id }); }}
 						onCopyPatch={(value) => void handleCopy(value, 'Patch copied')}
 						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetType, targetId) => void handleCommentSubmit(targetType, targetId)}
-						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
+						onCommentDelete={(id) => { deleteCommentMutation.mutate({ id }); }}
 						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
 						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetType, targetId) => void handleAssignmentCreate(targetType, targetId)}
-						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
-						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
+						onAssignmentStatusChange={(assignmentId, status) => { updateAssignmentMutation.mutate({ id: assignmentId, status }); }}
+						onAssignmentDelete={(id) => { deleteAssignmentMutation.mutate({ id }); }}
 					/>
 
 					<CollaborationTeamTab
@@ -871,17 +875,17 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 								deviceLabel: member.deviceLabel,
 							});
 						}}
-						onMemberRemove={(memberId) => removeMemberMutation.mutate({ id: memberId })}
-						onTeamProfileSave={(profile) => updateTeamProfileMutation.mutate(profile)}
+						onMemberRemove={(memberId) => { removeMemberMutation.mutate({ id: memberId }); }}
+						onTeamProfileSave={(profile) => { updateTeamProfileMutation.mutate(profile); }}
 						onOpenReviewUrl={handleOpenReviewUrl}
 						onCommentDraftChange={(targetKey, value) => { setCommentDrafts((previous) => ({ ...previous, [targetKey]: value })); }}
 						onCommentSubmit={(targetId) => void handleCommentSubmit('pull-request', targetId)}
-						onCommentDelete={(id) => deleteCommentMutation.mutate({ id })}
+						onCommentDelete={(id) => { deleteCommentMutation.mutate({ id }); }}
 						onAssignmentAssigneeChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: value, note: previous[targetKey]?.note ?? '' } })); }}
 						onAssignmentNoteChange={(targetKey, value) => { setAssignmentDrafts((previous) => ({ ...previous, [targetKey]: { assigneeId: previous[targetKey]?.assigneeId ?? '', note: value } })); }}
 						onAssignmentCreate={(targetId) => void handleAssignmentCreate('pull-request', targetId)}
-						onAssignmentStatusChange={(assignmentId, status) => updateAssignmentMutation.mutate({ id: assignmentId, status })}
-						onAssignmentDelete={(id) => deleteAssignmentMutation.mutate({ id })}
+						onAssignmentStatusChange={(assignmentId, status) => { updateAssignmentMutation.mutate({ id: assignmentId, status }); }}
+						onAssignmentDelete={(id) => { deleteAssignmentMutation.mutate({ id }); }}
 					/>
 
 					<CollaborationReviewDashboardTab
@@ -902,11 +906,11 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 						probePending={probeRemoteMutation.isPending}
 						onSyncConfigChange={(patch) => { setSyncConfig((previous) => ({ ...previous, ...patch })); }}
 						onImportStrategyChange={setImportStrategy}
-						onSave={() => saveSyncConfigMutation.mutate(syncConfig)}
+						onSave={() => { saveSyncConfigMutation.mutate(syncConfig); }}
 						onProbe={() => void handleProbeRemote()}
-						onPush={() => syncRemoteMutation.mutate({ direction: 'push' })}
-						onPull={() => syncRemoteMutation.mutate({ direction: 'pull' })}
-						onRoundtrip={() => syncRemoteMutation.mutate({ direction: 'roundtrip' })}
+						onPush={() => { syncRemoteMutation.mutate({ direction: 'push' }); }}
+						onPull={() => { syncRemoteMutation.mutate({ direction: 'pull' }); }}
+						onRoundtrip={() => { syncRemoteMutation.mutate({ direction: 'roundtrip' }); }}
 						onExport={() => void handleExportBundle()}
 						onImport={() => importInputRef.current?.click()}
 					/>

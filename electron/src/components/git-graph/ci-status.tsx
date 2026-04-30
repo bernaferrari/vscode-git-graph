@@ -163,7 +163,7 @@ export function CIStatusPanel({ commitHash, repo }: { commitHash: string; repo?:
 						{config.icon}
 						<span className='ml-1 capitalize'>{statusInfo.status}</span>
 					</Badge>
-					<Button variant='ghost' size='sm' className='h-7 w-7 p-0' onClick={() => query.refetch()}>
+					<Button variant='ghost' size='sm' className='h-7 w-7 p-0' onClick={() => { void query.refetch(); }}>
 						<RefreshCw className={`h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />
 					</Button>
 				</div>

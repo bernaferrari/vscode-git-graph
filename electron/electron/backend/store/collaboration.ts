@@ -214,10 +214,10 @@ export function getCollaborationState(): {
 	assignments: CollaborationAssignment[];
 } {
 	return {
-		workspaceShares: collaborationWorkspaceShareSchema.array().parse(instanceStore.get('collaborationWorkspaceShares') ?? []),
-		patchShelf: collaborationPatchShareSchema.array().parse(instanceStore.get('collaborationPatchShelf') ?? []),
-		comments: collaborationCommentSchema.array().parse(instanceStore.get('collaborationComments') ?? []),
-		assignments: collaborationAssignmentSchema.array().parse(instanceStore.get('collaborationAssignments') ?? []),
+		workspaceShares: collaborationWorkspaceShareSchema.array().catch([]).parse(instanceStore.get('collaborationWorkspaceShares')),
+		patchShelf: collaborationPatchShareSchema.array().catch([]).parse(instanceStore.get('collaborationPatchShelf')),
+		comments: collaborationCommentSchema.array().catch([]).parse(instanceStore.get('collaborationComments')),
+		assignments: collaborationAssignmentSchema.array().catch([]).parse(instanceStore.get('collaborationAssignments')),
 	};
 }
 
@@ -406,7 +406,7 @@ export function deleteCollaborationAssignment(assignmentId: string): Collaborati
 }
 
 export function listCollaborationActivity(limit: number = 100): CollaborationActivityEntry[] {
-	return (instanceStore.get('collaborationActivity') ?? [])
+	return collaborationActivityEntrySchema.array().catch([]).parse(instanceStore.get('collaborationActivity'))
 		.map((entry) => collaborationActivityEntrySchema.safeParse(entry))
 		.filter((result): result is { success: true; data: CollaborationActivityEntry } => result.success)
 		.map((result) => result.data)

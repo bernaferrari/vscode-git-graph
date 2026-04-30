@@ -130,6 +130,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 			}
 		});
 
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (currentHunk) {
 			parsedHunks.push(currentHunk);
 		}
@@ -296,7 +297,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 												line.type === 'added' ? 'bg-green-500/5' :
 												line.type === 'removed' ? 'bg-red-500/5' : ''
 											}`}
-											onClick={() => line.type !== 'context' && toggleLine(hunkIndex, lineIndex)}
+											onClick={() => { if (line.type !== 'context') toggleLine(hunkIndex, lineIndex); }}
 										>
 											<div className="w-8 text-right text-muted-foreground select-none">
 												{line.oldLineNumber ?? ''}

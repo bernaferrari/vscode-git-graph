@@ -9,14 +9,15 @@ import {
 	Maximize2,
 	ImageOff,
 	Columns,
-	Square,
 	Eye,
+	Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppStore } from '@/lib/store';
+import { trpc } from '@/trpc/client';
 
 interface ImageDiffProps {
 	file: {
@@ -30,27 +31,42 @@ interface ImageDiffProps {
 
 export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 	const { activeRepo } = useAppStore();
-	const [viewMode, setViewMode] = useState<'side-by-side' | 'overlay' | 'swipe'>('side-by-side');
+	const [viewMode, setViewMode] = useState<'side-by-side' | 'overlay'>('side-by-side');
 	const [zoom, setZoom] = useState(100);
 	const [overlayOpacity, setOverlayOpacity] = useState(50);
 
-	// In a real app, we'd get these URLs from the backend
-	// For now, use placeholder logic
-	const getImageUrl = (repo: string, commit: string, path: string) => {
-		// This would be a real endpoint to fetch image content
-		return `git-image://${repo}/${commit}/${path}`;
-	};
-
-	const currentUrl = activeRepo && commitHash && file.path
-		? getImageUrl(activeRepo, commitHash, file.path)
-		: null;
-
-	const oldUrl = activeRepo && oldCommitHash && (file.oldPath || file.path)
-		? getImageUrl(activeRepo, oldCommitHash, file.oldPath || file.path)
-		: null;
-
 	const isNewFile = file.status === 'A';
 	const isDeleted = file.status === 'D';
+	const currentMimeType = useMemo(() => getImageMimeType(file.path), [file.path]);
+	const oldMimeType = useMemo(() => getImageMimeType(file.oldPath || file.path), [file.oldPath, file.path]);
+
+	const currentImageQuery = trpc.git.fileBinaryAtRevision.useQuery(
+		{
+			repo: activeRepo ?? '',
+			commitHash,
+			filePath: file.path,
+		},
+		{ enabled: Boolean(activeRepo && commitHash && !isDeleted) }
+	);
+	const previousImageQuery = trpc.git.fileBinaryAtRevision.useQuery(
+		{
+			repo: activeRepo ?? '',
+			commitHash: oldCommitHash ?? '',
+			filePath: file.oldPath || file.path,
+		},
+		{ enabled: Boolean(activeRepo && oldCommitHash && !isNewFile) }
+	);
+
+	const currentUrl = currentImageQuery.data?.contentBase64
+		? `data:${currentMimeType};base64,${currentImageQuery.data.contentBase64}`
+		: null;
+	const oldUrl = previousImageQuery.data?.contentBase64
+		? `data:${oldMimeType};base64,${previousImageQuery.data.contentBase64}`
+		: null;
+	const isLoading = currentImageQuery.isLoading || previousImageQuery.isLoading;
+	const hasUnavailableVersion =
+		(!isDeleted && !currentUrl && !currentImageQuery.isLoading) ||
+		(!isNewFile && oldCommitHash && !oldUrl && !previousImageQuery.isLoading);
 
 	const handleZoomIn = () => { setZoom(Math.min(zoom + 25, 400)); };
 	const handleZoomOut = () => { setZoom(Math.max(zoom - 25, 25)); };
@@ -78,10 +94,6 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 								<Eye className="h-3 w-3 mr-1" />
 								Overlay
 							</TabsTrigger>
-							<TabsTrigger value="swipe" className="text-xs h-5 px-2">
-								<Square className="h-3 w-3 mr-1" />
-								Swipe
-							</TabsTrigger>
 						</TabsList>
 					</Tabs>
 					<div className="flex items-center gap-1 border-l pl-2 ml-2">
@@ -100,7 +112,22 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 			</div>
 
 			<div className="flex-1 overflow-auto bg-muted/20 p-4">
-				{viewMode === 'side-by-side' && (
+				{isLoading && (
+					<div className="flex h-full items-center justify-center text-muted-foreground">
+						<div className="flex items-center gap-2 text-sm">
+							<Loader2 className="h-4 w-4 animate-spin" />
+							Loading image revision…
+						</div>
+					</div>
+				)}
+
+				{!isLoading && hasUnavailableVersion && (
+					<div className="mb-4 rounded-lg border border-border/70 bg-background/75 px-3 py-2 text-xs text-muted-foreground">
+						Some image revisions are unavailable for this change. That usually means the file did not exist on one side of the diff.
+					</div>
+				)}
+
+				{!isLoading && viewMode === 'side-by-side' && (
 					<div className="flex gap-4 h-full">
 						{!isNewFile && (
 							<div className="flex-1 flex flex-col">
@@ -112,7 +139,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 										<img
 											src={oldUrl}
 											alt="Old version"
-											style={{ maxWidth: `${zoom}%`, maxHeight: '100%', objectFit: 'contain' }}
+											style={{ maxWidth: `${String(zoom)}%`, maxHeight: '100%', objectFit: 'contain' }}
 											className="rounded"
 											onError={(e) => {
 												(e.target as HTMLImageElement).style.display = 'none';
@@ -137,7 +164,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 										<img
 											src={currentUrl}
 											alt="New version"
-											style={{ maxWidth: `${zoom}%`, maxHeight: '100%', objectFit: 'contain' }}
+											style={{ maxWidth: `${String(zoom)}%`, maxHeight: '100%', objectFit: 'contain' }}
 											className="rounded"
 											onError={(e) => {
 												(e.target as HTMLImageElement).style.display = 'none';
@@ -155,7 +182,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 					</div>
 				)}
 
-				{viewMode === 'overlay' && !isNewFile && !isDeleted && (
+				{!isLoading && viewMode === 'overlay' && !isNewFile && !isDeleted && (
 					<div className="flex flex-col h-full">
 						<div className="flex items-center gap-4 mb-4">
 							<span className="text-xs text-muted-foreground">Opacity (Old):</span>
@@ -174,7 +201,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 								<img
 									src={currentUrl}
 									alt="New version"
-									style={{ maxWidth: `${zoom}%`, maxHeight: '100%', objectFit: 'contain' }}
+									style={{ maxWidth: `${String(zoom)}%`, maxHeight: '100%', objectFit: 'contain' }}
 									className="absolute rounded"
 								/>
 							)}
@@ -183,7 +210,7 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 									src={oldUrl}
 									alt="Old version"
 									style={{
-										maxWidth: `${zoom}%`,
+										maxWidth: `${String(zoom)}%`,
 										maxHeight: '100%',
 										objectFit: 'contain',
 										opacity: overlayOpacity / 100,
@@ -194,41 +221,30 @@ export function ImageDiff({ file, commitHash, oldCommitHash }: ImageDiffProps) {
 						</div>
 					</div>
 				)}
-
-				{viewMode === 'swipe' && !isNewFile && !isDeleted && (
-					<div className="flex flex-col h-full">
-						<div className="text-xs text-muted-foreground mb-2">
-							Drag to compare (simulated - actual swipe requires more complex implementation)
-						</div>
-						<div className="flex-1 relative flex items-center justify-center border rounded bg-background overflow-hidden">
-							{/* This is a simplified version - a full swipe implementation would use a slider */}
-							<div className="absolute inset-0 flex">
-								<div className="w-1/2 overflow-hidden flex items-center justify-center">
-									{oldUrl && (
-										<img
-											src={oldUrl}
-											alt="Old version"
-											style={{ maxWidth: `${zoom * 2}%`, maxHeight: '100%', objectFit: 'contain' }}
-											className="rounded"
-										/>
-									)}
-								</div>
-								<div className="w-px bg-border" />
-								<div className="w-1/2 overflow-hidden flex items-center justify-center">
-									{currentUrl && (
-										<img
-											src={currentUrl}
-											alt="New version"
-											style={{ maxWidth: `${zoom * 2}%`, maxHeight: '100%', objectFit: 'contain' }}
-											className="rounded"
-										/>
-									)}
-								</div>
-							</div>
-						</div>
-					</div>
-				)}
 			</div>
 		</div>
 	);
+}
+
+function getImageMimeType(path: string): string {
+	const ext = path.split('.').pop()?.toLowerCase();
+	switch (ext) {
+		case 'png':
+			return 'image/png';
+		case 'jpg':
+		case 'jpeg':
+			return 'image/jpeg';
+		case 'gif':
+			return 'image/gif';
+		case 'webp':
+			return 'image/webp';
+		case 'svg':
+			return 'image/svg+xml';
+		case 'bmp':
+			return 'image/bmp';
+		case 'ico':
+			return 'image/x-icon';
+		default:
+			return 'application/octet-stream';
+	}
 }

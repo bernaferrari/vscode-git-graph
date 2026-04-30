@@ -52,9 +52,9 @@ export function RepoStatusIndicator({
 		if (isMerging) return { type: 'merge', label: 'Merging', color: 'text-amber-500', icon: RefreshCw };
 		if (hasConflicts) return { type: 'conflict', label: 'Conflicts', color: 'text-red-500', icon: AlertCircle };
 		if (isFetching) return { type: 'fetching', label: 'Fetching', color: 'text-blue-500', icon: RefreshCw };
-		if (behind > 0 && ahead > 0) return { type: 'diverged', label: `${behind} behind, ${ahead} ahead`, color: 'text-amber-500', icon: ArrowUp };
-		if (behind > 0) return { type: 'behind', label: `${behind} behind`, color: 'text-amber-500', icon: ArrowDown };
-		if (ahead > 0) return { type: 'ahead', label: `${ahead} ahead`, color: 'text-green-500', icon: ArrowUp };
+		if (behind > 0 && ahead > 0) return { type: 'diverged', label: `${String(behind)} behind, ${String(ahead)} ahead`, color: 'text-amber-500', icon: ArrowUp };
+		if (behind > 0) return { type: 'behind', label: `${String(behind)} behind`, color: 'text-amber-500', icon: ArrowDown };
+		if (ahead > 0) return { type: 'ahead', label: `${String(ahead)} ahead`, color: 'text-green-500', icon: ArrowUp };
 		if (hasStagedChanges || hasUnstagedChanges) return { type: 'changes', label: 'Changes pending', color: 'text-blue-500', icon: GitBranch };
 		if (protectedBranch) return { type: 'protected', label: 'Protected', color: 'text-green-500', icon: ShieldCheck };
 		return { type: 'clean', label: 'Up to date', color: 'text-green-500', icon: CheckCircle2 };

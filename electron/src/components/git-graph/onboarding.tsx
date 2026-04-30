@@ -55,15 +55,15 @@ export function OnboardingDialog({
 		{
 			id: 'welcome',
 			title: 'Welcome to Git Graph',
-			description: 'A beautiful, powerful Git client',
+			description: 'A review-first Git client',
 			icon: <Sparkles className="h-8 w-8" />,
 			content: (
 				<div className="space-y-4 text-center">
 					<p className="text-lg">
-						Git Graph helps you visualize and manage your Git repositories with ease.
+						Git Graph keeps branch state, local changes, and commit review in one shell.
 					</p>
 					<p className="text-muted-foreground">
-						Let's take a quick tour of the key features.
+						This tour focuses on the flows you will use every day.
 					</p>
 				</div>
 			),
@@ -76,20 +76,20 @@ export function OnboardingDialog({
 			content: (
 				<div className="space-y-4">
 					<p>
-						The commit graph shows your repository's history with branches, merges, and tags.
+						The graph is the primary navigation surface for branch state, merge history, and commit selection.
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Click commits to see details
+							Select commits to open review details and file-level patches
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Right-click for context actions
+							Use the side panel to inspect branch tracking, publish status, and stashes
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Use filters to find commits
+							Search and filter when the visible graph gets noisy
 						</li>
 					</ul>
 				</div>
@@ -103,7 +103,7 @@ export function OnboardingDialog({
 			content: (
 				<div className="space-y-4">
 					<p>
-						Stage individual lines or hunks, write commit messages, and commit with ease.
+						Stage individual lines or hunks, review local diffs, then commit without leaving the main shell.
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
@@ -112,11 +112,11 @@ export function OnboardingDialog({
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Inline diff preview
+							Quick review of staged versus unstaged files before you commit
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Commit templates available
+							Commit templates and signing are built in
 						</li>
 					</ul>
 				</div>
@@ -130,20 +130,20 @@ export function OnboardingDialog({
 			content: (
 				<div className="space-y-4">
 					<p>
-						Create, merge, rebase, and compare branches with visual tools.
+						Create, publish, rename, compare, and recover branches with a safer default workflow.
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Drag commits to branches
+							Publish and track upstream branches without dropping to the terminal
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Visual merge conflict editor
+							Use force-with-lease for rewrite-history pushes
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4 text-green-500" />
-							Git Flow automation
+							Create a branch from a stash when recovery is safer than re-applying in place
 						</li>
 					</ul>
 				</div>
@@ -157,15 +157,23 @@ export function OnboardingDialog({
 			content: (
 				<div className="space-y-4">
 					<p>
-						Git Graph is designed for keyboard efficiency.
+						The shell is designed around a small set of reliable shortcuts.
 					</p>
 					<div className="grid grid-cols-2 gap-2 text-sm">
+						<div className="flex justify-between">
+							<span>Fuzzy Finder</span>
+							<kbd className="ui-kbd">⌘K</kbd>
+						</div>
 						<div className="flex justify-between">
 							<span>Command Palette</span>
 							<kbd className="ui-kbd">⌘⇧P</kbd>
 						</div>
 						<div className="flex justify-between">
-							<span>Find</span>
+							<span>Commit Search</span>
+							<kbd className="ui-kbd">⌘⇧F</kbd>
+						</div>
+						<div className="flex justify-between">
+							<span>Find in View</span>
 							<kbd className="ui-kbd">⌘F</kbd>
 						</div>
 						<div className="flex justify-between">
@@ -173,16 +181,8 @@ export function OnboardingDialog({
 							<kbd className="ui-kbd">⌘B</kbd>
 						</div>
 						<div className="flex justify-between">
-							<span>Commit</span>
-							<kbd className="ui-kbd">⌘⏎</kbd>
-						</div>
-						<div className="flex justify-between">
-							<span>Push</span>
-							<kbd className="ui-kbd">⌘P</kbd>
-						</div>
-						<div className="flex justify-between">
-							<span>Pull</span>
-							<kbd className="ui-kbd">⌘⇧P</kbd>
+							<span>Settings</span>
+							<kbd className="ui-kbd">⌘,</kbd>
 						</div>
 					</div>
 				</div>
@@ -196,24 +196,24 @@ export function OnboardingDialog({
 			content: (
 				<div className="space-y-4">
 					<p>
-						Git Graph includes powerful tools for advanced workflows.
+						Advanced tools stay available, but they stay secondary until you need them.
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
 							<Search className="h-4 w-4" />
-							Search across all commits
+							Search across all commits and jump straight to the result
 						</li>
 						<li className="flex items-center gap-2">
 							<FolderOpen className="h-4 w-4" />
-							Worktrees & Submodules
+							Worktrees, submodules, and stash recovery
 						</li>
 						<li className="flex items-center gap-2">
 							<Settings className="h-4 w-4" />
-							Git Configuration Editor
+							Diagnostics, repo policy, and Git configuration
 						</li>
 						<li className="flex items-center gap-2">
 							<CheckCircle2 className="h-4 w-4" />
-							Real Undo Stack
+							Undo stack and safer action previews for risky operations
 						</li>
 					</ul>
 				</div>
@@ -302,6 +302,7 @@ export function OnboardingDialog({
 }
 
 // Hook to check if onboarding should be shown
+// eslint-disable-next-line react-refresh/only-export-components
 export function useOnboarding() {
 	const [shouldShow, setShouldShow] = useState(false);
     const onboardingQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });

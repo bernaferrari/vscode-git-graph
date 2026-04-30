@@ -15,10 +15,11 @@ export interface GitExecutable {
 }
 
 export enum GitVersionRequirement {
-	FetchAndPruneTags = '2.17.0',
+	_FetchAndPruneTags = '2.17.0',
+	// eslint-disable-next-line no-unused-vars
 	GpgInfo = '2.4.0',
-	PushStash = '2.13.2',
-	TagDetails = '1.7.8',
+	_PushStash = '2.13.2',
+	_TagDetails = '1.7.8',
 }
 
 // ==================== Git Discovery ====================
@@ -158,6 +159,7 @@ async function findGitWin32InPath(): Promise<GitExecutable> {
  */
 function isExecutable(p: string): Promise<boolean> {
 	return new Promise((resolve) => {
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		fs.stat(p, (err, stat) => {
 			resolve(!err && (stat.isFile() || stat.isSymbolicLink()));
 		});

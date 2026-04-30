@@ -28,7 +28,8 @@ function formatDashboardDate(date: string): string {
 function formatRepoLabel(repoKey: string): string {
 	const [host, ...pathSegments] = repoKey.split('/');
 	const tail = pathSegments.slice(-2).join('/');
-	return tail ? `${tail} · ${host}` : repoKey;
+	if (tail.length > 0 && host !== undefined) return `${tail} · ${host}`;
+	return repoKey;
 }
 
 export function CollaborationReviewDashboardTab({
@@ -207,7 +208,7 @@ export function CollaborationReviewDashboardTab({
 												<div className='flex items-start justify-between gap-3'>
 													<div className='min-w-0'>
 														<p className='truncate text-sm font-medium'>
-															{reviewItem ? `#${reviewItem.number} ${reviewItem.title}` : target.rootTargetId}
+															{reviewItem ? `#${String(reviewItem.number)} ${reviewItem.title}` : target.rootTargetId}
 														</p>
 														<p className='mt-1 text-xs text-muted-foreground'>
 															{target.assignmentCount} assignment{target.assignmentCount === 1 ? '' : 's'} · {target.commentCount} comment{target.commentCount === 1 ? '' : 's'} · {target.fileThreadCount} file thread{target.fileThreadCount === 1 ? '' : 's'}
@@ -265,13 +266,13 @@ export function CollaborationReviewDashboardTab({
 												<div className='flex h-24 items-end gap-1 rounded-xl bg-muted/35 p-2'>
 													<div
 														className='w-1/2 rounded-sm bg-primary/85'
-														style={{ height: `${Math.max(10, (entry.assignments / maxActivity) * 100)}%` }}
-														title={`${entry.assignments} assignments`}
+														style={{ height: `${String(Math.max(10, (entry.assignments / maxActivity) * 100))}%` }}
+														title={`${String(entry.assignments)} assignments`}
 													/>
 													<div
 														className='w-1/2 rounded-sm bg-sky-500/85'
-														style={{ height: `${Math.max(10, (entry.comments / maxActivity) * 100)}%` }}
-														title={`${entry.comments} comments`}
+														style={{ height: `${String(Math.max(10, (entry.comments / maxActivity) * 100))}%` }}
+														title={`${String(entry.comments)} comments`}
 													/>
 												</div>
 												<p className='text-center text-[10px] text-muted-foreground'>{formatDashboardDate(entry.date)}</p>

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidateCommitTemplates = vi.fn(async () => undefined);
+const invalidateCommitTemplates = vi.fn(() => undefined);
 const mutateCommitTemplates = vi.fn();
 let commitTemplatesData: { templates: Array<{ id: string; name: string; content: string; description?: string; isDefault?: boolean }> } | undefined;
 let commitTemplatesSuccess = false;
@@ -63,6 +63,7 @@ describe('useCommitTemplates', () => {
 
         render(<Harness />);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTestId('template-count')).toHaveTextContent('1');
 
         fireEvent.click(screen.getByText('Save Templates'));

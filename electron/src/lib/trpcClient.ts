@@ -20,7 +20,7 @@ function getClient(): TrpcClient {
 
 // Vanilla tRPC client for use outside React components (e.g., in main.tsx)
 export const trpcClient = new Proxy({} as TrpcClient, {
-	get(_target, key, receiver) {
+	get(_target: TrpcClient, key: string | symbol, receiver: unknown): unknown {
 		return Reflect.get(getClient(), key, receiver);
 	},
 });

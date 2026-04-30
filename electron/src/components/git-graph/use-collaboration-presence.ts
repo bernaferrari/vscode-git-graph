@@ -14,9 +14,9 @@ export function useCollaborationPresence(activeRepo: string | null, currentHead:
 		if (
 			!config ||
 			!config.enabled ||
-			!config.endpointUrl?.trim() ||
+			!config.endpointUrl.trim() ||
 			!config.presenceEnabled ||
-			!config.displayName?.trim()
+			!config.displayName.trim()
 		) {
 			return;
 		}

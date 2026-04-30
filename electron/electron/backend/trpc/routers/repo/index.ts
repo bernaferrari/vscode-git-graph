@@ -378,10 +378,10 @@ const providerGitlabTokenSecretKey = 'providerAuth.gitlabToken';
 const providerBitbucketTokenSecretKey = 'providerAuth.bitbucketToken';
 const providerAzureTokenSecretKey = 'providerAuth.azureToken';
 const collaborationAuthTokenSecretKey = 'collaborationSyncConfig.authToken';
-const collaborationMemberApiKeySecretKey = 'collaborationSyncConfig.memberApiKey';
+const collaborationMemberApiKeySecretKey = 'collaborationSyncConfig.memberApiKey'; // eslint-disable-line no-secrets/no-secrets
 
 function hydrateProviderAuthConfig(): ProviderAuthConfig {
-	const current = (appStore.get('providerAuth') ?? {}) as Partial<Record<string, unknown>>;
+	const current = appStore.get('providerAuth') as Partial<Record<string, unknown>>;
 	const githubToken = readSecretValue(providerGithubTokenSecretKey);
 	const gitlabToken = readSecretValue(providerGitlabTokenSecretKey);
 	const bitbucketToken = readSecretValue(providerBitbucketTokenSecretKey);
@@ -427,7 +427,7 @@ function getStoredProviderAuthConfig(): ProviderAuthConfig {
 }
 
 function hydrateCollaborationSyncConfig(): CollaborationSyncConfig {
-	const current = (appStore.get('collaborationSyncConfig') ?? {}) as Partial<CollaborationSyncConfig>;
+	const current = appStore.get('collaborationSyncConfig') as Partial<CollaborationSyncConfig>;
 	const authToken = readSecretValue(collaborationAuthTokenSecretKey);
 	const memberApiKey = readSecretValue(collaborationMemberApiKeySecretKey);
 	const currentAuthToken = readString(current.authToken).trim();
@@ -949,7 +949,7 @@ export const repoRouter = router({
 				action: 'exported',
 				status: 'info',
 				title: 'Collaboration bundle exported',
-				description: `Prepared ${bundle.workspaceShares.length} handoff${bundle.workspaceShares.length === 1 ? '' : 's'}, ${bundle.patchShelf.length} patch${bundle.patchShelf.length === 1 ? '' : 'es'}, and ${bundle.comments.length} comment${bundle.comments.length === 1 ? '' : 's'} for exchange.`,
+				description: `Prepared ${String(bundle.workspaceShares.length)} handoff${bundle.workspaceShares.length === 1 ? '' : 's'}, ${String(bundle.patchShelf.length)} patch${bundle.patchShelf.length === 1 ? '' : 'es'}, and ${String(bundle.comments.length)} comment${bundle.comments.length === 1 ? '' : 's'} for exchange.`,
 				metadata: {
 					projectId: config.projectId,
 					workspaceShares: bundle.workspaceShares.length,
@@ -998,7 +998,7 @@ export const repoRouter = router({
 					action: 'imported',
 					status: 'success',
 					title: 'Collaboration bundle imported',
-					description: `Imported ${input.bundle.workspaceShares.length} handoff${input.bundle.workspaceShares.length === 1 ? '' : 's'}, ${input.bundle.patchShelf.length} patch${input.bundle.patchShelf.length === 1 ? '' : 'es'}, and ${input.bundle.comments.length} comment${input.bundle.comments.length === 1 ? '' : 's'} using ${input.strategy} mode.`,
+					description: `Imported ${String(input.bundle.workspaceShares.length)} handoff${input.bundle.workspaceShares.length === 1 ? '' : 's'}, ${String(input.bundle.patchShelf.length)} patch${input.bundle.patchShelf.length === 1 ? '' : 'es'}, and ${String(input.bundle.comments.length)} comment${input.bundle.comments.length === 1 ? '' : 's'} using ${input.strategy} mode.`,
 					metadata: {
 						strategy: input.strategy,
 						projectId: input.bundle.projectId ?? null,
@@ -1028,7 +1028,7 @@ export const repoRouter = router({
 					return { share: null, error: initError };
 				}
 
-				const workspaces = instanceStore.get('workspaces') ?? [];
+				const workspaces = instanceStore.get('workspaces');
 				const workspace = workspaces.find((entry) => entry.id === input.workspaceId);
 				if (!workspace) {
 					return { share: null, error: 'Workspace not found.' };
@@ -1039,7 +1039,7 @@ export const repoRouter = router({
 				);
 				const now = Date.now();
 				const share: z.infer<typeof collaborationWorkspaceShareSchema> = {
-					id: `workspace-share-${now}`,
+					id: `workspace-share-${String(now)}`,
 					workspaceId: workspace.id,
 					name: input.name.trim(),
 					note: input.note?.trim() ?? '',
@@ -1059,7 +1059,7 @@ export const repoRouter = router({
 					action: 'created',
 					status: 'success',
 					title: `Workspace handoff created: ${share.name}`,
-					description: `${share.repos.length} repo${share.repos.length === 1 ? '' : 's'} captured for workspace ${workspace.name}.`,
+					description: `${String(share.repos.length)} repo${share.repos.length === 1 ? '' : 's'} captured for workspace ${workspace.name}.`,
 					metadata: {
 						workspaceId: share.workspaceId,
 						repoCount: share.repos.length,
@@ -1134,12 +1134,12 @@ export const repoRouter = router({
 					const stats = summarizePatchStats(numstat ?? '');
 					const now = Date.now();
 					const share: z.infer<typeof collaborationPatchShareSchema> = {
-						id: `patch-share-${now}`,
+						id: `patch-share-${String(now)}`,
 						repo: input.repo,
 						name: input.name.trim(),
 						baseRef: input.baseRef,
 						headRef: input.headRef,
-						summary: `${stats.fileCount} file${stats.fileCount === 1 ? '' : 's'} changed, +${stats.additions}/-${stats.deletions}`,
+						summary: `${String(stats.fileCount)} file${stats.fileCount === 1 ? '' : 's'} changed, +${String(stats.additions)}/-${String(stats.deletions)}`,
 						patch: normalizedPatch,
 						fileCount: stats.fileCount,
 						additions: stats.additions,
@@ -1289,7 +1289,7 @@ export const repoRouter = router({
 					return { success: false, error: 'Collaboration comment not found.', comment: null, remoteComment: null };
 				}
 				if (comment.targetType !== 'pull-request' && comment.targetType !== 'pull-request-file') {
-					return { success: false, error: 'Only pull request discussion can be synced to a provider.', comment: comment ?? null, remoteComment: null };
+					return { success: false, error: 'Only pull request discussion can be synced to a provider.', comment, remoteComment: null };
 				}
 
 				const target = parseCollaborationReviewCommentTarget(comment);
@@ -1346,7 +1346,7 @@ export const repoRouter = router({
 						title: `Comment mirrored to ${target.provider}`,
 						description:
 							target.kind === 'line-thread'
-								? `${target.filePath}:${String(target.line)} synced to the provider review thread.`
+								? `${target.filePath ?? ''}:${String(target.line)} synced to the provider review thread.`
 								: 'Shared collaboration note mirrored to the provider pull request discussion.',
 						metadata: {
 							commentId: comment.id,
@@ -1447,7 +1447,7 @@ export const repoRouter = router({
 						action: 'imported',
 						status: 'success',
 						title: `Imported provider review discussion from ${input.provider}`,
-						description: `${providerComments.length} comment${providerComments.length === 1 ? '' : 's'} mirrored into local collaboration threads for PR #${String(input.number)}.`,
+						description: `${String(providerComments.length)} comment${providerComments.length === 1 ? '' : 's'} mirrored into local collaboration threads for PR #${String(input.number)}.`,
 						metadata: {
 							provider: input.provider,
 							pullRequestNumber: input.number,
@@ -1480,7 +1480,7 @@ export const repoRouter = router({
 
 				const state = getCollaborationState();
 				const comment = state.comments.find((entry) => entry.id === input.id) ?? null;
-				if (!comment?.providerSync?.remoteThreadId || !comment.providerSync.provider) {
+				if (!comment?.providerSync?.remoteThreadId) {
 					return { success: false, error: 'This comment is not linked to a provider thread.', comment: null };
 				}
 
@@ -1504,12 +1504,15 @@ export const repoRouter = router({
 						input.resolved
 					);
 
+					const syncProvider = comment.providerSync.provider;
+					const syncThreadId = comment.providerSync.remoteThreadId;
+
 						const nextComments = state.comments.map((entry) => {
 							const providerSync = entry.providerSync;
 							if (
 								!providerSync ||
-								providerSync.provider !== comment.providerSync?.provider ||
-								providerSync.remoteThreadId !== comment.providerSync?.remoteThreadId
+								providerSync.provider !== syncProvider ||
+								providerSync.remoteThreadId !== syncThreadId
 							) {
 								return entry;
 							}
@@ -1639,8 +1642,8 @@ export const repoRouter = router({
 						type: 'assignment',
 						action: 'updated',
 						status: 'success',
-						title: `Synced ${input.provider} reviewer state for PR #${String(input.number)}`,
-						description: `${reviewState.reviewers.length} provider reviewer${reviewState.reviewers.length === 1 ? '' : 's'} mirrored into the shared review queue.`,
+					title: `Synced ${input.provider} reviewer state for PR #${String(input.number)}`,
+					description: `${String(reviewState.reviewers.length)} provider reviewer${reviewState.reviewers.length === 1 ? '' : 's'} mirrored into the shared review queue.`,
 						metadata: {
 							provider: input.provider,
 							pullRequestNumber: input.number,
@@ -2357,14 +2360,14 @@ export const repoRouter = router({
 		.query(({ input }) => {
 			const current = instanceStore.get('commitFiltersByRepo');
 			return {
-				filters: current?.[input.repo] ?? {},
+				filters: current[input.repo] ?? {},
 			};
 		}),
 
 	setCommitFilters: publicProcedure
 		.input(commitFilterStateSchema)
 		.mutation(({ input }) => {
-			const current = instanceStore.get('commitFiltersByRepo') ?? {};
+			const current = instanceStore.get('commitFiltersByRepo');
 			const { repo, ...filters } = input;
 			const nextFilters = Object.fromEntries(
 				Object.entries(filters).filter(([, value]) => typeof value === 'string' && value.length > 0)
@@ -2386,7 +2389,7 @@ export const repoRouter = router({
 			})
 		)
 		.query(({ input }) => {
-			const current = instanceStore.get('pinnedCommitsByRepo') ?? {};
+			const current = instanceStore.get('pinnedCommitsByRepo');
 			return {
 				commits: current[input.repo] ?? [],
 			};
@@ -2400,7 +2403,7 @@ export const repoRouter = router({
 			})
 		)
 		.mutation(({ input }) => {
-			const current = instanceStore.get('pinnedCommitsByRepo') ?? {};
+			const current = instanceStore.get('pinnedCommitsByRepo');
 			instanceStore.set('pinnedCommitsByRepo', {
 				...current,
 				[input.repo]: input.commits,
@@ -2413,7 +2416,7 @@ export const repoRouter = router({
 
 	recentRepoDetails: publicProcedure.query(() => {
 		return {
-			repos: instanceStore.get('recentRepoDetails') ?? [],
+			repos: instanceStore.get('recentRepoDetails'),
 		};
 	}),
 
@@ -2438,7 +2441,7 @@ export const repoRouter = router({
 			})
 		)
 		.query(({ input }) => {
-			const current = instanceStore.get('undoHistoryByRepo') ?? {};
+			const current = instanceStore.get('undoHistoryByRepo');
 			return {
 				history: current[input.repo] ?? { operations: [], currentIndex: -1 },
 			};
@@ -2453,7 +2456,7 @@ export const repoRouter = router({
 			})
 		)
 		.mutation(({ input }) => {
-			const current = instanceStore.get('undoHistoryByRepo') ?? {};
+			const current = instanceStore.get('undoHistoryByRepo');
 			const nextHistory = {
 				operations: input.operations.slice(0, 100),
 				currentIndex: input.currentIndex,
@@ -2631,7 +2634,7 @@ export const repoRouter = router({
 		)
 		.query(async ({ input }) => {
 			const initError = await ensureGitInitialized();
-			const statusMapStore = instanceStore.get('launchpadStatusMap') ?? {};
+			const statusMapStore = instanceStore.get('launchpadStatusMap');
 			if (initError !== null) {
 				return {
 					repos: input.repos.map((repoPath) => ({
@@ -2895,6 +2898,7 @@ export const repoRouter = router({
 
 				if (input.provider === 'gitlab') {
 					const data = await requestProviderJson<Array<Record<string, unknown>>>(
+						// eslint-disable-next-line no-secrets/no-secrets
 						'https://gitlab.com/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&sort=desc&per_page=100',
 						headers
 					);
@@ -2970,6 +2974,7 @@ export const repoRouter = router({
 				const destination = path.resolve(input.destination);
 				const parentDir = path.dirname(destination);
 				const destinationName = path.basename(destination);
+				// eslint-disable-next-line security/detect-non-literal-fs-filename
 				await fs.mkdir(parentDir, { recursive: true });
 
 				const gitService = getGitService();

@@ -44,7 +44,7 @@ function readStoredString(value: unknown): string {
 }
 
 function hydrateProviderAuthConfig(): ProviderAuthConfig {
-    const current = (appStore.get('providerAuth') ?? {}) as Partial<Record<string, unknown>>;
+    const current = appStore.get('providerAuth') as Partial<Record<string, unknown>>;
     const githubToken = readSecretValue(providerGithubTokenSecretKey);
     const gitlabToken = readSecretValue(providerGitlabTokenSecretKey);
     const bitbucketToken = readSecretValue(providerBitbucketTokenSecretKey);
@@ -254,6 +254,7 @@ async function discoverSshPublicKeys(selectedSigningKeyPath: string | null): Pro
     const keys: SshPublicKeyInfo[] = [];
 
     try {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         const entries = await fs.readdir(sshDir, { withFileTypes: true });
         const pubEntries = entries
             .filter((entry) => entry.isFile() && entry.name.endsWith('.pub'))
@@ -264,6 +265,7 @@ async function discoverSshPublicKeys(selectedSigningKeyPath: string | null): Pro
                 const keyPath = path.join(sshDir, entry.name);
 
                 try {
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     const content = await fs.readFile(keyPath, 'utf-8');
                     const parsed = parseSshPublicKey(content);
                     if (!parsed) {
@@ -471,6 +473,7 @@ function parseLfsTrackPatterns(trackOutput: string | null): string[] {
 
 function parseByteSizeToken(value: string): number | null {
     const normalized = value.replace(/,/g, '').trim();
+    // eslint-disable-next-line security/detect-unsafe-regex
     const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([kmgtp]?i?b?)?$/i);
     if (!match?.[1]) {
         return null;
@@ -698,6 +701,216 @@ interface RebaseTodoItem {
     message: string;
 }
 
+interface RepoHealthDiagnostic {
+    id: string;
+    label: string;
+    description: string;
+    status: 'pass' | 'warn' | 'fail';
+    detail: string;
+    metrics?: Record<string, number | string | boolean | null>;
+}
+
+function parsePorcelainStatus(output: string | null): {
+    stagedCount: number;
+    unstagedCount: number;
+    conflictedCount: number;
+    untrackedCount: number;
+} {
+    const counts = {
+        stagedCount: 0,
+        unstagedCount: 0,
+        conflictedCount: 0,
+        untrackedCount: 0,
+    };
+    for (const line of output?.split('\n') ?? []) {
+        if (line.length < 2) continue;
+        const x = line[0] ?? ' ';
+        const y = line[1] ?? ' ';
+        if (x === '?' && y === '?') {
+            counts.untrackedCount += 1;
+            continue;
+        }
+        if (x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D')) {
+            counts.conflictedCount += 1;
+            continue;
+        }
+        if (x !== ' ') counts.stagedCount += 1;
+        if (y !== ' ') counts.unstagedCount += 1;
+    }
+    return counts;
+}
+
+function parseLargeTrackedFiles(output: string | null): Array<{ path: string; sizeBytes: number }> {
+    return (output?.split('\n') ?? [])
+        .map((line) => {
+            const match = line.match(/^\S+\s+\S+\s+\S+\s+(\d+|-)\t(.+)$/);
+            const rawSize = match?.[1];
+            const filePath = match?.[2];
+            if (!rawSize || rawSize === '-' || !filePath) {
+                return null;
+            }
+            return { path: filePath, sizeBytes: Number(rawSize) };
+        })
+        .filter((entry): entry is { path: string; sizeBytes: number } => Boolean(entry))
+        .sort((left, right) => right.sizeBytes - left.sizeBytes);
+}
+
+function parseBranchDates(output: string | null): Array<{ name: string; timestamp: number }> {
+    return (output?.split('\n') ?? [])
+        .map((line) => {
+            const [name, rawTimestamp] = line.split('|');
+            const timestamp = Number(rawTimestamp);
+            if (!name || !Number.isFinite(timestamp)) {
+                return null;
+            }
+            return { name, timestamp };
+        })
+        .filter((entry): entry is { name: string; timestamp: number } => Boolean(entry));
+}
+
+function parseAheadBehind(output: string | null): { ahead: number; behind: number } | null {
+    const [behindRaw, aheadRaw] = output?.trim().split(/\s+/) ?? [];
+    const ahead = Number(aheadRaw);
+    const behind = Number(behindRaw);
+    if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+        return null;
+    }
+    return { ahead, behind };
+}
+
+async function buildRepoHealthDiagnostics(repo: string): Promise<{
+    checks: RepoHealthDiagnostic[];
+    score: number;
+    generatedAt: number;
+}> {
+    const git = getGitService();
+    const statusOutput = await git.runGitCommandWithOutput(['status', '--porcelain=v1'], repo);
+    const statusCounts = parsePorcelainStatus(statusOutput);
+    const remoteOutput = await git.runGitCommandWithOutput(['remote', '-v'], repo);
+    const head = (await git.runGitCommandWithOutput(['branch', '--show-current'], repo))?.trim() || null;
+    const upstream = (await git.runGitCommandWithOutput(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], repo))?.trim() || null;
+    const aheadBehind = upstream
+        ? parseAheadBehind(await git.runGitCommandWithOutput(['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], repo))
+        : null;
+    const largeFiles = parseLargeTrackedFiles(await git.runGitCommandWithOutput(['ls-tree', '-r', '-l', 'HEAD'], repo));
+    const largeFileThreshold = 5 * 1024 * 1024;
+    const oversizedFiles = largeFiles.filter((file) => file.sizeBytes >= largeFileThreshold).slice(0, 5);
+    const staleThresholdSeconds = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
+    const branchDates = parseBranchDates(
+        await git.runGitCommandWithOutput(['for-each-ref', '--format=%(refname:short)|%(committerdate:unix)', 'refs/heads'], repo)
+    );
+    const staleBranches = branchDates
+        .filter((branch) => branch.name !== head && branch.timestamp < staleThresholdSeconds)
+        .sort((left, right) => left.timestamp - right.timestamp)
+        .slice(0, 5);
+    const mergedBranches = (await git.runGitCommandWithOutput(['branch', '--merged', 'HEAD', '--format=%(refname:short)'], repo))
+        ?.split('\n')
+        .map((branch) => branch.trim())
+        .filter((branch) => branch && branch !== head && !['main', 'master', 'develop'].includes(branch))
+        .slice(0, 8) ?? [];
+    const lfsFiles = parseLfsTrackedFiles(await git.runGitCommandWithOutput(['lfs', 'ls-files', '--size'], repo));
+    const submoduleOutput = await git.runGitCommandWithOutput(['submodule', 'status', '--recursive'], repo);
+    const submoduleLines = submoduleOutput?.split('\n').filter((line) => line.trim().length > 0) ?? [];
+    const fsckError = await git.runGitCommand(['fsck', '--no-progress'], repo);
+
+    const checks: RepoHealthDiagnostic[] = [
+        {
+            id: 'working-tree',
+            label: 'Working Directory',
+            description: 'Detect staged, unstaged, untracked, and conflicted files.',
+            status: statusCounts.conflictedCount > 0 ? 'fail' : statusCounts.stagedCount + statusCounts.unstagedCount + statusCounts.untrackedCount > 0 ? 'warn' : 'pass',
+            detail:
+                statusCounts.stagedCount + statusCounts.unstagedCount + statusCounts.untrackedCount + statusCounts.conflictedCount > 0
+                    ? `${String(statusCounts.stagedCount)} staged, ${String(statusCounts.unstagedCount)} unstaged, ${String(statusCounts.untrackedCount)} untracked, ${String(statusCounts.conflictedCount)} conflicted`
+                    : 'Clean working directory',
+            metrics: statusCounts,
+        },
+        {
+            id: 'remote',
+            label: 'Remote Configuration',
+            description: 'Check whether remotes and upstream tracking are configured.',
+            status: remoteOutput?.trim() ? (upstream ? 'pass' : 'warn') : 'warn',
+            detail: remoteOutput?.trim()
+                ? upstream
+                    ? `Tracking ${upstream}`
+                    : 'Remotes exist, but current branch has no upstream'
+                : 'No remotes configured',
+            metrics: {
+                hasRemote: Boolean(remoteOutput?.trim()),
+                upstream,
+                ahead: aheadBehind?.ahead ?? null,
+                behind: aheadBehind?.behind ?? null,
+            },
+        },
+        {
+            id: 'remote-drift',
+            label: 'Remote Drift',
+            description: 'Compare the current branch to its upstream.',
+            status: !upstream ? 'warn' : (aheadBehind?.behind ?? 0) > 0 ? 'warn' : 'pass',
+            detail: !upstream
+                ? 'No upstream configured'
+                : `${String(aheadBehind?.ahead ?? 0)} ahead, ${String(aheadBehind?.behind ?? 0)} behind ${upstream}`,
+            metrics: {
+                ahead: aheadBehind?.ahead ?? null,
+                behind: aheadBehind?.behind ?? null,
+            },
+        },
+        {
+            id: 'large-files',
+            label: 'Large Tracked Files',
+            description: 'Find large files committed directly to Git history.',
+            status: oversizedFiles.length > 0 ? 'warn' : 'pass',
+            detail:
+                oversizedFiles.length > 0
+	                    ? oversizedFiles.map((file) => `${file.path} (${formatByteSize(file.sizeBytes) ?? 'unknown size'})`).join(', ')
+                    : 'No tracked files over 5 MB in HEAD',
+            metrics: {
+                thresholdBytes: largeFileThreshold,
+                largeFileCount: oversizedFiles.length,
+            },
+        },
+        {
+            id: 'branch-hygiene',
+            label: 'Branch Hygiene',
+            description: 'Find stale and already-merged local branches.',
+            status: staleBranches.length + mergedBranches.length > 0 ? 'warn' : 'pass',
+            detail:
+                staleBranches.length + mergedBranches.length > 0
+                    ? `${String(staleBranches.length)} stale, ${String(mergedBranches.length)} merged: ${[...staleBranches.map((branch) => branch.name), ...mergedBranches].slice(0, 6).join(', ')}`
+                    : 'No stale or merged local branches detected',
+            metrics: {
+                staleBranchCount: staleBranches.length,
+                mergedBranchCount: mergedBranches.length,
+            },
+        },
+        {
+            id: 'lfs-submodules',
+            label: 'LFS and Submodules',
+            description: 'Summarize LFS and submodule footprint.',
+            status: submoduleLines.some((line) => line.startsWith('-') || line.startsWith('+')) ? 'warn' : 'pass',
+            detail: `${String(lfsFiles.length)} LFS file(s), ${String(submoduleLines.length)} submodule(s)`,
+            metrics: {
+                lfsFileCount: lfsFiles.length,
+                submoduleCount: submoduleLines.length,
+            },
+        },
+        {
+            id: 'object-integrity',
+            label: 'Object Integrity',
+            description: 'Run git fsck to detect object database problems.',
+            status: fsckError ? 'fail' : 'pass',
+            detail: fsckError ? fsckError.slice(0, 240) : 'git fsck completed without errors',
+        },
+    ];
+
+    const score = Math.round(
+        checks.reduce((total, check) => total + (check.status === 'pass' ? 100 : check.status === 'warn' ? 55 : 0), 0) /
+            checks.length
+    );
+
+    return { checks, score, generatedAt: Date.now() };
+}
+
 function validateRebaseTodoText(todos: string): string | null {
     const trimmed = todos.trim();
     if (!trimmed) return null;
@@ -741,6 +954,7 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
     }
 
     const actionWithCommitMatch = trimmedLine.match(
+        // eslint-disable-next-line security/detect-unsafe-regex
         /^(pick|reword|edit|squash|fixup|drop)\s+([0-9a-f]{7,40})(?:\s+(.*))?$/i
     );
     if (actionWithCommitMatch) {
@@ -775,6 +989,7 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
             };
         }
 
+        // eslint-disable-next-line security/detect-unsafe-regex
         const hashMatch = body.match(/^([0-9a-f]{7,40})(?:\s+(.*))?$/i);
         if (hashMatch) {
             const hash = (hashMatch[1] ?? '').toLowerCase();
@@ -819,6 +1034,7 @@ async function readRebaseTodo(
     for (const candidate of rebaseTodoCandidates) {
         if (!(await fileExists(candidate.path))) continue;
 
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         const rawTodo = await fs.readFile(candidate.path, 'utf8');
         const todos = rawTodo
             .split('\n')
@@ -1067,6 +1283,35 @@ export const gitRouter = router({
 
         const root = await getGitService().getRepoRoot(input.path);
         return { root, error: null };
+    }),
+
+    /**
+     * Run repository health diagnostics in the backend.
+     */
+    repoHealth: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
+        const initError = await ensureGitInitialized();
+        if (initError) {
+            return {
+                checks: [],
+                score: 0,
+                generatedAt: Date.now(),
+                error: initError,
+            };
+        }
+
+        try {
+            return {
+                ...(await buildRepoHealthDiagnostics(input.repo)),
+                error: null,
+            };
+        } catch (error) {
+            return {
+                checks: [],
+                score: 0,
+                generatedAt: Date.now(),
+                error: error instanceof Error ? error.message : 'Unknown repository health error',
+            };
+        }
     }),
 
     /**
@@ -1554,6 +1799,33 @@ export const gitRouter = router({
             }
         }),
 
+    fileBinaryAtRevision: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                commitHash: z.string(),
+                filePath: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { contentBase64: null, error: initError };
+
+            try {
+                const contentBase64 = await getGitService().getFileBinaryAtRevision(
+                    input.repo,
+                    input.commitHash,
+                    input.filePath
+                );
+                return { contentBase64, error: null };
+            } catch (error) {
+                return {
+                    contentBase64: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        }),
+
     /**
      * Get diff between two revisions.
      */
@@ -1603,6 +1875,7 @@ export const gitRouter = router({
                 repo: z.string(),
                 commitHash: z.string(),
                 filePath: z.string(),
+                previousFilePath: z.string().optional(),
             })
         )
         .query(async ({ input }) => {
@@ -1611,11 +1884,24 @@ export const gitRouter = router({
 
             try {
                 const service = getGitService();
+                const pathArgs =
+                    input.previousFilePath && input.previousFilePath !== input.filePath
+                        ? [input.previousFilePath, input.filePath]
+                        : [input.filePath];
                 const diff = await service.runGitCommandWithOutput(
-                    ['diff', input.commitHash + '^', input.commitHash, '--', input.filePath],
+                    [
+                        'show',
+                        '--format=',
+                        '--no-ext-diff',
+                        '--find-renames',
+                        '--find-copies-harder',
+                        input.commitHash,
+                        '--',
+                        ...pathArgs,
+                    ],
                     input.repo
                 );
-                return { diff, error: null };
+                return { diff: diff ?? '', error: null };
             } catch (error) {
                 return { diff: '', error: error instanceof Error ? error.message : 'Unknown error' };
             }
@@ -1819,7 +2105,8 @@ export const gitRouter = router({
                 branchName: z.string(),
                 remote: z.string(),
                 setUpstream: z.boolean(),
-                force: z.boolean(),
+                force: z.boolean().optional(),
+                mode: z.enum(['normal', 'force', 'force-with-lease']).optional(),
             })
         )
         .mutation(async ({ input }) => {
@@ -1828,7 +2115,12 @@ export const gitRouter = router({
 
             const args = ['push', input.remote, input.branchName];
             if (input.setUpstream) args.push('--set-upstream');
-            if (input.force) args.push('--force');
+            const pushMode = input.mode ?? (input.force ? 'force' : 'normal');
+            if (pushMode === 'force') {
+                args.push('--force');
+            } else if (pushMode === 'force-with-lease') {
+                args.push('--force-with-lease');
+            }
 
             const error = await getGitService().runGitCommand(args, input.repo);
             return { error };
@@ -2755,11 +3047,54 @@ export const gitRouter = router({
             const initError = await ensureGitInitialized();
             if (initError) return { error: initError };
 
-            const args = ['branch', '-m'];
-            if (input.force) args.push('-M');
+            const args = ['branch', input.force ? '-M' : '-m'];
             args.push(input.oldName, input.newName);
 
             const error = await getGitService().runGitCommand(args, input.repo);
+            return { error };
+        }),
+
+    /**
+     * Set upstream tracking branch for a local branch.
+     */
+    setBranchUpstream: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                branchName: z.string(),
+                upstream: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            const error = await getGitService().runGitCommand(
+                ['branch', '--set-upstream-to', input.upstream, input.branchName],
+                input.repo
+            );
+            return { error };
+        }),
+
+    /**
+     * Delete a remote branch.
+     */
+    deleteRemoteBranch: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                remote: z.string(),
+                branchName: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            const error = await getGitService().runGitCommand(
+                ['push', input.remote, '--delete', input.branchName],
+                input.repo
+            );
             return { error };
         }),
 
@@ -3172,7 +3507,9 @@ export const gitRouter = router({
 
                 const mergedContent = `${ours}${ours.endsWith('\n') || theirs.length === 0 ? '' : '\n'}${theirs}`;
                 const targetPath = resolveRepoPath(input.repo, safePath);
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 await fs.mkdir(path.dirname(targetPath), { recursive: true });
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 await fs.writeFile(targetPath, mergedContent, 'utf8');
 
                 const stageError = await gitService.runGitCommand(['add', '--', safePath], input.repo);
@@ -3930,6 +4267,7 @@ export const gitRouter = router({
             .query(async ({ input }) => {
                 const candidate = path.isAbsolute(input.path) ? input.path : path.resolve(input.repo, input.path);
                 try {
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     const stat = await fs.stat(candidate);
                     if (!stat.isDirectory()) {
                         return {
@@ -3941,6 +4279,7 @@ export const gitRouter = router({
                         };
                     }
 
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     const entries = await fs.readdir(candidate);
                     const empty = entries.length === 0;
                     if (!empty && !input.allowNonEmpty) {
@@ -4059,11 +4398,11 @@ export const gitRouter = router({
             const current = instanceStore.get('worktreeViewPrefs');
             return {
                 prefs: {
-                    showLocked: current?.showLocked ?? true,
-                    showPrunable: current?.showPrunable ?? true,
-                    defaultCreateMode: current?.defaultCreateMode ?? 'existing',
-                    pathPresetRoot: current?.pathPresetRoot ?? null,
-                    lastSelectedBranch: current?.lastSelectedBranch ?? null,
+                    showLocked: current.showLocked,
+                    showPrunable: current.showPrunable,
+                    defaultCreateMode: current.defaultCreateMode,
+                    pathPresetRoot: current.pathPresetRoot,
+                    lastSelectedBranch: current.lastSelectedBranch,
                 },
                 error: null as string | null,
             };
@@ -4082,11 +4421,11 @@ export const gitRouter = router({
             .mutation(({ input }) => {
                 const current = instanceStore.get('worktreeViewPrefs');
                 instanceStore.set('worktreeViewPrefs', {
-                    showLocked: input.showLocked ?? current?.showLocked ?? true,
-                    showPrunable: input.showPrunable ?? current?.showPrunable ?? true,
-                    defaultCreateMode: input.defaultCreateMode ?? current?.defaultCreateMode ?? 'existing',
-                    pathPresetRoot: input.pathPresetRoot ?? current?.pathPresetRoot ?? null,
-                    lastSelectedBranch: input.lastSelectedBranch ?? current?.lastSelectedBranch ?? null,
+                    showLocked: input.showLocked ?? current.showLocked,
+                    showPrunable: input.showPrunable ?? current.showPrunable,
+                    defaultCreateMode: input.defaultCreateMode ?? current.defaultCreateMode,
+                    pathPresetRoot: input.pathPresetRoot ?? current.pathPresetRoot,
+                    lastSelectedBranch: input.lastSelectedBranch ?? current.lastSelectedBranch,
                 });
                 return { success: true };
             }),
@@ -5046,6 +5385,7 @@ export const gitRouter = router({
 
                 let additions = 0;
                 let deletions = 0;
+                // eslint-disable-next-line security/detect-unsafe-regex
                 const statsMatch = statsOutput?.match(/(\d+) insertion[^,]*(?:,\s*(\d+) deletion)?/);
                 if (statsMatch) {
                     additions = parseInt(statsMatch[1] ?? '0', 10);
@@ -5415,6 +5755,7 @@ export const gitRouter = router({
                     'sendemail-validate',
                 ];
 
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 const entries = await fs.readdir(hooksDir, { withFileTypes: true });
                 const discovered = new Map<
                     string,
@@ -5431,6 +5772,7 @@ export const gitRouter = router({
                     if (!baseName) continue;
 
                     const entryPath = path.join(hooksDir, entry.name);
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     const stat = await fs.stat(entryPath);
                     const executable = (stat.mode & 0o111) !== 0;
 
@@ -5504,6 +5846,7 @@ export const gitRouter = router({
                         return { error: 'Could not find .git directory' };
                     }
                     const hooksDir = path.join(gitDir, 'hooks');
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     await fs.mkdir(hooksDir, { recursive: true });
 
                     const hookPath = path.join(hooksDir, input.name);
@@ -5512,10 +5855,13 @@ export const gitRouter = router({
                     if (input.enabled) {
                         if (await fileExists(samplePath)) {
                             if (await fileExists(hookPath)) {
+                                // eslint-disable-next-line security/detect-non-literal-fs-filename
                                 await fs.unlink(hookPath);
                             }
+                            // eslint-disable-next-line security/detect-non-literal-fs-filename
                             await fs.rename(samplePath, hookPath);
                         } else if (!(await fileExists(hookPath))) {
+                            // eslint-disable-next-line security/detect-non-literal-fs-filename
                             await fs.writeFile(
                                 hookPath,
                                 '#!/usr/bin/env sh\n# Generated by Git Graph\nexit 0\n',
@@ -5524,14 +5870,17 @@ export const gitRouter = router({
                         }
 
                         try {
+                            // eslint-disable-next-line security/detect-non-literal-fs-filename
                             await fs.chmod(hookPath, 0o755);
                         } catch {
                             // chmod can fail on some platforms/filesystems, but the hook was still enabled.
                         }
                     } else if (await fileExists(hookPath)) {
                         if (await fileExists(samplePath)) {
+                            // eslint-disable-next-line security/detect-non-literal-fs-filename
                             await fs.unlink(samplePath);
                         }
+                        // eslint-disable-next-line security/detect-non-literal-fs-filename
                         await fs.rename(hookPath, samplePath);
                     }
 
@@ -5666,6 +6015,7 @@ export const gitRouter = router({
                         guard.type === 'branchMatches' &&
                         guard.value &&
                         currentBranch &&
+                        // eslint-disable-next-line security/detect-non-literal-regexp
                         !new RegExp(guard.value).test(currentBranch)
                     ) {
                         warnings.push(
@@ -5863,8 +6213,7 @@ export const gitRouter = router({
                                     stepError = 'Hook command failed.';
                                 }
                             }
-                        } else if (step.type === 'notify') {
-                            // Notifications are currently local-only metadata events.
+                        } else {
                             stepError = null;
                         }
 
@@ -5894,7 +6243,7 @@ export const gitRouter = router({
                                     : 'Rollback attempt did not complete any recovery step';
                                 const rollbackFailures =
                                     failed.length > 0
-                                        ? ` | rollback warnings: ${failed.map((entry) => `${entry.name}: ${entry.error}`).join(' ; ')}`
+                                        ? ` | rollback warnings: ${failed.map((entry) => `${entry.name}: ${entry.error ?? ''}`).join(' ; ')}`
                                         : '';
 
                                 run.error = `${stepError} | ${rollbackSummary}${rollbackFailures}`;
@@ -6092,7 +6441,7 @@ export const gitRouter = router({
                             issues.push(`Missing local branch ${entry.branch}`);
                         }
                         if (baseDrift) {
-                            issues.push(`${entry.branch} is drifted from expected base ${expectedBase}`);
+                            issues.push(`${entry.branch} is drifted from expected base ${expectedBase ?? ''}`);
                         }
 
                         return {
@@ -6265,7 +6614,7 @@ export const gitRouter = router({
             )
             .query(({ input }) => {
                 const pinned = instanceStore.get('pinnedBranches');
-                const map = pinned ?? {};
+                const map = pinned;
                 return { branches: map[input.repo] ?? [], error: null };
             }),
 
@@ -6278,7 +6627,7 @@ export const gitRouter = router({
             )
             .mutation(({ input }) => {
                 const current = instanceStore.get('pinnedBranches');
-                const next = { ...(current ?? {}) };
+                const next = { ...current };
                 const existing = next[input.repo] ?? [];
                 if (!existing.includes(input.branch)) {
                     next[input.repo] = [...existing, input.branch];
@@ -6296,7 +6645,7 @@ export const gitRouter = router({
             )
             .mutation(({ input }) => {
                 const current = instanceStore.get('pinnedBranches');
-                const next = { ...(current ?? {}) };
+                const next = { ...current };
                 next[input.repo] = (next[input.repo] ?? []).filter((entry) => entry !== input.branch);
                 instanceStore.set('pinnedBranches', next);
                 return { success: true, branches: next[input.repo] ?? [] };
@@ -6323,7 +6672,7 @@ export const gitRouter = router({
                     ['for-each-ref', '--format=%(refname:short)|%(upstream:short)', 'refs/heads'],
                     input.repo
                 );
-                const pinned = instanceStore.get('pinnedBranches')?.[input.repo] ?? [];
+                const pinned = instanceStore.get('pinnedBranches')[input.repo] ?? [];
 
                 const upstreamByBranch = new Map<string, string>();
                 for (const line of (aheadBehindOutput ?? '').split('\n').filter(Boolean)) {
@@ -6376,7 +6725,7 @@ export const gitRouter = router({
             )
             .mutation(({ input }) => {
                 const current = instanceStore.get('launchpadStatusMap');
-                const next = { ...(current ?? {}) };
+                const next = { ...current };
                 next[input.repo] = input.map;
                 instanceStore.set('launchpadStatusMap', next);
                 return { success: true };
@@ -6391,7 +6740,7 @@ export const gitRouter = router({
             .query(({ input }) => {
                 const map = instanceStore.get('launchpadStatusMap');
                 return {
-                    map: map?.[input.repo] ?? {},
+                    map: map[input.repo] ?? {},
                     error: null,
                 };
             }),
@@ -7377,6 +7726,25 @@ export const gitRouter = router({
             return { error };
         }),
 
+    stashBranch: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                index: z.number(),
+                branchName: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            const error = await getGitService().runGitCommand(
+                ['stash', 'branch', input.branchName, `stash@{${String(input.index)}}`],
+                input.repo
+            );
+            return { error };
+        }),
+
     stashClear: publicProcedure.input(z.object({ repo: z.string() })).mutation(async ({ input }) => {
         const initError = await ensureGitInitialized();
         if (initError) return { error: initError };
@@ -7461,6 +7829,7 @@ export const gitRouter = router({
             if (!(await fileExists(configPath))) {
                 return '';
             }
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             return await fs.readFile(configPath, 'utf8');
         } catch {
             return '';
@@ -7484,12 +7853,14 @@ export const gitRouter = router({
             try {
                 const configPath = resolveGlobalGitConfigPath();
                 const configDir = path.dirname(configPath);
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 await fs.mkdir(configDir, { recursive: true });
 
                 const now = Date.now().toString();
                 const tmpPath = `${configPath}.tmp-${now}`;
                 const backupPath = `${configPath}.bak-${now}`;
 
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 await fs.writeFile(tmpPath, input.content, 'utf8');
 
                 const validationError = await getGitService().runGitCommand(
@@ -7497,6 +7868,7 @@ export const gitRouter = router({
                     input.repo
                 );
                 if (validationError) {
+                    // eslint-disable-next-line security/detect-non-literal-fs-filename
                     await fs.unlink(tmpPath).catch(() => undefined);
                     return { error: `Invalid git config content: ${validationError}` };
                 }
@@ -7505,6 +7877,7 @@ export const gitRouter = router({
                     await fs.copyFile(configPath, backupPath);
                 }
 
+                // eslint-disable-next-line security/detect-non-literal-fs-filename
                 await fs.rename(tmpPath, configPath);
                 return { error: null, backupPath: (await fileExists(backupPath)) ? backupPath : null };
             } catch (error) {

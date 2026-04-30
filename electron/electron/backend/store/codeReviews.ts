@@ -7,8 +7,7 @@ export interface CodeReviewProgress {
 }
 
 function getCodeReviewStore(): Record<string, Record<string, CodeReviewProgress>> {
-	const current = instanceStore.get('codeReviews');
-	return current && typeof current === 'object' ? current : {};
+	return instanceStore.get('codeReviews');
 }
 
 export function getCodeReviewProgress(repo: string, reviewId: string): CodeReviewProgress | null {
@@ -51,7 +50,8 @@ export function resetCodeReviewProgress(repo: string, reviewId: string): void {
 		return;
 	}
 
-	const { [reviewId]: _removed, ...rest } = repoReviews;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { [reviewId]: _, ...rest } = repoReviews;
 	instanceStore.set('codeReviews', {
 		...currentStore,
 		[repo]: rest,

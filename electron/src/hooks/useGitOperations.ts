@@ -34,6 +34,12 @@ interface DeleteBranchVariables {
     force: boolean;
 }
 
+interface RenameBranchVariables {
+    oldName: string;
+    newName: string;
+    force?: boolean | undefined;
+}
+
 interface CheckoutVariables {
     ref: string;
 }
@@ -56,10 +62,10 @@ interface PullVariables {
 }
 
 interface PushVariables {
-    force?: boolean;
     remote: string;
     branchName: string;
     setUpstream?: boolean;
+    mode?: 'normal' | 'force' | 'force-with-lease' | undefined;
 }
 
 interface MergeVariables {
@@ -90,8 +96,23 @@ interface CommitVariables {
     message: string;
 }
 
+interface SetBranchUpstreamVariables {
+    branchName: string;
+    upstream: string;
+}
+
+interface DeleteRemoteBranchVariables {
+    remote: string;
+    branchName: string;
+}
+
 interface UndoLastCommitVariables {
     soft?: boolean | undefined;
+}
+
+interface StashBranchVariables {
+    index: number;
+    branchName: string;
 }
 
 type LoggedOperation = Omit<OperationReceipt, 'id' | 'timestamp'>;
@@ -244,7 +265,7 @@ export function useGitOperations() {
 
     const runTrackedOperation = useCallback(
         async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
-            const operationId = `queued-op-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            const operationId = `queued-op-${String(Date.now())}-${Math.random().toString(36).slice(2, 9)}`;
             enqueueOperation(operationId, label);
 
             const execute = async (): Promise<T> => {
@@ -345,6 +366,30 @@ export function useGitOperations() {
         },
         onError: (error: MutationErrorShape) => {
             notifyOperationError('Failed to delete branch', error.message);
+        },
+    });
+
+    const renameBranch = trpc.git.renameBranch.useMutation({
+        onSuccess: (result: MutationResultShape, variables: RenameBranchVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Failed to rename branch', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'branch-rename',
+                description: `Renamed branch ${variables.oldName} to ${variables.newName}`,
+                details: variables.newName,
+                gitCommands: [`git branch ${variables.force ? '-M' : '-m'} ${variables.oldName} ${variables.newName}`],
+                affectedBranches: [variables.oldName, variables.newName],
+                affectedCommits: [],
+                status: 'success',
+            });
+            toast.success('Branch renamed');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Failed to rename branch', error.message);
         },
     });
 
@@ -463,13 +508,14 @@ export function useGitOperations() {
                 notifyOperationError('Push failed', error);
                 return;
             }
+            const pushMode = variables.mode ?? 'normal';
             void safeInvalidateRepositoryData();
             logOperation({
-                type: variables.force ? 'force-push' : 'push',
-                description: `${variables.force ? 'Force pushed' : 'Pushed'} ${variables.remote}/${variables.branchName}`,
+                type: pushMode === 'normal' ? 'push' : 'force-push',
+                description: `${pushMode === 'normal' ? 'Pushed' : pushMode === 'force-with-lease' ? 'Force-with-lease pushed' : 'Force pushed'} ${variables.remote}/${variables.branchName}`,
                 details: `${variables.remote}/${variables.branchName}`,
                 gitCommands: [
-                    `git push ${variables.force ? '--force ' : ''}${variables.setUpstream ? '--set-upstream ' : ''}${variables.remote} ${variables.branchName}`.trim(),
+                    `git push ${pushMode === 'force' ? '--force ' : pushMode === 'force-with-lease' ? '--force-with-lease ' : ''}${variables.setUpstream ? '--set-upstream ' : ''}${variables.remote} ${variables.branchName}`.trim(),
                 ],
                 affectedBranches: [variables.branchName],
                 affectedCommits: [],
@@ -726,6 +772,30 @@ export function useGitOperations() {
         },
     });
 
+    const stashBranch = trpc.git.stashBranch.useMutation({
+        onSuccess: (result: MutationResultShape, variables: StashBranchVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Create branch from stash failed', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'branch-create',
+                description: `Created branch ${variables.branchName} from stash@{${String(variables.index)}}`,
+                details: variables.branchName,
+                gitCommands: [`git stash branch ${variables.branchName} stash@{${String(variables.index)}}`],
+                affectedBranches: [variables.branchName],
+                affectedCommits: [],
+                status: 'success',
+            });
+            toast.success('Branch created from stash');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Create branch from stash failed', error.message);
+        },
+    });
+
     const undoLastCommit = trpc.git.undoLastCommit.useMutation({
         onSuccess: (result: MutationResultShape, variables: UndoLastCommitVariables) => {
             const error = getMutationError(result);
@@ -822,6 +892,54 @@ export function useGitOperations() {
         },
     });
 
+    const setBranchUpstream = trpc.git.setBranchUpstream.useMutation({
+        onSuccess: (result: MutationResultShape, variables: SetBranchUpstreamVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Failed to set upstream', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'push',
+                description: `Set upstream for ${variables.branchName} to ${variables.upstream}`,
+                details: `${variables.branchName}:${variables.upstream}`,
+                gitCommands: [`git branch --set-upstream-to ${variables.upstream} ${variables.branchName}`],
+                affectedBranches: [variables.branchName],
+                affectedCommits: [],
+                status: 'success',
+            });
+            toast.success('Upstream set');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Failed to set upstream', error.message);
+        },
+    });
+
+    const deleteRemoteBranch = trpc.git.deleteRemoteBranch.useMutation({
+        onSuccess: (result: MutationResultShape, variables: DeleteRemoteBranchVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Failed to delete remote branch', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'branch-delete',
+                description: `Deleted remote branch ${variables.remote}/${variables.branchName}`,
+                details: `${variables.remote}/${variables.branchName}`,
+                gitCommands: [`git push ${variables.remote} --delete ${variables.branchName}`],
+                affectedBranches: [variables.branchName],
+                affectedCommits: [],
+                status: 'success',
+            });
+            toast.success('Remote branch deleted');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Failed to delete remote branch', error.message);
+        },
+    });
+
     const worktreeCreate = trpc.git.worktree.add.useMutation({
         onSuccess: () => {
             void Promise.allSettled([utils.git.worktree.list.invalidate(), safeInvalidateRepositoryData()]);
@@ -864,6 +982,21 @@ export function useGitOperations() {
             );
         },
         [activeRepo, deleteBranch, runTrackedOperation]
+    );
+
+    const handleRenameBranch = useCallback(
+        async (oldName: string, newName: string, force?: boolean) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Renaming branch ${oldName} to ${newName}`, () =>
+                renameBranch.mutateAsync({
+                    repo: activeRepo,
+                    oldName,
+                    newName,
+                    force,
+                })
+            );
+        },
+        [activeRepo, renameBranch, runTrackedOperation]
     );
 
     const handleCheckout = useCallback(
@@ -935,7 +1068,12 @@ export function useGitOperations() {
     );
 
     const handlePush = useCallback(
-        async (branchName?: string, remote: string = 'origin', setUpstream: boolean = true, force: boolean = false) => {
+        async (
+            branchName?: string,
+            remote: string = 'origin',
+            setUpstream: boolean = true,
+            mode: 'normal' | 'force' | 'force-with-lease' = 'normal'
+        ) => {
             if (!activeRepo) return { error: 'No active repository' };
             const resolvedBranch = branchName ?? currentBranch;
             if (!resolvedBranch) return { error: 'No current branch selected for push' };
@@ -945,7 +1083,7 @@ export function useGitOperations() {
                     branchName: resolvedBranch,
                     remote,
                     setUpstream,
-                    force,
+                    mode,
                 })
             );
         },
@@ -1096,7 +1234,7 @@ export function useGitOperations() {
     const handleStashPop = useCallback(
         async (index: number) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Popping stash@{${index}}`, () =>
+            return runTrackedOperation(`Popping stash@{${String(index)}}`, () =>
                 stashPop.mutateAsync({
                     repo: activeRepo,
                     index,
@@ -1109,7 +1247,7 @@ export function useGitOperations() {
     const handleStashApply = useCallback(
         async (index: number) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Applying stash@{${index}}`, () =>
+            return runTrackedOperation(`Applying stash@{${String(index)}}`, () =>
                 stashApply.mutateAsync({
                     repo: activeRepo,
                     index,
@@ -1122,7 +1260,7 @@ export function useGitOperations() {
     const handleStashDrop = useCallback(
         async (index: number) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Dropping stash@{${index}}`, () =>
+            return runTrackedOperation(`Dropping stash@{${String(index)}}`, () =>
                 stashDrop.mutateAsync({
                     repo: activeRepo,
                     index,
@@ -1130,6 +1268,20 @@ export function useGitOperations() {
             );
         },
         [activeRepo, stashDrop, runTrackedOperation]
+    );
+
+    const handleStashBranch = useCallback(
+        async (index: number, branchName: string) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Creating branch ${branchName} from stash@{${String(index)}}`, () =>
+                stashBranch.mutateAsync({
+                    repo: activeRepo,
+                    index,
+                    branchName,
+                })
+            );
+        },
+        [activeRepo, runTrackedOperation, stashBranch]
     );
 
     const handleUndoLastCommit = useCallback(
@@ -1310,6 +1462,34 @@ export function useGitOperations() {
         [activeRepo, remoteUpdate, runTrackedOperation]
     );
 
+    const handleSetBranchUpstream = useCallback(
+        async (branchName: string, upstream: string) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Setting upstream for ${branchName}`, () =>
+                setBranchUpstream.mutateAsync({
+                    repo: activeRepo,
+                    branchName,
+                    upstream,
+                })
+            );
+        },
+        [activeRepo, runTrackedOperation, setBranchUpstream]
+    );
+
+    const handleDeleteRemoteBranch = useCallback(
+        async (remote: string, branchName: string) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Deleting remote branch ${remote}/${branchName}`, () =>
+                deleteRemoteBranch.mutateAsync({
+                    repo: activeRepo,
+                    remote,
+                    branchName,
+                })
+            );
+        },
+        [activeRepo, deleteRemoteBranch, runTrackedOperation]
+    );
+
     const handleWorktreeCreate = useCallback(
         async (path: string, branch?: string, commit?: string) => {
             if (!activeRepo) return { error: 'No active repository' };
@@ -1355,6 +1535,7 @@ export function useGitOperations() {
         isLoading:
             createBranch.isPending ||
             deleteBranch.isPending ||
+            renameBranch.isPending ||
             checkout.isPending ||
             reset.isPending ||
             fetch.isPending ||
@@ -1373,6 +1554,7 @@ export function useGitOperations() {
             stashPop.isPending ||
             stashApply.isPending ||
             stashDrop.isPending ||
+            stashBranch.isPending ||
             undoLastCommit.isPending ||
             submoduleAdd.isPending ||
             submoduleUpdate.isPending ||
@@ -1386,12 +1568,15 @@ export function useGitOperations() {
             remoteAdd.isPending ||
             remoteRemove.isPending ||
             remoteUpdate.isPending ||
+            setBranchUpstream.isPending ||
+            deleteRemoteBranch.isPending ||
             worktreeCreate.isPending ||
             worktreeRemove.isPending,
 
         // Operations
         createBranch: handleCreateBranch,
         deleteBranch: handleDeleteBranch,
+        renameBranch: handleRenameBranch,
         checkout: handleCheckout,
         reset: handleReset,
         fetch: handleFetch,
@@ -1410,6 +1595,7 @@ export function useGitOperations() {
         stashPop: handleStashPop,
         stashApply: handleStashApply,
         stashDrop: handleStashDrop,
+        stashBranch: handleStashBranch,
         undoLastCommit: handleUndoLastCommit,
         submoduleAdd: handleSubmoduleAdd,
         submoduleUpdate: handleSubmoduleUpdate,
@@ -1423,6 +1609,8 @@ export function useGitOperations() {
         remoteAdd: handleRemoteAdd,
         remoteRemove: handleRemoteRemove,
         remoteUpdate: handleRemoteUpdate,
+        setBranchUpstream: handleSetBranchUpstream,
+        deleteRemoteBranch: handleDeleteRemoteBranch,
         worktreeCreate: handleWorktreeCreate,
         worktreeRemove: handleWorktreeRemove,
         copyToClipboard: handleCopyToClipboard,

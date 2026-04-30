@@ -17,7 +17,7 @@ import type { GitExecutable } from './gitExecutable';
 
 // ==================== Constants ====================
 
-export const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb';
+export const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb'; // eslint-disable-line no-secrets/no-secrets
 export const UNCOMMITTED = '*';
 
 const EOL_REGEX = /\r\n|\r|\n/g;
@@ -303,9 +303,12 @@ export class GitService {
             ? `@echo off\\r\\nif "%GIT_GRAPH_REBASE_TODO%"=="" exit /B 0\\nif "%~1"=="" exit /B 0\\ncopy /Y "%GIT_GRAPH_REBASE_TODO%" "%~1" >nul\\nexit /B 0\\n`
             : `#!/bin/sh\\nset -eu\\nif [ -n "$GIT_GRAPH_REBASE_TODO" ] && [ -n "$1" ]; then\\n  cp "$GIT_GRAPH_REBASE_TODO" "$1"\\nfi\\nexit 0\\n`;
 
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         await fs.writeFile(tmpTodoPath, normalizedTodos, { encoding: 'utf8' });
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         await fs.writeFile(tmpEditorPath, editorScript, { encoding: 'utf8' });
         if (!isWindows) {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             await fs.chmod(tmpEditorPath, 0o755);
         }
 
@@ -318,7 +321,9 @@ export class GitService {
             });
             return error;
         } finally {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             await fs.unlink(tmpTodoPath).catch(() => {});
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             await fs.unlink(tmpEditorPath).catch(() => {});
         }
     }
@@ -793,6 +798,52 @@ export class GitService {
      */
     async getFileAtRevision(repo: string, commitHash: string, filePath: string): Promise<string> {
         return this.spawnGit(['show', `${commitHash}:${filePath}`], repo, (stdout) => stdout);
+    }
+
+    /**
+     * Get binary file contents at a specific revision as base64.
+     */
+    async getFileBinaryAtRevision(repo: string, commitHash: string, filePath: string): Promise<string> {
+        const gitExecutable = this.gitExecutable;
+        if (!gitExecutable) {
+            throw new Error('Git executable not available');
+        }
+
+        return new Promise((resolve, reject) => {
+            const cmd = cp.spawn(gitExecutable.path, ['show', `${commitHash}:${filePath}`], { cwd: repo });
+            const stdoutChunks: Buffer[] = [];
+            let stdoutBytes = 0;
+            let stderr = '';
+
+            cmd.stdout.on('data', (data: Buffer | string) => {
+                const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
+                stdoutChunks.push(chunk);
+                stdoutBytes += chunk.length;
+            });
+
+            cmd.stderr.on('data', (data: Buffer | string) => {
+                stderr += Buffer.isBuffer(data) ? data.toString('utf8') : data;
+            });
+
+            cmd.on('error', (error) => {
+                reject(error);
+            });
+
+            cmd.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(stderr.trim() || `Git exited with code ${String(code)}`));
+                    return;
+                }
+
+                const outputBuffer =
+                    stdoutChunks.length === 0
+                        ? Buffer.alloc(0)
+                        : stdoutChunks.length === 1
+                          ? (stdoutChunks[0] ?? Buffer.alloc(0))
+                          : Buffer.concat(stdoutChunks, stdoutBytes);
+                resolve(outputBuffer.toString('base64'));
+            });
+        });
     }
 
     /**

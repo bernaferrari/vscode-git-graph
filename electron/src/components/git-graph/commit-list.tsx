@@ -3,6 +3,8 @@
  * Renders the list of commits aligned with the graph
  */
 
+import { GitBranch, Globe2, Tag } from 'lucide-react';
+
 import { CIStatusMini } from './ci-status';
 import { getGravatarUrl } from '@/lib/gravatar';
 
@@ -35,9 +37,10 @@ interface CommitListProps {
 }
 
 // Row height - must match graph grid Y spacing
+// eslint-disable-next-line react-refresh/only-export-components
 export const ROW_HEIGHT = 32;
 const COMMIT_ROW_BASE_CLASS =
-    'commit-row ui-commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/35 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-inset';
+    'commit-row ui-commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/35 transition-[background-color,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-inset';
 
 // Semantic commit types with colors
 const COMMIT_TYPES: Record<string, { color: string; bg: string }> = {
@@ -171,7 +174,7 @@ function CommitRow({
                     {/* Current branch (first head) */}
                     {commit.heads && commit.heads.length > 0 && (
                         <span className='bg-primary/15 text-primary border-primary/30 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-tight'>
-                            <GitBranchIcon className='h-3 w-3' />
+                            <GitBranch className='h-3 w-3' />
                             {commit.heads[0]}
                         </span>
                     )}
@@ -188,7 +191,7 @@ function CommitRow({
                         <span
                             key={i}
                             className='border-border/70 text-muted-foreground inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px]'>
-                            <GlobeIcon className='h-3 w-3' />
+                            <Globe2 className='h-3 w-3' />
                             {remote}
                         </span>
                     ))}
@@ -197,7 +200,7 @@ function CommitRow({
                         <span
                             key={tag}
                             className='inline-flex items-center gap-1 rounded-md border border-amber-200/70 bg-amber-50/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-400'>
-                            <TagIcon className='h-3 w-3' />
+                            <Tag className='h-3 w-3' />
                             {tag}
                         </span>
                     ))}
@@ -231,58 +234,6 @@ function CommitRow({
     );
 }
 
-// Simple icon components
-function GitBranchIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            className={className}
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <line x1='6' y1='3' x2='6' y2='15' />
-            <circle cx='18' cy='18' r='3' />
-            <circle cx='6' cy='18' r='3' />
-            <path d='M18 9a9 9 0 0 0-9-9' />
-        </svg>
-    );
-}
-
-function GlobeIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            className={className}
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <circle cx='12' cy='12' r='10' />
-            <line x1='2' y1='12' x2='22' y2='12' />
-            <path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z' />
-        </svg>
-    );
-}
-
-function TagIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            className={className}
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <path d='M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z' />
-            <path d='M7 7h.01' />
-        </svg>
-    );
-}
-
 // Commit message with semantic type highlighting
 function CommitMessage({ message }: { message: string }) {
     const parsed = parseCommitMessage(message);
@@ -313,12 +264,12 @@ function formatDate(timestamp: number): string {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
+    if (diffMins < 60) return `${String(diffMins)}m`;
+    if (diffHours < 24) return `${String(diffHours)}h`;
     if (diffDays === 1) return 'yday';
-    if (diffDays < 7) return `${diffDays}d`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo`;
+    if (diffDays < 7) return `${String(diffDays)}d`;
+    if (diffDays < 30) return `${String(Math.floor(diffDays / 7))}w`;
+    if (diffDays < 365) return `${String(Math.floor(diffDays / 30))}mo`;
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }

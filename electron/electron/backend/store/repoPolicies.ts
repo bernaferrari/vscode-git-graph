@@ -28,9 +28,6 @@ export function createDefaultRepoPolicy(repoPath: string): RepoPolicy {
 
 export function getRepoPolicies(): Record<string, RepoPolicy> {
 	const current = instanceStore.get('repoPolicies');
-	if (!current || typeof current !== 'object') {
-		return {};
-	}
 
 	return Object.fromEntries(
 		Object.entries(current)

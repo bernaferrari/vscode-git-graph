@@ -5,7 +5,4 @@
 
 import { exposeElectronTRPC } from 'electron-trpc-experimental/preload';
 
-// 'loaded' fires after preload executes but before renderer scripts run
-process.once('loaded', () => {
-    exposeElectronTRPC();
-});
+exposeElectronTRPC();

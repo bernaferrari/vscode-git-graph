@@ -129,7 +129,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 								<InsightCard
 									label='Active Days'
 									value={String(summary?.activeDays ?? 0)}
-									hint={summary?.avgCommitsPerActiveDay ? `${summary.avgCommitsPerActiveDay} commits/day` : 'No activity'}
+									hint={summary?.avgCommitsPerActiveDay ? `${String(summary.avgCommitsPerActiveDay)} commits/day` : 'No activity'}
 									icon={Calendar}
 								/>
 								<InsightCard
@@ -207,7 +207,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 												<div className='flex h-28 w-full items-end rounded-md bg-muted/40 px-1 pb-1'>
 													<div
 														className='w-full rounded-sm bg-primary/80 transition-[height] motion-reduce:transition-none'
-														style={{ height: `${Math.max(8, (day.commits / maxDailyCommits) * 100)}%` }}
+														style={{ height: `${String(Math.max(8, (day.commits / maxDailyCommits) * 100))}%` }}
 														title={`${formatDateLabel(day.date)}: ${String(day.commits)} commits`}
 													/>
 												</div>
@@ -257,7 +257,7 @@ export function Statistics({ open = false, onClose }: StatisticsProps) {
 													<div className='mt-1 h-1.5 overflow-hidden rounded-full bg-muted'>
 														<div
 															className='h-full rounded-full bg-primary'
-															style={{ width: `${(author.commits / maxCommits) * 100}%` }}
+															style={{ width: `${String((author.commits / maxCommits) * 100)}%` }}
 														/>
 													</div>
 												</div>

@@ -38,7 +38,9 @@ import { getGravatarUrl } from '@/lib/gravatar';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
-const LazySideBySideDiff = lazy(() => import('./side-by-side-diff').then((mod) => ({ default: mod.SideBySideDiff })));
+const LazyEnhancedDiffViewer = lazy(() =>
+    import('./enhanced-diff-viewer').then((mod) => ({ default: mod.EnhancedDiffViewer }))
+);
 const LazyImageDiff = lazy(() => import('./image-diff').then((mod) => ({ default: mod.ImageDiff })));
 
 // Check if file is an image
@@ -150,7 +152,7 @@ export function CommitDetailsPanel({
         if (isImageFile(filePath)) {
             void import('./image-diff');
         } else {
-            void import('./side-by-side-diff');
+            void import('./enhanced-diff-viewer');
         }
         setSelectedFile(filePath);
         setShowDiff(true);
@@ -252,9 +254,19 @@ export function CommitDetailsPanel({
     const [subjectLine, ...messageRemainder] = details.body.split('\n');
     const commitSubject = subjectLine?.trim() || 'No commit message';
     const commitBody = messageRemainder.join('\n').trim();
+    const totalAdditions = details.fileChanges.reduce(
+        (acc: number, file: { additions: number | null }) => acc + (file.additions ?? 0),
+        0
+    );
+    const totalDeletions = details.fileChanges.reduce(
+        (acc: number, file: { deletions: number | null }) => acc + (file.deletions ?? 0),
+        0
+    );
+    const reviewFocus = getReviewFocus(details.fileChanges.length, totalAdditions + totalDeletions, details.parents.length);
+    const primaryParentHash = details.parents[0] ?? undefined;
 
     const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
+        void navigator.clipboard.writeText(text);
     };
 
     return (
@@ -274,7 +286,8 @@ export function CommitDetailsPanel({
                         size='sm'
                         className='hover:bg-accent h-6 w-6 rounded-md p-0'
                         onClick={() => { copyToClipboard(details.hash); }}
-                        title='Copy full SHA'>
+                        title='Copy full SHA'
+                        aria-label='Copy full SHA'>
                         <Copy className='h-3 w-3' />
                     </Button>
                     {onClose && (
@@ -282,7 +295,8 @@ export function CommitDetailsPanel({
                             variant='ghost'
                             size='sm'
                             className='hover:bg-accent h-6 w-6 rounded-md p-0'
-                            onClick={onClose}>
+                            onClick={onClose}
+                            aria-label='Close commit details'>
                             <X className='h-4 w-4' />
                         </Button>
                     )}
@@ -291,37 +305,16 @@ export function CommitDetailsPanel({
 
             <ScrollArea className='flex-1'>
                 <div className='space-y-4 p-3'>
-                    {/* Author & Date */}
-                    <div className='space-y-2'>
-                        <div
-                            className={`border-border/70 bg-muted/25 flex items-start gap-2.5 rounded-lg border p-2.5 ${onFilterByAuthor ? 'group hover:bg-accent/45 cursor-pointer transition-colors' : ''}`}
-                            onClick={() => onFilterByAuthor?.(details.authorEmail)}
-                            title={onFilterByAuthor ? 'Click to filter by author' : undefined}>
-                            <img
-                                src={getGravatarUrl(details.authorEmail, 64)}
-                                alt={details.author}
-                                className='border-border/60 h-8 w-8 shrink-0 rounded-full border'
-                            />
-                            <div className='min-w-0 flex-1'>
-                                <p
-                                    className={`text-sm font-medium ${onFilterByAuthor ? 'group-hover:text-primary' : ''}`}>
-                                    {details.author}
-                                </p>
-                                <p className='text-muted-foreground truncate text-xs'>{details.authorEmail}</p>
-                                <div className='text-muted-foreground mt-1 flex items-center gap-2 text-[11px]'>
-                                    <Calendar className='h-3 w-3' />
-                                    <span>{formatDate(details.authorDate)}</span>
-                                    <span className='text-border'>•</span>
-                                    <span>{formatRelative(details.authorDate)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Message */}
-                    <div className='border-border/70 bg-background/55 space-y-1 rounded-lg border p-2.5'>
+                    <div className='border-border/70 bg-background/55 space-y-3 rounded-xl border p-3'>
                         <div className='mb-1 flex items-center justify-between gap-2'>
-                            <p className='text-[14px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
+                            <div className='space-y-1'>
+                                <div className='text-muted-foreground flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em]'>
+                                    <span>Review Focus</span>
+                                    <span className='text-border'>•</span>
+                                    <span>{reviewFocus}</span>
+                                </div>
+                                <p className='text-[15px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
+                            </div>
                             {aiProdEnabled && (
                                 <div className='flex shrink-0 items-center gap-1'>
                                     <Button
@@ -361,6 +354,15 @@ export function CommitDetailsPanel({
                             </p>
                         )}
                         {!commitBody && <p className='text-muted-foreground text-xs'>Single-line commit message</p>}
+                        <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-4'>
+                            <SummaryMetric label='Files changed' value={String(details.fileChanges.length)} />
+                            <SummaryMetric label='Lines added' value={`+${String(totalAdditions)}`} tone='positive' />
+                            <SummaryMetric label='Lines removed' value={`-${String(totalDeletions)}`} tone='negative' />
+                            <SummaryMetric
+                                label={details.parents.length > 1 ? 'Parent commits' : 'Parent commit'}
+                                value={String(details.parents.length)}
+                            />
+                        </div>
                         {aiProdEnabled && aiExplanation && (
                             <div className='mt-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 p-2'>
                                 <p className='text-xs font-semibold text-emerald-700 dark:text-emerald-300'>
@@ -440,40 +442,73 @@ export function CommitDetailsPanel({
                         )}
                     </div>
 
-                    {/* Parents */}
-                    {details.parents && details.parents.length > 0 && (
-                        <div className='space-y-1'>
-                            <span className='text-muted-foreground text-xs font-medium'>Parents</span>
+                    <div className='grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]'>
+                        <div
+                            className={`border-border/70 bg-muted/25 flex items-start gap-2.5 rounded-xl border p-3 ${onFilterByAuthor ? 'group hover:bg-accent/45 cursor-pointer transition-colors' : ''}`}
+                            onClick={() => onFilterByAuthor?.(details.authorEmail)}
+                            title={onFilterByAuthor ? 'Click to filter by author' : undefined}>
+                            <img
+                                src={getGravatarUrl(details.authorEmail, 64)}
+                                alt={details.author}
+                                className='border-border/60 h-9 w-9 shrink-0 rounded-full border'
+                            />
+                            <div className='min-w-0 flex-1'>
+                                <p className={`text-sm font-medium ${onFilterByAuthor ? 'group-hover:text-primary' : ''}`}>
+                                    {details.author}
+                                </p>
+                                <p className='text-muted-foreground truncate text-xs'>{details.authorEmail}</p>
+                                <div className='text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]'>
+                                    <Calendar className='h-3 w-3' />
+                                    <span>{formatDate(details.authorDate)}</span>
+                                    <span className='text-border'>•</span>
+                                    <span>{formatRelative(details.authorDate)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className='border-border/70 bg-muted/20 space-y-2 rounded-xl border p-3'>
+                            <p className='text-muted-foreground text-[11px] font-medium uppercase tracking-[0.18em]'>
+                                Safety
+                            </p>
+                            <p className='text-sm leading-relaxed'>
+                                Open a file to inspect the diff. Use the overflow menu for file history before branch,
+                                tag, or reset actions.
+                            </p>
+                            {details.signature && (
+                                <div
+                                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                                        isGoodSignature(details.signature.status)
+                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                            : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                    }`}>
+                                    <span className='font-medium'>{formatSignatureStatus(details.signature.status)}</span>
+                                    <span className='opacity-70'>•</span>
+                                    <span className='truncate'>{details.signature.signer}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {details.parents.length > 0 && (
+                        <div className='space-y-2'>
+                            <div className='flex items-center justify-between gap-2'>
+                                <span className='text-muted-foreground text-xs font-medium'>Parent Commits</span>
+                                <span className='text-muted-foreground text-[11px]'>
+                                    {details.parents.length > 1 ? 'Compare ancestry before rewriting history' : 'Trace previous state'}
+                                </span>
+                            </div>
                             <div className='flex flex-wrap gap-1.5'>
                                 {details.parents.map((parent: string, i: number) => (
                                     <button
                                         key={parent}
-                                        className='bg-muted hover:bg-primary hover:text-primary-foreground inline-flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 font-mono text-xs transition-colors'
+                                        className='bg-muted hover:bg-primary hover:text-primary-foreground inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs transition-colors'
                                         onClick={() => onNavigateToCommit?.(parent)}
                                         title={`Go to ${parent}`}>
-                                        {i === 0 ? (
-                                            <ArrowRight className='h-3.5 w-3.5' />
-                                        ) : (
-                                            <GitCommit className='h-3.5 w-3.5' />
-                                        )}
+                                        {i === 0 ? <ArrowRight className='h-3.5 w-3.5' /> : <GitCommit className='h-3.5 w-3.5' />}
                                         {parent.slice(0, 7)}
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
-
-                    {/* Signature */}
-                    {details.signature && (
-                        <div
-                            className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${
-                                isGoodSignature(details.signature.status)
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                                    : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                            }`}>
-                            <span className='font-medium'>{formatSignatureStatus(details.signature.status)}</span>
-                            <span className='opacity-70'>•</span>
-                            <span>{details.signature.signer}</span>
                         </div>
                     )}
 
@@ -483,24 +518,17 @@ export function CommitDetailsPanel({
                     {/* File Changes */}
                     <div className='space-y-2'>
                         <div className='flex items-center justify-between'>
-                            <span className='text-muted-foreground text-xs font-medium'>
-                                Changed Files ({details.fileChanges.length})
-                            </span>
-                            <div className='flex items-center gap-2 text-xs'>
-                                <span className='text-green-600 dark:text-green-400'>
-                                    +
-                                    {details.fileChanges.reduce(
-                                        (acc: number, f: { additions: number | null }) => acc + (f.additions ?? 0),
-                                        0
-                                    )}
+                            <div>
+                                <span className='text-muted-foreground text-xs font-medium'>
+                                    Changed Files ({details.fileChanges.length})
                                 </span>
-                                <span className='text-red-600 dark:text-red-400'>
-                                    -
-                                    {details.fileChanges.reduce(
-                                        (acc: number, f: { deletions: number | null }) => acc + (f.deletions ?? 0),
-                                        0
-                                    )}
-                                </span>
+                                <p className='text-muted-foreground mt-1 text-[11px]'>
+                                    Open any row to inspect the patch. Use the overflow menu to jump into file history.
+                                </p>
+                            </div>
+                            <div className='flex items-center gap-2 text-xs tabular-nums'>
+                                <span className='text-green-600 dark:text-green-400'>+{String(totalAdditions)}</span>
+                                <span className='text-red-600 dark:text-red-400'>-{String(totalDeletions)}</span>
                             </div>
                         </div>
 
@@ -611,15 +639,18 @@ export function CommitDetailsPanel({
                                             ? { oldPath: selectedFileInfo.oldFilePath }
                                             : {}),
                                     }}
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                                     commitHash={commitHash ?? ''}
+                                    {...(primaryParentHash ? { oldCommitHash: primaryParentHash } : {})}
                                 />
                             ) : (
-                                <LazySideBySideDiff
+                                <LazyEnhancedDiffViewer
                                     file={{
                                         path: selectedFile,
                                         status: selectedFileInfo.type,
                                         ...(selectedFileInfo.oldFilePath ? { from: selectedFileInfo.oldFilePath } : {}),
                                     }}
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                                     commitHash={commitHash ?? ''}
                                 />
                             )}
@@ -674,12 +705,12 @@ export function CommitDetailsPanel({
                     Tag
                 </Button>
                 <Button
-                    variant='ghost'
+                    variant='outline'
                     size='sm'
-                    className='hover:bg-accent hover:border-border/65 h-7 gap-1 rounded-md border border-transparent text-xs font-medium'
+                    className='hover:bg-accent h-7 gap-1 rounded-md border-amber-500/30 text-xs font-medium text-amber-700 dark:text-amber-300'
                     onClick={handleResetCommit}>
                     <RotateCcw className='h-3 w-3' />
-                    Reset
+                    Reset to Commit
                 </Button>
             </div>
         </div>
@@ -718,6 +749,30 @@ function fileChangeBadgeClass(type: string): string {
         default:
             return 'bg-muted text-muted-foreground';
     }
+}
+
+function SummaryMetric({
+    label,
+    value,
+    tone = 'default',
+}: {
+    label: string;
+    value: string;
+    tone?: 'default' | 'positive' | 'negative';
+}) {
+    const toneClass =
+        tone === 'positive'
+            ? 'text-green-700 dark:text-green-400'
+            : tone === 'negative'
+              ? 'text-red-700 dark:text-red-400'
+              : 'text-foreground';
+
+    return (
+        <div className='bg-muted/35 rounded-lg border border-border/60 px-3 py-2'>
+            <p className='text-muted-foreground text-[11px] font-medium uppercase tracking-[0.16em]'>{label}</p>
+            <p className={`mt-1 text-sm font-semibold tabular-nums ${toneClass}`}>{value}</p>
+        </div>
+    );
 }
 
 function formatSignatureStatus(status: string): string {
@@ -766,11 +821,24 @@ function formatRelative(timestamp: number): string {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
     if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes} minutes ago`;
-    if (hours < 24) return `${hours} hours ago`;
-    if (days < 7) return `${days} days ago`;
+    if (minutes < 60) return `${String(minutes)} minutes ago`;
+    if (hours < 24) return `${String(hours)} hours ago`;
+    if (days < 7) return `${String(days)} days ago`;
 
     return formatDate(timestamp);
+}
+
+function getReviewFocus(fileCount: number, lineDelta: number, parentCount: number): string {
+    if (parentCount > 1) {
+        return 'Merge commit';
+    }
+    if (fileCount >= 12 || lineDelta >= 800) {
+        return 'Large change set';
+    }
+    if (fileCount <= 2 && lineDelta <= 120) {
+        return 'Tight change';
+    }
+    return 'Standard review';
 }
 
 // Middle truncate long file paths: "src/components/very/long/path/to/file.ts" -> "src/.../to/file.ts"

@@ -15,7 +15,7 @@ import {
     Loader2,
     RotateCcw,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useSettings } from './useSettings';
@@ -28,10 +28,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
+import type { SettingsSection } from './use-git-graph-shell-panels';
+
 interface SettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     initialTab?: 'general' | 'appearance' | 'editor' | 'notifications' | 'performance' | 'integrations' | 'privacy';
+    initialSection?: SettingsSection | null;
 }
 
 interface FeatureFlagsState {
@@ -106,10 +109,17 @@ const DEFAULT_REPO_POLICY: RepoPolicyState = {
     customWorkflow: '',
 };
 
-export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: SettingsDialogProps) {
+export function SettingsDialog({
+    open,
+    onOpenChange,
+    initialTab = 'general',
+    initialSection = null,
+}: SettingsDialogProps) {
     const { activeRepo } = useAppStore();
     const { settings, updateSetting, resetSettings } = useSettings();
     const [activeTab, setActiveTab] = useState(initialTab);
+    const [activeSection, setActiveSection] = useState<SettingsSection | null>(initialSection);
+    const sectionRefs = useRef<Partial<Record<SettingsSection, HTMLDivElement | null>>>({});
     const utils = trpc.useUtils();
     const configQuery = trpc.config.getAll.useQuery(undefined, { enabled: open, staleTime: 10_000 });
     const aiConfigQuery = trpc.ai.getConfig.useQuery(undefined, { enabled: open, staleTime: 10_000 });
@@ -175,11 +185,36 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
     useEffect(() => {
         if (open) {
             setActiveTab(initialTab);
+            setActiveSection(initialSection);
         }
-    }, [initialTab, open]);
+    }, [initialSection, initialTab, open]);
+
+    useEffect(() => {
+        if (!open || activeTab !== 'integrations' || !activeSection) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            sectionRefs.current[activeSection]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 30);
+
+        return () => { window.clearTimeout(timer); };
+    }, [activeSection, activeTab, open]);
+
+    const integrationsSections = useMemo(
+        () => [
+            { id: 'feature-flags' as const, label: 'Feature Flags' },
+            { id: 'ai-provider' as const, label: 'AI Provider' },
+            { id: 'repo-policy' as const, label: 'Repo Policy' },
+            { id: 'diagnostics' as const, label: 'Diagnostics' },
+            { id: 'audit-log' as const, label: 'Audit Log' },
+        ],
+        []
+    );
 
     useEffect(() => {
         const ui = configQuery.data?.ui;
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!ui || !('featureFlags' in ui) || typeof ui.featureFlags !== 'object' || ui.featureFlags === null) {
             return;
         }
@@ -196,20 +231,20 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
             return;
         }
         setAiConfig({
-            enabled: Boolean(config.enabled),
+            enabled: config.enabled,
             provider: config.provider === 'self-host' ? 'self-host' : 'openai-compatible',
-            baseUrl: config.baseUrl ?? '',
-            model: config.model ?? DEFAULT_AI_CONFIG.model,
+            baseUrl: config.baseUrl,
+            model: config.model,
             timeoutMs: Number.isFinite(config.timeoutMs) ? config.timeoutMs : DEFAULT_AI_CONFIG.timeoutMs,
             maxTokens: Number.isFinite(config.maxTokens) ? config.maxTokens : DEFAULT_AI_CONFIG.maxTokens,
             retries: Number.isFinite(config.retries) ? config.retries : DEFAULT_AI_CONFIG.retries,
-            redactSensitivePaths: Boolean(config.redactSensitivePaths),
+            redactSensitivePaths: config.redactSensitivePaths,
             featureToggles: {
-                commitMessage: Boolean(config.featureToggles?.commitMessage),
-                pullRequest: Boolean(config.featureToggles?.pullRequest),
-                conflictExplain: Boolean(config.featureToggles?.conflictExplain),
-                explainCommit: Boolean(config.featureToggles?.explainCommit),
-                reviewDiff: Boolean(config.featureToggles?.reviewDiff),
+                commitMessage: config.featureToggles.commitMessage,
+                pullRequest: config.featureToggles.pullRequest,
+                conflictExplain: config.featureToggles.conflictExplain,
+                explainCommit: config.featureToggles.explainCommit,
+                reviewDiff: config.featureToggles.reviewDiff,
             },
         });
     }, [aiConfigQuery.data]);
@@ -221,12 +256,12 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
             return;
         }
         setRepoPolicy({
-            requireSignedCommits: Boolean(policy.requireSignedCommits),
+            requireSignedCommits: policy.requireSignedCommits,
             allowedMergeStrategies: Array.isArray(policy.allowedMergeStrategies) && policy.allowedMergeStrategies.length > 0
                 ? policy.allowedMergeStrategies
                 : DEFAULT_REPO_POLICY.allowedMergeStrategies,
-            requireUpToDate: Boolean(policy.requireUpToDate),
-            enableStacking: Boolean(policy.enableStacking),
+            requireUpToDate: policy.requireUpToDate,
+            enableStacking: policy.enableStacking,
             defaultStackBase: policy.defaultStackBase || 'main',
             customWorkflow: policy.customWorkflow || '',
         });
@@ -526,7 +561,34 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                         </TabsContent>
 
                         <TabsContent value='integrations' className='m-0 space-y-6'>
-                            <SettingsSection title='Release Feature Flags' icon={<GitBranch className='h-4 w-4' />}>
+                            <div className='flex flex-wrap gap-2'>
+                                {integrationsSections.map((section) => (
+                                    <Button
+                                        key={section.id}
+                                        type='button'
+                                        size='sm'
+                                        variant={activeSection === section.id ? 'default' : 'outline'}
+                                        className='h-8'
+                                        onClick={() => {
+                                            setActiveSection(section.id);
+                                            sectionRefs.current[section.id]?.scrollIntoView({
+                                                behavior: 'smooth',
+                                                block: 'start',
+                                            });
+                                        }}>
+                                        {section.label}
+                                    </Button>
+                                ))}
+                            </div>
+
+                            <SettingsSection
+                                title='Release Feature Flags'
+                                icon={<GitBranch className='h-4 w-4' />}
+                                sectionId='feature-flags'
+                                activeSection={activeSection}
+                                onSectionRef={(node) => {
+                                    sectionRefs.current['feature-flags'] = node;
+                                }}>
                                 <SettingRow
                                     label='Worktree Pro'
                                     description='Unified worktree center and advanced lifecycle actions'>
@@ -595,7 +657,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 </div>
                             </SettingsSection>
 
-                            <SettingsSection title='AI Provider' icon={<Globe className='h-4 w-4' />}>
+                            <SettingsSection
+                                title='AI Provider'
+                                icon={<Globe className='h-4 w-4' />}
+                                sectionId='ai-provider'
+                                activeSection={activeSection}
+                                onSectionRef={(node) => {
+                                    sectionRefs.current['ai-provider'] = node;
+                                }}>
                                 <SettingRow
                                     label='Enable AI'
                                     description='Master switch for provider-backed AI assistance'>
@@ -823,7 +892,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 </div>
                             </SettingsSection>
 
-                            <SettingsSection title='Repo Policy' icon={<Shield className='h-4 w-4' />}>
+                            <SettingsSection
+                                title='Repo Policy'
+                                icon={<Shield className='h-4 w-4' />}
+                                sectionId='repo-policy'
+                                activeSection={activeSection}
+                                onSectionRef={(node) => {
+                                    sectionRefs.current['repo-policy'] = node;
+                                }}>
                                 {!activeRepo ? (
                                     <p className='text-muted-foreground text-sm'>Open a repository to configure repo-specific policy guidance.</p>
                                 ) : (
@@ -920,7 +996,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 )}
                             </SettingsSection>
 
-                            <SettingsSection title='Diagnostics' icon={<HardDrive className='h-4 w-4' />}>
+                            <SettingsSection
+                                title='Diagnostics'
+                                icon={<HardDrive className='h-4 w-4' />}
+                                sectionId='diagnostics'
+                                activeSection={activeSection}
+                                onSectionRef={(node) => {
+                                    sectionRefs.current['diagnostics'] = node;
+                                }}>
                                 <SettingRow
                                     label='Protocol registration'
                                     description='Desktop deep links require the app to own the `gitgraph://` protocol'>
@@ -949,7 +1032,14 @@ export function SettingsDialog({ open, onOpenChange, initialTab = 'general' }: S
                                 </SettingRow>
                             </SettingsSection>
 
-                            <SettingsSection title='Audit Log' icon={<Bell className='h-4 w-4' />}>
+                            <SettingsSection
+                                title='Audit Log'
+                                icon={<Bell className='h-4 w-4' />}
+                                sectionId='audit-log'
+                                activeSection={activeSection}
+                                onSectionRef={(node) => {
+                                    sectionRefs.current['audit-log'] = node;
+                                }}>
                                 <div className='space-y-2'>
                                     {(auditLogQuery.data?.entries ?? []).map(
                                         (entry: {
@@ -1021,13 +1111,25 @@ function SettingsSection({
     title,
     icon,
     children,
+    sectionId,
+    activeSection,
+    onSectionRef,
 }: {
     title: string;
     icon: React.ReactNode;
     children: React.ReactNode;
+    sectionId?: SettingsSection;
+    activeSection?: SettingsSection | null;
+    onSectionRef?: (node: HTMLDivElement | null) => void;
 }) {
+    const isActive = Boolean(sectionId && activeSection === sectionId);
+
     return (
-        <div className='space-y-4'>
+        <div
+            ref={onSectionRef}
+            className={`space-y-4 scroll-mt-4 rounded-xl px-1 py-1 transition-colors ${
+                isActive ? 'bg-primary/5 ring-1 ring-primary/15' : ''
+            }`}>
             <div className='text-muted-foreground flex items-center gap-2 text-sm font-medium'>
                 {icon}
                 {title}

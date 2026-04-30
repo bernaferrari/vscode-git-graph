@@ -60,7 +60,7 @@ export function useFeatureHubData(activeRepo: string | null, featureFlags: Relea
     );
 
     const prSummary = useMemo(() => {
-        const repo = launchpadSummaryQuery.data?.repos?.[0];
+        const repo = launchpadSummaryQuery.data?.repos[0];
         return {
             openPullRequests: repo?.openPullRequests ?? 0,
             needsAttention: Boolean(repo?.needsAttention),
@@ -70,22 +70,22 @@ export function useFeatureHubData(activeRepo: string | null, featureFlags: Relea
     }, [launchpadSummaryQuery.data?.repos]);
 
     return {
-        worktreeCount: worktreeSummaryQuery.data?.worktrees?.length ?? 0,
+        worktreeCount: worktreeSummaryQuery.data?.worktrees.length ?? 0,
         worktreeAttentionCount,
-        workflowCount: workflowSummaryQuery.data?.definitions?.length ?? 0,
+        workflowCount: workflowSummaryQuery.data?.definitions.length ?? 0,
         workflowFailureCount,
-        auditCount: auditSummaryQuery.data?.entries?.length ?? 0,
+        auditCount: auditSummaryQuery.data?.entries.length ?? 0,
         protocolRegistered: Boolean(diagnosticsSummaryQuery.data?.protocolRegistered),
         collaborationSummary: {
-            workspaceShares: collaborationSummaryQuery.data?.workspaceShares?.length ?? 0,
-            patchShelf: collaborationSummaryQuery.data?.patchShelf?.length ?? 0,
-            syncEnabled: Boolean(collaborationConfigQuery.data?.config?.enabled),
-            lastSyncStatus: collaborationConfigQuery.data?.config?.lastSyncStatus ?? 'idle',
+            workspaceShares: collaborationSummaryQuery.data?.workspaceShares.length ?? 0,
+            patchShelf: collaborationSummaryQuery.data?.patchShelf.length ?? 0,
+            syncEnabled: Boolean(collaborationConfigQuery.data?.config.enabled),
+            lastSyncStatus: collaborationConfigQuery.data?.config.lastSyncStatus ?? 'idle',
         },
         repoPolicy: {
-            requireSignedCommits: Boolean(repoPolicySummaryQuery.data?.policy?.requireSignedCommits),
-            requireUpToDate: Boolean(repoPolicySummaryQuery.data?.policy?.requireUpToDate),
-            enableStacking: Boolean(repoPolicySummaryQuery.data?.policy?.enableStacking),
+            requireSignedCommits: Boolean(repoPolicySummaryQuery.data?.policy.requireSignedCommits),
+            requireUpToDate: Boolean(repoPolicySummaryQuery.data?.policy.requireUpToDate),
+            enableStacking: Boolean(repoPolicySummaryQuery.data?.policy.enableStacking),
         },
         prSummary,
     };

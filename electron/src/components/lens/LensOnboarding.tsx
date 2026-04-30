@@ -196,8 +196,9 @@ export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
     );
 }
 
+
 // Hook to manage lens onboarding state
-export function useLensOnboarding() {
+export function useLensOnboarding() { // eslint-disable-line react-refresh/only-export-components
     const [showOnboarding, setShowOnboarding] = useState(false);
     const onboardingQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
     const shouldShow = useMemo(

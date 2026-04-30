@@ -75,9 +75,9 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 				}
 			} else if (currentHunk) {
 				if (section === 'ours') {
-					currentHunk.ours!.push(line);
+					currentHunk.ours?.push(line);
 				} else {
-					currentHunk.theirs!.push(line);
+					currentHunk.theirs?.push(line);
 				}
 			}
 		}
@@ -158,7 +158,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 		// Check all conflicts are resolved
 		const unresolvedCount = conflicts.filter((_, i) => !resolutions.has(i)).length;
 		if (unresolvedCount > 0) {
-			toast.error(`${unresolvedCount} conflict(s) not resolved`);
+			toast.error(`${String(unresolvedCount)} conflict(s) not resolved`);
 			return;
 		}
 
@@ -182,7 +182,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 			toast.success('Conflict resolved and staged');
 			onResolved?.();
 			onOpenChange(false);
-		} catch (error) {
+		} catch {
 			toast.error('Failed to save resolution');
 		} finally {
 			setIsSaving(false);
@@ -338,7 +338,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 							Cancel
 						</Button>
 						<Button
-							onClick={handleSave}
+							onClick={() => { void handleSave(); }}
 							disabled={isSaving || resolvedCount < totalConflicts}
 						>
 							{isSaving ? (

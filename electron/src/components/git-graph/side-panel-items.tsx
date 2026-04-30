@@ -4,6 +4,7 @@ import {
     ArrowUp,
     Box,
     Check,
+    Edit2,
     Ellipsis,
     FolderOpen,
     FolderTree,
@@ -11,6 +12,7 @@ import {
     GitMerge,
     Globe,
     Pin,
+    Upload,
     Tag,
     Trash2,
     Wrench,
@@ -32,8 +34,12 @@ export function BranchItem({
     pinned,
     ahead,
     behind,
+    upstream,
     onSelect,
     onCheckout,
+    onPublish,
+    onTrackUpstream,
+    onRename,
     onMerge,
     onDelete,
     onPinToggle,
@@ -43,13 +49,18 @@ export function BranchItem({
     pinned?: boolean;
     ahead?: number;
     behind?: number;
+    upstream?: string | null;
     onSelect?: (branch: string) => void;
     onCheckout: () => unknown;
+    onPublish?: () => unknown;
+    onTrackUpstream?: () => unknown;
+    onRename?: () => unknown;
     onMerge?: () => unknown;
     onDelete: () => unknown;
     onPinToggle?: () => void;
 }) {
     const hasAheadBehind = (ahead ?? 0) > 0 || (behind ?? 0) > 0;
+    const trackingLabel = upstream ?? 'unpublished';
 
     return (
         <div
@@ -72,6 +83,15 @@ export function BranchItem({
             <span className={`flex-1 truncate ${isCurrent ? 'text-primary font-semibold' : 'font-medium'}`}>
                 {branch}
             </span>
+            <span
+                title={upstream ? `Tracking ${upstream}` : 'Branch is not published'}
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+                    upstream
+                        ? 'bg-muted text-muted-foreground'
+                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                }`}>
+                {trackingLabel}
+            </span>
             {pinned && <Pin className='h-3 w-3 shrink-0 text-amber-500' />}
             {hasAheadBehind && (
                 <span className='flex shrink-0 items-center gap-0.5 text-[10px]'>
@@ -90,48 +110,80 @@ export function BranchItem({
                 </span>
             )}
             {isCurrent && <Check className='text-primary h-3 w-3 shrink-0' />}
-            {!isCurrent && (
-                <ActionMenu>
-                    {onPinToggle && (
-                        <button
-                            className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onPinToggle();
-                            }}>
-                            <Pin className='h-3.5 w-3.5' /> {pinned ? 'Unpin' : 'Pin'}
-                        </button>
-                    )}
+            <ActionMenu>
+                {onPinToggle && (
                     <button
                         className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
                         onClick={(e) => {
                             e.stopPropagation();
-                            onSelect?.(branch);
-                            void onCheckout();
+                            onPinToggle();
                         }}>
-                        <Check className='h-3.5 w-3.5' /> Checkout
+                        <Pin className='h-3.5 w-3.5' /> {pinned ? 'Unpin' : 'Pin'}
                     </button>
+                )}
+                {!upstream && onPublish && (
                     <button
                         className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (onMerge) {
-                                void onMerge();
-                            }
+                            void onPublish();
+                        }}>
+                        <Upload className='h-3.5 w-3.5' /> Publish to origin
+                    </button>
+                )}
+                {!upstream && onTrackUpstream && (
+                    <button
+                        className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            void onTrackUpstream();
+                        }}>
+                        <GitBranch className='h-3.5 w-3.5' /> Track matching remote
+                    </button>
+                )}
+                <button
+                    className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect?.(branch);
+                        void onCheckout();
+                    }}>
+                    <Check className='h-3.5 w-3.5' /> Checkout
+                </button>
+                {onRename && (
+                    <button
+                        className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            void onRename();
+                        }}>
+                        <Edit2 className='h-3.5 w-3.5' /> Rename
+                    </button>
+                )}
+                {onMerge && (
+                    <button
+                        className='hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-xs'
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            void onMerge();
                         }}>
                         <GitMerge className='h-3.5 w-3.5' /> Merge
                     </button>
-                    <div className='bg-border mx-2 my-1 h-px' />
-                    <button
-                        className='flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            void onDelete();
-                        }}>
-                        <Trash2 className='h-3.5 w-3.5' /> Delete
-                    </button>
-                </ActionMenu>
-            )}
+                )}
+                {!isCurrent && (
+                    <>
+                        <div className='bg-border mx-2 my-1 h-px' />
+                        <button
+                            className='flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                void onDelete();
+                            }}>
+                            <Trash2 className='h-3.5 w-3.5' /> Delete
+                        </button>
+                    </>
+                )}
+            </ActionMenu>
         </div>
     );
 }
@@ -141,11 +193,13 @@ export function RemoteBranchItem({
     branchName,
     onSelect,
     onCheckout,
+    onDeleteRemote,
 }: {
     branch: string;
     branchName?: string;
     onSelect?: (branch: string) => void;
     onCheckout: () => unknown;
+    onDeleteRemote?: () => unknown;
 }) {
     const displayBranch = branch.replace('remotes/', '');
     const [remote, ...rest] = displayBranch.split('/');
@@ -172,6 +226,18 @@ export function RemoteBranchItem({
             <Globe className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
             <span className='text-muted-foreground shrink-0 text-[10px]'>{remote}/</span>
             <span className='flex-1 truncate font-medium'>{resolvedBranch}</span>
+            {onDeleteRemote && (
+                <ActionMenu>
+                    <button
+                        className='flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            void onDeleteRemote();
+                        }}>
+                        <Trash2 className='h-3.5 w-3.5' /> Delete Remote Branch
+                    </button>
+                </ActionMenu>
+            )}
         </div>
     );
 }

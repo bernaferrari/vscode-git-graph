@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 
 import type { CommandPaletteActions } from './command-palette';
+import type { SettingsSection, SettingsTab } from './use-git-graph-shell-panels';
 
 interface UseCommandPaletteActionsInput {
     currentHead: string;
     gitOps: {
         fetch: () => unknown;
         pull: (branch: string, remote: string, rebase: boolean, ffOnly?: boolean) => unknown;
-        push: (branch: string, remote: string, setUpstream: boolean, force?: boolean) => unknown;
+        push: (branch: string, remote: string, setUpstream: boolean, mode?: 'normal' | 'force' | 'force-with-lease') => unknown;
     };
     terminalOpen: boolean;
     featureFlags: {
@@ -20,7 +21,7 @@ interface UseCommandPaletteActionsInput {
         unstaged?: Array<{ file?: string }>;
         staged?: Array<{ file?: string }>;
     };
-    openSettingsAt: (tab: 'general' | 'appearance' | 'editor' | 'notifications' | 'performance' | 'integrations' | 'privacy') => void;
+    openSettingsAt: (tab: SettingsTab, section?: SettingsSection) => void;
     openers: {
         setCreateBranchOpen: (open: boolean) => void;
         setAddTagOpen: (open: boolean) => void;
@@ -91,7 +92,7 @@ export function useCommandPaletteActions(input: UseCommandPaletteActionsInput): 
             onFetch: () => gitOps.fetch(),
             onPull: () => gitOps.pull(currentHead, 'origin', false),
             onPullFfOnly: () => gitOps.pull(currentHead, 'origin', false, true),
-            onPush: () => gitOps.push(currentHead, 'origin', true, false),
+            onPush: () => gitOps.push(currentHead, 'origin', true, 'normal'),
             onRefresh: handleRefreshAll,
             onSettings: () => {
                 openSettingsAt('general');
@@ -151,13 +152,13 @@ export function useCommandPaletteActions(input: UseCommandPaletteActionsInput): 
                 openers.setSubmoduleOpen(true);
             },
             onRepoPolicy: () => {
-                openSettingsAt('integrations');
+                openSettingsAt('integrations', 'repo-policy');
             },
             onAuditLog: () => {
-                openSettingsAt('integrations');
+                openSettingsAt('integrations', 'audit-log');
             },
             onDiagnostics: () => {
-                openSettingsAt('integrations');
+                openSettingsAt('integrations', 'diagnostics');
             },
             onStatistics: () => {
                 openers.setStatisticsOpen(true);

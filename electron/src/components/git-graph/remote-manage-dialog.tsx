@@ -89,9 +89,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 			: await gitOps.remoteAdd(form.name, form.url, form.pushUrl || undefined);
 
 		const remoteError =
-			remoteResult && typeof remoteResult === 'object' && 'error' in remoteResult
-				? (remoteResult as { error?: string | null }).error
-				: null;
+			(remoteResult as { error?: string | null }).error;
 		if (remoteError) {
 			return;
 		}
@@ -117,12 +115,12 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 		}
 
 		resetEditorState();
-		refetch();
+		void refetch();
 	};
 
 	const handleRemove = async (name: string) => {
 		await gitOps.remoteRemove(name);
-		refetch();
+		void refetch();
 	};
 
 	return (
@@ -172,7 +170,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 												variant="ghost"
 												size="sm"
 												className="h-7 w-7 p-0"
-												onClick={() => gitOps.fetch(remote.name)}
+												onClick={() => { void gitOps.fetch(remote.name); }}
 												title={`Fetch ${remote.name}`}
 											>
 												<RefreshCw className="h-3.5 w-3.5" />
@@ -181,7 +179,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 												variant="ghost"
 												size="sm"
 												className="h-7 w-7 p-0"
-												onClick={() => gitOps.fetch(remote.name, true)}
+												onClick={() => { void gitOps.fetch(remote.name, true); }}
 												title={`Fetch + prune ${remote.name}`}
 											>
 												<GitPullRequest className="h-3.5 w-3.5" />
@@ -208,7 +206,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 												variant="ghost"
 												size="sm"
 												className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-												onClick={() => handleRemove(remote.name)}
+												onClick={() => { void handleRemove(remote.name); }}
 												disabled={remote.name === 'origin'}
 											>
 												<Trash2 className="h-3.5 w-3.5" />
@@ -295,7 +293,7 @@ export function RemoteManageDialog({ open, onOpenChange }: RemoteManageDialogPro
 							Cancel
 						</Button>
 						<Button
-							onClick={handleSaveRemote}
+							onClick={() => { void handleSaveRemote(); }}
 							disabled={!form.name || !form.url || setRefspecMutation.isPending}
 						>
 							{editRemote ? 'Save' : 'Add'}

@@ -216,12 +216,13 @@ export function WorkflowEngineDialog({
 	const listQuery = trpc.git.workflow.list.useQuery(undefined, { enabled: open });
 	const createMutation = trpc.git.workflow.create.useMutation({
 		onSuccess: async (result) => {
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			if (result.error) {
 				notifyError('Workflow create failed', { description: result.error });
 				return;
 			}
 			notifySuccess('Workflow created');
-			if (result.workflow?.id) {
+			if (result.workflow.id) {
 				setSelectedWorkflowId(result.workflow.id);
 			}
 			await trpcUtils.git.workflow.list.invalidate();
@@ -239,6 +240,7 @@ export function WorkflowEngineDialog({
 	});
 	const updateMutation = trpc.git.workflow.update.useMutation({
 		onSuccess: async (result) => {
+			 
 			if (result.error) {
 				notifyError('Workflow update failed', { description: result.error });
 				return;
@@ -249,6 +251,7 @@ export function WorkflowEngineDialog({
 	});
 	const executeMutation = trpc.git.workflow.execute.useMutation({
 		onSuccess: async (result) => {
+			 
 			if (result.error) {
 				notifyError('Workflow run failed', { description: result.error });
 				return;
@@ -302,9 +305,11 @@ export function WorkflowEngineDialog({
 			}))
 		);
 		setEditorSteps(
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			(selectedWorkflow.steps ?? []).map((step) => ({
 				id: step.id,
 				type: step.type,
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 				params: Object.entries(step.params ?? {}).map(([key, value]) => toStepParamForm(key, value)),
 			}))
 		);
@@ -424,7 +429,8 @@ export function WorkflowEngineDialog({
 			workflowId: selectedWorkflow.id,
 			inputs: {},
 		});
-		if (result.error) {
+		 
+			if (result.error) {
 			toast.error(result.error);
 			return;
 		}
@@ -483,7 +489,7 @@ export function WorkflowEngineDialog({
 			.map((input) => ({
 				key: input.key.trim(),
 				label: input.label.trim(),
-				required: Boolean(input.required),
+				required: input.required,
 				...(input.defaultValue?.trim() ? { defaultValue: input.defaultValue.trim() } : {}),
 			}))
 			.filter((input) => input.key.length > 0 && input.label.length > 0);
@@ -693,7 +699,7 @@ export function WorkflowEngineDialog({
 														<Checkbox
 															checked={input.required}
 															onCheckedChange={(checked) => {
-																updateInput(index, { required: Boolean(checked) });
+																updateInput(index, { required: checked });
 															}}
 														/>
 														Required

@@ -108,7 +108,7 @@ Any other command is executed by your system shell in the active repository.`,
 				nextEntries.push({ type: 'error', text: `Command timed out after 60000ms` });
 			}
 			if (result.exitCode !== null && result.exitCode !== 0) {
-				nextEntries.push({ type: 'error', text: `Exited with code ${result.exitCode}` });
+				nextEntries.push({ type: 'error', text: `Exited with code ${String(result.exitCode)}` });
 			}
 
 			if (nextEntries.length === 0) {
@@ -126,7 +126,7 @@ Any other command is executed by your system shell in the active repository.`,
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter') {
-			executeCommand(input);
+			void executeCommand(input);
 			setInput('');
 			return;
 		}

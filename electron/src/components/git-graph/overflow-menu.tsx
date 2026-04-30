@@ -89,7 +89,8 @@ const isMacPlatform = () => {
     if (typeof navigator === 'undefined') {
         return false;
     }
-    return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform ?? '');
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform);
 };
 
 const shortcutLabels = {

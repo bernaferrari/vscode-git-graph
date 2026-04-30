@@ -132,6 +132,7 @@ export function CreateBranchDialog({
 	open,
 	onOpenChange,
 	onCreate,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	targetCommit: _targetCommit,
 	defaultCheckout = false,
 }: CreateBranchDialogProps) {
@@ -171,7 +172,7 @@ export function CreateBranchDialog({
 						onChange={(e) => { setName(e.target.value); }}
 						placeholder="Enter branch name..."
 						autoFocus
-						onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+						onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
 					/>
 				</div>
 				<div className="flex items-center gap-2">
@@ -206,6 +207,7 @@ export function AddTagDialog({
 	open,
 	onOpenChange,
 	onAdd,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	targetCommit: _targetCommit,
 	defaultType = 'annotated',
 	defaultPush = false,
@@ -247,7 +249,7 @@ export function AddTagDialog({
 						onChange={(e) => { setName(e.target.value); }}
 						placeholder="Enter tag name..."
 						autoFocus
-						onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+						onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
 					/>
 				</div>
 				<div className="space-y-2">

@@ -54,7 +54,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "ui-surface data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/20 grid max-w-[min(100%-1.5rem,48rem)] gap-4 rounded-2xl p-4 text-sm ring-1 shadow-[0_18px_90px_-40px_rgba(0,0,0,0.6)] duration-150 backdrop-blur-sm sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+          "ui-surface data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-98 data-open:zoom-in-98 ring-foreground/16 grid max-w-[min(100%-1.5rem,48rem)] gap-4 rounded-lg p-4 text-sm ring-1 shadow-[0_22px_80px_-48px_rgba(0,0,0,0.7)] duration-150 backdrop-blur-sm sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
           className
         )}
         {...props}
@@ -66,7 +66,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2 rounded-full"
+                className="absolute top-2 right-2"
                 size="icon-sm"
               />
             }
@@ -102,7 +102,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "ui-toolbar -mx-4 -mb-4 rounded-b-[calc(theme(borderRadius.2xl)-1px)] p-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "ui-toolbar -mx-4 -mb-4 rounded-b-lg p-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

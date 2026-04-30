@@ -11,6 +11,7 @@ import {
 	MinusCircle,
 	Check,
 	Loader2,
+	FileDiff,
 } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -81,13 +82,21 @@ export function InlineStagingDiff({
 		if (!stagedDiff?.diff) return [];
 		return parseDiffIntoHunks(stagedDiff.diff, true);
 	}, [stagedDiff?.diff]);
+	const diffStats = useMemo(() => {
+		const allLines = [...stagedHunks, ...unstagedHunks].flatMap((hunk) => hunk.lines);
+		return {
+			hunks: stagedHunks.length + unstagedHunks.length,
+			added: allLines.filter((line) => line.type === 'added').length,
+			removed: allLines.filter((line) => line.type === 'removed').length,
+		};
+	}, [stagedHunks, unstagedHunks]);
 
 	// Stage mutations
 	const stageMutation = trpc.git.stage.useMutation({
 		onSuccess: () => {
 			toast.success('Staged');
-			refetchUnstaged();
-			refetchStaged();
+			void refetchUnstaged();
+			void refetchStaged();
 			onStaged?.();
 		},
 		onError: (error) => {
@@ -98,8 +107,8 @@ export function InlineStagingDiff({
 	const unstageMutation = trpc.git.unstage.useMutation({
 		onSuccess: () => {
 			toast.success('Unstaged');
-			refetchUnstaged();
-			refetchStaged();
+			void refetchUnstaged();
+			void refetchStaged();
 		},
 		onError: (error) => {
 			toast.error('Failed to unstage', { description: error.message });
@@ -145,46 +154,42 @@ export function InlineStagingDiff({
 		unstageMutation.mutate({ repo: activeRepo, files: [filePath] });
 	};
 
-	// Toggle individual line
-	const handleToggleLine = useCallback((lineIndex: number, isUnstaged: boolean) => {
-		if (!activeRepo || !filePath) return;
-
-		// For simplicity, stage/unstage the whole hunk containing this line
-		const hunks = isUnstaged ? unstagedHunks : stagedHunks;
-		const hunkIndex = hunks.findIndex((h) => 
-			lineIndex >= h.startLine && lineIndex <= h.endLine
-		);
-		
-		if (hunkIndex >= 0) {
-			handleStageHunk(hunkIndex, isUnstaged);
-		}
-	}, [activeRepo, filePath, unstagedHunks, stagedHunks, handleStageHunk]);
-
 	const isLoading = loadingUnstaged || loadingStaged;
+	const isMutating = stageMutation.isPending || unstageMutation.isPending;
 
 	return (
 		<div className="flex flex-col h-full">
 			{/* Header */}
 			<div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
 				<div className="flex items-center gap-2">
+					<FileDiff className='h-3.5 w-3.5 text-muted-foreground' />
 					<span className="text-sm font-medium truncate max-w-[200px]" title={filePath}>
 						{filePath}
 					</span>
 					<Badge variant="outline" className="text-xs">
 						{fileStatus === '?' ? 'Untracked' : fileStatus}
 					</Badge>
+					<Badge variant='outline' className='text-xs'>
+						{diffStats.hunks} hunks
+					</Badge>
+					<Badge variant='outline' className='border-green-500/25 text-green-700 dark:text-green-300'>
+						+{diffStats.added}
+					</Badge>
+					<Badge variant='outline' className='border-red-500/25 text-red-700 dark:text-red-300'>
+						-{diffStats.removed}
+					</Badge>
 				</div>
 				<div className="flex items-center gap-2">
 					{unstagedHunks.length > 0 && (
-						<Button variant="outline" size="sm" onClick={handleStageAll}>
+						<Button variant="outline" size="sm" onClick={handleStageAll} disabled={isMutating}>
 							<PlusCircle className="h-3 w-3 mr-1" />
-							Stage All
+							Stage File
 						</Button>
 					)}
 					{stagedHunks.length > 0 && (
-						<Button variant="outline" size="sm" onClick={handleUnstageAll}>
+						<Button variant="outline" size="sm" onClick={handleUnstageAll} disabled={isMutating}>
 							<MinusCircle className="h-3 w-3 mr-1" />
-							Unstage All
+							Unstage File
 						</Button>
 					)}
 				</div>
@@ -206,12 +211,11 @@ export function InlineStagingDiff({
 								</div>
 									{stagedHunks.map((hunk, hunkIndex) => (
 										<HunkDisplay
-											key={`staged-${hunkIndex}`}
+											key={`staged-${String(hunkIndex)}`}
 											hunk={hunk}
 											isStaged={true}
-											onToggleHunk={() => handleStageHunk(hunkIndex, false)}
-											onToggleLine={(lineIdx) => { handleToggleLine(lineIdx, false); }}
-										isStaging={stagingHunk === hunkIndex}
+											onToggleHunk={() => { void handleStageHunk(hunkIndex, false); }}
+											isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
 							</div>
@@ -226,12 +230,11 @@ export function InlineStagingDiff({
 								</div>
 									{unstagedHunks.map((hunk, hunkIndex) => (
 										<HunkDisplay
-											key={`unstaged-${hunkIndex}`}
+											key={`unstaged-${String(hunkIndex)}`}
 											hunk={hunk}
 											isStaged={false}
-											onToggleHunk={() => handleStageHunk(hunkIndex, true)}
-											onToggleLine={(lineIdx) => { handleToggleLine(lineIdx, true); }}
-										isStaging={stagingHunk === hunkIndex}
+											onToggleHunk={() => { void handleStageHunk(hunkIndex, true); }}
+											isStaging={stagingHunk === hunkIndex}
 									/>
 								))}
 							</div>
@@ -314,17 +317,13 @@ function HunkDisplay({
 	hunk,
 	isStaged,
 	onToggleHunk,
-	onToggleLine,
 	isStaging,
 }: {
 	hunk: Hunk;
 	isStaged: boolean;
 	onToggleHunk: () => void;
-	onToggleLine: (lineIndex: number) => void;
 	isStaging: boolean;
 }) {
-	const [hoveredLine, setHoveredLine] = useState<number | null>(null);
-
 	return (
 		<div className="border-b last:border-b-0">
 			{/* Hunk header with stage button */}
@@ -344,12 +343,12 @@ function HunkDisplay({
 					) : isStaged ? (
 						<>
 							<MinusCircle className="h-3 w-3 mr-1" />
-							Unstage
+							Unstage File
 						</>
 					) : (
 						<>
 							<PlusCircle className="h-3 w-3 mr-1" />
-							Stage
+							Stage File
 						</>
 					)}
 				</Button>
@@ -363,8 +362,6 @@ function HunkDisplay({
 						line.type === 'added' ? 'bg-green-50 dark:bg-green-900/20' :
 						line.type === 'removed' ? 'bg-red-50 dark:bg-red-900/20' : ''
 					} hover:bg-accent/30`}
-					onMouseEnter={() => { setHoveredLine(lineIndex); }}
-					onMouseLeave={() => { setHoveredLine(null); }}
 				>
 					{/* Line number */}
 					<div className="w-10 text-right pr-2 text-muted-foreground select-none border-r bg-muted/20">
@@ -378,27 +375,6 @@ function HunkDisplay({
 					<div className="w-6 text-center select-none border-r bg-muted/20">
 						{line.type === 'added' && <Plus className="h-3 w-3 mx-auto text-green-600" />}
 						{line.type === 'removed' && <Minus className="h-3 w-3 mx-auto text-red-600" />}
-					</div>
-
-					{/* Stage line button */}
-					<div className={`w-6 flex items-center justify-center border-r ${
-						hoveredLine === lineIndex && line.type !== 'context' ? 'opacity-100' : 'opacity-0'
-					}`}>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-5 w-5 p-0"
-							onClick={(e) => {
-								e.stopPropagation();
-								onToggleLine(lineIndex);
-							}}
-						>
-							{isStaged ? (
-								<MinusCircle className="h-3 w-3 text-red-500" />
-							) : (
-								<PlusCircle className="h-3 w-3 text-green-500" />
-							)}
-						</Button>
 					</div>
 
 					{/* Content */}

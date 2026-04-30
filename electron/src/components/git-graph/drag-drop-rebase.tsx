@@ -72,7 +72,7 @@ export function DragDropRebase({
 	const utils = trpc.useUtils();
 const rebaseMutation = trpc.git.rebase.useMutation({
 		onSuccess: () => {
-			utils.git.commits.invalidate();
+			void utils.git.commits.invalidate();
 		},
 	});
 
@@ -146,7 +146,7 @@ const rebaseMutation = trpc.git.rebase.useMutation({
 				todos: todoContent,
 			});
 
-			if (result?.error) {
+			if (result.error) {
 				toast.error(result.error);
 				return;
 			}
@@ -268,7 +268,7 @@ const rebaseMutation = trpc.git.rebase.useMutation({
 						Cancel
 					</Button>
 					<Button
-						onClick={handleRebase}
+						onClick={() => { void handleRebase(); }}
 						disabled={isSubmitting || rebaseMutation.isPending}
 					>
 						{isSubmitting || rebaseMutation.isPending ? 'Rebasing...' : 'Start Rebase'}
@@ -282,6 +282,7 @@ const rebaseMutation = trpc.git.rebase.useMutation({
 /**
  * Keyboard shortcuts for quick actions
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const REBASE_SHORTCUTS = {
 	'p': 'pick',
 	'r': 'reword',

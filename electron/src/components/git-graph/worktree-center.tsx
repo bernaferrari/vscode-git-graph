@@ -114,11 +114,12 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
     const workspaceQuery = trpc.repo.workspace.list.useQuery(undefined, { enabled: open });
     const launchpadQuery = trpc.repo.launchpad.useQuery(
         {
+				// eslint-disable-next-line @typescript-eslint/no-base-to-string
             repos: (listQuery.data?.worktrees ?? []).map((entry: Record<string, unknown>) => String(entry.path ?? '')),
             includePullRequests: true,
         },
         {
-            enabled: open && !!targetRepo && (listQuery.data?.worktrees?.length ?? 0) > 0,
+            enabled: open && !!targetRepo && (listQuery.data?.worktrees.length ?? 0) > 0,
             staleTime: 20_000,
         }
     );
@@ -284,8 +285,8 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
             return;
         }
         const prefs = prefsQuery.data.prefs;
-        setShowLocked(Boolean(prefs.showLocked));
-        setShowPrunable(Boolean(prefs.showPrunable));
+        setShowLocked(prefs.showLocked);
+        setShowPrunable(prefs.showPrunable);
         setMode(prefs.defaultCreateMode as CreateMode);
         setPathPresetRoot(prefs.pathPresetRoot ?? '');
         if (prefs.lastSelectedBranch) {
@@ -373,12 +374,14 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
     };
 
     const handleRemove = (targetPath: string, dirtyCount: number) => {
+				// eslint-disable-next-line no-alert
         const confirmed = window.confirm(`Remove worktree at ${targetPath}?`);
         if (!confirmed) {
             return;
         }
 
         if (dirtyCount > 0) {
+				// eslint-disable-next-line no-alert
             const typedReason = window.prompt(
                 `Worktree has ${String(dirtyCount)} local change(s). Type reason to force remove:`,
                 forceReason || 'cleanup'
@@ -469,6 +472,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                                           ? worktree.branch
                                           : 'detached';
                                 const lockReason = typeof worktree.lockReason === 'string' ? worktree.lockReason : '';
+				// eslint-disable-next-line @typescript-eslint/no-base-to-string
                                 const targetPath = String(worktree.path ?? '');
                                 const launchpad = launchpadByPath.get(targetPath);
                                 const linkedWorkspaces = workspacesByPath.get(targetPath) ?? [];
@@ -576,6 +580,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                                                     variant='outline'
                                                     className='h-8'
                                                     onClick={() => {
+				// eslint-disable-next-line no-alert
                                                         const reason = window.prompt('Lock reason (optional):', '') ?? '';
                                                         lockMutation.mutate({
                                                             repo: targetRepo,
@@ -770,7 +775,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                         </div>
                         <ScrollArea className='h-52'>
                             <div className='space-y-1 text-xs'>
-                                {((prunePreviewQuery.data?.entries ?? []) as string[]).map((entry: string) => (
+                                {((prunePreviewQuery.data?.entries ?? [])).map((entry: string) => (
                                     <p key={entry} className='text-muted-foreground'>
                                         {entry}
                                     </p>

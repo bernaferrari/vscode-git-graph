@@ -24,8 +24,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 import { trpc } from '@/trpc/client';
 
 
@@ -89,6 +89,7 @@ const DEFAULT_COMMANDS: CustomCommand[] = [
 	},
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCustomCommands() {
 	const [commands, setCommands] = useState<CustomCommand[]>([]);
 	const utils = trpc.useUtils();
@@ -328,7 +329,7 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 												<Button
 													variant="outline"
 													size="sm"
-													onClick={() => runCommand(cmd)}
+													onClick={() => { void runCommand(cmd); }}
 													disabled={runningCommand === cmd.id}
 												>
 													{runningCommand === cmd.id ? (
@@ -375,7 +376,7 @@ export function CustomCommands({ open, onOpenChange }: CustomCommandsProps) {
 								variant="ghost"
 								size="sm"
 								onClick={() => {
-									navigator.clipboard.writeText(output);
+									void navigator.clipboard.writeText(output);
 									toast.success('Copied to clipboard');
 								}}
 							>

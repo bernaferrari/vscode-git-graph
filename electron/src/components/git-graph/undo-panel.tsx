@@ -28,8 +28,8 @@ export function UndoPanel({ repo }: UndoPanelProps) {
 
 	const undoMutation = trpc.git.reset.useMutation({
 		onSuccess: () => {
-			utils.git.commits.invalidate();
-			utils.git.repoInfo.invalidate();
+			void utils.git.commits.invalidate();
+			void utils.git.repoInfo.invalidate();
 		},
 	});
 
@@ -58,7 +58,7 @@ export function UndoPanel({ repo }: UndoPanelProps) {
 					<div className="space-y-1">
 						{entries.map((entry, index) => (
 							<div
-								key={`${entry.hash}-${index}`}
+								key={`${entry.hash}-${String(index)}`}
 								className="flex items-center justify-between p-2 rounded hover:bg-accent text-sm"
 							>
 								<div className="flex-1 min-w-0">

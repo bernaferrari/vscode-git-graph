@@ -44,6 +44,30 @@ const issueTrackerConfigSchema = z.object({
 	autoDetect: z.boolean(),
 	patterns: z.array(z.string()),
 });
+const issueProviderSchema = z.enum(['github', 'jira', 'linear', 'asana', 'trello', 'clickup', 'notion']);
+const issueStatusSchema = z.enum(['open', 'in_progress', 'closed', 'done']);
+const linkedIssueSchema = z.object({
+	id: z.string().min(1),
+	commitHash: z.string().min(1),
+	issueKey: z.string().min(1),
+	provider: issueProviderSchema,
+	title: z.string().min(1),
+	status: issueStatusSchema,
+	url: z.string().min(1),
+	addedAt: z.number(),
+});
+const issueSearchResultSchema = z.object({
+	id: z.string().min(1),
+	key: z.string().min(1),
+	title: z.string().min(1),
+	description: z.string().optional(),
+	status: issueStatusSchema,
+	provider: issueProviderSchema,
+	url: z.string().min(1),
+	labels: z.array(z.string()).optional(),
+	assignee: z.string().optional(),
+	priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+});
 const customCommandSchema = z.object({
 	id: z.string().min(1),
 	name: z.string().min(1),
@@ -114,11 +138,20 @@ const collaborationSyncConfigSchema = z.object({
 });
 
 type CollaborationSyncConfig = z.infer<typeof collaborationSyncConfigSchema>;
+type IssueProvider = z.infer<typeof issueProviderSchema>;
+type IssueSearchResult = z.infer<typeof issueSearchResultSchema>;
+type LinkedIssue = z.infer<typeof linkedIssueSchema>;
+type IssueProviderConfig = {
+	enabled: boolean;
+	apiKey?: string | undefined;
+	domain?: string | undefined;
+	projectKey?: string | undefined;
+};
 type CollaborationSyncConfigPatch = {
 	[K in keyof CollaborationSyncConfig]?: CollaborationSyncConfig[K] | undefined;
 };
 const collaborationAuthTokenSecretKey = 'collaborationSyncConfig.authToken';
-const collaborationMemberApiKeySecretKey = 'collaborationSyncConfig.memberApiKey';
+const collaborationMemberApiKeySecretKey = 'collaborationSyncConfig.memberApiKey'; // eslint-disable-line no-secrets/no-secrets
 
 function readStoredString(value: unknown): string {
 	return typeof value === 'string' ? value.trim() : '';
@@ -219,6 +252,214 @@ function persistCollaborationSyncConfig(config: CollaborationSyncConfig): Collab
 	appStore.set('collaborationSyncConfig', nextConfig);
 
 	return config;
+}
+
+function normalizeIssueStatus(provider: IssueProvider, value: string | undefined): z.infer<typeof issueStatusSchema> {
+	const normalized = value?.toLowerCase().replace(/\s+/g, '_') ?? '';
+	if (provider === 'linear') {
+		if (normalized === 'completed' || normalized === 'done') return 'done';
+		if (normalized === 'started' || normalized === 'triage' || normalized === 'backlog') return 'in_progress';
+		if (normalized === 'canceled' || normalized === 'cancelled') return 'closed';
+	}
+	if (normalized === 'closed' || normalized === 'merged') return 'closed';
+	if (normalized === 'done' || normalized === 'resolved') return 'done';
+	if (normalized === 'in_progress' || normalized === 'in-progress') return 'in_progress';
+	return 'open';
+}
+
+function getIssueLinksStore(): Record<string, LinkedIssue[]> {
+	return z.record(z.string(), z.array(linkedIssueSchema)).catch({}).parse(appStore.get('issueLinksByCommit'));
+}
+
+function setIssueLinksStore(next: Record<string, LinkedIssue[]>): void {
+	appStore.set('issueLinksByCommit', next);
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+	const response = await fetch(url, init);
+	if (!response.ok) {
+		throw new Error(`${String(response.status)} ${response.statusText}`);
+	}
+	return response.json() as Promise<T>;
+}
+
+async function searchGithubIssues(query: string, config: IssueProviderConfig): Promise<IssueSearchResult[]> {
+	const searchTerms = [query.trim(), 'is:issue'];
+	if (config.projectKey?.trim()) {
+		searchTerms.push(`repo:${config.projectKey.trim()}`);
+	}
+	const headers = new Headers({ Accept: 'application/vnd.github+json' });
+	if (config.apiKey?.trim()) {
+		headers.set('Authorization', `Bearer ${config.apiKey.trim()}`);
+	}
+	const params = new URLSearchParams({
+		q: searchTerms.join(' '),
+		per_page: '20',
+	});
+	const result = await fetchJson<{
+		items?: Array<{
+			id: number;
+			number: number;
+			title: string;
+			body?: string | null;
+			state: string;
+			html_url: string;
+			labels?: Array<{ name?: string } | string>;
+			assignees?: Array<{ login?: string }>;
+		}>;
+	}>(`https://api.github.com/search/issues?${params.toString()}`, { headers });
+
+	return (result.items ?? []).map((issue) => ({
+		id: `github-${String(issue.id)}`,
+		key: `#${String(issue.number)}`,
+		title: issue.title,
+		...(issue.body ? { description: issue.body } : {}),
+		status: normalizeIssueStatus('github', issue.state),
+		provider: 'github',
+		url: issue.html_url,
+		labels: issue.labels
+			?.map((label) => (typeof label === 'string' ? label : label.name ?? ''))
+			.filter((label) => label.length > 0),
+		...(issue.assignees?.[0]?.login ? { assignee: issue.assignees[0].login } : {}),
+	}));
+}
+
+async function searchJiraIssues(query: string, config: IssueProviderConfig): Promise<IssueSearchResult[]> {
+	const domain = config.domain?.trim();
+	const apiKey = config.apiKey?.trim();
+	if (!domain || !apiKey || !apiKey.includes(':')) {
+		throw new Error('Jira requires domain and apiKey formatted as email:token.');
+	}
+	const [email, token] = apiKey.split(/:(.*)/s);
+	if (!email || !token) {
+		throw new Error('Jira requires domain and apiKey formatted as email:token.');
+	}
+	const projectClause = config.projectKey?.trim() ? `project = "${config.projectKey.trim()}" AND ` : '';
+	const escapedQuery = query.trim().replace(/["\\]/g, '\\$&');
+	const jql = `${projectClause}(summary ~ "${escapedQuery}" OR text ~ "${escapedQuery}") ORDER BY updated DESC`;
+	const host = domain.startsWith('http') ? domain.replace(/\/$/, '') : `https://${domain}.atlassian.net`;
+	const params = new URLSearchParams({
+		jql,
+		maxResults: '20',
+		fields: 'summary,status,priority,assignee,labels,description',
+	});
+	const result = await fetchJson<{
+		issues?: Array<{
+			id: string;
+			key: string;
+			fields: {
+				summary?: string;
+				status?: { name?: string };
+				priority?: { name?: string };
+				assignee?: { displayName?: string };
+				labels?: string[];
+			};
+		}>;
+	}>(`${host}/rest/api/3/search?${params.toString()}`, {
+		headers: {
+			Authorization: `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`,
+			Accept: 'application/json',
+		},
+	});
+
+	return (result.issues ?? []).map((issue) => ({
+		id: `jira-${issue.id}`,
+		key: issue.key,
+		title: issue.fields.summary ?? issue.key,
+		status: normalizeIssueStatus('jira', issue.fields.status?.name),
+		provider: 'jira',
+		url: `${host}/browse/${issue.key}`,
+		labels: issue.fields.labels ?? [],
+		...(issue.fields.assignee?.displayName ? { assignee: issue.fields.assignee.displayName } : {}),
+		...(issue.fields.priority?.name
+			? { priority: issue.fields.priority.name.toLowerCase() as 'low' | 'medium' | 'high' | 'urgent' }
+			: {}),
+	}));
+}
+
+async function searchLinearIssues(query: string, config: IssueProviderConfig): Promise<IssueSearchResult[]> {
+	const apiKey = config.apiKey?.trim();
+	if (!apiKey) {
+		throw new Error('Linear requires an API key.');
+	}
+	const teamClause = config.projectKey?.trim() ? `, team: { key: { eq: "${config.projectKey.trim()}" } }` : '';
+	const graphql = `
+		query SearchIssues($term: String!) {
+			issues(first: 20, filter: { or: [{ title: { containsIgnoreCase: $term } }, { description: { containsIgnoreCase: $term } }]${teamClause} }) {
+				nodes {
+					id
+					identifier
+					title
+					description
+					url
+					priorityLabel
+					state { name type }
+					assignee { name }
+					labels { nodes { name } }
+				}
+			}
+		}
+	`;
+	const result = await fetchJson<{
+		data?: {
+			issues?: {
+				nodes?: Array<{
+					id: string;
+					identifier: string;
+					title: string;
+					description?: string | null;
+					url: string;
+					priorityLabel?: string | null;
+					state?: { name?: string; type?: string };
+					assignee?: { name?: string } | null;
+					labels?: { nodes?: Array<{ name?: string }> };
+				}>;
+			};
+		};
+		errors?: Array<{ message?: string }>;
+	}>('https://api.linear.app/graphql', {
+		method: 'POST',
+		headers: {
+			Authorization: apiKey,
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({ query: graphql, variables: { term: query.trim() } }),
+	});
+	if (result.errors?.length) {
+		throw new Error(result.errors[0]?.message ?? 'Linear API error');
+	}
+
+	return (result.data?.issues?.nodes ?? []).map((issue) => ({
+		id: `linear-${issue.id}`,
+		key: issue.identifier,
+		title: issue.title,
+		...(issue.description ? { description: issue.description } : {}),
+		status: normalizeIssueStatus('linear', issue.state?.type ?? issue.state?.name),
+		provider: 'linear',
+		url: issue.url,
+		labels: issue.labels?.nodes?.map((label) => label.name ?? '').filter((label) => label.length > 0) ?? [],
+		...(issue.assignee?.name ? { assignee: issue.assignee.name } : {}),
+		...(issue.priorityLabel
+			? { priority: issue.priorityLabel.toLowerCase() as 'low' | 'medium' | 'high' | 'urgent' }
+			: {}),
+	}));
+}
+
+async function searchProviderIssues(
+	provider: IssueProvider,
+	query: string,
+	config: IssueProviderConfig
+): Promise<IssueSearchResult[]> {
+	switch (provider) {
+		case 'github':
+			return searchGithubIssues(query, config);
+		case 'jira':
+			return searchJiraIssues(query, config);
+		case 'linear':
+			return searchLinearIssues(query, config);
+		default:
+			throw new Error(`${provider} issue search is not implemented yet.`);
+	}
 }
 
 export const configRouter = router({
@@ -554,6 +795,109 @@ export const configRouter = router({
 			return { success: true };
 		}),
 
+	issueSearch: publicProcedure
+		.input(
+			z.object({
+				query: z.string().min(1),
+				providers: z.array(issueProviderSchema).optional(),
+			})
+		)
+		.query(async ({ input }) => {
+			const config = issueTrackerConfigSchema.catch({ providers: {}, autoDetect: true, patterns: [] }).parse(
+				appStore.get('issueTrackerConfig')
+			);
+			const requestedProviders = input.providers?.length
+				? input.providers
+				: (Object.entries(config.providers)
+						.filter(([, providerConfig]) => providerConfig.enabled)
+						.map(([provider]) => provider)
+						.filter((provider): provider is IssueProvider => issueProviderSchema.safeParse(provider).success));
+			const uniqueProviders = [...new Set(requestedProviders)];
+			const results: IssueSearchResult[] = [];
+			const errors: Array<{ provider: IssueProvider; message: string }> = [];
+
+			await Promise.all(
+				uniqueProviders.map(async (provider) => {
+					const providerConfig = config.providers[provider];
+					if (!providerConfig?.enabled) {
+						return;
+					}
+					try {
+						results.push(...(await searchProviderIssues(provider, input.query, providerConfig)));
+					} catch (error) {
+						errors.push({
+							provider,
+							message: error instanceof Error ? error.message : 'Unknown issue search error',
+						});
+					}
+				})
+			);
+
+			return {
+				issues: results
+					.sort((left, right) => left.key.localeCompare(right.key))
+					.slice(0, 50),
+				errors,
+			};
+		}),
+
+	issueLinks: publicProcedure
+		.input(z.object({ commitHash: z.string().min(1) }))
+		.query(({ input }) => {
+			const linksByCommit = getIssueLinksStore();
+			return {
+				links: linksByCommit[input.commitHash] ?? [],
+			};
+		}),
+
+	linkIssue: publicProcedure
+		.input(
+			z.object({
+				commitHash: z.string().min(1),
+				issue: issueSearchResultSchema,
+			})
+		)
+		.mutation(({ input }) => {
+			const linksByCommit = getIssueLinksStore();
+			const currentLinks = linksByCommit[input.commitHash] ?? [];
+			const existing = currentLinks.find(
+				(link) => link.provider === input.issue.provider && link.issueKey === input.issue.key
+			);
+			const nextLink: LinkedIssue = {
+				id: existing?.id ?? `${input.issue.provider}-${input.issue.key}-${String(Date.now())}`,
+				commitHash: input.commitHash,
+				issueKey: input.issue.key,
+				provider: input.issue.provider,
+				title: input.issue.title,
+				status: input.issue.status,
+				url: input.issue.url,
+				addedAt: existing?.addedAt ?? Date.now(),
+			};
+			setIssueLinksStore({
+				...linksByCommit,
+				[input.commitHash]: [nextLink, ...currentLinks.filter((link) => link.id !== nextLink.id)],
+			});
+			return { link: nextLink };
+		}),
+
+	unlinkIssue: publicProcedure
+		.input(
+			z.object({
+				commitHash: z.string().min(1),
+				linkId: z.string().min(1),
+			})
+		)
+		.mutation(({ input }) => {
+			const linksByCommit = getIssueLinksStore();
+			const currentLinks = linksByCommit[input.commitHash] ?? [];
+			const nextLinks = currentLinks.filter((link) => link.id !== input.linkId);
+			setIssueLinksStore({
+				...linksByCommit,
+				[input.commitHash]: nextLinks,
+			});
+			return { success: nextLinks.length !== currentLinks.length };
+		}),
+
 	settings: publicProcedure.query(() => {
 		return {
 			settings: appStore.get('gitGraphSettings'),
@@ -607,7 +951,7 @@ export const configRouter = router({
 		.mutation(({ input }) => {
 			const current = appStore.get('notificationCenter');
 			const nextNotification = {
-				id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+				id: `${String(Date.now())}-${Math.random().toString(36).slice(2, 9)}`,
 				type: input.type,
 				title: input.title,
 				...(input.message ? { message: input.message } : {}),

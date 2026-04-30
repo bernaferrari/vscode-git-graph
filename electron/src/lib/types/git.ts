@@ -188,6 +188,7 @@ export enum SquashMessageFormat {
 
 export const UNCOMMITTED = 'UNCOMMITTED';
 
+// eslint-disable-next-line no-secrets/no-secrets
 export const GIT_LOG_SEPARATOR = 'XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb';
 
 // ==================== Internal Data Types ====================

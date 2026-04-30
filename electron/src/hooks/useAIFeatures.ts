@@ -79,7 +79,7 @@ export function useAIFeatures(): UseAIFeatures {
 						stagedFiles: change.files,
 						diff: change.diff,
 					});
-					suggestions.push(result.suggestion ?? `chore: update ${change.files.length} file(s)`);
+					suggestions.push(result.suggestion ?? `chore: update ${String(change.files.length)} file(s)`);
 				}
 				return suggestions;
 			} finally {

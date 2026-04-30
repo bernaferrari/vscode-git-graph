@@ -44,7 +44,7 @@ export function DiffToolConfig({ repo }: DiffToolConfigProps) {
 
 	const setToolMutation = trpc.git.setDiffTool.useMutation({
 		onSuccess: () => {
-			utils.git.getDiffTool.invalidate();
+			void utils.git.getDiffTool.invalidate();
 		},
 	});
 
@@ -80,7 +80,7 @@ export function DiffToolConfig({ repo }: DiffToolConfigProps) {
 			<CardContent className="space-y-3">
 				<div className="space-y-2">
 					<Label className="text-xs">Select Tool</Label>
-					<Select value={selectedTool} onValueChange={(v) => v && setSelectedTool(v)}>
+					<Select value={selectedTool} onValueChange={(v) => { if (v) setSelectedTool(v); }}>
 						<SelectTrigger className="h-8">
 							<SelectValue placeholder="Choose a diff tool..." />
 						</SelectTrigger>

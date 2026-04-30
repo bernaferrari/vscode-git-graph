@@ -6,8 +6,6 @@
 import {
     Loader2,
     GitBranch,
-    Download,
-    Plus,
     Tag,
     GitCommit,
     X,
@@ -32,6 +30,7 @@ import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
 import { GitGraphShellOverlays } from './git-graph-shell-overlays';
 import { GitGraphToolbar } from './git-graph-toolbar';
+import { HomeStartSurface, type HomeStartRepoEntry } from './home-start-surface';
 import { NotificationCenter } from './notification-center';
 import { OperationStatusBar } from './operation-status-bar';
 import { OverflowMenu } from './overflow-menu';
@@ -60,7 +59,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useGitOperations } from '@/hooks/useGitOperations';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
-import { DEFAULT_GRAPH_CONFIG } from '@/lib/graph/layout';
+import { DEFAULT_GRAPH_CONFIG } from '@/lib/graph/config';
 import { useGraphLayoutWorker } from '@/lib/graph/useGraphLayoutWorker';
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
@@ -222,8 +221,8 @@ function classifyPerfTrend(stats: PerfStatsSummary): PerfTrend {
     if (deltaPct >= PERF_REGRESSION_DELTA_PCT || hasTailSpike) {
         return {
             level: 'regressed',
-            label: `+${roundedDelta}%`,
-            title: `Regression detected: latest latency is ${roundedDelta}% slower than p50.`,
+            label: `+${String(roundedDelta)}%`,
+            title: `Regression detected: latest latency is ${String(roundedDelta)}% slower than p50.`,
             deltaPct,
         };
     }
@@ -231,8 +230,8 @@ function classifyPerfTrend(stats: PerfStatsSummary): PerfTrend {
     if (deltaPct >= PERF_WATCH_DELTA_PCT) {
         return {
             level: 'watch',
-            label: `+${roundedDelta}%`,
-            title: `Watch: latest latency is ${roundedDelta}% slower than p50.`,
+            label: `+${String(roundedDelta)}%`,
+            title: `Watch: latest latency is ${String(roundedDelta)}% slower than p50.`,
             deltaPct,
         };
     }
@@ -240,8 +239,8 @@ function classifyPerfTrend(stats: PerfStatsSummary): PerfTrend {
     if (deltaPct <= PERF_IMPROVING_DELTA_PCT) {
         return {
             level: 'improving',
-            label: `${roundedDelta}%`,
-            title: `Improving: latest latency is ${Math.abs(roundedDelta)}% faster than p50.`,
+            label: `${String(roundedDelta)}%`,
+            title: `Improving: latest latency is ${String(Math.abs(roundedDelta))}% faster than p50.`,
             deltaPct,
         };
     }
@@ -298,6 +297,7 @@ export function GitGraph() {
     // App store
     const {
         activeRepo,
+        openedRepos,
         selectedCommit,
         commitDetailsOpen,
         repoLoadPhase,
@@ -394,6 +394,7 @@ export function GitGraph() {
         settingsOpen,
         setSettingsOpen,
         settingsInitialTab,
+        settingsInitialSection,
         gitFlowOpen,
         setGitFlowOpen,
         healthCheckOpen,
@@ -425,6 +426,37 @@ export function GitGraph() {
     const { settings } = useSettings();
     const showPerfDebug = settings.telemetryEnabled;
     const onboardingStateQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
+    const repoList = trpc.repo.list.useQuery(undefined, { staleTime: 10_000 }).data as
+        | { repos?: HomeStartRepoEntry[] }
+        | undefined;
+    const recentRepos = trpc.repo.recent.useQuery(undefined, { staleTime: 10_000 }).data;
+    const repoMetaByPath = useMemo(
+        () => new Map<string, HomeStartRepoEntry>((repoList?.repos ?? []).map((repo) => [repo.path, repo])),
+        [repoList?.repos]
+    );
+    const knownRepoPaths = useMemo(() => new Set((repoList?.repos ?? []).map((repo) => repo.path)), [repoList?.repos]);
+    const openedRepoEntries = useMemo<HomeStartRepoEntry[]>(
+        () =>
+            openedRepos.map((path) => {
+                const meta = repoMetaByPath.get(path);
+                return {
+                    path,
+                    name: meta?.name ?? path.split('/').pop() ?? path,
+                };
+            }),
+        [openedRepos, repoMetaByPath]
+    );
+    const recentRepoEntries = useMemo<HomeStartRepoEntry[]>(
+        () =>
+            (recentRepos ?? []).map((path) => {
+                const meta = repoMetaByPath.get(path);
+                return {
+                    path,
+                    name: meta?.name ?? path.split('/').pop() ?? path,
+                };
+            }),
+        [recentRepos, repoMetaByPath]
+    );
 
     useEffect(() => {
         if (!activeRepo) return;
@@ -622,6 +654,7 @@ export function GitGraph() {
                                         gitUtils.git.commits.invalidate(),
                                         gitUtils.git.repoInfo.invalidate(),
                                         gitUtils.git.workingDirectoryStatus.invalidate({ repo: activeRepo }),
+                                    // eslint-disable-next-line @typescript-eslint/use-unknown-in-catch-callback-variable
                                     ]).catch((error) => {
                                         console.error('[git-graph] Failed to invalidate conflict state:', error);
                                     });
@@ -762,7 +795,7 @@ export function GitGraph() {
     // Load more commits handler
     const handleLoadMore = useCallback(() => {
         if (maxCommits >= maxCommitsLimit) {
-            toast.info(`Commit load limit reached (${maxCommitsLimit}).`, {
+            toast.info(`Commit load limit reached (${String(maxCommitsLimit)}).`, {
                 description: 'Increase it in Settings > Performance if needed.',
             });
             return;
@@ -849,7 +882,7 @@ export function GitGraph() {
             return '--';
         }
         if (value < 1024) {
-            return `${value} B`;
+            return `${String(value)} B`;
         }
         return `${(value / 1024).toFixed(1)} KB`;
     }, []);
@@ -869,14 +902,14 @@ export function GitGraph() {
             repository: activeRepo ?? null,
             windowSize: MAX_PERF_HISTORY_SAMPLES,
             activeFetches: {
-                repoInfo: Boolean(repoLoading),
-                commits: Boolean(commitsFetching || commitsLoading),
-                refs: Boolean(refsFetching),
+                repoInfo: repoLoading,
+                commits: commitsFetching || commitsLoading,
+                refs: refsFetching,
             },
             counts: {
-                branches: repoInfo?.branches?.length ?? 0,
-                tags: repoInfo?.tags?.length ?? 0,
-                commits: commitsData?.commits?.length ?? 0,
+                branches: repoInfo?.branches.length ?? 0,
+                tags: repoInfo?.tags.length ?? 0,
+                commits: commitsData?.commits.length ?? 0,
             },
             queries: {
                 repoInfo: {
@@ -902,9 +935,9 @@ export function GitGraph() {
         commitsFetching,
         commitsLoading,
         refsFetching,
-        repoInfo?.branches?.length,
-        repoInfo?.tags?.length,
-        commitsData?.commits?.length,
+        repoInfo?.branches.length,
+        repoInfo?.tags.length,
+        commitsData?.commits.length,
         repoInfoPerfStats,
         repoInfoPerfTrend,
         commitsPerfStats,
@@ -936,7 +969,7 @@ export function GitGraph() {
         workflowEngine: featureFlags.workflowEngine,
     });
 
-    const totalLoadedCommits = commitsData?.commits?.length ?? 0;
+    const totalLoadedCommits = commitsData?.commits.length ?? 0;
     const refsLookup = useMemo(() => {
         const headsByHash: Record<string, string[]> = {};
         const tagsByHash: Record<string, string[]> = {};
@@ -975,7 +1008,7 @@ export function GitGraph() {
     const isDecoratingRefs = Boolean(commitsData?.refsDeferred && (!refsLookup.hasData || refsFetching));
 
     const layoutCommits = useMemo(() => {
-        if (!commitsData?.commits?.length) {
+        if (!commitsData?.commits.length) {
             return [];
         }
         return commitsData.commits.slice(0, Math.min(layoutCommitLimit, commitsData.commits.length));
@@ -1116,7 +1149,7 @@ export function GitGraph() {
     // Navigate to a commit by hash
     const handleNavigateToCommit = useCallback(
         (hash: string) => {
-            const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+            const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
             if (index !== undefined && index >= 0) {
                 handleSelectCommit(index);
             }
@@ -1141,20 +1174,21 @@ export function GitGraph() {
             }
 
             const matches: number[] = [];
+            const searchQuery = options.caseSensitive ? query : query.toLowerCase();
+            let regex: RegExp | null = null;
+            if (options.regex) {
+                try {
+                    regex = new RegExp(searchQuery);
+                } catch {
+                    setFindMatches([]);
+                    setFindCurrentIndex(0);
+                    return;
+                }
+            }
             commitsData.commits.forEach((commit: ClientCommit, index: number) => {
                 const searchStr = options.caseSensitive ? commit.message : commit.message.toLowerCase();
-                const searchQuery = options.caseSensitive ? query : query.toLowerCase();
 
-                if (options.regex) {
-                    try {
-                        const regex = new RegExp(searchQuery);
-                        if (regex.test(searchStr)) {
-                            matches.push(index);
-                        }
-                    } catch {
-                        // Invalid regex
-                    }
-                } else if (searchStr.includes(searchQuery)) {
+                if (regex ? regex.test(searchStr) : searchStr.includes(searchQuery)) {
                     matches.push(index);
                 }
             });
@@ -1238,6 +1272,7 @@ export function GitGraph() {
     );
 
     useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!featureFlags.deepLinks) {
             return;
         }
@@ -1278,6 +1313,7 @@ export function GitGraph() {
             }
 
             if (resolved.target.panel === 'worktree') {
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                 if (!featureFlags.worktreePro) {
                     toast.info('Worktree panel is disabled by feature flag');
                     return;
@@ -1375,6 +1411,7 @@ export function GitGraph() {
             ...(selectedCommit ? { commit: selectedCommit } : {}),
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (featureFlags.worktreePro && worktreeOpen) {
             target.panel = 'worktree';
         } else if (fileAnnotationsOpen && annotationsFile) {
@@ -1482,30 +1519,108 @@ export function GitGraph() {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            const target = e.target;
+            if (!(target instanceof HTMLElement)) {
                 return;
             }
 
-            const totalCommits = commitsData?.commits?.length ?? 0;
+            if (
+                target instanceof HTMLInputElement ||
+                target instanceof HTMLTextAreaElement ||
+                target instanceof HTMLSelectElement ||
+                target.isContentEditable ||
+                target.closest('[contenteditable="true"]') ||
+                target.closest('[role="textbox"]') ||
+                target.closest('[role="dialog"]')
+            ) {
+                return;
+            }
 
-            if (e.key === 'j' || e.key === 'ArrowDown') {
+            const totalCommits = commitsData?.commits.length ?? 0;
+            const hasPrimaryModifier = e.metaKey || e.ctrlKey;
+            const hasAnyModifier = hasPrimaryModifier || e.altKey;
+
+            if (e.key === 'k' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setFuzzyFinderOpen(true);
+            } else if (e.key === 'P' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setCommandPaletteOpen(true);
+            } else if (e.key === 'F' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                // Cmd+Shift+F for global search
+                e.preventDefault();
+                setSearchCommitsOpen(true);
+            } else if (e.key === 'G' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                // Cmd+Shift+G for Git Flow
+                e.preventDefault();
+                setGitFlowOpen(true);
+            } else if (e.key === 'l' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                // Cmd/Ctrl+Shift+L for pinned commits
+                e.preventDefault();
+                setPinnedCommitsOpen(true);
+            } else if (e.key === 'r' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setRemoteManageOpen(true);
+            } else if (e.key === 's' && hasPrimaryModifier && e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setStatisticsOpen(true);
+            } else if (e.key === 'p' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setTerminalOpen(!terminalOpen);
+            } else if (e.key === 'f' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                setFindWidgetOpen(true);
+            } else if (e.key === 'r' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                handleRefreshAll();
+            } else if (e.key === 'b' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                if (selectedCommit) {
+                    commitActionController.openCreateBranch(selectedCommit);
+                }
+            } else if (e.key === 't' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                if (selectedCommit) {
+                    commitActionController.openCreateTag(selectedCommit);
+                }
+            } else if (e.key === ',' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                // Cmd+, for settings
+                e.preventDefault();
+                setSettingsOpen(true);
+            } else if (e.key === '1' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                // Cmd+1 for Guided mode
+                e.preventDefault();
+                setLensMode('guided');
+            } else if (e.key === '2' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                // Cmd+2 for Craft mode
+                e.preventDefault();
+                setLensMode('craft');
+            } else if (e.key === '3' && hasPrimaryModifier && !e.shiftKey && !e.altKey) {
+                // Cmd+3 for Control mode
+                e.preventDefault();
+                setLensMode('control');
+            } else if (e.key === 'Escape') {
+                setCommitDetailsOpen(false);
+                setFindWidgetOpen(false);
+                setFuzzyFinderOpen(false);
+            } else if ((e.key === 'j' || e.key === 'ArrowDown') && !hasAnyModifier && !e.shiftKey) {
                 e.preventDefault();
                 if (totalCommits > 0) {
                     const nextIndex =
                         selectedCommitIndex === null ? 0 : Math.min(selectedCommitIndex + 1, totalCommits - 1);
                     handleSelectCommit(nextIndex);
                 }
-            } else if (e.key === 'k' || e.key === 'ArrowUp') {
+            } else if ((e.key === 'k' || e.key === 'ArrowUp') && !hasAnyModifier && !e.shiftKey) {
                 e.preventDefault();
                 if (totalCommits > 0) {
                     const prevIndex =
                         selectedCommitIndex === null ? totalCommits - 1 : Math.max(selectedCommitIndex - 1, 0);
                     handleSelectCommit(prevIndex);
                 }
-            } else if (e.key === 'g' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+            } else if (e.key === 'g' && !hasAnyModifier && !e.shiftKey) {
                 e.preventDefault();
                 if (totalCommits > 0) handleSelectCommit(0);
-            } else if (e.key === 'G' && !e.metaKey && !e.ctrlKey) {
+            } else if (e.key === 'G' && !hasAnyModifier && e.shiftKey) {
                 e.preventDefault();
                 if (totalCommits > 0) handleSelectCommit(totalCommits - 1);
             } else if (e.key === 'Enter') {
@@ -1513,46 +1628,7 @@ export function GitGraph() {
                 if (selectedCommitIndex !== null) {
                     handleExpandCommit(expandedCommit === selectedCommitIndex ? null : selectedCommitIndex);
                 }
-            } else if (e.key === 'f' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                setFindWidgetOpen(true);
-            } else if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                handleRefreshAll();
-            } else if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                if (selectedCommit) {
-                    commitActionController.openCreateBranch(selectedCommit);
-                }
-            } else if (e.key === 't' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                if (selectedCommit) {
-                    commitActionController.openCreateTag(selectedCommit);
-                }
-            } else if (e.key === 'Escape') {
-                setCommitDetailsOpen(false);
-                setFindWidgetOpen(false);
-                setFuzzyFinderOpen(false);
-            } else if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                setFuzzyFinderOpen(true);
-            } else if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                setTerminalOpen(!terminalOpen);
-            } else if (e.key === 's' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                e.preventDefault();
-                setStatisticsOpen(true);
-            } else if (e.key === 'p' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                e.preventDefault();
-                setPinnedCommitsOpen(true);
-            } else if (e.key === 'r' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                e.preventDefault();
-                setRemoteManageOpen(true);
-            } else if (e.key === 'F' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                // Cmd+Shift+F for global search
-                e.preventDefault();
-                setSearchCommitsOpen(true);
-            } else if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
+            } else if (e.key === 's' && !hasAnyModifier && !e.shiftKey) {
                 // Pin current commit with 's' (star)
                 e.preventDefault();
                 handlePinCommit();
@@ -1560,30 +1636,6 @@ export function GitGraph() {
                 // Show help/keyboard shortcuts
                 e.preventDefault();
                 setKeyboardHelpOpen(true);
-            } else if (e.key === ',' && (e.metaKey || e.ctrlKey)) {
-                // Cmd+, for settings
-                e.preventDefault();
-                setSettingsOpen(true);
-            } else if (e.key === '1' && (e.metaKey || e.ctrlKey)) {
-                // Cmd+1 for Guided mode
-                e.preventDefault();
-                setLensMode('guided');
-            } else if (e.key === '2' && (e.metaKey || e.ctrlKey)) {
-                // Cmd+2 for Craft mode
-                e.preventDefault();
-                setLensMode('craft');
-            } else if (e.key === '3' && (e.metaKey || e.ctrlKey)) {
-                // Cmd+3 for Control mode
-                e.preventDefault();
-                setLensMode('control');
-            } else if (e.key === 'P' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                // Cmd+Shift+P for command palette
-                e.preventDefault();
-                setCommandPaletteOpen(true);
-            } else if (e.key === 'G' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-                // Cmd+Shift+G for Git Flow
-                e.preventDefault();
-                setGitFlowOpen(true);
             }
         };
 
@@ -1591,7 +1643,7 @@ export function GitGraph() {
         return () => { window.removeEventListener('keydown', handleKeyDown); };
     }, [
         handleRefreshAll,
-        commitsData?.commits?.length,
+        commitsData?.commits.length,
         selectedCommitIndex,
         selectedCommit,
         expandedCommit,
@@ -1687,31 +1739,33 @@ export function GitGraph() {
     // No repo selected
     if (!activeRepo) {
         return (
-            <div className='flex flex-1 items-center justify-center'>
-                <div className='ui-surface ui-empty-state-shell max-w-md'>
-                    <div className='from-primary/20 to-primary/5 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br'>
-                        <GitCommit className='text-primary h-10 w-10' />
-                    </div>
-                    <h1 className='mb-2 text-2xl font-semibold'>Welcome to Git Graph</h1>
-                    <p className='text-muted-foreground mb-6'>
-                        Open a Git repository to visualize your commit history.
-                    </p>
-                    <Button size='lg' onClick={handleOpenRepo} className='gap-2' disabled={isRepoBusy}>
-                        {isRepoLoading ? <Loader2 className='h-5 w-5 animate-spin' /> : <Plus className='h-5 w-5' />}
-                        {isRepoLoading ? 'Opening…' : 'Open Repository'}
-                    </Button>
-                    <Button
-                        size='lg'
-                        variant='outline'
-                        onClick={() => { setCloneDialogOpen(true); }}
-                        className='mt-3 gap-2'
-                        disabled={isRepoBusy}>
-                        <Download className='h-5 w-5' />
-                        Clone Repository
-                    </Button>
-                    <p className='text-muted-foreground mt-4 text-xs'>
-                        or use the sidebar to browse recent repositories
-                    </p>
+            <div className='flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8'>
+                <div className='mx-auto flex w-full justify-center'>
+                        <HomeStartSurface
+                            mode='hero'
+                        title='Open a repository.'
+                        description='Pick a folder. Git Graph will open on the commit graph with your changes, branches, and sync state ready.'
+                        primaryActionLabel='Open Repository'
+                        primaryActionBusyLabel='Opening…'
+                        isPrimaryActionBusy={isRepoLoading}
+                        onPrimaryAction={() => { void handleOpenRepo(); }}
+                        secondaryActionLabel='Clone Repository'
+                        secondaryActionBusyLabel='Opening clone flow…'
+                        isSecondaryActionBusy={isRepoBusy && cloneDialogOpen}
+                        onSecondaryAction={() => { setCloneDialogOpen(true); }}
+                        recentRepos={recentRepoEntries}
+                        openedRepos={openedRepoEntries}
+                        activeRepoPath={activeRepo}
+                        onActivateRepo={(path) => {
+                            if (isRepoBusy) {
+                                return;
+                            }
+                            void activateRepoPath(path, {
+                                ensureRegistered: !knownRepoPaths.has(path),
+                                errorTitle: 'Failed to open repository',
+                            });
+                        }}
+                    />
                 </div>
                 {cloneDialogOpen && (
                     <Suspense fallback={<DialogLoadingFallback />}>
@@ -1780,37 +1834,40 @@ export function GitGraph() {
     }
 
     const handlePreviewedPush = useCallback(
-        (force: boolean) => {
+        (rewriteRemoteHistory: boolean) => {
             if (!currentHead) {
                 toast.error('No current branch selected for push');
                 return;
             }
 
-            if (!force) {
-                void gitOps.push(currentHead, 'origin', true, false);
+            if (!rewriteRemoteHistory) {
+                void gitOps.push(currentHead, 'origin', true, 'normal');
                 return;
             }
 
             const ahead = aheadBehindData?.ahead ?? 0;
             const preview: ActionPreview = {
                 type: 'force-push',
-                title: 'Force Push Confirmation',
-                description: `You are about to force push ${currentHead} to origin.`,
+                title: 'Force-with-lease Push Confirmation',
+                description: `You are about to rewrite origin/${currentHead} using a force-with-lease push.`,
+                confirmLabel: 'Push with Lease',
+                safetyNote:
+                    'Force-with-lease refuses to overwrite the remote if someone else pushed meanwhile. It is safer than raw force push, but still rewrites shared history.',
                 willChange: {
                     ...(ahead > 0 ? { commits: ahead } : {}),
                     branches: [currentHead],
                     remotes: ['origin'],
                 },
                 risks: [
-                    'Force push rewrites remote history and can overwrite teammates changes.',
+                    'This rewrites remote history for the branch.',
                     'Anyone tracking this branch may need to rebase or reset.',
                 ],
                 undoAvailable: false,
-                gitCommands: [`git push --force --set-upstream origin ${currentHead}`],
+                gitCommands: [`git push --force-with-lease --set-upstream origin ${currentHead}`],
             };
 
             actionPreview.showPreview(preview, () => {
-                void gitOps.push(currentHead, 'origin', true, true);
+                void gitOps.push(currentHead, 'origin', true, 'force-with-lease');
             });
         },
         [actionPreview, aheadBehindData?.ahead, currentHead, gitOps]
@@ -1960,9 +2017,9 @@ export function GitGraph() {
                                 onFileAnnotations={() => { setFileAnnotationsOpen(true); }}
                                 onActivityHeatmap={() => { setActivityHeatmapOpen(true); }}
                                 onSettings={() => { openSettingsAt('general'); }}
-                                onDiagnostics={() => { openSettingsAt('integrations'); }}
+                                onDiagnostics={() => { openSettingsAt('integrations', 'diagnostics'); }}
                                 onCommandPalette={() => { setCommandPaletteOpen(true); }}
-                                onUndoLastCommit={() => gitOps.undoLastCommit()}
+                                onUndoLastCommit={() => { void gitOps.undoLastCommit(); }}
                             />
                         }
                         notifications={<NotificationCenter />}
@@ -2013,18 +2070,7 @@ export function GitGraph() {
                             setPinnedCommitsOpen(true);
                         }}
                     />
-                    <QuickActionsToolbar
-                        className='border-border/60 border-t'
-                        onCreateBranch={() => {
-                            commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
-                        }}
-                        onCreateTag={() => {
-                            commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
-                        }}
-                        onStash={() => {
-                            setStashManageOpen(true);
-                        }}
-                    />
+                    <QuickActionsToolbar className='border-border/60 border-t' />
 
                     <FeatureHubStrip
                         worktreeCount={featureHubData.worktreeCount}
@@ -2037,6 +2083,7 @@ export function GitGraph() {
                         prSummary={featureHubData.prSummary}
                         repoPolicy={featureHubData.repoPolicy}
                         onOpenWorktrees={() => {
+                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                             if (featureFlags.worktreePro) {
                                 setWorktreeOpen(true);
                                 return;
@@ -2044,6 +2091,7 @@ export function GitGraph() {
                             openSettingsAt('integrations');
                         }}
                         onOpenWorkflows={() => {
+                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                             if (featureFlags.workflowEngine) {
                                 setWorkflowOpen(true);
                                 return;
@@ -2057,10 +2105,10 @@ export function GitGraph() {
                             setCollaborationOpen(true);
                         }}
                         onOpenRepoPolicy={() => {
-                            openSettingsAt('integrations');
+                            openSettingsAt('integrations', 'repo-policy');
                         }}
                         onOpenDiagnostics={() => {
-                            openSettingsAt('integrations');
+                            openSettingsAt('integrations', 'diagnostics');
                         }}
                     />
 
@@ -2095,6 +2143,7 @@ export function GitGraph() {
                                     commitActionController.openMerge(branch);
                                 }}
                                 enableBranchPinning={featureFlags.branchPinning}
+                                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                                 {...(featureFlags.worktreePro
                                     ? {
                                           onOpenWorktrees: () => {
@@ -2178,7 +2227,7 @@ export function GitGraph() {
                                                         onVertexClick={handleSelectCommit}
                                                         onVertexHover={() => {}}
                                                         commits={commitGraphCommits}
-                                                        showAvatars={(commitsData?.commits?.length ?? 0) < 2500}
+		                                                        showAvatars={commitGraphCommits.length < 2500}
                                                         visibleStartIndex={visibleStartIndex}
                                                         visibleEndIndex={visibleEndIndex}
                                                         scrollOffset={commitListScrollOffset}
@@ -2201,7 +2250,7 @@ export function GitGraph() {
                                                         commits={commitsData.commits}
                                                         layout={graphLayout}
                                                         refLookup={refsLookup}
-                                                        repo={activeRepo ?? undefined}
+                                                        repo={activeRepo}
                                                         selectedIndex={selectedCommitIndex}
                                                         expandedIndex={expandedCommit}
                                                         onSelect={handleSelectCommit}
@@ -2209,7 +2258,7 @@ export function GitGraph() {
                                                         onContextMenu={handleContextMenu}
                                                         onVisibleRangeChange={handleVisibleRangeChange}
                                                         onScrollOffsetChange={handleCommitListScrollOffsetChange}
-                                                        showAvatars={false}
+	                                                        showAvatars={totalLoadedCommits < 2500}
                                                         hideRefs={false}
                                                     />
                                                 ) : (
@@ -2257,7 +2306,7 @@ export function GitGraph() {
                         {/* Left side - commit info */}
                         <div className='flex items-center gap-3'>
                             <span className='text-muted-foreground'>
-                                <span className='text-foreground font-medium'>{commitsData?.commits?.length ?? 0}</span>{' '}
+                                <span className='text-foreground font-medium'>{commitsData?.commits.length ?? 0}</span>{' '}
                                 commits
                             </span>
                             {commitsData?.moreCommitsAvailable && maxCommits < maxCommitsLimit && (
@@ -2288,10 +2337,10 @@ export function GitGraph() {
                                     {aheadBehindData?.behind} behind
                                 </span>
                             )}
-                            {(workingTreeStatus?.unstaged?.length ?? 0) > 0 && (
+                            {(workingTreeStatus?.unstaged.length ?? 0) > 0 && (
                                 <span className='flex items-center gap-1'>
                                     <GitCommit className='h-3 w-3' />
-                                    {workingTreeStatus?.unstaged?.length ?? 0} changes
+                                    {workingTreeStatus?.unstaged.length ?? 0} changes
                                 </span>
                             )}
                         </div>
@@ -2302,11 +2351,11 @@ export function GitGraph() {
                         <div className='text-muted-foreground flex items-center gap-3'>
                             <span className='flex items-center gap-1'>
                                 <GitBranch className='h-3 w-3' />
-                                {repoInfo?.branches?.length ?? 0}
+                                {repoInfo?.branches.length ?? 0}
                             </span>
                             <span className='flex items-center gap-1'>
                                 <Tag className='h-3 w-3' />
-                                {repoInfo?.tags?.length ?? 0}
+                                {repoInfo?.tags.length ?? 0}
                             </span>
                             {showPerfDebug && (
                                 <button
@@ -2358,7 +2407,7 @@ export function GitGraph() {
                                             variant='outline'
                                             size='sm'
                                             className='h-7 gap-1 px-2 text-[11px]'
-                                            onClick={copyPerfDiagnostics}
+                                            onClick={() => { void copyPerfDiagnostics(); }}
                                             disabled={copyingPerfDiagnostics}>
                                             {copyingPerfDiagnostics ? (
                                                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -2445,8 +2494,8 @@ export function GitGraph() {
                                             {refsFetching ? 'yes' : 'no'}
                                         </p>
                                         <p>
-                                            Counts: branches {repoInfo?.branches?.length ?? 0}, tags{' '}
-                                            {repoInfo?.tags?.length ?? 0}, commits {commitsData?.commits?.length ?? 0}
+                                            Counts: branches {repoInfo?.branches.length ?? 0}, tags{' '}
+                                            {repoInfo?.tags.length ?? 0}, commits {commitsData?.commits.length ?? 0}
                                         </p>
                                     </div>
                                 </div>
@@ -2458,13 +2507,13 @@ export function GitGraph() {
                         createBranchOpen={commitActionController.createBranchOpen}
                         onCreateBranchOpenChange={commitActionController.setCreateBranchOpen}
                         onCreateBranch={(name, checkout) => {
-                            gitOps.createBranch(commitActionController.targetCommit, name, checkout);
+                            void gitOps.createBranch(commitActionController.targetCommit, name, checkout);
                             commitActionController.setCreateBranchOpen(false);
                         }}
                         addTagOpen={commitActionController.addTagOpen}
                         onAddTagOpenChange={commitActionController.setAddTagOpen}
                         onAddTag={(name, type) => {
-                            gitOps.createTag(
+                            void gitOps.createTag(
                                 commitActionController.targetCommit,
                                 name,
                                 type === 'annotated' ? name : undefined
@@ -2522,7 +2571,7 @@ export function GitGraph() {
                             conflict: conflictFile,
                             onResolve: handleResolveConflictFile,
                         }}
-                        terminal={{ open: terminalOpen, onOpenChange: setTerminalOpen, cwd: activeRepo ?? undefined }}
+                        terminal={{ open: terminalOpen, onOpenChange: setTerminalOpen, cwd: activeRepo }}
                         commitSigning={{ open: commitSigningOpen, onOpenChange: setCommitSigningOpen }}
                         rebaseTodo={{ open: rebaseTodoOpen, onOpenChange: setRebaseTodoOpen }}
                     />
@@ -2536,7 +2585,7 @@ export function GitGraph() {
                         onUnpin={unpinCommit}
                         onUpdateNote={updateNote}
                         onJumpToCommit={(hash) => {
-                            const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+                            const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
                             if (index !== undefined && index >= 0) {
                                 handleSelectCommit(index);
                                 setPinnedCommitsOpen(false);
@@ -2624,7 +2673,7 @@ export function GitGraph() {
                         customCommands={{ open: customCommandsOpen, onOpenChange: setCustomCommandsOpen }}
                         searchCommits={{ open: searchCommitsOpen, onOpenChange: setSearchCommitsOpen }}
                         onSelectCommit={(hash) => {
-                            const index = commitsData?.commits?.findIndex((c: ClientCommit) => c.hash === hash);
+                            const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
                             if (index !== undefined && index >= 0) {
                                 handleSelectCommit(index);
                             }
@@ -2652,6 +2701,7 @@ export function GitGraph() {
                             open: settingsOpen,
                             onOpenChange: setSettingsOpen,
                             initialTab: settingsInitialTab,
+                            initialSection: settingsInitialSection,
                         }}
                         lineStaging={{ open: lineStagingOpen, onOpenChange: setLineStagingOpen }}
                         stagingFile={stagingFile}
@@ -2663,7 +2713,7 @@ export function GitGraph() {
                         }}
                         onLineStaged={() => {
                             void gitUtils.git.workingTreeStatus
-                                .invalidate({ repo: activeRepo ?? '' })
+                                .invalidate({ repo: activeRepo })
                                 .catch((error: unknown) => {
                                     console.error('[git-graph] Failed to refresh working tree status:', error);
                                 });

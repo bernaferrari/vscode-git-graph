@@ -2,7 +2,7 @@
  * Branch Rename Dialog
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ interface BranchRenameDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	branchName: string;
-	onRename: (oldName: string, newName: string) => void;
+	onRename: (oldName: string, newName: string, force?: boolean) => void;
 }
 
 export function BranchRenameDialog({
@@ -25,9 +25,19 @@ export function BranchRenameDialog({
 	const [newName, setNewName] = useState('');
 	const [force, setForce] = useState(false);
 
+	useEffect(() => {
+		if (!open) {
+			setNewName('');
+			setForce(false);
+			return;
+		}
+		setNewName(branchName);
+		setForce(false);
+	}, [branchName, open]);
+
 	const handleRename = () => {
 		if (newName.trim()) {
-			onRename(branchName, newName.trim());
+			onRename(branchName, newName.trim(), force);
 			setNewName('');
 			onOpenChange(false);
 		}
@@ -55,7 +65,7 @@ export function BranchRenameDialog({
 							onChange={(e) => { setNewName(e.target.value); }}
 							placeholder="Enter new branch name..."
 							autoFocus
-							onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+							onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); }}
 						/>
 					</div>
 					<div className="flex items-center gap-2">

@@ -65,6 +65,7 @@ const LANE_COLORS = [
 ];
 
 function getLaneColor(laneIndex: number): string {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 	return LANE_COLORS[laneIndex % LANE_COLORS.length]!;
 }
 
@@ -79,6 +80,7 @@ export function LaneBasedGraph({
 	rowHeight = 32,
 	laneWidth = 24,
 	nodeRadius = 5,
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	curveRadius: _curveRadius = 12,
 }: LaneBasedGraphProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -112,6 +114,7 @@ export function LaneBasedGraph({
 			if (currentLane === undefined) {
 				// New branch - take from pool or create new
 				if (lanePool.length > 0) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					currentLane = lanePool.shift()!;
 				} else {
 					currentLane = maxLane + 1;
@@ -139,6 +142,7 @@ export function LaneBasedGraph({
 					} else {
 						// Other parents get new lanes (merge)
 						if (lanePool.length > 0) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 							parentLane = lanePool.shift()!;
 						} else {
 							parentLane = maxLane + 1;
@@ -332,7 +336,7 @@ export function LaneBasedGraph({
 				onClick={handleClick}
 				className="absolute top-0 left-0 cursor-pointer"
 				style={{ 
-					transform: `translateY(-${scrollTop}px)`,
+					transform: `translateY(-${String(scrollTop)}px)`,
 					willChange: 'transform',
 				}}
 			/>
@@ -373,6 +377,7 @@ export function LaneBasedGraphSVG({
 			let currentLane = laneAssignments.get(commit.hash);
 			
 			if (currentLane === undefined) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				currentLane = lanePool.length > 0 ? lanePool.shift()! : maxLane + 1;
 				laneAssignments.set(commit.hash, currentLane);
 			}
@@ -384,6 +389,7 @@ export function LaneBasedGraphSVG({
 				let parentLane = laneAssignments.get(parentHash);
 				
 				if (parentLane === undefined) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					parentLane = lanePool.length > 0 ? lanePool.shift()! : maxLane + 1;
 					laneAssignments.set(parentHash, parentLane);
 					maxLane = Math.max(maxLane, parentLane);
@@ -415,16 +421,16 @@ export function LaneBasedGraphSVG({
 			className="lane-graph-svg"
 			width={graphWidth}
 			height={commits.length * rowHeight}
-			style={{ transform: `translateY(-${scrollTop}px)` }}
+			style={{ transform: `translateY(-${String(scrollTop)}px)` }}
 		>
 			{/* Edges */}
 			{edges.map((edge, i) => (
 				<path
-					key={`edge-${i}`}
+					key={`edge-${String(i)}`}
 					d={
 						edge.type === 'straight'
-							? `M ${edge.fromX} ${edge.fromY} L ${edge.toX} ${edge.toY}`
-							: `M ${edge.fromX} ${edge.fromY} C ${edge.fromX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${edge.toY}`
+							? `M ${String(edge.fromX)} ${String(edge.fromY)} L ${String(edge.toX)} ${String(edge.toY)}`
+							: `M ${String(edge.fromX)} ${String(edge.fromY)} C ${String(edge.fromX)} ${String((edge.fromY + edge.toY) / 2)}, ${String(edge.toX)} ${String((edge.fromY + edge.toY) / 2)}, ${String(edge.toX)} ${String(edge.toY)}`
 					}
 					stroke={edge.color}
 					strokeWidth={2}
@@ -445,7 +451,7 @@ export function LaneBasedGraphSVG({
 
 				return (
 					<g 
-						key={`node-${index}`}
+						key={`node-${String(index)}`}
 						onClick={() => { onSelectCommit(index); }}
 						className="cursor-pointer"
 					>

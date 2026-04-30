@@ -113,7 +113,7 @@ export function CommitHistoryFilters({ filters, onChange }: CommitHistoryFilters
 					placeholder="Search commits..."
 					value={localSearch}
 					onChange={(e) => { setLocalSearch(e.target.value); }}
-					onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+					onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
 					className="h-7 pl-7 pr-7 text-xs"
 				/>
 				{localSearch && (

@@ -37,7 +37,7 @@ export function BlameView({ repo, filePath, commitHash }: BlameViewProps) {
 		if (data?.blame) {
 			// Parse blame output
 			const lines: BlameLine[] = [];
-			const blameData = data.blame as string;
+			const blameData = data.blame;
 			const lines_ = blameData.split('\n');
 			
 			let currentHash = '';

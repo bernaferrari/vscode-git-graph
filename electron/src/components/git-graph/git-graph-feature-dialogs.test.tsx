@@ -42,6 +42,38 @@ function getOpenState(open = false) {
     };
 }
 
+type CommandPaletteActions = Parameters<typeof GitGraphFeatureDialogs>[0]['commandPaletteActions'];
+
+function getCommandPaletteActions(): CommandPaletteActions {
+    return {
+        onCreateBranch: vi.fn(),
+        onCreateTag: vi.fn(),
+        onFetch: vi.fn(),
+        onPull: vi.fn(),
+        onPush: vi.fn(),
+        onRefresh: vi.fn(),
+        onSettings: vi.fn(),
+        onSearch: vi.fn(),
+        onTerminal: vi.fn(),
+        onStash: vi.fn(),
+        onCommitSigning: vi.fn(),
+        onReflog: vi.fn(),
+        onTemplates: vi.fn(),
+        onGitignore: vi.fn(),
+        onCustomCommands: vi.fn(),
+        onLFS: vi.fn(),
+        onPRIntegration: vi.fn(),
+        onSubmodules: vi.fn(),
+        onStatistics: vi.fn(),
+        onRemotes: vi.fn(),
+        onFilters: vi.fn(),
+        onPinned: vi.fn(),
+        onKeyboardHelp: vi.fn(),
+        onHealthCheck: vi.fn(),
+        onFuzzyFinder: vi.fn(),
+    };
+}
+
 describe('GitGraphFeatureDialogs', () => {
     it('renders open feature dialogs and respects feature flags', async () => {
         render(
@@ -68,15 +100,15 @@ describe('GitGraphFeatureDialogs', () => {
                 workspaces={getOpenState(false)}
                 collaboration={getOpenState(false)}
                 cloneRepository={getOpenState(false)}
-                onCloned={vi.fn(async () => undefined)}
+                onCloned={vi.fn(async () => {})}
                 stashManagement={getOpenState(false)}
-                settings={{ ...getOpenState(false), initialTab: 'general' }}
+                settings={{ ...getOpenState(false), initialTab: 'general', initialSection: null }}
                 lineStaging={getOpenState(false)}
                 stagingFile={null}
                 onLineStagingChange={vi.fn()}
                 onLineStaged={vi.fn()}
                 commandPalette={getOpenState(false)}
-                commandPaletteActions={{} as any}
+                commandPaletteActions={getCommandPaletteActions()}
                 gitFlow={getOpenState(false)}
                 healthCheck={getOpenState(false)}
                 bisect={getOpenState(false)}
@@ -95,8 +127,11 @@ describe('GitGraphFeatureDialogs', () => {
         );
 
         await waitFor(() => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByText('Reflog Viewer')).toBeInTheDocument();
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByText('PR Integration')).toBeInTheDocument();
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByText('Worktree Management')).toBeInTheDocument();
         });
 

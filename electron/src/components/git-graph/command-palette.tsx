@@ -48,7 +48,8 @@ const isMacPlatform = () => {
 	if (typeof navigator === 'undefined') {
 		return false;
 	}
-	return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform ?? '');
+	// eslint-disable-next-line @typescript-eslint/no-deprecated
+	return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform);
 };
 
 const shortcutLabels = {
@@ -58,7 +59,7 @@ const shortcutLabels = {
 	fuzzyFinder: isMacPlatform() ? '⌘K' : 'Ctrl+K',
 	terminal: isMacPlatform() ? '⌘P' : 'Ctrl+P',
 	statistics: isMacPlatform() ? '⌘⇧S' : 'Ctrl+Shift+S',
-	pinned: isMacPlatform() ? '⌘⇧P' : 'Ctrl+Shift+P',
+	pinned: isMacPlatform() ? '⌘⇧L' : 'Ctrl+Shift+L',
 	remotes: isMacPlatform() ? '⌘⇧R' : 'Ctrl+Shift+R',
 	settings: isMacPlatform() ? '⌘,' : 'Ctrl+,',
 	refresh: isMacPlatform() ? '⌘R' : 'Ctrl+R',
@@ -225,13 +226,13 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 			shortcut: shortcutLabels.terminal,
 			action: actions.onTerminal,
 		},
-		{
-			id: 'finder',
-			label: 'Reveal in File Manager',
-			icon: <FolderOpen className="h-4 w-4" />,
-			category: 'Tools',
-			action: actions.onOpenInFinder ?? (() => {}),
-		},
+			...(actions.onOpenInFinder ? [{
+				id: 'finder',
+				label: 'Reveal in File Manager',
+				icon: <FolderOpen className="h-4 w-4" />,
+				category: 'Tools',
+				action: actions.onOpenInFinder,
+			}] : []),
 		...(actions.onCopyDeepLink ? [{
 			id: 'copy-deeplink',
 			label: 'Copy Deep Link',
@@ -520,6 +521,7 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 				break;
 			case 'Enter':
 				e.preventDefault();
+				// eslint-disable-next-line no-case-declarations
 				const selectedCommand = filteredCommands[selectedIndex];
 				if (selectedCommand) {
 					selectedCommand.action();

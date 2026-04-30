@@ -131,7 +131,7 @@ export function SavedPlansManager({
 	const duplicatePlan = useCallback((plan: SavedPlan) => {
 		const newPlan: SavedPlan = {
 			...plan,
-			id: `plan-${Date.now()}`,
+			id: `plan-${String(Date.now())}`,
 			name: `${plan.name} (copy)`,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),

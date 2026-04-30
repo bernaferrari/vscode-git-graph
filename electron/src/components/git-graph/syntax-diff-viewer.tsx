@@ -121,7 +121,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 											<span 
 												dangerouslySetInnerHTML={{ 
 													__html: highlightSyntax(
-														line.left?.chars?.map(c => c.char).join('') || '',
+														line.left?.chars.map(c => c.char).join('') || '',
 														filename
 													) 
 												}} 
@@ -135,7 +135,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 												<span 
 													dangerouslySetInnerHTML={{ 
 														__html: highlightSyntax(
-															line.left?.chars?.map(c => c.char).join('') || '',
+															line.left?.chars.map(c => c.char).join('') || '',
 															filename
 														) 
 													}} 
@@ -150,7 +150,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 												<span 
 													dangerouslySetInnerHTML={{ 
 														__html: highlightSyntax(
-															line.right?.chars?.map(c => c.char).join('') || '',
+															line.right?.chars.map(c => c.char).join('') || '',
 															filename
 														) 
 													}} 
@@ -162,10 +162,11 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 												{line.left && (
 													<div className={wordDiff ? '' : 'hidden'}>
 														<span className="text-red-700 dark:text-red-300">
+															{/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
 															{wordDiff && line.left.chars ? (
 																<DiffCharRenderer chars={line.left.chars} baseClass="removed" />
 															) : (
-																line.left.chars?.map(c => c.char).join('')
+																line.left.chars.map(c => c.char).join('')
 															)}
 														</span>
 													</div>
@@ -173,10 +174,11 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 												{line.right && (
 													<div className={wordDiff ? '' : ''}>
 														<span className="text-green-700 dark:text-green-300">
+															{/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
 															{wordDiff && line.right.chars ? (
 																<DiffCharRenderer chars={line.right.chars} baseClass="added" />
 															) : (
-																line.right.chars?.map(c => c.char).join('')
+																line.right.chars.map(c => c.char).join('')
 															)}
 														</span>
 													</div>

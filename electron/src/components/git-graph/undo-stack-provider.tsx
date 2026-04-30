@@ -34,6 +34,7 @@ export type GitOperationType =
 
 export interface GitOperation {
     id: string;
+	// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     type: GitOperationType | string;
     timestamp: number;
     description: string;
@@ -92,6 +93,11 @@ function getCompatMutation<TInput extends Record<string, unknown>, TResult exten
     };
 }
 
+type CompatMutationRoute<TInput extends Record<string, unknown>, TResult extends { error?: string | null }> = {
+    useMutation?: () => { mutateAsync?: (input: TInput) => Promise<TResult> };
+    mutate?: (input: TInput) => TResult | Promise<TResult>;
+};
+
 export function UndoStackProvider({ children }: { children: ReactNode }) {
     const { activeRepo } = useAppStore();
     const [operations, setOperations] = useState<GitOperation[]>([]);
@@ -111,24 +117,19 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
             await utils.repo.undoHistory.invalidate({ repo: activeRepo });
         },
     });
-    const undoLastCommitMutation = getCompatMutation(
-        trpc.git.undoLastCommit?.useMutation,
-        trpc.git.undoLastCommit as { mutate?: (input: { repo: string; soft: boolean }) => Promise<{ error?: string | null }> }
-    );
-    const deleteBranchMutation = getCompatMutation(
-        trpc.git.deleteBranch?.useMutation,
-        trpc.git.deleteBranch as {
-            mutate?: (input: { repo: string; branchName: string; force: boolean }) => Promise<{ error?: string | null }>;
-        }
-    );
-    const checkoutMutation = getCompatMutation(
-        trpc.git.checkout?.useMutation,
-        trpc.git.checkout as { mutate?: (input: { repo: string; ref: string }) => Promise<{ error?: string | null }> }
-    );
-    const stashDropMutation = getCompatMutation(
-        trpc.git.stashDrop?.useMutation,
-        trpc.git.stashDrop as { mutate?: (input: { repo: string; index: number }) => Promise<{ error?: string | null }> }
-    );
+    const undoLastCommitRoute = trpc.git.undoLastCommit as
+        | CompatMutationRoute<{ repo: string; soft: boolean }, { error?: string | null }>
+        | undefined;
+    const deleteBranchRoute = trpc.git.deleteBranch as CompatMutationRoute<
+        { repo: string; branchName: string; force: boolean },
+        { error?: string | null }
+    >;
+    const checkoutRoute = trpc.git.checkout as CompatMutationRoute<{ repo: string; ref: string }, { error?: string | null }>;
+    const stashDropRoute = trpc.git.stashDrop as CompatMutationRoute<{ repo: string; index: number }, { error?: string | null }>;
+    const undoLastCommitMutation = getCompatMutation(undoLastCommitRoute?.useMutation, undoLastCommitRoute);
+    const deleteBranchMutation = getCompatMutation(deleteBranchRoute.useMutation, deleteBranchRoute);
+    const checkoutMutation = getCompatMutation(checkoutRoute.useMutation, checkoutRoute);
+    const stashDropMutation = getCompatMutation(stashDropRoute.useMutation, stashDropRoute);
 
     useEffect(() => {
         if (!activeRepo) {
@@ -145,8 +146,8 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        const nextOperations = history.operations ?? [];
-        const nextCurrentIndex = history.currentIndex ?? -1;
+        const nextOperations = history.operations;
+        const nextCurrentIndex = history.currentIndex;
         lastHydratedSnapshotRef.current = JSON.stringify({
             operations: nextOperations,
             currentIndex: nextCurrentIndex,
@@ -180,7 +181,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
         (operation: Omit<GitOperation, 'id' | 'timestamp'>) => {
             const newOperation: GitOperation = {
                 ...operation,
-                id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                id: `${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
                 timestamp: Date.now(),
             };
 
@@ -220,6 +221,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
                         break;
                     case 'branch_create':
                         {
+				// eslint-disable-next-line @typescript-eslint/no-base-to-string
                             const branchName = String(operation.details.branchName ?? '');
                             const result = await deleteBranchMutation.mutateAsync({
                                 repo: activeRepo,
@@ -233,6 +235,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
                         break;
                     case 'checkout':
                         {
+				// eslint-disable-next-line @typescript-eslint/no-base-to-string
                             const previousBranch = String(operation.details.previousBranch ?? '');
                             if (!previousBranch) {
                                 throw new Error('No previous branch recorded for this checkout.');
@@ -288,6 +291,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
         }
     }, [canUndo, currentIndex, operations, undoOperation]);
 
+			// eslint-disable-next-line @typescript-eslint/require-await
     const redo = useCallback(async () => {
         if (!canRedo || !activeRepo) return;
 
@@ -329,6 +333,7 @@ export function UndoStackProvider({ children }: { children: ReactNode }) {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useUndoStack() {
     const context = useContext(UndoStackContext);
     if (!context) {

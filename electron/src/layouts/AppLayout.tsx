@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { HomeStartSurface, type HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRepoActivation } from '@/hooks/useRepoActivation';
@@ -21,6 +20,7 @@ import { preloadGitGraph, scheduleGitGraphPreload } from '@/lib/preloadGitGraph'
 import { useAppStore } from '@/lib/store';
 import { trpc } from '@/trpc/client';
 
+import type { HomeStartRepoEntry } from '@/components/git-graph/home-start-surface';
 
 // Extend CSSProperties to include webkit drag properties.
 declare module 'react' {
@@ -126,8 +126,8 @@ export default function AppLayout() {
     }, [uiSettings.enhancedAccessibility, uiSettings.theme]);
 
     const repoList = trpc.repo.list.useQuery().data as { repos?: HomeStartRepoEntry[] } | undefined;
-    const recentRepos = trpc.repo.recent.useQuery().data as string[] | undefined;
-    const lastActiveRepo = trpc.repo.lastActive.useQuery().data as string | null | undefined;
+    const recentRepos = trpc.repo.recent.useQuery().data;
+    const lastActiveRepo = trpc.repo.lastActive.useQuery().data;
     const { mutate: setLastActive } = trpc.repo.setLastActive.useMutation();
     const repoEntries = useMemo(() => repoList?.repos ?? [], [repoList?.repos]);
 
@@ -344,26 +344,22 @@ export default function AppLayout() {
 
                     {sidebarOpen && (
                         <>
-                            <div className='border-sidebar-border border-b p-2'>
-                                <HomeStartSurface
-                                    mode='sidebar'
-                                    title={activeRepo ? 'Switch repositories quickly' : 'Open a repository'}
-                                    description={
-                                        activeRepo
-                                            ? 'Keep opened repositories and recent work within reach while the graph stays focused.'
-                                            : 'Open a folder once, then jump back into recent repositories without rebuilding your workspace.'
-                                    }
-                                    primaryActionLabel='Open Repository'
-                                    primaryActionBusyLabel={repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Opening'}
-                                    isPrimaryActionBusy={isRepoBusy || isRepoLoading}
-                                    onPrimaryAction={handleOpenFolder}
-                                    recentRepos={recentRepoEntries}
-                                    openedRepos={openedRepoEntries}
-                                    activeRepoPath={activeRepo}
-                                    onActivateRepo={(path) => {
-                                        void handleActivateRepo(path);
-                                    }}
-                                />
+                            <div className='border-sidebar-border border-b p-3'>
+                                <div className='space-y-3'>
+                                    <div>
+                                        <p className='text-sm font-medium'>Repositories</p>
+                                        <p className='text-muted-foreground mt-1 text-xs leading-5'>
+                                            {activeRepo ? 'Switch context.' : 'Start with a local folder.'}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        className='w-full justify-start gap-2'
+                                        onClick={() => { void handleOpenFolder(); }}
+                                        disabled={isRepoBusy || isRepoLoading}>
+                                        {isRepoLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Plus className='h-4 w-4' />}
+                                        {repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Open Repository'}
+                                    </Button>
+                                </div>
                             </div>
 
                             <ScrollArea className='flex-1 px-2'>
@@ -429,7 +425,7 @@ export default function AppLayout() {
                                 variant='ghost'
                                 size='sm'
                                 className='h-11 w-11 p-0'
-                                onClick={handleOpenFolder}
+                                onClick={() => { void handleOpenFolder(); }}
                                 onPointerEnter={() => {
                                     void preloadGitGraph();
                                 }}
@@ -570,7 +566,7 @@ export default function AppLayout() {
                             variant='outline'
                             size='sm'
                             className='h-8 shrink-0 gap-1.5'
-                            onClick={handleOpenFolder}
+                            onClick={() => { void handleOpenFolder(); }}
                             onPointerEnter={() => {
                                 void preloadGitGraph();
                             }}

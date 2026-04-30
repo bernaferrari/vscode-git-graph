@@ -154,7 +154,7 @@ export function RewritePlanEditor({
 	// Add a new operation
 	const addOperation = useCallback((type: RewriteOpType, commit?: { hash: string; message: string }) => {
 		const newOp: RewriteOp = {
-			id: `op-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			id: `op-${String(Date.now())}-${Math.random().toString(36).substring(2, 11)}`,
 			type,
 			commitHash: commit?.hash || '',
 			message: commit?.message || '',
@@ -186,8 +186,9 @@ export function RewritePlanEditor({
 			if (newIndex < 0 || newIndex >= prev.length) return prev;
 			
 			const newOps = [...prev];
-			const currentOp = newOps[index]!;
-			const targetOp = newOps[newIndex]!;
+			const currentOp = newOps[index];
+			const targetOp = newOps[newIndex];
+			if (!currentOp || !targetOp) return prev;
 			newOps[index] = targetOp;
 			newOps[newIndex] = currentOp;
 			return newOps;
@@ -228,7 +229,7 @@ export function RewritePlanEditor({
 		if (!validationResults?.valid) return;
 		
 		const plan: RewritePlan = {
-			id: `plan-${Date.now()}`,
+			id: `plan-${String(Date.now())}`,
 			name: planName,
 			sourceBranch,
 			baseBranch,
@@ -245,7 +246,7 @@ export function RewritePlanEditor({
 	// Save draft
 	const handleSaveDraft = useCallback(() => {
 		const plan: RewritePlan = {
-			id: `plan-${Date.now()}`,
+			id: `plan-${String(Date.now())}`,
 			name: planName,
 			sourceBranch,
 			baseBranch,
@@ -368,7 +369,7 @@ export function RewritePlanEditor({
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={validatePlan}
+							onClick={() => { void validatePlan(); }}
 							disabled={isValidating}
 							className="flex-1"
 						>
@@ -459,7 +460,7 @@ function RewriteOpItem({
 								{config.label}
 							</Badge>
 							<span className="text-xs font-mono text-muted-foreground">
-								{op.commitHash?.substring(0, 7)}
+								{op.commitHash.substring(0, 7)}
 							</span>
 						</div>
 						

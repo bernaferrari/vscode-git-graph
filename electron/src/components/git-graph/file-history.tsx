@@ -52,7 +52,7 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 			date?: string;
 			sourceLine?: number;
 		}> = [];
-		const blameText = String(blameData.blame);
+		const blameText = blameData.blame;
 		const blameLines = blameText.split('\n');
 
 		let currentCommit: string | undefined;
@@ -105,9 +105,8 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 			</div>
 
 			<div className="flex-1 overflow-hidden">
-				{view === 'blame' && (
-					<>
-						{blameLoading ? (
+				{view === 'blame' && (blameLoading
+						? (
 							<div className="flex items-center justify-center h-full">
 								<Loader2 className="h-4 w-4 animate-spin" />
 							</div>
@@ -139,13 +138,11 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 									))}
 								</div>
 							</ScrollArea>
-						)}
-					</>
-				)}
+						)
+					)}
 
-				{view === 'history' && (
-					<>
-						{historyLoading ? (
+				{view === 'history' && (historyLoading
+						? (
 							<div className="flex items-center justify-center h-full">
 								<Loader2 className="h-4 w-4 animate-spin" />
 							</div>
@@ -179,9 +176,8 @@ export function FileHistory({ filePath, onSelectCommit }: FileHistoryProps) {
 									))}
 								</div>
 							</ScrollArea>
-						)}
-					</>
-				)}
+						)
+					)}
 			</div>
 		</div>
 	);

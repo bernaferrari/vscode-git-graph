@@ -56,7 +56,7 @@ export function BlameOnHover({
 	const utils = trpc.useUtils();
 
 	// Cache key
-	const cacheKey = `${activeRepo}-${filePath}`;
+	const cacheKey = `${activeRepo ?? ''}-${filePath}`;
 
 	// Fetch blame info
 	useEffect(() => {
@@ -65,6 +65,7 @@ export function BlameOnHover({
 		// Check cache first
 		const fileCache = blameCache.get(cacheKey);
 		if (fileCache?.has(lineNumber)) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			setBlameInfo(fileCache.get(lineNumber)!);
 			return;
 		}
@@ -121,7 +122,7 @@ export function BlameOnHover({
 
 	const handleCopyHash = useCallback(() => {
 		if (blameInfo?.hash) {
-			navigator.clipboard.writeText(blameInfo.hash);
+			void navigator.clipboard.writeText(blameInfo.hash);
 			setCopied(true);
 			setTimeout(() => { setCopied(false); }, 2000);
 		}
@@ -142,16 +143,16 @@ export function BlameOnHover({
 			const diffYears = Math.floor(diffDays / 365);
 
 			if (diffMins < 1) return 'just now';
-			if (diffMins < 60) return `${diffMins}m ago`;
-			if (diffHours < 24) return `${diffHours}h ago`;
+			if (diffMins < 60) return `${String(diffMins)}m ago`;
+			if (diffHours < 24) return `${String(diffHours)}h ago`;
 			if (diffDays === 1) return 'yesterday';
-			if (diffDays < 7) return `${diffDays}d ago`;
+			if (diffDays < 7) return `${String(diffDays)}d ago`;
 			if (diffWeeks === 1) return 'last week';
-			if (diffWeeks < 4) return `${diffWeeks}w ago`;
+			if (diffWeeks < 4) return `${String(diffWeeks)}w ago`;
 			if (diffMonths === 1) return 'last month';
-			if (diffMonths < 12) return `${diffMonths}mo ago`;
+			if (diffMonths < 12) return `${String(diffMonths)}mo ago`;
 			if (diffYears === 1) return 'last year';
-			return `${diffYears}y ago`;
+			return `${String(diffYears)}y ago`;
 		} catch {
 			return dateStr;
 		}
@@ -233,16 +234,18 @@ interface InlineBlameAnnotationProps {
 export function InlineBlameAnnotation({
 	filePath,
 	lineNumber,
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	commitHash: _commitHash,
 	className,
 }: InlineBlameAnnotationProps) {
 	const { activeRepo } = useAppStore();
 	const [blameInfo, setBlameInfo] = useState<BlameInfo | null>(null);
-	const cacheKey = `${activeRepo}-${filePath}`;
+	const cacheKey = `${activeRepo ?? ''}-${filePath}`;
 
 	useEffect(() => {
 		const fileCache = blameCache.get(cacheKey);
 		if (fileCache?.has(lineNumber)) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			setBlameInfo(fileCache.get(lineNumber)!);
 		}
 	}, [cacheKey, lineNumber]);
@@ -270,9 +273,10 @@ export function InlineBlameAnnotation({
 }
 
 // Hook to prefetch blame for a file
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePrefetchBlame(filePath: string, commitHash?: string) {
 	const { activeRepo } = useAppStore();
-	const cacheKey = `${activeRepo}-${filePath}`;
+	const cacheKey = `${activeRepo ?? ''}-${filePath}`;
 	const utils = trpc.useUtils();
 
 	useEffect(() => {
@@ -331,10 +335,10 @@ function formatRelativeDate(dateStr: string): string {
 		const diffDays = Math.floor(diffHours / 24);
 
 		if (diffMins < 1) return 'just now';
-		if (diffMins < 60) return `${diffMins}m`;
-		if (diffHours < 24) return `${diffHours}h`;
+		if (diffMins < 60) return `${String(diffMins)}m`;
+		if (diffHours < 24) return `${String(diffHours)}h`;
 		if (diffDays === 1) return 'yday';
-		if (diffDays < 7) return `${diffDays}d`;
+		if (diffDays < 7) return `${String(diffDays)}d`;
 		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 	} catch {
 		return dateStr;

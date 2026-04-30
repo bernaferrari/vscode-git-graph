@@ -112,6 +112,7 @@ export default [
         'eslint.config.js',
         'prettier.config.js',
         'electron-builder.json5',
+        'scripts/gg.mjs',
     ]),
 
     js.configs.recommended,
@@ -161,6 +162,13 @@ export default [
             ...tanstackQueryRules,
             '@tanstack/query/exhaustive-deps': 'error',
             '@tanstack/query/no-unstable-deps': 'error',
+        },
+    },
+    {
+        files: ['src/workers/**/*.ts'],
+        rules: {
+            // Worker entry files may need local relative imports for bundler compatibility.
+            'no-restricted-imports': 'off',
         },
     },
 

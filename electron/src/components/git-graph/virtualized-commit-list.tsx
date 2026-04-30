@@ -4,9 +4,21 @@
  */
 
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useRef, useCallback, memo, useMemo, useEffect } from 'react';
+import { GitBranch, Globe2, SlidersHorizontal, Tag } from 'lucide-react';
+import { useRef, useCallback, memo, useMemo, useEffect, useState } from 'react';
 
 import { CIStatusMini } from './ci-status';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { getGravatarUrl } from '@/lib/gravatar';
 
 import type { GraphLayout } from '@/lib/graph/layout';
@@ -48,9 +60,52 @@ interface VirtualizedCommitListProps {
 }
 
 // Row height - must match graph grid Y spacing
+// eslint-disable-next-line react-refresh/only-export-components
 export const ROW_HEIGHT = 32;
 const COMMIT_ROW_BASE_CLASS =
-    'commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/35 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-inset';
+    'commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/35 transition-[background-color,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-inset';
+const COLUMN_SETTINGS_KEY = 'git-graph.commit-list.columns.v1';
+
+interface CommitListColumnSettings {
+    refs: boolean;
+    author: boolean;
+    ci: boolean;
+    sha: boolean;
+    date: boolean;
+    avatars: boolean;
+    authorWidth: 'narrow' | 'normal' | 'wide';
+}
+
+const DEFAULT_COLUMN_SETTINGS: CommitListColumnSettings = {
+    refs: true,
+    author: true,
+    ci: true,
+    sha: true,
+    date: true,
+    avatars: false,
+    authorWidth: 'normal',
+};
+
+function readColumnSettings(): CommitListColumnSettings {
+    try {
+        const raw = window.localStorage.getItem(COLUMN_SETTINGS_KEY);
+        if (!raw) return DEFAULT_COLUMN_SETTINGS;
+        return { ...DEFAULT_COLUMN_SETTINGS, ...(JSON.parse(raw) as Partial<CommitListColumnSettings>) };
+    } catch {
+        return DEFAULT_COLUMN_SETTINGS;
+    }
+}
+
+function getAuthorWidthClass(width: CommitListColumnSettings['authorWidth']): string {
+    switch (width) {
+        case 'narrow':
+            return 'w-20';
+        case 'wide':
+            return 'w-36';
+        default:
+            return 'w-24';
+    }
+}
 
 // Semantic commit types with colors
 const COMMIT_TYPES: Record<string, { color: string; bg: string }> = {
@@ -91,12 +146,12 @@ function formatDate(timestamp: number): string {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
+    if (diffMins < 60) return `${String(diffMins)}m`;
+    if (diffHours < 24) return `${String(diffHours)}h`;
     if (diffDays === 1) return 'yday';
-    if (diffDays < 7) return `${diffDays}d`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo`;
+    if (diffDays < 7) return `${String(diffDays)}d`;
+    if (diffDays < 30) return `${String(Math.floor(diffDays / 7))}w`;
+    if (diffDays < 365) return `${String(Math.floor(diffDays / 30))}mo`;
 
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
@@ -115,6 +170,7 @@ const CommitRow = memo(function CommitRow({
     onContextMenu,
     showAvatar,
     hideRefs,
+    columns,
     repo,
 }: {
     commit: DisplayCommit;
@@ -129,6 +185,7 @@ const CommitRow = memo(function CommitRow({
     onContextMenu?: (e: React.MouseEvent) => void;
     showAvatar: boolean;
     hideRefs: boolean;
+    columns: CommitListColumnSettings;
     repo?: string;
 }) {
     const isUncommitted = commit.hash === '*';
@@ -159,7 +216,7 @@ const CommitRow = memo(function CommitRow({
                 height: ROW_HEIGHT,
             }}>
             {/* Avatar */}
-            {showAvatar && !isUncommitted && (
+            {columns.avatars && showAvatar && !isUncommitted && (
                 <img
                     src={getGravatarUrl(commit.email, 40)}
                     alt={commit.author}
@@ -169,11 +226,11 @@ const CommitRow = memo(function CommitRow({
             )}
 
             {/* Refs */}
-            {!hideRefs && (
+            {!hideRefs && columns.refs && (
                 <div className='flex shrink-0 items-center gap-1'>
                     {heads.length > 0 && (
                         <span className='bg-primary/15 text-primary border-primary/30 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-tight'>
-                            <GitBranchIcon />
+                            <GitBranch className='h-3 w-3' />
                             {heads[0]}
                         </span>
                     )}
@@ -188,7 +245,7 @@ const CommitRow = memo(function CommitRow({
                         <span
                             key={i}
                             className='border-border/70 text-muted-foreground inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px]'>
-                            <GlobeIcon />
+                            <Globe2 className='h-3 w-3' />
                             {remote}
                         </span>
                     ))}
@@ -196,7 +253,7 @@ const CommitRow = memo(function CommitRow({
                         <span
                             key={tag}
                             className='inline-flex items-center gap-1 rounded-md border border-amber-200/70 bg-amber-50/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-400'>
-                            <TagIcon />
+                            <Tag className='h-3 w-3' />
                             {tag}
                         </span>
                     ))}
@@ -227,69 +284,23 @@ const CommitRow = memo(function CommitRow({
                     className={`text-muted-foreground flex shrink-0 items-center gap-4 text-xs transition-opacity ${
                         isSelected ? 'opacity-100' : 'opacity-45 group-hover:opacity-85'
                     }`}>
-                    <span className='w-24 truncate font-medium'>{commit.author}</span>
-                    <CIStatusMini commitHash={commit.hash} {...(repo ? { repo } : {})} />
-                    <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
-                        {commit.hash.slice(0, 7)}
-                    </span>
-                    <span className='w-16 text-right tabular-nums'>{formatDate(commit.date)}</span>
+                    {columns.author && (
+                        <span className={`${getAuthorWidthClass(columns.authorWidth)} truncate font-medium`}>
+                            {commit.author}
+                        </span>
+                    )}
+                    {columns.ci && <CIStatusMini commitHash={commit.hash} {...(repo ? { repo } : {})} />}
+                    {columns.sha && (
+                        <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
+                            {commit.hash.slice(0, 7)}
+                        </span>
+                    )}
+                    {columns.date && <span className='w-16 text-right tabular-nums'>{formatDate(commit.date)}</span>}
                 </div>
             )}
         </div>
     );
 });
-
-// Icon components
-function GitBranchIcon() {
-    return (
-        <svg
-            className='h-3 w-3'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <line x1='6' y1='3' x2='6' y2='15' />
-            <circle cx='18' cy='18' r='3' />
-            <circle cx='6' cy='18' r='3' />
-            <path d='M18 9a9 9 0 0 0-9-9' />
-        </svg>
-    );
-}
-
-function GlobeIcon() {
-    return (
-        <svg
-            className='h-3 w-3'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <circle cx='12' cy='12' r='10' />
-            <line x1='2' y1='12' x2='22' y2='12' />
-            <path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z' />
-        </svg>
-    );
-}
-
-function TagIcon() {
-    return (
-        <svg
-            className='h-3 w-3'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'>
-            <path d='M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z' />
-            <path d='M7 7h.01' />
-        </svg>
-    );
-}
 
 export function VirtualizedCommitList({
     commits,
@@ -311,6 +322,14 @@ export function VirtualizedCommitList({
     const visibleRangeRef = useRef<{ start: number; end: number } | null>(null);
     const scrollFrameRef = useRef<number | null>(null);
     const lastScrollTopRef = useRef(0);
+    const [columns, setColumns] = useState<CommitListColumnSettings>(() => readColumnSettings());
+    const updateColumns = useCallback((patch: Partial<CommitListColumnSettings>) => {
+        setColumns((current) => {
+            const next = { ...current, ...patch };
+            window.localStorage.setItem(COLUMN_SETTINGS_KEY, JSON.stringify(next));
+            return next;
+        });
+    }, []);
 
     // Create virtualizer instance
     const virtualizer = useVirtualizer({
@@ -379,8 +398,66 @@ export function VirtualizedCommitList({
     const totalSize = virtualizer.getTotalSize();
 
     return (
-        <div ref={parentRef} className='h-full overflow-auto' style={{ contain: 'strict' }}>
-            <div className='relative w-full' style={{ height: `${totalSize}px` }}>
+        <div ref={parentRef} className='relative h-full overflow-auto' style={{ contain: 'strict' }}>
+            <div className='sticky top-2 right-2 z-20 ml-auto flex w-fit pr-2'>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant='outline'
+                            size='sm'
+                            className='bg-background/92 h-7 gap-1.5 px-2 text-xs shadow-sm backdrop-blur'
+                            aria-label='Commit list columns'>
+                            <SlidersHorizontal className='h-3.5 w-3.5' />
+                            Columns
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align='end' className='w-48'>
+                        <DropdownMenuLabel>Visible Columns</DropdownMenuLabel>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.refs}
+	                            onCheckedChange={(checked) => { updateColumns({ refs: checked }); }}>
+                            Refs
+                        </DropdownMenuCheckboxItem>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.avatars}
+	                            onCheckedChange={(checked) => { updateColumns({ avatars: checked }); }}>
+                            Avatars
+                        </DropdownMenuCheckboxItem>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.author}
+	                            onCheckedChange={(checked) => { updateColumns({ author: checked }); }}>
+                            Author
+                        </DropdownMenuCheckboxItem>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.ci}
+	                            onCheckedChange={(checked) => { updateColumns({ ci: checked }); }}>
+                            CI
+                        </DropdownMenuCheckboxItem>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.sha}
+	                            onCheckedChange={(checked) => { updateColumns({ sha: checked }); }}>
+                            SHA
+                        </DropdownMenuCheckboxItem>
+	                        <DropdownMenuCheckboxItem
+	                            checked={columns.date}
+	                            onCheckedChange={(checked) => { updateColumns({ date: checked }); }}>
+                            Date
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Author Width</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                            value={columns.authorWidth}
+                            onValueChange={(value) => {
+                                updateColumns({ authorWidth: value as CommitListColumnSettings['authorWidth'] });
+                            }}>
+                            <DropdownMenuRadioItem value='narrow'>Narrow</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value='normal'>Normal</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value='wide'>Wide</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+            <div className='relative w-full' style={{ height: `${String(totalSize)}px` }}>
                 {virtualItems.map((virtualRow) => {
                     const commit = commits[virtualRow.index];
                     if (!commit) return null;
@@ -394,7 +471,7 @@ export function VirtualizedCommitList({
                             data-index={virtualRow.index}
                             className='absolute top-0 left-0 w-full'
                             style={{
-                                transform: `translateY(${virtualRow.start}px)`,
+                                transform: `translateY(${String(virtualRow.start)}px)`,
                             }}>
                             <CommitRow
                                 commit={commit}
@@ -410,6 +487,7 @@ export function VirtualizedCommitList({
                                 }
                                 showAvatar={showAvatars}
                                 hideRefs={hideRefs}
+                                columns={columns}
                                 {...(repo ? { repo } : {})}
                                 {...(onContextMenu
                                     ? { onContextMenu: (e: React.MouseEvent) => { onContextMenu(virtualRow.index, e); } }
@@ -424,6 +502,7 @@ export function VirtualizedCommitList({
 }
 
 // Also export a hook for virtualization utilities
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCommitVirtualization(commits: DisplayCommit[]) {
     return useMemo(
         () => ({

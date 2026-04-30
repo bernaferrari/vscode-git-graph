@@ -11,6 +11,13 @@ export type SettingsTab =
     | 'integrations'
     | 'privacy';
 
+export type SettingsSection =
+    | 'feature-flags'
+    | 'ai-provider'
+    | 'repo-policy'
+    | 'diagnostics'
+    | 'audit-log';
+
 export function useGitGraphShellPanels() {
     const utils = trpc.useUtils();
     const setOnboardingStateMutation = trpc.config.setOnboardingState.useMutation({
@@ -31,6 +38,7 @@ export function useGitGraphShellPanels() {
     const [stashManageOpen, setStashManageOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general');
+    const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection | null>(null);
     const [gitFlowOpen, setGitFlowOpen] = useState(false);
     const [healthCheckOpen, setHealthCheckOpen] = useState(false);
     const [bisectOpen, setBisectOpen] = useState(false);
@@ -42,8 +50,9 @@ export function useGitGraphShellPanels() {
     const [fileAnnotationsOpen, setFileAnnotationsOpen] = useState(false);
     const [activityHeatmapOpen, setActivityHeatmapOpen] = useState(false);
 
-    const openSettingsAt = useCallback((tab: SettingsTab) => {
+    const openSettingsAt = useCallback((tab: SettingsTab, section?: SettingsSection) => {
         setSettingsInitialTab(tab);
+        setSettingsInitialSection(section ?? null);
         setSettingsOpen(true);
     }, []);
 
@@ -78,6 +87,7 @@ export function useGitGraphShellPanels() {
         settingsOpen,
         setSettingsOpen,
         settingsInitialTab,
+        settingsInitialSection,
         gitFlowOpen,
         setGitFlowOpen,
         healthCheckOpen,

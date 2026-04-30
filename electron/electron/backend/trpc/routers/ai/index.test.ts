@@ -11,7 +11,7 @@ vi.mock('@/app/backend/store', () => ({
 			appStoreState[key] = value;
 		},
 		clear: () => {
-			for (const key of Object.keys(appStoreState)) delete appStoreState[key];
+			for (const key of Object.keys(appStoreState)) Reflect.deleteProperty(appStoreState, key);
 		},
 	},
 }));
@@ -55,7 +55,7 @@ describe('ai router secret handling', () => {
 
 		fetchMock.mockResolvedValue({
 			ok: true,
-			json: async () => ({
+			json: () => ({
 				choices: [{ message: { content: 'feat: improve secrets' } }],
 			}),
 		});
@@ -72,7 +72,9 @@ describe('ai router secret handling', () => {
 
 		expect(appStoreState.secretVault).toEqual(
 			expect.objectContaining({
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 				entries: expect.objectContaining({
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 					'ai.runtimeApiKey': expect.any(String),
 				}),
 			})
@@ -87,6 +89,7 @@ describe('ai router secret handling', () => {
 		expect(fetchMock).toHaveBeenCalledWith(
 			'https://ai.example.com/v1/chat/completions',
 			expect.objectContaining({
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 				headers: expect.objectContaining({
 					Authorization: 'Bearer runtime-secret',
 				}),

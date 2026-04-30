@@ -28,7 +28,7 @@ export interface Notification {
 const notificationActionRegistry = new Map<string, NotificationActionInput>();
 
 function registerNotificationAction(action: NotificationActionInput): { actionId: string; actionLabel: string } {
-    const actionId = `notification-action-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const actionId = `notification-action-${String(Date.now())}-${Math.random().toString(36).slice(2, 9)}`;
     notificationActionRegistry.set(actionId, action);
     return {
         actionId,
@@ -43,6 +43,7 @@ function unregisterNotificationAction(actionId?: string) {
     notificationActionRegistry.delete(actionId);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotifications() {
     const utils = trpc.useUtils();
     const notificationsQuery = trpc.config.notifications.useQuery(undefined, { staleTime: 5_000 });
@@ -176,9 +177,9 @@ export function NotificationCenter() {
         const diffDays = Math.floor(diffHours / 24);
 
         if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMins < 60) return `${String(diffMins)}m ago`;
+        if (diffHours < 24) return `${String(diffHours)}h ago`;
+        if (diffDays < 7) return `${String(diffDays)}d ago`;
         return new Date(timestamp).toLocaleDateString();
     };
 

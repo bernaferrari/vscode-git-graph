@@ -60,7 +60,7 @@ function isBinaryContent(content: string | undefined): boolean {
 }
 
 function formatContentSize(content: string | undefined): string {
-	return `${new TextEncoder().encode(content ?? '').length} bytes`;
+	return `${String(new TextEncoder().encode(content ?? '').length)} bytes`;
 }
 
 export function MergeConflictEditor({
@@ -85,7 +85,7 @@ export function MergeConflictEditor({
 				return;
 			}
 			setAiSummary(result.explanation);
-			setAiSuggestions(result.suggestions ?? []);
+			setAiSuggestions(result.suggestions);
 			if (result.error) {
 				toast.warning('AI explanation used fallback', { description: result.error });
 			} else {
@@ -369,6 +369,7 @@ export function MergeConflictEditor({
 			const message = hasUnresolvedConflicts
 				? 'There are still unresolved conflict markers in this file. Close anyway?'
 				: 'You have unsaved conflict edits. Close anyway?';
+				// eslint-disable-next-line no-alert
 			const canClose = window.confirm(message);
 			if (!canClose) return;
 		}
@@ -437,9 +438,9 @@ export function MergeConflictEditor({
 					</Button>
 					<span className="text-xs text-muted-foreground">
 						{hasUnresolvedConflicts
-							? `${activeConflictIndex + 1} / ${unresolvedConflicts.length}`
+							? `${String(activeConflictIndex + 1)} / ${String(unresolvedConflicts.length)}`
 							: '0 / 0'}
-						{activeConflict?.startLine !== undefined ? ` (lines ${activeConflict.startLine + 1}-${activeConflict.endLine + 1})` : ''}
+						{activeConflict?.startLine !== undefined ? ` (lines ${String(activeConflict.startLine + 1)}-${String(activeConflict.endLine + 1)})` : ''}
 					</span>
 					<Button
 						variant="outline"
@@ -481,7 +482,7 @@ export function MergeConflictEditor({
 					</Button>
 					<Badge variant="secondary" className="h-7 px-2">
 						{hasOriginalConflicts
-							? `${resolvedConflictCount}/${totalConflictCount} resolved`
+							? `${String(resolvedConflictCount)}/${String(totalConflictCount)} resolved`
 							: 'No conflict markers'}
 					</Badge>
 					{aiProdEnabled && (
@@ -579,7 +580,7 @@ export function MergeConflictEditor({
 						<div className="mt-1 flex flex-wrap gap-2">
 							{unresolvedConflicts.map((chunk, index) => (
 								<Button
-									key={`${chunk.startLine}-${chunk.endLine}-${index}`}
+									key={`${String(chunk.startLine)}-${String(chunk.endLine)}-${String(index)}`}
 									variant={index === activeConflictIndex ? 'secondary' : 'outline'}
 									size="sm"
 									onClick={() => { setActiveConflictIndex(index); }}

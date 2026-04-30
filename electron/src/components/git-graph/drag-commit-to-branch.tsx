@@ -23,8 +23,8 @@ import {
 	DialogTitle,
 	DialogFooter,
 } from '@/components/ui/dialog';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 
 
 interface DragCommitProps {
@@ -36,6 +36,7 @@ interface DragCommitProps {
 // Drag state
 let draggedCommit: { hash: string; message: string } | null = null;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDragCommit() {
 	const startDrag = useCallback((hash: string, message: string) => {
 		draggedCommit = { hash, message };
@@ -272,7 +273,7 @@ export function DragCommitHandler({
 					<Button variant="ghost" onClick={() => { onOpenChange(false); }} disabled={isExecuting}>
 						Cancel
 					</Button>
-					<Button onClick={handleConfirm} disabled={isExecuting}>
+					<Button onClick={() => { void handleConfirm(); }} disabled={isExecuting}>
 						{isExecuting ? (
 							<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 						) : (

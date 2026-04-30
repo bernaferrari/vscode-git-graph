@@ -18,6 +18,7 @@ interface GitOperationControls {
     createTag: (commitHash: string, name: string, message?: string) => void;
     reset: (commitHash: string, mode: 'soft' | 'mixed' | 'hard') => void;
     merge: (branchName: string, options: { noFastForward: boolean; squash: boolean; noCommit: boolean }) => void;
+	// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
     rebase: (onto: string, interactive?: boolean, todoContent?: string) => Promise<unknown> | void;
     cherryPick: (commitHash: string, noCommit?: boolean) => void;
     revert: (commitHash: string, noCommit?: boolean) => void;
@@ -123,7 +124,7 @@ export function useGitGraphCommitActions({
                 from: 'HEAD',
                 to: targetCommit,
             });
-            const fileCount = stats?.stats?.files ?? undefined;
+            const fileCount = stats.stats?.files ?? undefined;
 
             const modeRisk =
                 mode === 'hard'
@@ -135,7 +136,18 @@ export function useGitGraphCommitActions({
             const preview: ActionPreview = {
                 type: 'reset',
                 title: `Reset ${mode} to ${targetCommit.slice(0, 7)}`,
-                description: 'Reset the current branch pointer to a selected commit.',
+                description:
+                    mode === 'hard'
+                        ? 'Move the current branch and discard tracked working tree changes back to this commit.'
+                        : mode === 'mixed'
+                          ? 'Move the current branch to this commit and keep changes in the working tree unstaged.'
+                          : 'Move the current branch to this commit while keeping all resulting changes staged.',
+                confirmLabel: mode === 'hard' ? 'Reset Hard' : mode === 'mixed' ? 'Reset Mixed' : 'Reset Soft',
+                severity: mode === 'hard' ? 'destructive' : 'warning',
+                safetyNote:
+                    mode === 'hard'
+                        ? 'Use hard reset only when you are certain local tracked changes should be discarded.'
+                        : 'This rewrites the current branch position. Review the target commit and branch before continuing.',
                 willChange: {
                     ...(commitDelta !== undefined ? { commits: commitDelta } : {}),
                     ...(fileCount !== undefined ? { files: fileCount } : {}),
@@ -165,6 +177,7 @@ export function useGitGraphCommitActions({
                 source: targetBranch,
                 target: currentHead,
             });
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (previewResult && 'error' in previewResult && previewResult.error) {
                 toast.error('Unable to preview merge', {
                     description: previewResult.error,
@@ -173,6 +186,7 @@ export function useGitGraphCommitActions({
             }
 
             const mergePreviewData =
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                 previewResult && 'aheadCommits' in previewResult && 'files' in previewResult ? previewResult : null;
             const previewConflicts =
                 mergePreviewData && 'conflicts' in mergePreviewData && Array.isArray(mergePreviewData.conflicts)
@@ -183,13 +197,15 @@ export function useGitGraphCommitActions({
                 type: options.squash ? 'squash' : 'merge',
                 title: `Merge ${targetBranch} into ${currentHead}`,
                 description: 'Review merge impact before applying it.',
+                confirmLabel: options.squash ? 'Start Squash Merge' : 'Merge Branch',
+                safetyNote: 'Confirm the target branch and likely conflict count before changing branch history.',
                 willChange: {
                     commits: mergePreviewData?.aheadCommits?.length ?? 0,
                     files: mergePreviewData?.files?.length ?? 0,
                     branches: [targetBranch, currentHead],
                 },
                 risks: [
-                    ...(previewConflicts.length ? [`${previewConflicts.length} conflict file(s) likely.`] : []),
+                    ...(previewConflicts.length ? [`${String(previewConflicts.length)} conflict file(s) likely.`] : []),
                     ...(options.squash ? ['Squash merge combines all commits into one.'] : []),
                     ...(options.noCommit ? ['No-commit mode stages changes without creating a commit.'] : []),
                 ],
@@ -235,11 +251,14 @@ export function useGitGraphCommitActions({
                 type: 'rebase',
                 title: `Rebase ${currentHead} onto ${targetCommit.slice(0, 7)}`,
                 description: 'This rewrites commit hashes for rebased commits.',
+                confirmLabel: 'Start Rebase',
+                severity: 'warning',
+                safetyNote: 'Only continue if you intend to rewrite this branch on top of the selected commit.',
                 willChange: {
-                    commits: previewResult?.commits?.length ?? 0,
+                    commits: previewResult.commits.length,
                     ...(currentHead ? { branches: [currentHead] } : {}),
                 },
-                risks: [...(previewResult?.warnings ?? []), 'Rebase can require conflict resolution commit-by-commit.'],
+                risks: [...previewResult.warnings, 'Rebase can require conflict resolution commit-by-commit.'],
                 undoAvailable: true,
                 gitCommands: [`git rebase ${targetCommit}`],
             };
@@ -259,6 +278,8 @@ export function useGitGraphCommitActions({
                 type: 'cherry-pick',
                 title: `Cherry-pick ${targetCommit.slice(0, 7)}`,
                 description: pickedCommit?.message ?? 'Apply a commit from another branch onto the current branch.',
+                confirmLabel: noCommit ? 'Apply Without Commit' : 'Cherry-pick Commit',
+                safetyNote: 'Review the target branch and confirm this commit should be replayed here.',
                 willChange: {
                     commits: noCommit ? 0 : 1,
                     ...(currentHead ? { branches: [currentHead] } : {}),
@@ -283,6 +304,8 @@ export function useGitGraphCommitActions({
                 type: 'revert',
                 title: `Revert ${targetCommit.slice(0, 7)}`,
                 description: revertedCommit?.message ?? 'Create a new commit that reverts a previous commit.',
+                confirmLabel: noCommit ? 'Stage Revert Changes' : 'Create Revert Commit',
+                safetyNote: 'Revert is safer than reset for shared history, but dependent changes can still conflict.',
                 willChange: {
                     commits: noCommit ? 0 : 1,
                     ...(currentHead ? { branches: [currentHead] } : {}),

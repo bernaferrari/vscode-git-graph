@@ -149,7 +149,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 	);
 	const createPullRequest = trpc.git.createPullRequest.useMutation();
 	const branchNames = useMemo(
-		() => ((repoInfo?.branches ?? []) as string[]).filter((name) => !name.startsWith('remotes/')),
+		() => ((repoInfo?.branches ?? [])).filter((name) => !name.startsWith('remotes/')),
 		[repoInfo?.branches]
 	);
 	const currentBranch = repoInfo?.head ?? null;
@@ -258,7 +258,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 				status: result.pullRequest.state === 'merged' ? 'merged' : 'ready',
 				baseBranch: targetBranch,
 			});
-			toast.success(`Created PR #${result.pullRequest.number} for ${branch.name}`);
+			toast.success(`Created PR #${String(result.pullRequest.number)} for ${branch.name}`);
 		} catch (error) {
 			toast.error('Failed to create pull request', {
 				description: error instanceof Error ? error.message : 'Unknown error',

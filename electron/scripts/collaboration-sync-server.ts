@@ -245,8 +245,8 @@ function normalizeBundle(input: unknown, projectId: string): CollaborationBundle
 				version: 2,
 				projectId,
 				exportedAt: typeof candidate.exportedAt === 'number' ? candidate.exportedAt : Date.now(),
-				workspaceShares: Array.isArray(candidate.workspaceShares) ? candidate.workspaceShares : [],
-				patchShelf: Array.isArray(candidate.patchShelf) ? candidate.patchShelf : [],
+				workspaceShares: Array.isArray(candidate.workspaceShares) ? candidate.workspaceShares as CollaborationWorkspaceShare[] : [],
+				patchShelf: Array.isArray(candidate.patchShelf) ? candidate.patchShelf as CollaborationPatchShare[] : [],
 				comments: [],
 				assignments: [],
 			};
@@ -256,10 +256,10 @@ function normalizeBundle(input: unknown, projectId: string): CollaborationBundle
 				version: 2,
 				projectId,
 				exportedAt: typeof candidate.exportedAt === 'number' ? candidate.exportedAt : Date.now(),
-				workspaceShares: Array.isArray(candidate.workspaceShares) ? candidate.workspaceShares : [],
-				patchShelf: Array.isArray(candidate.patchShelf) ? candidate.patchShelf : [],
-				comments: Array.isArray(candidate.comments) ? candidate.comments : [],
-				assignments: Array.isArray(candidate.assignments) ? candidate.assignments : [],
+				workspaceShares: Array.isArray(candidate.workspaceShares) ? candidate.workspaceShares as CollaborationWorkspaceShare[] : [],
+				patchShelf: Array.isArray(candidate.patchShelf) ? candidate.patchShelf as CollaborationPatchShare[] : [],
+				comments: Array.isArray(candidate.comments) ? candidate.comments as CollaborationComment[] : [],
+				assignments: Array.isArray(candidate.assignments) ? candidate.assignments as CollaborationAssignment[] : [],
 			};
 		}
 	}
@@ -339,8 +339,8 @@ function mergeBundles(localBundle: CollaborationBundle, remoteBundle: Collaborat
 		exportedAt: Date.now(),
 		workspaceShares: mergeById(remoteBundle.workspaceShares, localBundle.workspaceShares).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 40),
 		patchShelf: mergeById(remoteBundle.patchShelf, localBundle.patchShelf).sort((a, b) => b.createdAt - a.createdAt).slice(0, 60),
-		comments: mergeById(remoteBundle.comments ?? [], localBundle.comments ?? []).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 400),
-		assignments: mergeById(remoteBundle.assignments ?? [], localBundle.assignments ?? []).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 240),
+		comments: mergeById(remoteBundle.comments, localBundle.comments).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 400),
+		assignments: mergeById(remoteBundle.assignments, localBundle.assignments).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 240),
 	};
 }
 
@@ -406,7 +406,7 @@ function appendActivity(state: CollaborationProjectState, entry: Omit<Collaborat
 	return {
 		...state,
 		activity: [
-			{ id: `activity-${Date.now()}-${Math.round(Math.random() * 10_000)}`, timestamp: Date.now(), ...entry },
+			{ id: `activity-${String(Date.now())}-${String(Math.round(Math.random() * 10_000))}`, timestamp: Date.now(), ...entry },
 			...state.activity,
 		].slice(0, MAX_ACTIVITY),
 	};
@@ -455,7 +455,7 @@ function publishRealtimeEvent(projectId: string, event: Omit<CollaborationRealti
 	}
 
 	const payload: CollaborationRealtimeEvent = {
-		id: `event-${Date.now()}-${Math.round(Math.random() * 10_000)}`,
+		id: `event-${String(Date.now())}-${String(Math.round(Math.random() * 10_000))}`,
 		projectId,
 		timestamp: Date.now(),
 		...event,
@@ -477,8 +477,8 @@ function summarizeInsights(state: CollaborationProjectState, presence: Collabora
 		.map(([actor, count]) => ({ actor, count }))
 		.sort((a, b) => b.count - a.count)
 		.slice(0, 5);
-	const assignments = state.assignments ?? [];
-	const members = state.members ?? [];
+	const assignments = state.assignments;
+	const members = state.members;
 	return {
 		...(state.teamProfile?.organizationName ? { organizationName: state.teamProfile.organizationName } : {}),
 		...(state.teamProfile?.teamName ? { teamName: state.teamProfile.teamName } : {}),
@@ -519,7 +519,7 @@ function isAuthorized(request: http.IncomingMessage, url: URL): boolean {
 async function readJsonBody(request: http.IncomingMessage): Promise<unknown> {
 	const chunks: Buffer[] = [];
 	for await (const chunk of request) {
-		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBufferLike));
 	}
 	const raw = Buffer.concat(chunks).toString('utf8');
 	return raw ? JSON.parse(raw) : {};
@@ -529,6 +529,7 @@ function requestUrl(request: http.IncomingMessage): URL {
 	return new URL(request.url || '/', `http://${request.headers.host || `${resolvedHost}:${String(resolvedPort)}`}`);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
 const server = http.createServer(async (request, response) => {
 	if (!request.url) {
 		json(response, 404, { error: 'Not found' });
@@ -608,7 +609,7 @@ const server = http.createServer(async (request, response) => {
 			const streams = projectStreams.get(projectId) ?? new Set<http.ServerResponse>();
 			streams.add(response);
 			projectStreams.set(projectId, streams);
-			response.write(`data: ${JSON.stringify({ id: `event-${Date.now()}`, projectId, type: 'session', timestamp: Date.now() })}\n\n`);
+			response.write(`data: ${JSON.stringify({ id: `event-${String(Date.now())}`, projectId, type: 'session', timestamp: Date.now() })}\n\n`);
 			const keepAlive = setInterval(() => {
 				response.write(': keep-alive\n\n');
 			}, 20_000);
@@ -848,7 +849,7 @@ const server = http.createServer(async (request, response) => {
 				type: 'sync',
 				status: 'success',
 				title: 'Collaboration state pushed',
-				description: `${actor ?? 'A collaborator'} published ${incomingBundle.workspaceShares.length} handoff${incomingBundle.workspaceShares.length === 1 ? '' : 's'}, ${incomingBundle.patchShelf.length} patch${incomingBundle.patchShelf.length === 1 ? '' : 'es'}, and ${incomingBundle.assignments.length} assignment${incomingBundle.assignments.length === 1 ? '' : 's'}.`,
+				description: `${actor ?? 'A collaborator'} published ${String(incomingBundle.workspaceShares.length)} handoff${incomingBundle.workspaceShares.length === 1 ? '' : 's'}, ${String(incomingBundle.patchShelf.length)} patch${incomingBundle.patchShelf.length === 1 ? '' : 'es'}, and ${String(incomingBundle.assignments.length)} assignment${incomingBundle.assignments.length === 1 ? '' : 's'}.`,
 				...(actor ? { actor } : {}),
 				});
 				await writeProjectState(projectId, state);

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidateNotifications = vi.fn(async () => undefined);
+const invalidateNotifications = vi.fn(() => undefined);
 const markAllNotificationsRead = vi.fn();
 const removeNotification = vi.fn();
 let notificationsData:
@@ -73,9 +73,11 @@ describe('NotificationCenter', () => {
     it('renders unread notifications and supports mark all read', async () => {
         render(<NotificationCenter />);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTitle('Notifications')).toHaveTextContent('1');
         fireEvent.click(screen.getByTitle('Notifications'));
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('Fetch failed')).toBeInTheDocument();
         fireEvent.click(screen.getByText('Mark all read'));
 

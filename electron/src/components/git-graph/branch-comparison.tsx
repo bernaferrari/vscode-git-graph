@@ -59,9 +59,9 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
         { enabled: !!activeRepo && !!baseBranch && !!compareBranch }
     );
 
-    const branches = ((repoInfo?.branches ?? []) as string[]).filter((b: string) => !b.startsWith('remotes/'));
-    const ahead = compareData?.commits?.length ?? 0;
-    const behind = reverseCompareData?.commits?.length ?? 0;
+    const branches = ((repoInfo?.branches ?? [])).filter((b: string) => !b.startsWith('remotes/'));
+    const ahead = compareData?.commits.length ?? 0;
+    const behind = reverseCompareData?.commits.length ?? 0;
     const files = (compareData?.files ?? []) as Array<{ status: string; path: string }>;
 
     const totalChanges = files.length;
@@ -126,7 +126,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                         variant='ghost'
                         size='sm'
                         className='mt-4'
-                        onClick={() => refetch()}
+                        onClick={() => { void refetch(); }}
                         disabled={!baseBranch || !compareBranch}>
                         <RefreshCw className='h-4 w-4' />
                     </Button>
@@ -181,7 +181,7 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                                                   ? 'text-red-600'
                                                   : 'text-amber-600'
                                         }`}>
-                                        {file.status?.toUpperCase() || 'M'}
+                                        {file.status.toUpperCase() || 'M'}
                                     </span>
                                 </div>
                             ))}

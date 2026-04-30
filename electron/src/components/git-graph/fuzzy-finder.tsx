@@ -96,7 +96,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 		};
 
 		// Branches
-		const branches = (repoInfo?.branches ?? []) as string[];
+		const branches = (repoInfo?.branches ?? []);
 		branches.forEach((branch: string) => {
 			const name = branch.replace('remotes/', '');
 			if (name.toLowerCase().includes(q)) {
@@ -106,7 +106,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 					subtitle: branch.startsWith('remotes/') ? 'remote' : 'local',
 					icon: branch.startsWith('remotes/') ? Globe : GitBranch,
 					action: () => {
-						gitOps.checkout(branch);
+						void gitOps.checkout(branch);
 						onOpenChange(false);
 					},
 				});
@@ -114,7 +114,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 		});
 
 		// Tags
-		const tags = (repoInfo?.tags ?? []) as string[];
+		const tags = (repoInfo?.tags ?? []);
 		tags.forEach((tag: string) => {
 			if (tag.toLowerCase().includes(q)) {
 				items.push({
@@ -122,7 +122,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 					name: tag,
 					icon: Tag,
 					action: () => {
-						gitOps.checkout(tag);
+						void gitOps.checkout(tag);
 						onOpenChange(false);
 					},
 				});
@@ -142,7 +142,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 					subtitle: commit.hash.slice(0, 7),
 					icon: GitCommit,
 					action: () => {
-						gitOps.checkout(commit.hash);
+						void gitOps.checkout(commit.hash);
 						onOpenChange(false);
 					},
 				});
@@ -151,7 +151,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 
 		// Search results from backend
 		if (searchResults) {
-			((searchResults.commits ?? []) as SearchRefCommitResult[]).forEach((c: SearchRefCommitResult) => {
+			(searchResults.commits as SearchRefCommitResult[]).forEach((c: SearchRefCommitResult) => {
 				if (!items.some((i) => i.subtitle === c.hash.slice(0, 7))) {
 					items.push({
 						type: 'commit',
@@ -159,7 +159,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 						subtitle: c.hash.slice(0, 7),
 						icon: GitCommit,
 						action: () => {
-							gitOps.checkout(c.hash);
+							void gitOps.checkout(c.hash);
 							onOpenChange(false);
 						},
 					});
@@ -174,6 +174,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 			if (aExact && !bExact) return -1;
 			if (!aExact && bExact) return 1;
 
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			return (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99);
 		});
 
@@ -239,7 +240,7 @@ export function FuzzyFinder({ open, onOpenChange }: FuzzyFinderProps) {
 								const Icon = result.icon;
 								return (
 									<div
-										key={`${result.type}-${result.name}-${result.subtitle}`}
+										key={`${result.type}-${result.name}-${result.subtitle ?? ''}`}
 										className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${
 											index === selectedIndex
 												? 'bg-accent text-accent-foreground'

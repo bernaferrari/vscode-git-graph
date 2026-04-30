@@ -88,7 +88,7 @@ export function CommitSeriesBuilder({
 	// Add a new commit to the series
 	const addCommit = useCallback(() => {
 		const newCommit: CommitInSeries = {
-			id: `commit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+			id: `commit-${String(Date.now())}-${Math.random().toString(36).substring(2, 11)}`,
 			message: '',
 			files: [],
 			isValid: false,
@@ -131,7 +131,7 @@ export function CommitSeriesBuilder({
 	}, []);
 
 	// Auto-assign files to commits using AI
-	const autoAssignFiles = useCallback(async () => {
+	const autoAssignFiles = useCallback(() => {
 		if (allFiles.length === 0) return;
 		
 		setIsGenerating(true);
@@ -145,7 +145,7 @@ export function CommitSeriesBuilder({
 			if (!grouped.has(dir)) {
 				grouped.set(dir, []);
 			}
-			grouped.get(dir)!.push(file);
+			grouped.get(dir)?.push(file);
 		});
 		
 		// Create commits from groups
@@ -158,7 +158,7 @@ export function CommitSeriesBuilder({
 				return;
 			}
 			newCommits.push({
-				id: `commit-${Date.now()}-${commitIndex}`,
+				id: `commit-${String(Date.now())}-${String(commitIndex)}`,
 				message: `${type.prefix}: ${dir} changes`,
 				files,
 				isValid: true,
@@ -261,7 +261,7 @@ export function CommitSeriesBuilder({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={autoAssignFiles}
+								onClick={() => { autoAssignFiles(); }}
 								disabled={isGenerating || allFiles.length === 0}
 							>
 								<Sparkles className="h-4 w-4 mr-1" />
@@ -270,7 +270,7 @@ export function CommitSeriesBuilder({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={generateMessages}
+								onClick={() => { void generateMessages(); }}
 								disabled={isGenerating || commits.length === 0}
 							>
 								{isGenerating ? (

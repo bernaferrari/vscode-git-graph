@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidatePinnedCommits = vi.fn(async () => undefined);
+const invalidatePinnedCommits = vi.fn(() => undefined);
 const mutatePinnedCommits = vi.fn();
 let pinnedCommitsData: { commits: Array<{ hash: string; message: string; author: string; date: string; pinnedAt: number }> } | undefined;
 
@@ -57,12 +57,14 @@ describe('usePinnedCommits', () => {
     it('hydrates from backend commits and persists pin/unpin operations', async () => {
         render(<Harness />);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTestId('pinned-count')).toHaveTextContent('1');
 
         fireEvent.click(screen.getByText('Pin Commit'));
         await waitFor(() => {
             expect(mutatePinnedCommits).toHaveBeenCalledWith({
                 repo: '/tmp/repo',
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 commits: expect.arrayContaining([
                     expect.objectContaining({ hash: 'seed' }),
                     expect.objectContaining({ hash: 'abc123', message: 'Test' }),

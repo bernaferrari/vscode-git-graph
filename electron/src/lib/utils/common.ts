@@ -54,7 +54,7 @@ export function getRelativeTimeDiff(unixTimestamp: number): string {
 		diff = Math.round(diff / 31557600);
 	}
 
-	return diff + ' ' + unit + (diff !== 1 ? 's' : '') + ' ago';
+	return String(diff) + ' ' + unit + (diff !== 1 ? 's' : '') + ' ago';
 }
 
 /**
@@ -62,6 +62,7 @@ export function getRelativeTimeDiff(unixTimestamp: number): string {
  */
 export function getNonce(): string {
 	let text = '';
+	// eslint-disable-next-line no-secrets/no-secrets
 	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 	for (let i = 0; i < 32; i++) {
 		text += possible.charAt(Math.floor(Math.random() * possible.length));
@@ -90,7 +91,7 @@ export async function evalPromises<X, Y>(
 	}
 
 	return new Promise((resolve, reject) => {
-		const results: Y[] = new Array(data.length);
+		const results = new Array<Y>(data.length);
 		let nextPromise = 0;
 		let rejected = false;
 		let completed = 0;
@@ -162,7 +163,7 @@ export function formatDate(
 		case 'date-time':
 		default:
 			if (iso) {
-				return date.toISOString().slice(0, 16)?.replace('T', ' ') ?? '';
+				return date.toISOString().slice(0, 16).replace('T', ' ');
 			}
 			return date.toLocaleDateString('en-US', {
 				day: 'numeric',

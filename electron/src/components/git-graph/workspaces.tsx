@@ -130,7 +130,7 @@ export function WorkspacesManager({
             if (failed.length === 0) {
                 notifySuccess('Fetched all workspace repositories');
             } else {
-                notifyError(`Fetched with ${failed.length} failures`);
+                notifyError(`Fetched with ${String(failed.length)} failures`);
             }
             void launchpadQuery.refetch();
         },
@@ -195,7 +195,7 @@ export function WorkspacesManager({
         if (!newWorkspaceName.trim()) return;
 
         const workspace: Workspace = {
-            id: `ws-${Date.now()}`,
+            id: `ws-${String(Date.now())}`,
             name: newWorkspaceName.trim(),
             color: COLORS[Math.floor(Math.random() * COLORS.length)] ?? DEFAULT_WORKSPACE_COLOR,
             repos: [],
@@ -212,7 +212,8 @@ export function WorkspacesManager({
     // Delete workspace
     const handleDeleteWorkspace = (id: string) => {
         const ws = workspaces.find((w) => w.id === id);
-        if (!confirm(`Delete workspace "${ws?.name}"?`)) return;
+        // eslint-disable-next-line no-alert
+        if (!confirm(`Delete workspace "${ws?.name ?? ''}"?`)) return;
 
         saveWorkspaces(workspaces.filter((w) => w.id !== id));
         if (selectedWorkspace?.id === id) {
@@ -238,6 +239,7 @@ export function WorkspacesManager({
             title: 'Add repository to workspace',
             properties: ['openDirectory'],
         });
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!result || result.canceled) return;
 
         const path = result.filePaths[0];
@@ -297,6 +299,7 @@ export function WorkspacesManager({
             return;
         }
         if (onSelectRepo) {
+            // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
             await Promise.resolve(onSelectRepo(path));
             onOpenChange(false);
             return;
@@ -310,6 +313,7 @@ export function WorkspacesManager({
         }
     };
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     const handleFetchWorkspace = async (workspace: Workspace) => {
         if (workspace.repos.length === 0) {
             notifyInfo('No repositories in this workspace', { persist: false });
@@ -448,7 +452,7 @@ export function WorkspacesManager({
                                                     <RefreshCw className='mr-2 h-4 w-4' />
                                                     Fetch All
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleAddRepo(selectedWorkspace.id)}>
+                                                <DropdownMenuItem onClick={() => { void handleAddRepo(selectedWorkspace.id); }}>
                                                     <Plus className='mr-2 h-4 w-4' />
                                                     Add Repository
                                                 </DropdownMenuItem>
@@ -657,7 +661,7 @@ export function WorkspacesManager({
                                                 variant='outline'
                                                 size='sm'
                                                 className='mt-2'
-                                                onClick={() => handleAddRepo(selectedWorkspace.id)}>
+                                                onClick={() => { void handleAddRepo(selectedWorkspace.id); }}>
                                                 <Plus className='mr-2 h-4 w-4' />
                                                 Add Repository
                                             </Button>

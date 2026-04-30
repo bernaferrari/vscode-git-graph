@@ -103,7 +103,7 @@ export function EnhancedCommitPanel({ commit, repo, onFileClick }: EnhancedCommi
 	};
 
 	const handleCopyHash = () => {
-		navigator.clipboard.writeText(commit.hash);
+		void navigator.clipboard.writeText(commit.hash);
 		setCopiedHash(commit.hash);
 		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};

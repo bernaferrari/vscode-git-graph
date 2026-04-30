@@ -96,7 +96,7 @@ export function BranchDropdown({
             const branch = branches.find((b) => b.value === selectedBranches[0]);
             return branch?.name ?? selectedBranches[0];
         }
-        return `${selectedBranches.length} branches`;
+        return `${String(selectedBranches.length)} branches`;
     }, [selectedBranches, branches, placeholder, multiple]);
 
     return (

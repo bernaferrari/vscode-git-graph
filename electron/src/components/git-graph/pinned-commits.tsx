@@ -206,6 +206,7 @@ export function PinnedCommitsDialog({
 }
 
 // Hook for managing pinned commits (persisted in backend store)
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePinnedCommits(repoId: string | null) {
 	const [pinnedCommits, setPinnedCommits] = useState<PinnedCommit[]>([]);
     const utils = trpc.useUtils();

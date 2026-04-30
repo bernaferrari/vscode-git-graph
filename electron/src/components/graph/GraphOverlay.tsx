@@ -166,7 +166,7 @@ export function GraphOverlay({
 										<span className="font-mono text-[10px] text-muted-foreground">
 											{commit.hash.substring(0, 7)}
 										</span>
-										<span className="truncate">{commit.message?.substring(0, 25)}</span>
+										<span className="truncate">{commit.message.substring(0, 25)}</span>
 									</div>
 								);
 							})}
@@ -210,7 +210,7 @@ export function GraphOverlay({
 										<span className="font-mono text-[10px] text-muted-foreground">
 											{commit.hash.substring(0, 7)}
 										</span>
-										<span className="truncate">{commit.message?.substring(0, 25)}</span>
+										<span className="truncate">{commit.message.substring(0, 25)}</span>
 									</div>
 								);
 							})}

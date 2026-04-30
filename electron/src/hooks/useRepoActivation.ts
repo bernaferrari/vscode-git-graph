@@ -88,7 +88,7 @@ export function useRepoActivation() {
                     target: root,
                 });
                 // Refresh repository lists in the background so UI can render immediately.
-                void refreshRepoCollections().catch((error) => {
+                void refreshRepoCollections().catch((error: unknown) => {
                     console.error('[repo-activation] Failed to refresh repository collections:', error);
                 });
                 return { root, error: null, canceled: false };

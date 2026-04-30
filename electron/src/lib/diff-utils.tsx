@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Word/Character Level Diff Utilities
  * Implements precise character-level diffing similar to Sublime Merge
@@ -36,18 +37,18 @@ function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x ==
 	const n = b.length;
 	
 	// Use dynamic programming with optimization for space
-	const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+	const dp: number[][] = Array.from({ length: m + 1 }, (): number[] => Array<number>(n + 1).fill(0));
 	
 	for (let i = 1; i <= m; i++) {
-		const previousRow = dp[i - 1]!;
-		const currentRow = dp[i]!;
+		const previousRow = dp[i - 1] as number[];
+		const currentRow = dp[i] as number[];
 		for (let j = 1; j <= n; j++) {
-			const left = a[i - 1]!;
-			const right = b[j - 1]!;
-			if (equals(left, right)) {
-				currentRow[j] = previousRow[j - 1]! + 1;
-			} else {
-				currentRow[j] = Math.max(previousRow[j]!, currentRow[j - 1]!);
+		const left = a[i - 1] as T;
+		const right = b[j - 1] as T;
+		if (equals(left, right)) {
+			currentRow[j] = previousRow[j - 1] as number + 1;
+		} else {
+			currentRow[j] = Math.max(previousRow[j] as number, currentRow[j - 1] as number);
 			}
 		}
 	}
@@ -56,15 +57,15 @@ function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x ==
 	const result: [number, number][] = [];
 	let i = m, j = n;
 	while (i > 0 && j > 0) {
-		const previousRow = dp[i - 1]!;
-		const currentRow = dp[i]!;
-		const left = a[i - 1]!;
-		const right = b[j - 1]!;
+		const previousRow = dp[i - 1] as number[];
+		const currentRow = dp[i] as number[];
+		const left = a[i - 1] as T;
+		const right = b[j - 1] as T;
 		if (equals(left, right)) {
 			result.unshift([i - 1, j - 1]);
 			i--;
 			j--;
-		} else if (previousRow[j]! > currentRow[j - 1]!) {
+		} else if ((previousRow[j] as number) > (currentRow[j - 1] as number)) {
 			i--;
 		} else {
 			j--;
@@ -91,7 +92,7 @@ export function tokenizeText(text: string): string[] {
 		const charType: 'word' | 'space' | 'punct' | 'other' = 
 			/[a-zA-Z0-9]/.test(char) ? 'word' :
 			/\s/.test(char) ? 'space' :
-			/[.,;:!?'"()\[\]{}<>@#$%^&*+=|\\\/~`-]/.test(char) ? 'punct' :
+			/[.,;:!?'"()[\]{}<>@#$%^&*+=|\\/~`-]/.test(char) ? 'punct' :
 			'other';
 		
 		if (current && charType !== currentType && 
@@ -128,8 +129,8 @@ export function diffChars(oldStr: string, newStr: string): { old: DiffChar[]; ne
 		const commonPair = common[commonIdx];
 		if (commonPair && oldIdx === commonPair[0] && newIdx === commonPair[1]) {
 			// Match found
-			const oldChar = oldChars[oldIdx]!;
-			const newChar = newChars[newIdx]!;
+			const oldChar = oldChars[oldIdx] as string;
+			const newChar = newChars[newIdx] as string;
 			oldResult.push({ char: oldChar, type: 'unchanged' });
 			newResult.push({ char: newChar, type: 'unchanged' });
 			oldIdx++;
@@ -137,11 +138,11 @@ export function diffChars(oldStr: string, newStr: string): { old: DiffChar[]; ne
 			commonIdx++;
 		} else if (oldIdx < oldChars.length && (!commonPair || oldIdx < commonPair[0])) {
 			// Character removed
-			oldResult.push({ char: oldChars[oldIdx]!, type: 'removed' });
+			oldResult.push({ char: oldChars[oldIdx] as string, type: 'removed' });
 			oldIdx++;
 		} else if (newIdx < newChars.length) {
 			// Character added
-			newResult.push({ char: newChars[newIdx]!, type: 'added' });
+			newResult.push({ char: newChars[newIdx] as string, type: 'added' });
 			newIdx++;
 		}
 	}
@@ -169,18 +170,18 @@ export function diffWords(oldStr: string, newStr: string): { old: DiffWord[]; ne
 		const commonPair = common[commonIdx];
 		if (commonPair && oldIdx === commonPair[0] && newIdx === commonPair[1]) {
 			// Match found
-			oldResult.push({ text: oldWords[oldIdx]!, type: 'unchanged' });
-			newResult.push({ text: newWords[newIdx]!, type: 'unchanged' });
+			oldResult.push({ text: oldWords[oldIdx] as string, type: 'unchanged' });
+			newResult.push({ text: newWords[newIdx] as string, type: 'unchanged' });
 			oldIdx++;
 			newIdx++;
 			commonIdx++;
 		} else if (oldIdx < oldWords.length && (!commonPair || oldIdx < commonPair[0])) {
 			// Word removed
-			oldResult.push({ text: oldWords[oldIdx]!, type: 'removed' });
+			oldResult.push({ text: oldWords[oldIdx] as string, type: 'removed' });
 			oldIdx++;
 		} else if (newIdx < newWords.length) {
 			// Word added
-			newResult.push({ text: newWords[newIdx]!, type: 'added' });
+			newResult.push({ text: newWords[newIdx] as string, type: 'added' });
 			newIdx++;
 		}
 	}
@@ -219,7 +220,7 @@ export function computeInlineDiff(removedLine: string, addedLine: string): {
 
 			if (!oldWord) {
 				// Only new words left
-				pushChars(addedChars, newWord!.text, 'added');
+				pushChars(addedChars, (newWord as DiffWord).text, 'added');
 				newIndex++;
 			} else if (!newWord) {
 				// Only old words left

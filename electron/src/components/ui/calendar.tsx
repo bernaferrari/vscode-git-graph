@@ -133,6 +133,7 @@ function Calendar({
         hidden: cn("invisible", defaultClassNames.hidden),
         ...classNames,
       }}
+      /* eslint-disable react/no-unstable-nested-components */
       components={{
         Root: ({ className, rootRef, ...props }) => {
           return (
@@ -179,6 +180,7 @@ function Calendar({
         },
         ...components,
       }}
+      /* eslint-enable react/no-unstable-nested-components */
       {...props}
     />
   )

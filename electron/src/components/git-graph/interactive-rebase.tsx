@@ -101,8 +101,14 @@ export function InteractiveRebase({
 		e.preventDefault();
 		if (dragIndex !== null && dragIndex !== index) {
 			const newCommits = [...rebaseCommits];
-			const [dragged] = newCommits.splice(dragIndex, 1);
-			newCommits.splice(index, 0, dragged!);
+			const dragged = newCommits[dragIndex];
+			if (!dragged) {
+				setDragIndex(null);
+				setDropIndex(null);
+				return;
+			}
+			newCommits.splice(dragIndex, 1);
+			newCommits.splice(index, 0, dragged);
 			setRebaseCommits(newCommits);
 		}
 		setDragIndex(null);
@@ -131,7 +137,13 @@ export function InteractiveRebase({
 		if (newIndex < 0 || newIndex >= rebaseCommits.length) return;
 
 		const newCommits = [...rebaseCommits];
-		[newCommits[index], newCommits[newIndex]] = [newCommits[newIndex]!, newCommits[index]!];
+		const currentCommit = newCommits[index];
+		const targetCommit = newCommits[newIndex];
+		if (!currentCommit || !targetCommit) {
+			return;
+		}
+		newCommits[index] = targetCommit;
+		newCommits[newIndex] = currentCommit;
 		setRebaseCommits(newCommits);
 	};
 
@@ -161,8 +173,8 @@ export function InteractiveRebase({
 
 			try {
 				const result = await gitOps.rebase(baseCommit, true, todoContent);
-				if (result && typeof result === 'object' && 'error' in result && result.error) {
-					toast.error(String(result.error));
+				if (typeof result === 'object' && 'error' in result && result.error) {
+					toast.error(result.error);
 					return;
 				}
 			} finally {
@@ -277,7 +289,7 @@ export function InteractiveRebase({
 					<Button variant="outline" onClick={() => { onOpenChange(false); }}>
 						Cancel
 					</Button>
-					<Button onClick={executeRebase} disabled={isSubmitting || validCommits.length === 0}>
+					<Button onClick={() => { void executeRebase(); }} disabled={isSubmitting || validCommits.length === 0}>
 						{isSubmitting ? 'Starting Rebase...' : 'Start Rebase'}
 					</Button>
 				</DialogFooter>

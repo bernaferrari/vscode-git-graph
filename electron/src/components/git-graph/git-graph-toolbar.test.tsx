@@ -49,6 +49,7 @@ describe('GitGraphToolbar', () => {
     it('renders pinned commit count badge when present', () => {
         renderToolbar({ pinnedCommitCount: 3 });
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('3')).toBeInTheDocument();
     });
 

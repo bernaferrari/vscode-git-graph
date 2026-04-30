@@ -6,16 +6,15 @@ import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
 const Toaster = ({
-  theme: _theme,
   ...props
-}: Omit<ToasterProps, "theme"> & { theme?: ToasterProps["theme"] }) => {
+}: Omit<ToasterProps, "theme">) => {
   const { theme = "system" } = useTheme()
   const resolvedTheme: ToasterProps["theme"] =
     theme === "light" || theme === "dark" ? theme : "system"
-  const toasterProps = {
+  const toasterProps: ToasterProps = {
     ...props,
-    ...(resolvedTheme ? { theme: resolvedTheme } : {}),
-  } as ToasterProps
+    theme: resolvedTheme,
+  }
 
   return (
     <Sonner

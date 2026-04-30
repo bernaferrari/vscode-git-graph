@@ -52,6 +52,7 @@ export class IssueLinkingManager {
 		if (!this.config) return [];
 
 		const issues: IssueInfo[] = [];
+		// eslint-disable-next-line security/detect-non-literal-regexp
 		const pattern = new RegExp(this.config.issue, 'g');
 		let match;
 

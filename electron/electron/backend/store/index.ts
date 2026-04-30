@@ -119,6 +119,16 @@ export const appStore = new Store<{
 		autoDetect: boolean;
 		patterns: string[];
 	};
+	issueLinksByCommit: Record<string, Array<{
+		id: string;
+		commitHash: string;
+		issueKey: string;
+		provider: string;
+		title: string;
+		status: 'open' | 'in_progress' | 'closed' | 'done';
+		url: string;
+		addedAt: number;
+	}>>;
 	customCommands: Array<{
 		id: string;
 		name: string;
@@ -247,6 +257,7 @@ export const appStore = new Store<{
 			autoDetect: true,
 			patterns: [],
 		},
+		issueLinksByCommit: {},
 		customCommands: [],
 		gitGraphSettings: {
 			confirmDestructiveActions: true,

@@ -3,7 +3,7 @@ import { lazy, Suspense } from 'react';
 
 import type { CommandPaletteActions } from './command-palette';
 import type { CommitTemplate } from './commit-templates';
-import type { SettingsTab } from './use-git-graph-shell-panels';
+import type { SettingsSection, SettingsTab } from './use-git-graph-shell-panels';
 import type { Dispatch, SetStateAction } from 'react';
 
 const CloneRepositoryDialog = lazy(() =>
@@ -167,7 +167,7 @@ export function GitGraphFeatureDialogs({
     cloneRepository: OpenState;
     onCloned: (repoPath: string) => Promise<void>;
     stashManagement: OpenState;
-    settings: OpenState & { initialTab: SettingsTab };
+    settings: OpenState & { initialTab: SettingsTab; initialSection: SettingsSection | null };
     lineStaging: OpenState;
     stagingFile: string | null;
     onLineStagingChange: (nextOpen: boolean) => void;
@@ -307,6 +307,7 @@ export function GitGraphFeatureDialogs({
                         open={settings.open}
                         onOpenChange={settings.onOpenChange}
                         initialTab={settings.initialTab}
+                        initialSection={settings.initialSection}
                     />
                 </Suspense>
             )}

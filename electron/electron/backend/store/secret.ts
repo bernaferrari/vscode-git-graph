@@ -128,7 +128,7 @@ export function deleteSecretValue(key: string): void {
 		return;
 	}
 
-	delete vault.entries[key];
+	Reflect.deleteProperty(vault.entries, key);
 	writeVault(vault);
 }
 

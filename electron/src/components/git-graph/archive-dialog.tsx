@@ -75,7 +75,7 @@ export function ArchiveDialog({
 
 					<div className="space-y-2">
 						<Label>Format</Label>
-						<Select value={format} onValueChange={(v) => v && setFormat(v)}>
+						<Select value={format} onValueChange={(v) => { if (v) setFormat(v); }}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>

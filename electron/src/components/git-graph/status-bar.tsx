@@ -49,13 +49,29 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
     );
 
     // Get file counts
-    const stagedCount = statusData?.staged?.length ?? 0;
-    const unstagedCount = statusData?.unstaged?.length ?? 0;
-    const untrackedCount = statusData?.unstaged?.filter((f: { status: string }) => f.status === 'U').length ?? 0;
-    const conflictedCount: number = workingDirStatus?.conflicted?.length ?? 0;
+    const stagedCount = statusData?.staged.length ?? 0;
+    const unstagedCount = statusData?.unstaged.length ?? 0;
+    const untrackedCount = statusData?.unstaged.filter((f: { status: string }) => f.status === 'U').length ?? 0;
+    const conflictedCount: number = workingDirStatus?.conflicted.length ?? 0;
 
     const ahead = aheadBehindData?.ahead ?? 0;
     const behind = aheadBehindData?.behind ?? 0;
+    const stateMessage =
+        conflictedCount > 0
+            ? `${String(conflictedCount)} conflict${conflictedCount === 1 ? '' : 's'} need resolution`
+            : stagedCount > 0 && unstagedCount > 0
+              ? `${String(stagedCount)} staged, ${String(unstagedCount)} still outside the next commit`
+              : stagedCount > 0
+                ? `${String(stagedCount)} staged and ready to commit`
+                : unstagedCount > 0
+                  ? `${String(unstagedCount)} unstaged change${unstagedCount === 1 ? '' : 's'}`
+                  : ahead > 0 && behind > 0
+                    ? `Sync required: push ${String(ahead)}, pull ${String(behind)}`
+                    : ahead > 0
+                      ? `${String(ahead)} commit${ahead === 1 ? '' : 's'} ready to push`
+                      : behind > 0
+                        ? `Pull ${String(behind)} incoming commit${behind === 1 ? '' : 's'}`
+                        : 'Working tree clean';
 
     if (!activeRepo) {
         return (
@@ -117,6 +133,7 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
                         )}
                     </div>
                 )}
+                <span className='text-muted-foreground hidden lg:inline'>{stateMessage}</span>
             </div>
 
             {/* Right side - Quick actions and info */}

@@ -27,6 +27,10 @@ import {
 
 import type { ElementType, ReactNode } from 'react';
 
+const TOOLBAR_CONTROL_CHROME =
+    'rounded-md border border-transparent text-[12px] font-medium text-muted-foreground transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:border-border/70 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.98] disabled:opacity-40';
+const TOOLBAR_DROPDOWN_TRIGGER_CLASS = `inline-flex h-8 items-center gap-1.5 px-2.5 ${TOOLBAR_CONTROL_CHROME}`;
+
 function ToolbarButton({
     icon: Icon,
     label,
@@ -43,14 +47,12 @@ function ToolbarButton({
     disabled?: boolean;
 }) {
     const title = shortcut ? `${label} (${shortcut})` : label;
-    const sharedControlClass =
-        'rounded-md border border-transparent px-2.5 text-[12px] font-medium text-muted-foreground transition-all duration-150 hover:border-border/70 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.98] disabled:opacity-40';
 
     return (
         <Button
             variant={variant}
             size='sm'
-            className={`h-8 gap-1.5 ${sharedControlClass}`}
+            className={`h-8 gap-1.5 px-2.5 ${TOOLBAR_CONTROL_CHROME}`}
             onClick={onClick}
             disabled={disabled}
             title={title}
@@ -130,7 +132,10 @@ export function GitGraphToolbar({
                 <>
                     <ToolbarButton icon={Download} label='Fetch' onClick={onFetch} />
                     <DropdownMenu>
-                        <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
+                        <DropdownMenuTrigger
+                            className={TOOLBAR_DROPDOWN_TRIGGER_CLASS}
+                            title='Push options'
+                            aria-label='Push options'>
                             <Upload className='h-4 w-4' />
                             <span className='hidden sm:inline'>Push</span>
                             <ChevronDown className='h-3 w-3' />
@@ -147,7 +152,10 @@ export function GitGraphToolbar({
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <DropdownMenu>
-                        <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
+                        <DropdownMenuTrigger
+                            className={TOOLBAR_DROPDOWN_TRIGGER_CLASS}
+                            title='Pull options'
+                            aria-label='Pull options'>
                             <Download className='h-4 w-4' />
                             <span className='hidden sm:inline'>Pull</span>
                             <ChevronDown className='h-3 w-3' />
@@ -169,7 +177,7 @@ export function GitGraphToolbar({
             <div className='bg-border mx-1 h-5 w-px shrink-0' />
 
             <DropdownMenu>
-                <DropdownMenuTrigger className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 inline-flex h-8 items-center gap-1.5 rounded-md border border-transparent px-2.5 text-[12px] font-medium transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'>
+                <DropdownMenuTrigger className={TOOLBAR_DROPDOWN_TRIGGER_CLASS} title='New ref or stash' aria-label='New'>
                     <Plus className='h-4 w-4' />
                     <span className='hidden sm:inline'>New</span>
                     <ChevronDown className='h-3 w-3' />
@@ -191,12 +199,12 @@ export function GitGraphToolbar({
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            <div className='ml-1 w-44 shrink-0'>{branchFilter}</div>
+            <div className='ml-1 hidden w-40 shrink-0 lg:block'>{branchFilter}</div>
             <div className='ml-1 shrink-0'>{lensSwitcher}</div>
             <div className='ml-1 shrink-0'>{profileSwitcher}</div>
-            <div className='ml-1 shrink-0'>{operationTimeline}</div>
-            <div className='ml-1 shrink-0'>{stackedBranches}</div>
-            <div className='ml-1 shrink-0'>
+            <div className='ml-1 hidden shrink-0 xl:block'>{operationTimeline}</div>
+            <div className='ml-1 hidden shrink-0 xl:block'>{stackedBranches}</div>
+            <div className='ml-1 hidden shrink-0 lg:block'>
                 <ToolbarButton icon={FolderGit2} label='Workspaces' onClick={onOpenWorkspaces} />
             </div>
 
@@ -220,9 +228,10 @@ export function GitGraphToolbar({
             <Button
                 variant='ghost'
                 size='sm'
-                className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 relative h-8 w-8 rounded-md border border-transparent p-0 transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'
+                className={`relative h-8 w-8 p-0 ${TOOLBAR_CONTROL_CHROME}`}
                 onClick={onOpenPinnedCommits}
-                title='Pinned Commits'>
+                title='Pinned Commits'
+                aria-label='Pinned Commits'>
                 <Pin className='h-4 w-4' />
                 {pinnedCommitCount > 0 && (
                     <span className='bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]'>

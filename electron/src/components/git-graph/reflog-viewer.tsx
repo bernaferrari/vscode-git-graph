@@ -62,13 +62,13 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 		}));
 
 	const handleCopyHash = (hash: string) => {
-		navigator.clipboard.writeText(hash);
+		void navigator.clipboard.writeText(hash);
 		setCopiedHash(hash);
 		setTimeout(() => { setCopiedHash(null); }, 2000);
 	};
 
 	const handleResetTo = (hash: string, mode: 'soft' | 'mixed' | 'hard') => {
-		gitOps.reset(hash, mode);
+		void gitOps.reset(hash, mode);
 		onOpenChange(false);
 	};
 
@@ -112,9 +112,9 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 		const diffDays = Math.floor(diffHours / 24);
 
 		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		if (diffDays < 7) return `${diffDays}d ago`;
+		if (diffMins < 60) return `${String(diffMins)}m ago`;
+		if (diffHours < 24) return `${String(diffHours)}h ago`;
+		if (diffDays < 7) return `${String(diffDays)}d ago`;
 		return date.toLocaleDateString();
 	};
 
@@ -138,7 +138,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => refetch()}
+						onClick={() => { void refetch(); }}
 					>
 						<RotateCcw className="h-4 w-4 mr-1" />
 						Refresh
@@ -159,7 +159,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 						<div className="divide-y">
 							{entries.map((entry, index) => (
 								<div
-									key={`${entry.hash}-${index}`}
+									key={`${entry.hash}-${String(index)}`}
 									className="p-3 hover:bg-accent/50 group"
 								>
 									<div className="flex items-start gap-3">

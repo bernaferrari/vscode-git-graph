@@ -71,7 +71,7 @@ export function BranchCompare({
 
 				{/* Branch selectors */}
 				<div className="flex items-center gap-4 py-2">
-					<Select value={fromBranch} onValueChange={(v) => v && setFromBranch(v)}>
+					<Select value={fromBranch} onValueChange={(v) => { if (v) setFromBranch(v); }}>
 						<SelectTrigger className="w-[200px]">
 							<SelectValue placeholder="Select base branch" />
 						</SelectTrigger>
@@ -86,7 +86,7 @@ export function BranchCompare({
 
 					<ArrowRight className="h-4 w-4 text-muted-foreground" />
 
-					<Select value={toBranch} onValueChange={(v) => v && setToBranch(v)}>
+					<Select value={toBranch} onValueChange={(v) => { if (v) setToBranch(v); }}>
 						<SelectTrigger className="w-[200px]">
 							<SelectValue placeholder="Select compare branch" />
 						</SelectTrigger>

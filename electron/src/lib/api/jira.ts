@@ -63,22 +63,32 @@ export class JiraClient {
 	}
 
 	private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+		const headers = new Headers(options.headers);
+		headers.set('Authorization', this.getAuthHeader());
+		headers.set('Accept', 'application/json');
+		headers.set('Content-Type', 'application/json');
+
 		const response = await fetch(`${this.baseUrl}${path}`, {
-			...options,
-			headers: {
-				'Authorization': this.getAuthHeader(),
-				'Accept': 'application/json',
-				'Content-Type': 'application/json',
-				...options.headers,
-			},
+			...(options.method !== undefined ? { method: options.method } : {}),
+			...(options.body !== undefined ? { body: options.body } : {}),
+			...(options.cache !== undefined ? { cache: options.cache } : {}),
+			...(options.credentials !== undefined ? { credentials: options.credentials } : {}),
+			...(options.integrity !== undefined ? { integrity: options.integrity } : {}),
+			...(options.keepalive !== undefined ? { keepalive: options.keepalive } : {}),
+			...(options.mode !== undefined ? { mode: options.mode } : {}),
+			...(options.redirect !== undefined ? { redirect: options.redirect } : {}),
+			...(options.referrer !== undefined ? { referrer: options.referrer } : {}),
+			...(options.referrerPolicy !== undefined ? { referrerPolicy: options.referrerPolicy } : {}),
+			...(options.signal !== undefined ? { signal: options.signal } : {}),
+			headers,
 		});
 
 		if (!response.ok) {
 			const error = await response.text();
-			throw new Error(`Jira API error: ${response.status} ${response.statusText} - ${error}`);
+			throw new Error(`Jira API error: ${String(response.status)} ${response.statusText} - ${error}`);
 		}
 
-		return response.json();
+		return response.json() as Promise<T>;
 	}
 
 	// Get current user
@@ -126,7 +136,7 @@ export class JiraClient {
 
 	// Get recent issues
 	async getRecentIssues(days: number = 7): Promise<JiraIssue[]> {
-		const result = await this.searchIssues(`updated >= -${days}d ORDER BY updated DESC`, {
+		const result = await this.searchIssues(`updated >= -${String(days)}d ORDER BY updated DESC`, {
 			maxResults: 50,
 			fields: ['summary', 'status', 'priority', 'assignee', 'updated', 'issuetype', 'project'],
 		});

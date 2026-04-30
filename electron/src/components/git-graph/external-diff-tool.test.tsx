@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { openExternalDiff } = vi.hoisted(() => ({
-    openExternalDiff: vi.fn(async () => undefined),
+    openExternalDiff: vi.fn(() => undefined),
 }));
 let diffConfigData:
     | { config: { tools: Array<{ id: string; name: string; command: string; args: string; supports3Way: boolean; supportsDirDiff: boolean }>; selectedTool: string; useForMergeConflicts: boolean } }

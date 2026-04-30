@@ -60,6 +60,10 @@ export function BranchesSection({
     onBranchSelect,
     onCheckout,
     onDelete,
+    onPublishBranch,
+    canTrackBranch,
+    onTrackBranch,
+    onRenameBranch,
     onMergeBranch,
     onPinToggle,
     renderBranchItem,
@@ -77,6 +81,10 @@ export function BranchesSection({
     onBranchSelect?: (branch: string) => void;
     onCheckout: (branch: string) => void;
     onDelete: (branch: string) => void;
+    onPublishBranch?: (branch: string) => void;
+    canTrackBranch?: (branch: string) => boolean;
+    onTrackBranch?: (branch: string) => void;
+    onRenameBranch?: (branch: string) => void;
     onMergeBranch?: (branch: string) => void;
     onPinToggle: (branch: string, pinned: boolean) => void;
     renderBranchItem: (props: {
@@ -85,8 +93,12 @@ export function BranchesSection({
         pinned: boolean;
         ahead?: number;
         behind?: number;
+        upstream?: string | null;
         onSelect?: (branch: string) => void;
         onCheckout: () => unknown;
+        onPublish?: () => unknown;
+        onTrackUpstream?: () => unknown;
+        onRename?: () => unknown;
         onMerge?: () => unknown;
         onDelete: () => unknown;
         onPinToggle?: () => void;
@@ -134,8 +146,14 @@ export function BranchesSection({
                     pinned,
                     ...(aheadBehind?.ahead !== undefined ? { ahead: aheadBehind.ahead } : {}),
                     ...(aheadBehind?.behind !== undefined ? { behind: aheadBehind.behind } : {}),
+                    upstream: aheadBehind?.upstream ?? null,
                     ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                     onCheckout: () => { onCheckout(branch); },
+                    ...(onPublishBranch ? { onPublish: () => { onPublishBranch(branch); } } : {}),
+                    ...(onTrackBranch && (!canTrackBranch || canTrackBranch(branch))
+                        ? { onTrackUpstream: () => { onTrackBranch(branch); } }
+                        : {}),
+                    ...(onRenameBranch ? { onRename: () => { onRenameBranch(branch); } } : {}),
                     onDelete: () => { onDelete(branch); },
                     ...(onMergeBranch ? { onMerge: () => { onMergeBranch(branch); } } : {}),
                     onPinToggle: () => { onPinToggle(branch, pinned); },
@@ -155,6 +173,7 @@ export function RemoteBranchesSection({
     filteredRemoteBranches,
     onBranchSelect,
     onCheckout,
+    onDeleteRemoteBranch,
     renderRemoteBranchItem,
     renderMoreItems,
 }: {
@@ -164,10 +183,12 @@ export function RemoteBranchesSection({
     filteredRemoteBranches: string[];
     onBranchSelect?: (branch: string) => void;
     onCheckout: (branch: string) => void;
+    onDeleteRemoteBranch?: (remote: string, branchName: string) => void;
     renderRemoteBranchItem: (props: {
         branch: string;
         onSelect?: (branch: string) => void;
         onCheckout: () => unknown;
+        onDeleteRemote?: () => unknown;
     }) => ReactNode;
     renderMoreItems: (props: { label: string; count: number; children: ReactNode }) => ReactNode;
 }) {
@@ -186,6 +207,12 @@ export function RemoteBranchesSection({
                     branch,
                     ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                     onCheckout: () => { onCheckout(branch); },
+                    ...(onDeleteRemoteBranch ? { onDeleteRemote: () => {
+                        const [remote, ...rest] = branch.replace(/^remotes\//, '').split('/');
+                        if (remote && rest.length > 0) {
+                            onDeleteRemoteBranch(remote, rest.join('/'));
+                        }
+                    } } : {}),
                 })
             )}
             {filteredRemoteBranches.length > 20 &&
@@ -197,6 +224,12 @@ export function RemoteBranchesSection({
                             branch,
                             ...(onBranchSelect ? { onSelect: onBranchSelect } : {}),
                             onCheckout: () => { onCheckout(branch); },
+                            ...(onDeleteRemoteBranch ? { onDeleteRemote: () => {
+                                const [remote, ...rest] = branch.replace(/^remotes\//, '').split('/');
+                                if (remote && rest.length > 0) {
+                                    onDeleteRemoteBranch(remote, rest.join('/'));
+                                }
+                            } } : {}),
                         })
                     ),
                 })}

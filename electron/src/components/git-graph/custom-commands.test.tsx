@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidateCustomCommands = vi.fn(async () => undefined);
+const invalidateCustomCommands = vi.fn(() => undefined);
 const mutateCustomCommands = vi.fn();
 let customCommandsData:
     | {
@@ -38,7 +38,7 @@ vi.mock('@/trpc/client', () => ({
         },
         git: {
             runCustomCommand: {
-                mutate: vi.fn(async () => ({ output: 'ok' })),
+                mutate: vi.fn(() => ({ output: 'ok' })),
             },
         },
     },
@@ -81,6 +81,7 @@ describe('useCustomCommands', () => {
     it('hydrates from backend and persists added commands', async () => {
         render(<Harness />);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTestId('command-count')).toHaveTextContent('1');
         fireEvent.click(screen.getByText('Add Command'));
 

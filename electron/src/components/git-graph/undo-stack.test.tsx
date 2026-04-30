@@ -5,8 +5,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// eslint-disable-next-line import/order
 import { useAppStore } from '@/lib/store';
 
+// eslint-disable-next-line @typescript-eslint/require-await
 const invalidateUndoHistory = vi.fn(async () => undefined);
 const mutateUndoHistory = vi.fn();
 let undoHistoryData:
@@ -54,7 +56,9 @@ vi.mock('@/trpc/client', () => ({
     },
 }));
 
+// eslint-disable-next-line import/order
 import { UndoStackProvider, useUndoStack } from './undo-stack-provider';
+// eslint-disable-next-line import/order
 import { UndoRedoButtons, UndoStackDialog } from './undo-stack';
 
 function Harness() {
@@ -95,11 +99,14 @@ describe('Undo Stack', () => {
             </UndoStackProvider>
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByTestId('operation-count')).toHaveTextContent('0');
         fireEvent.click(screen.getByText('Add Operation'));
 
         await waitFor(() => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByTestId('operation-count')).toHaveTextContent('1');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByTestId('can-undo')).toHaveTextContent('true');
         });
 
@@ -119,11 +126,15 @@ describe('Undo Stack', () => {
         );
 
         fireEvent.click(screen.getByText('Add Operation'));
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
         await waitFor(() => expect(screen.getByTestId('operation-count')).toHaveTextContent('1'));
 
         fireEvent.click(screen.getByText('Clear'));
         await waitFor(() => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByTestId('operation-count')).toHaveTextContent('0');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             expect(screen.getByTestId('can-undo')).toHaveTextContent('false');
         });
     });

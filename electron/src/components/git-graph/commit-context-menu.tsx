@@ -55,19 +55,19 @@ export function CommitContextMenu({
 	const gitOps = useGitOperations();
 
 	const handleCopyHash = () => {
-		gitOps.copyToClipboard(commit.hash);
+		void gitOps.copyToClipboard(commit.hash);
 	};
 
 	const handleCopyMessage = () => {
-		gitOps.copyToClipboard(commit.message);
+		void gitOps.copyToClipboard(commit.message);
 	};
 
 	const handleResetHere = (mode: 'soft' | 'mixed' | 'hard') => {
-		gitOps.reset(commit.hash, mode);
+		void gitOps.reset(commit.hash, mode);
 	};
 
 	const handleCheckout = () => {
-		gitOps.checkout(commit.hash);
+		void gitOps.checkout(commit.hash);
 	};
 
 	return (

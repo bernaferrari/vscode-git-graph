@@ -31,8 +31,8 @@ import {
 	DialogFooter,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 import { trpc } from '@/trpc/client';
 
 
@@ -181,7 +181,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 
 	if (rawLine.startsWith('#')) {
 		return {
-			id: `comment-${index}`,
+			id: `comment-${String(index)}`,
 			kind: 'comment',
 			action: 'comment',
 			hash: '',
@@ -198,7 +198,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 	const rest = restParts.join(' ');
 	if (!KNOWN_COMMAND_ACTIONS.has(normalizedAction as CommandTodoAction)) {
 		return {
-			id: `raw-${index}`,
+			id: `raw-${String(index)}`,
 			kind: 'raw',
 			action: 'raw',
 			hash: '',
@@ -216,7 +216,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 		if (COMMAND_ACTIONS_WITH_HASH.has(commandAction)) {
 			if (!hash || !isHashLike(hash)) {
 				return {
-					id: `${commandAction}-${index}`,
+					id: `${commandAction}-${String(index)}`,
 					kind: 'raw',
 					action: 'raw',
 					hash: '',
@@ -240,7 +240,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 		if (COMMAND_ACTIONS_WITH_OPTIONAL_HASH.has(commandAction)) {
 			if (hash && isHashLike(hash)) {
 				return {
-					id: `${commandAction}-${index}`,
+					id: `${commandAction}-${String(index)}`,
 					kind: 'command',
 					action: commandAction,
 					hash,
@@ -251,7 +251,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 			}
 
 			return {
-				id: `${commandAction}-${index}`,
+				id: `${commandAction}-${String(index)}`,
 				kind: 'command',
 				action: commandAction,
 				hash: '',
@@ -263,7 +263,7 @@ const parseRebaseTodoLine = (line: string, index: number): TodoItem | null => {
 	}
 
 	return {
-		id: `${commandAction}-${index}`,
+		id: `${commandAction}-${String(index)}`,
 		kind: 'command',
 		action: commandAction,
 		hash: '',
@@ -326,7 +326,7 @@ export function VisualRebaseTodoEditor({
 		}
 	);
 	const activeTodoSource =
-		typeof activeRebaseTodo?.rawTodo === 'string' ? (activeRebaseTodo.rawTodo as string) : '';
+		typeof activeRebaseTodo?.rawTodo === 'string' ? (activeRebaseTodo.rawTodo) : '';
 
 	const sanitizeTodoMessage = useCallback((message: string) => {
 		return message.trim().replace(/[\r\n]+/g, ' ');
@@ -352,7 +352,7 @@ export function VisualRebaseTodoEditor({
 					.filter((todo): todo is TodoItem => Boolean(todo))
 					.map((todo: TodoItem) => ({
 						...todo,
-						message: sanitizeTodoMessage(todo.message ?? ''),
+						message: sanitizeTodoMessage(todo.message),
 					}));
 
 				setTodos(parsedTodoItems);
@@ -557,7 +557,7 @@ export function VisualRebaseTodoEditor({
 				repo: activeRepo,
 				todos: todoContent,
 			});
-			if (result?.error) {
+			if (result.error) {
 				toast.error(result.error);
 				return;
 			}
@@ -573,6 +573,7 @@ export function VisualRebaseTodoEditor({
 
 	const handleAbort = async () => {
 		if (!activeRepo) return;
+		// eslint-disable-next-line no-alert
 		if (!confirm('Abort the rebase? All changes will be lost.')) return;
 
 		try {
@@ -606,6 +607,7 @@ export function VisualRebaseTodoEditor({
 							key={key} 
 							variant="outline" 
 							className={`${config.color} border-0 cursor-pointer`}
+							// eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
 							onClick={() => selectedTodo && changeAction(selectedTodo, key as TodoAction)}
 						>
 							{config.icon}
@@ -641,10 +643,14 @@ export function VisualRebaseTodoEditor({
 									<div
 										key={todo.id}
 										draggable={isDraggable}
+										// eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
 										onDragStart={() => isDraggable && handleDragStart(index)}
+										// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 										onDragOver={(e) => { isDraggable ? handleDragOver(e, index) : undefined; }}
+										// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 										onDrop={() => { isDraggable ? handleDrop(index) : undefined; }}
 										onDragEnd={handleDragEnd}
+										// eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
 										onClick={() => isDraggable && setSelectedTodo(isSelected ? null : todo.id)}
 										className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
 											isDraggable ? 'group' : 'cursor-default opacity-90'
@@ -773,11 +779,11 @@ export function VisualRebaseTodoEditor({
 								Reset
 							</Button>
 						)}
-						<Button variant="outline" onClick={handleAbort} className="text-red-600">
+						<Button variant="outline" onClick={() => { void handleAbort(); }} className="text-red-600">
 							Abort
 						</Button>
 						<Button
-							onClick={handleContinueRebase}
+							onClick={() => { void handleContinueRebase(); }}
 							disabled={isExecuting || todos.filter((t) => t.kind === 'command' && t.action !== 'drop').length === 0}
 						>
 							{isExecuting ? (

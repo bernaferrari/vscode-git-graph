@@ -24,13 +24,16 @@ export class Logger extends Disposable {
 		this.enabled = enabled;
 
 		const logsDir = app.getPath('logs');
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		if (!fs.existsSync(logsDir)) {
+			// eslint-disable-next-line security/detect-non-literal-fs-filename
 			fs.mkdirSync(logsDir, { recursive: true });
 		}
 
 		this.logPath = path.join(logsDir, 'git-graph.log');
 
 		// Clear or create log file
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		fs.writeFileSync(this.logPath, '');
 
 		this.registerDisposable(
@@ -50,6 +53,7 @@ export class Logger extends Disposable {
 		const line = `[${timestamp}] ${message}\n`;
 
 		console.log(line.trim());
+		// eslint-disable-next-line security/detect-non-literal-fs-filename
 		fs.appendFileSync(this.logPath, line);
 	}
 

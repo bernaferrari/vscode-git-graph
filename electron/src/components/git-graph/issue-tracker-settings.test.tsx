@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const invalidateIssueTrackerConfig = vi.fn(async () => undefined);
+const invalidateIssueTrackerConfig = vi.fn(() => undefined);
 const mutateIssueTrackerConfig = vi.fn();
 let issueTrackerConfigData:
     | { config: { providers: Record<string, { enabled: boolean }>; autoDetect: boolean; patterns: string[] } }
@@ -53,7 +53,9 @@ describe('IssueTrackerSettings', () => {
         await waitFor(() => {
             expect(mutateIssueTrackerConfig).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     providers: expect.objectContaining({
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                         jira: expect.objectContaining({ enabled: true }),
                     }),
                 })

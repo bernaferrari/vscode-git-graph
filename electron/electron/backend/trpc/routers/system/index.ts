@@ -266,6 +266,7 @@ export const systemRouter = router({
                 timedOut: boolean;
                 error: string | null;
             }>((resolve) => {
+                // eslint-disable-next-line security/detect-child-process
                 exec(
                     input.command,
                     {

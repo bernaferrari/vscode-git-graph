@@ -9,7 +9,7 @@ vi.mock('@/app/backend/store', () => ({
 			appStoreState[key] = value;
 		},
 		clear: () => {
-			for (const key of Object.keys(appStoreState)) delete appStoreState[key];
+			for (const key of Object.keys(appStoreState)) Reflect.deleteProperty(appStoreState, key);
 		},
 	},
 }));

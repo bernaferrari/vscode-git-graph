@@ -23,6 +23,8 @@ import {
 import { useState } from 'react';
 
 import { InlineStagingDiff } from './inline-staging-diff';
+import { LineStaging } from './line-staging';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -55,6 +57,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
     const [expandedUnstaged, setExpandedUnstaged] = useState(true);
     const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
     const [selectedFile, setSelectedFile] = useState<{ path: string; status: string; staged: boolean } | null>(null);
+    const [lineStagingOpen, setLineStagingOpen] = useState(false);
 
     // Get working tree status
     const { data: statusData, refetch: refetchStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -129,6 +132,13 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
     const hasChanges = unstaged.length > 0 || staged.length > 0;
     const canCommit = staged.length > 0 && message.trim().length > 0;
     const canAmend = staged.length > 0;
+    const selectedFileScope = selectedFile?.staged ? 'Already staged' : 'Working tree';
+    const commitReadiness =
+        staged.length > 0
+            ? `${String(staged.length)} file${staged.length === 1 ? '' : 's'} ready`
+            : unstaged.length > 0
+              ? 'Stage changes before committing'
+              : 'No local changes';
 
     return (
         <div className='bg-muted/30 flex h-full flex-col border-t'>
@@ -154,10 +164,24 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                             {viewMode === 'tree' ? 'Switch to list view' : 'Switch to tree view'}
                         </TooltipContent>
                     </Tooltip>
-                    <Button variant='ghost' size='sm' className='h-6 w-6 p-0' onClick={() => refetchStatus()}>
+                    <Button variant='ghost' size='sm' className='h-6 w-6 p-0' onClick={() => { void refetchStatus(); }}>
                         <span className='sr-only'>Refresh file status</span>
                         <RefreshCw className='h-3 w-3' />
                     </Button>
+                </div>
+            </div>
+
+            <div className='border-b px-3 py-2'>
+                <div className='flex flex-wrap items-center gap-2'>
+                    <Badge variant='outline' className='border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300'>
+                        <Plus className='h-3 w-3' />
+                        {staged.length} staged
+                    </Badge>
+                    <Badge variant='outline' className='border-amber-500/25 bg-amber-500/8 text-amber-700 dark:text-amber-300'>
+                        <Minus className='h-3 w-3' />
+                        {unstaged.length} unstaged
+                    </Badge>
+                    <span className='text-muted-foreground text-xs'>{commitReadiness}</span>
                 </div>
             </div>
 
@@ -183,7 +207,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                     className='ml-auto h-4 px-1 text-[10px]'
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleUnstageAll();
+                                        void handleUnstageAll();
                                     }}>
                                     Unstage All
                                 </Button>
@@ -197,7 +221,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                             status={file.status}
                                             staged={true}
                                             selected={selectedFile?.path === file.file}
-                                            onToggle={() => handleUnstageFile(file.file)}
+                                            onToggle={() => { void handleUnstageFile(file.file); }}
                                             onClick={() =>
                                                 { setSelectedFile({ path: file.file, status: file.status, staged: true }); }
                                             }
@@ -227,7 +251,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                     className='ml-auto h-4 px-1 text-[10px]'
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleStageAll();
+                                        void handleStageAll();
                                     }}>
                                     Stage All
                                 </Button>
@@ -241,7 +265,7 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                                             status={file.status}
                                             staged={false}
                                             selected={selectedFile?.path === file.file}
-                                            onToggle={() => handleStageFile(file.file)}
+                                            onToggle={() => { void handleStageFile(file.file); }}
                                             onClick={() =>
                                                 { setSelectedFile({ path: file.file, status: file.status, staged: false }); }
                                             }
@@ -266,20 +290,45 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
             {selectedFile && (
                 <div className='flex h-64 flex-col border-t'>
                     <div className='bg-muted/50 flex items-center justify-between border-b px-2 py-1'>
-                        <span className='truncate text-xs font-medium'>{selectedFile.path}</span>
-                        <Button variant='ghost' size='sm' className='h-5 w-5 p-0' onClick={() => { setSelectedFile(null); }}>
-                            <span className='sr-only'>Close inline diff</span>
-                            <X className='h-3 w-3' />
-                        </Button>
+                        <div className='flex min-w-0 items-center gap-2'>
+                            <span className='truncate text-xs font-medium'>{selectedFile.path}</span>
+                            <Badge variant='outline' className='h-5 text-[10px]'>
+                                {selectedFileScope}
+                            </Badge>
+                        </div>
+                        <div className='flex items-center gap-1'>
+                            {!selectedFile.staged && selectedFile.status !== '?' && (
+                                <Button
+                                    variant='outline'
+                                    size='sm'
+                                    className='h-6 px-2 text-xs'
+                                    onClick={() => { setLineStagingOpen(true); }}>
+                                    Stage Lines
+                                </Button>
+                            )}
+                            <Button variant='ghost' size='sm' className='h-5 w-5 p-0' onClick={() => { setSelectedFile(null); }}>
+                                <span className='sr-only'>Close inline diff</span>
+                                <X className='h-3 w-3' />
+                            </Button>
+                        </div>
                     </div>
                     <div className='flex-1 overflow-hidden'>
                         <InlineStagingDiff
                             filePath={selectedFile.path}
                             fileStatus={selectedFile.status}
-                            onStaged={() => refetchStatus()}
+                            onStaged={() => { void refetchStatus(); }}
                         />
                     </div>
                 </div>
+            )}
+
+            {selectedFile && (
+                <LineStaging
+                    open={lineStagingOpen}
+                    onOpenChange={setLineStagingOpen}
+                    filePath={selectedFile.path}
+                    onStaged={() => { void refetchStatus(); }}
+                />
             )}
 
             {/* Commit message and actions */}
@@ -302,13 +351,13 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='start' className='w-40'>
-                            <DropdownMenuItem onClick={() => handleCommit(false)} disabled={!canCommit}>
+                            <DropdownMenuItem onClick={() => { void handleCommit(false); }} disabled={!canCommit}>
                                 <GitCommit className='mr-2 h-4 w-4' />
-                                Commit
+                                New Commit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCommit(true)} disabled={!canAmend}>
+                            <DropdownMenuItem onClick={() => { void handleCommit(true); }} disabled={!canAmend}>
                                 <Edit className='mr-2 h-4 w-4' />
-                                Amend Commit
+                                Amend HEAD
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -316,11 +365,15 @@ export function CommitPanel({ onCommit }: CommitPanelProps) {
                         variant='outline'
                         size='sm'
                         disabled={!hasChanges}
-                        onClick={handleStash}
+                        onClick={() => { void handleStash(); }}
                         aria-label='Stash current changes'
                         title='Stash changes'>
                         <Archive className='h-4 w-4' />
                     </Button>
+                </div>
+                <div className='text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-[11px]'>
+                    <span>Primary action creates a new commit from staged files.</span>
+                    <span>Use Amend HEAD only when replacing the previous commit.</span>
                 </div>
             </div>
         </div>

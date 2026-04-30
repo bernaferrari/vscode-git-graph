@@ -158,6 +158,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
 /**
  * Hook to manage keyboard shortcuts dialog
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useKeyboardShortcuts() {
 	const [open, setOpen] = useState(false);
 

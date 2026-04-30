@@ -1,11 +1,7 @@
-/**
- * Recent Repositories
- * Quick access to recently opened repositories
- */
-
 import { FolderGit2, Clock, X, Pin, GitBranch, Plus, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,6 +23,7 @@ interface RecentRepositoriesProps {
     onOpenChange: (open: boolean) => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRecentRepos() {
     const [recentRepos, setRecentRepos] = useState<RecentRepo[]>([]);
     const utils = trpc.useUtils();
@@ -137,9 +134,9 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
         const diffDays = Math.floor(diffHours / 24);
 
         if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMins < 60) return `${String(diffMins)}m ago`;
+        if (diffHours < 24) return `${String(diffHours)}h ago`;
+        if (diffDays < 7) return `${String(diffDays)}d ago`;
         return new Date(timestamp).toLocaleDateString();
     };
 
@@ -155,20 +152,25 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
             <DialogContent className='ui-surface flex max-h-[85vh] max-w-lg flex-col'>
                 <DialogHeader>
                     <DialogTitle className='flex items-center gap-2'>
-                        <FolderGit2 className='h-5 w-5' />
-                        Recent Repositories
+                        <FolderGit2 className='h-4 w-4' />
+                        Repositories
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className='flex items-center justify-between border-b py-2'>
-                    <span className='text-muted-foreground text-sm'>
-                        {recentRepos.length} repositor{recentRepos.length !== 1 ? 'ies' : 'y'}
-                    </span>
+                <div className='border-border/70 flex items-center justify-between border-b pb-3'>
+                    <Badge variant='outline'>
+                        {recentRepos.length} repositor{recentRepos.length === 1 ? 'y' : 'ies'}
+                    </Badge>
                     <div className='flex items-center gap-2'>
                         {recentRepos.length > 0 && (
-                            <Button variant='ghost' size='sm' onClick={clearRecentRepos} className='text-red-600'>
-                                <X className='mr-1 h-4 w-4' />
-                                Clear
+                            <Button
+                                variant='ghost'
+                                size='icon-sm'
+                                onClick={clearRecentRepos}
+                                className='text-muted-foreground hover:text-destructive'
+                                title='Clear recent repositories'
+                                aria-label='Clear recent repositories'>
+                                <X className='h-4 w-4' />
                             </Button>
                         )}
                         <Button size='sm' onClick={() => void handleOpenRepo()} disabled={isRepoBusy}>
@@ -177,40 +179,39 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
                             ) : (
                                 <Plus className='mr-1 h-4 w-4' />
                             )}
-                            Open Repository
+                            Open
                         </Button>
                     </div>
                 </div>
 
                 <ScrollArea className='flex-1'>
                     {sortedRepos.length === 0 ? (
-                        <div className='text-muted-foreground py-8 text-center'>
-                            <FolderGit2 className='mx-auto mb-4 h-12 w-12 opacity-50' />
-                            <p>No recent repositories</p>
-                            <p className='mt-1 text-xs'>Open a repository to get started</p>
+                        <div className='text-muted-foreground py-10 text-center'>
+                            <FolderGit2 className='mx-auto mb-3 h-9 w-9 opacity-45' />
+                            <p className='text-foreground text-sm font-medium'>Open a repository.</p>
                         </div>
                     ) : (
-                        <div className='space-y-1'>
+                        <div className='space-y-1 py-1'>
                             {sortedRepos.map((repo) => (
                                 <div
                                     key={repo.path}
-                                    className={`group flex cursor-pointer items-center gap-3 rounded-lg p-3 ${
+                                    className={`group flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-[background-color,border-color] ${
                                         repo.path === activeRepo
-                                            ? 'bg-primary/10 border-primary/20 border'
-                                            : 'hover:bg-accent/50'
+                                            ? 'border-primary/25 bg-primary/10'
+                                            : 'border-transparent hover:border-border/70 hover:bg-accent/45'
                                     }`}
                                     onClick={() => void handleSelectRepo(repo.path)}>
-                                    <div className='bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-full'>
-                                        <FolderGit2 className='text-muted-foreground h-5 w-5' />
+                                    <div className='bg-muted/70 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg'>
+                                        <FolderGit2 className='text-muted-foreground h-4 w-4' />
                                     </div>
                                     <div className='min-w-0 flex-1'>
                                         <div className='mb-0.5 flex items-center gap-2'>
-                                            <span className='truncate font-medium'>{repo.name}</span>
+                                            <span className='truncate text-sm font-medium'>{repo.name}</span>
                                             {repo.pinned && <Pin className='text-primary h-3 w-3' />}
                                             {repo.path === activeRepo && (
-                                                <span className='bg-primary/20 text-primary rounded px-1.5 py-0.5 text-xs'>
+                                                <Badge variant='outline' className='h-5 px-1.5 text-[11px]'>
                                                     Active
-                                                </span>
+                                                </Badge>
                                             )}
                                         </div>
                                         <div className='text-muted-foreground flex items-center gap-2 text-xs'>
@@ -229,8 +230,9 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
                                     <div className='flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100'>
                                         <Button
                                             variant='ghost'
-                                            size='sm'
-                                            className='h-7 w-7 p-0'
+                                            size='icon-sm'
+                                            title={repo.pinned ? 'Unpin repository' : 'Pin repository'}
+                                            aria-label={repo.pinned ? 'Unpin repository' : 'Pin repository'}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 togglePin(repo.path);
@@ -239,8 +241,10 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
                                         </Button>
                                         <Button
                                             variant='ghost'
-                                            size='sm'
-                                            className='h-7 w-7 p-0 text-red-600'
+                                            size='icon-sm'
+                                            className='text-muted-foreground hover:text-destructive'
+                                            title='Remove repository'
+                                            aria-label='Remove repository'
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 removeRecentRepo(repo.path);
@@ -253,10 +257,6 @@ export function RecentRepositories({ open, onOpenChange }: RecentRepositoriesPro
                         </div>
                     )}
                 </ScrollArea>
-
-                <div className='text-muted-foreground border-t pt-2 text-xs'>
-                    Tip: Pin frequently used repositories for quick access
-                </div>
             </DialogContent>
         </Dialog>
     );

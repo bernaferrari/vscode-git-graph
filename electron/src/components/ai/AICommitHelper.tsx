@@ -64,7 +64,7 @@ export function AICommitHelper({
 
 	const handleCopy = () => {
 		if (lastSuggestion) {
-			navigator.clipboard.writeText(lastSuggestion.message);
+			void navigator.clipboard.writeText(lastSuggestion.message);
 			toast.success('Copied to clipboard');
 		}
 	};
@@ -154,7 +154,7 @@ export function AICommitHelper({
 								variant="ghost"
 								size="sm"
 								className="h-7 w-7 p-0"
-								onClick={handleGenerate}
+															onClick={() => { void handleGenerate(); }}
 							>
 								<RefreshCw className="h-4 w-4" />
 							</Button>
@@ -168,9 +168,7 @@ export function AICommitHelper({
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={handleGenerate}
-							disabled={stagedFiles.length === 0}
-							className="gap-1.5"
+							onClick={() => { void handleGenerate(); }}
 						>
 							<Lightbulb className="h-4 w-4" />
 							<span className="hidden sm:inline">AI Message</span>

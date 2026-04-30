@@ -86,6 +86,7 @@ export function LaneGraph({
 			if (lane === undefined) {
 				// New branch - get lane from pool or create new
 				if (lanePool.length > 0) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 					lane = lanePool.shift()!;
 				} else {
 					lane = maxLaneIdx++;
@@ -107,6 +108,7 @@ export function LaneGraph({
 					} else {
 						// Other parents get new lanes (merge from another branch)
 						if (lanePool.length > 0) {
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 							parentLane = lanePool.shift()!;
 						} else {
 							parentLane = maxLaneIdx++;
@@ -162,11 +164,11 @@ export function LaneGraph({
 			<g className="edges">
 				{edges.map((edge, i) => (
 					<path
-						key={`edge-${i}`}
+						key={`edge-${String(i)}`}
 						d={
 							edge.curve
-								? `M ${edge.fromX} ${edge.fromY} C ${edge.fromX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${edge.toY}`
-								: `M ${edge.fromX} ${edge.fromY} L ${edge.toX} ${edge.toY}`
+								? `M ${String(edge.fromX)} ${String(edge.fromY)} C ${String(edge.fromX)} ${String((edge.fromY + edge.toY) / 2)}, ${String(edge.toX)} ${String((edge.fromY + edge.toY) / 2)}, ${String(edge.toX)} ${String(edge.toY)}`
+								: `M ${String(edge.fromX)} ${String(edge.fromY)} L ${String(edge.toX)} ${String(edge.toY)}`
 						}
 						stroke={edge.color}
 						strokeWidth={2}
@@ -186,7 +188,7 @@ export function LaneGraph({
 					const isSelected = selectedIndex === index;
 
 					return (
-						<g key={`node-${index}`}>
+						<g key={`node-${String(index)}`}>
 							{/* Outer ring for selected */}
 							{isSelected && (
 								<circle

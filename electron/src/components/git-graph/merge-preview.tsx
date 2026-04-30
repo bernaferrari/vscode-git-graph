@@ -30,8 +30,8 @@ import {
 	DialogFooter,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { trpcClient } from '@/lib/trpcClient';
 import { useAppStore } from '@/lib/store';
+import { trpcClient } from '@/lib/trpcClient';
 import { trpc } from '@/trpc/client';
 
 
@@ -156,8 +156,8 @@ export function MergePreview({
 		}
 	};
 
-	const totalAdditions = preview?.files?.reduce((sum, f) => sum + (f.additions || 0), 0) || 0;
-	const totalDeletions = preview?.files?.reduce((sum, f) => sum + (f.deletions || 0), 0) || 0;
+	const totalAdditions = preview?.files.reduce((sum, f) => sum + (f.additions || 0), 0) || 0;
+	const totalDeletions = preview?.files.reduce((sum, f) => sum + (f.deletions || 0), 0) || 0;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -344,7 +344,7 @@ export function MergePreview({
 							)}
 
 							{/* No changes */}
-							{preview && preview.aheadCommits?.length === 0 && preview.files?.length === 0 && (
+							{preview && preview.aheadCommits.length === 0 && preview.files.length === 0 && (
 								<div className="text-center py-8 text-muted-foreground">
 									<Check className="h-12 w-12 mx-auto mb-4 text-green-600" />
 									<p>Branches are up to date</p>
@@ -376,11 +376,11 @@ export function MergePreview({
 							Cancel
 						</Button>
 						<Button
-							onClick={handleMerge}
+							onClick={() => { void handleMerge(); }}
 							disabled={
 								isMerging || 
 								!preview?.canMerge || 
-								!preview?.aheadCommits?.length
+								!preview.aheadCommits.length
 							}
 						>
 							{isMerging ? (

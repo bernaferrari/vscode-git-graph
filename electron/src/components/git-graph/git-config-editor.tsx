@@ -142,14 +142,14 @@ export function GitConfigEditor({
 				// Also get raw config
 				const rawResult = await trpcClient.git.configRaw.query({ repo: activeRepo });
 				setRawConfig(rawResult || '');
-			} catch (error) {
+			} catch {
 				toast.error('Failed to load git config');
 			} finally {
 				setIsLoading(false);
 			}
 		};
 
-		loadConfig();
+		void loadConfig();
 	}, [open, activeRepo]);
 
 	// Filter sections by search
@@ -192,7 +192,7 @@ export function GitConfigEditor({
 
 			setModifiedKeys(new Set());
 			toast.success('Configuration saved');
-		} catch (error) {
+		} catch {
 			toast.error('Failed to save configuration');
 		} finally {
 			setIsSaving(false);
@@ -214,7 +214,7 @@ export function GitConfigEditor({
 				return;
 			}
 			toast.success('Configuration saved');
-		} catch (error) {
+		} catch {
 			toast.error('Failed to save configuration');
 		} finally {
 			setIsSaving(false);
@@ -242,6 +242,7 @@ export function GitConfigEditor({
 	// Delete key
 	const handleDeleteKey = async (sectionName: string, keyName: string) => {
 		if (!activeRepo) return;
+		// eslint-disable-next-line no-alert
 		if (!confirm(`Delete ${sectionName}.${keyName}?`)) return;
 
 		try {
@@ -301,7 +302,7 @@ export function GitConfigEditor({
 		setModifiedKeys(new Set());
 		// Reload config
 		if (activeRepo) {
-			trpcClient.git.configList.query({ repo: activeRepo }).then((result: unknown) => {
+			void trpcClient.git.configList.query({ repo: activeRepo }).then((result: unknown) => {
 				setConfigSections(buildConfigSections((result ?? {}) as Record<string, unknown>));
 			});
 		}
@@ -339,7 +340,7 @@ export function GitConfigEditor({
 							<Button variant="outline" size="sm" onClick={handleReset}>
 								<RotateCcw className="h-4 w-4" />
 							</Button>
-							<Button size="sm" onClick={viewMode === 'raw' ? handleSaveRaw : handleSave} disabled={isSaving}>
+							<Button size="sm" onClick={() => { void (viewMode === 'raw' ? handleSaveRaw() : handleSave()); }} disabled={isSaving}>
 								{isSaving ? (
 									<Loader2 className="h-4 w-4 animate-spin" />
 								) : (
@@ -479,7 +480,7 @@ export function GitConfigEditor({
 																		variant="ghost"
 																		size="sm"
 																		className="h-7 w-7 p-0 text-red-600"
-																		onClick={() => handleDeleteKey(section.name, configKey.key)}
+																		onClick={() => { void handleDeleteKey(section.name, configKey.key); }}
 																	>
 																		<Trash2 className="h-4 w-4" />
 																	</Button>

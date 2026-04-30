@@ -238,7 +238,7 @@ export function MergeConflictResolver({
 			}
 		}
 
-		loadContents();
+		void loadContents();
 	}, [filePath]);
 
 	const handleResolve = () => {

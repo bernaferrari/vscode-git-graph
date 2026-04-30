@@ -53,7 +53,7 @@ interface BlameMetadata {
 
 function parseBlamePorcelain(output: string): BlameMetadata[] {
 	const rows: BlameMetadata[] = [];
-	let current: Partial<BlameMetadata> = {};
+	const current: Partial<BlameMetadata> = {};
 
 	for (const line of output.split('\n')) {
 		if (/^[a-f0-9]{40}\s+/.test(line)) {
@@ -127,7 +127,7 @@ export function FileAnnotationsPanel({
 						throw new Error(fileContentResult.error ?? blameResult.error ?? 'Failed to load annotations');
 					}
 
-					const lines = String(fileContentResult.content ?? '').split('\n');
+					const lines = (fileContentResult.content ?? '').split('\n');
 					const blameLines = parseBlamePorcelain(blameResult.blame ?? '');
 					const annotationLines: AnnotationLine[] = lines.map((line: string, index: number) => {
 						const blame = blameLines[index];
@@ -149,7 +149,7 @@ export function FileAnnotationsPanel({
 			}
 		};
 
-		loadAnnotations();
+		void loadAnnotations();
 	}, [open, activeRepo, filePath, commitHash]);
 
 	// Group lines by commit
@@ -177,13 +177,13 @@ export function FileAnnotationsPanel({
 			'bg-orange-100 dark:bg-orange-900/30 border-l-orange-400',
 			'bg-indigo-100 dark:bg-indigo-900/30 border-l-indigo-400',
 		];
-			const colorMap = new Map<string, string>();
-			let colorIndex = 0;
-			commitGroups.forEach((_, hash) => {
-				const color = colors[colorIndex % colors.length]!;
-				colorMap.set(hash, color);
-				colorIndex++;
-			});
+		const colorMap = new Map<string, string>();
+		let colorIndex = 0;
+		commitGroups.forEach((_, hash) => {
+			const color = colors[colorIndex % colors.length] ?? colors[0] ?? 'bg-muted border-l-muted-foreground';
+			colorMap.set(hash, color);
+			colorIndex++;
+		});
 		return colorMap;
 	}, [commitGroups]);
 
@@ -280,9 +280,11 @@ export function FileAnnotationsPanel({
 							</div>
 							<ScrollArea className="flex-1">
 								{(() => {
-									const lines = commitGroups.get(selectedCommit);
-									const firstLine = lines?.[0];
+									const commitLines = commitGroups.get(selectedCommit);
+									const firstLine = commitLines?.[0];
 									if (!firstLine) return null;
+									const lineCount = commitLines.length;
+									const coveragePercent = annotations.length > 0 ? (lineCount / annotations.length) * 100 : 0;
 
 									return (
 										<div className="p-3 space-y-3">
@@ -318,10 +320,10 @@ export function FileAnnotationsPanel({
 
 											<div>
 												<p className="text-sm font-medium mb-1">
-													{lines?.length || 0} lines in this commit
+													{lineCount} lines in this commit
 												</p>
 												<Badge variant="outline">
-													{((lines?.length || 0) / annotations.length * 100).toFixed(1)}% of file
+													{coveragePercent.toFixed(1)}% of file
 												</Badge>
 											</div>
 										</div>

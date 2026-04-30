@@ -135,8 +135,8 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
 
             if (action === 'copy-hash') {
                 const hashes = selectedCommits.map((c) => c.hash.slice(0, 7)).join('\n');
-                navigator.clipboard.writeText(hashes);
-                toast.success(`Copied ${selectedHashes.size} commit hashes`);
+                void navigator.clipboard.writeText(hashes);
+                toast.success(`Copied ${String(selectedHashes.size)} commit hashes`);
                 return;
             }
 
@@ -165,7 +165,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                 };
 
                 switch (action) {
-                    case 'cherry-pick':
+                    case 'cherry-pick': {
                         // Cherry-pick commits in order (oldest first)
                         const orderedCommits = [...selectedCommits].reverse();
                         for (const commit of orderedCommits) {
@@ -175,8 +175,9 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                 throw new Error(error);
                             }
                         }
-                        toast.success(`Cherry-picked ${selectedHashes.size} commits`);
+                        toast.success(`Cherry-picked ${String(selectedHashes.size)} commits`);
                         break;
+                    }
 
                     case 'revert':
                         // Revert commits in order (newest first for reverts)
@@ -187,7 +188,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                 throw new Error(error);
                             }
                         }
-                        toast.success(`Reverted ${selectedHashes.size} commits`);
+                        toast.success(`Reverted ${String(selectedHashes.size)} commits`);
                         break;
 
                     case 'create-branch':
@@ -209,7 +210,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                     throw new Error(error);
                                 }
                             }
-                            toast.success(`Created branch ${targetBranch} with ${selectedHashes.size} commits`);
+                            toast.success(`Created branch ${targetBranch} with ${String(selectedHashes.size)} commits`);
                         }
                         break;
 
@@ -260,7 +261,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                         <Button
                             variant='outline'
                             size='sm'
-                            onClick={() => executeAction('copy-hash')}
+                            onClick={() => { void executeAction('copy-hash'); }}
                             disabled={selectedHashes.size === 0}>
                             <Copy className='mr-1 h-4 w-4' />
                             Copy Hashes
@@ -274,11 +275,11 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                 <MoreHorizontal className='ml-1 h-4 w-4' />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align='end'>
-                                <DropdownMenuItem onClick={() => executeAction('cherry-pick')}>
+                                <DropdownMenuItem onClick={() => { void executeAction('cherry-pick'); }}>
                                     <GitCommit className='mr-2 h-4 w-4' />
                                     Cherry-pick Selected
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => executeAction('revert')}>
+                                <DropdownMenuItem onClick={() => { void executeAction('revert'); }}>
                                     <RotateCcw className='mr-2 h-4 w-4' />
                                     Revert Selected
                                 </DropdownMenuItem>
@@ -306,7 +307,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                         />
                         <Button
                             size='sm'
-                            onClick={() => executeAction('create-branch')}
+                            onClick={() => { void executeAction('create-branch'); }}
                             disabled={!targetBranch.trim() || isExecuting}>
                             {isExecuting ? <Loader2 className='h-4 w-4 animate-spin' /> : <Check className='h-4 w-4' />}
                         </Button>

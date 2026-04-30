@@ -128,7 +128,7 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 		onSuccess: () => {
 			toast.success('.gitignore saved');
 			setHasChanges(false);
-			refetch();
+			void refetch();
 		},
 		onError: (error: unknown) => {
 			toast.error('Failed to save .gitignore', {
@@ -161,7 +161,7 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 				p.toLowerCase().includes(searchQuery.toLowerCase())
 			);
 			return [category, filtered] as [string, string[]];
-		}).filter(([_, patterns]) => patterns.length > 0);
+		}).filter(([, patterns]) => patterns.length > 0);
 	}, [searchQuery]);
 
 	return (
@@ -188,7 +188,7 @@ export function GitignoreManager({ open, onOpenChange }: GitignoreManagerProps) 
 								<Button
 									variant="ghost"
 									size="sm"
-									onClick={() => refetch()}
+									onClick={() => { void refetch(); }}
 								>
 									<RefreshCw className="h-4 w-4" />
 								</Button>

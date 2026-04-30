@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 
 // Loading fallback component
+// eslint-disable-next-line react-refresh/only-export-components
 function DialogLoader() {
 	return (
 		<div className="flex items-center justify-center h-48">
@@ -16,6 +17,7 @@ function DialogLoader() {
 }
 
 // Wrapper for lazy loading dialogs
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function createLazyDialog<T extends object>(
 	importFn: () => Promise<unknown>
 ) {

@@ -80,15 +80,15 @@ export function CommitGraph({
 
             const colour = config.colours[line.colour % config.colours.length] ?? '#808080';
 
-            let pathD = `M${x1},${adjustedY1}`;
+            let pathD = `M${String(x1)},${String(adjustedY1)}`;
 
             if (x1 === x2) {
-                pathD += `L${x2},${adjustedY2}`;
+                pathD += `L${String(x2)},${String(adjustedY2)}`;
             } else if (config.style === 'angular') {
                 const midY = line.lockedFirst ? adjustedY2 - curveOffset : adjustedY1 + curveOffset;
-                pathD += `L${x2},${midY}L${x2},${adjustedY2}`;
+                pathD += `L${String(x2)},${String(midY)}L${String(x2)},${String(adjustedY2)}`;
             } else {
-                pathD += `C${x1},${adjustedY1 + curveOffset} ${x2},${adjustedY2 - curveOffset} ${x2},${adjustedY2}`;
+                pathD += `C${String(x1)},${String(adjustedY1 + curveOffset)} ${String(x2)},${String(adjustedY2 - curveOffset)} ${String(x2)},${String(adjustedY2)}`;
             }
 
             paths.push({
@@ -187,7 +187,7 @@ export function CommitGraph({
                                         y={v.cy - avatarRadius + 2}
                                         width={(avatarRadius - 2) * 2}
                                         height={(avatarRadius - 2) * 2}
-                                        style={{ clipPath: `circle(${avatarRadius - 2}px)` }}
+                                        style={{ clipPath: `circle(${String(avatarRadius - 2)}px)` }}
                                         className='pointer-events-none'
                                     />
                                     {/* Current commit ring */}

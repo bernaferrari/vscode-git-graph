@@ -234,7 +234,7 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 						<Button variant="outline" onClick={() => { setDialogOpen(false); }}>
 							Cancel
 						</Button>
-						<Button onClick={handleAction} disabled={!name.trim()}>
+						<Button onClick={() => { void handleAction(); }} disabled={!name.trim()}>
 							{action === 'start' ? 'Start' : 'Finish'}
 						</Button>
 					</DialogFooter>

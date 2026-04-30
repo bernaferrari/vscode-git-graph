@@ -42,7 +42,9 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 
 	useEffect(() => {
 		if (signingStatus) {
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			setSigningEnabled(signingStatus.enabled ?? false);
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 			setSigningMethod((signingStatus.method as 'gpg' | 'ssh') ?? 'gpg');
 			setSigningKey(signingStatus.key ?? '');
 			setGpgProgram(signingStatus.gpgProgram ?? '');
@@ -94,7 +96,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 							<Label className="text-xs">Signing Method</Label>
 							<Select
 								value={signingMethod}
-								onValueChange={(v) => v && setSigningMethod(v)}
+								onValueChange={(v) => { if (v) setSigningMethod(v); }}
 							>
 								<SelectTrigger className="h-8">
 									<SelectValue />
@@ -114,7 +116,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 									{gpgKeys.length > 0 ? (
 										<Select
 											value={signingKey}
-											onValueChange={(v) => v && setSigningKey(v)}
+											onValueChange={(v) => { if (v) setSigningKey(v); }}
 										>
 											<SelectTrigger className="h-8">
 												<SelectValue placeholder="Select a GPG key..." />
@@ -157,7 +159,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 										<Label className="text-xs">Discovered SSH Public Keys</Label>
 										<Select
 											value={signingKey}
-											onValueChange={(v) => v && setSigningKey(v)}
+											onValueChange={(v) => { if (v) setSigningKey(v); }}
 										>
 											<SelectTrigger className="h-8">
 												<SelectValue placeholder="Select an SSH key..." />

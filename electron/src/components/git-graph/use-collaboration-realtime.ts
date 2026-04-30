@@ -27,7 +27,7 @@ export function useCollaborationRealtime() {
 
 	useEffect(() => {
 		const config = configQuery.data?.config;
-		if (!config || !config.enabled || !config.realtimeEnabled || !config.endpointUrl?.trim()) {
+		if (!config || !config.enabled || !config.realtimeEnabled || !config.endpointUrl.trim()) {
 			return;
 		}
 

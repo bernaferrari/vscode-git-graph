@@ -50,6 +50,28 @@ import { trpc } from '@/trpc/client';
 import type { CollaborationAssignment, CollaborationComment, CollaborationMemberProfile } from '@/components/git-graph/collaboration-types';
 
 type PullRequestStateFilter = 'open' | 'closed' | 'all';
+const PR_PROVIDER_CAPABILITIES: Record<PullRequestProvider, Array<{ label: string; supported: boolean }>> = {
+    github: [
+        { label: 'Draft PRs', supported: true },
+        { label: 'Inline review comments', supported: true },
+        { label: 'Merge, squash, rebase', supported: true },
+    ],
+    gitlab: [
+        { label: 'Draft merge requests', supported: true },
+        { label: 'Inline discussions', supported: true },
+        { label: 'Squash merge option', supported: true },
+    ],
+    bitbucket: [
+        { label: 'Create pull requests', supported: true },
+        { label: 'Inline comments', supported: true },
+        { label: 'Provider default merge', supported: true },
+    ],
+    azure: [
+        { label: 'Draft pull requests', supported: true },
+        { label: 'Threaded inline comments', supported: true },
+        { label: 'Merge strategy selection', supported: true },
+    ],
+};
 
 interface PullRequest {
     id: number;
@@ -392,6 +414,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         [remoteData?.remotes]
     );
     const provider = detectedProvider?.name ?? 'github';
+    const providerCapabilities = PR_PROVIDER_CAPABILITIES[provider];
     const reviewRepoKey = useMemo(
         () => deriveCollaborationRepoKey(remoteData?.remotes.find((remote) => remote.name === 'origin')?.url),
         [remoteData?.remotes]
@@ -806,8 +829,8 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
             `Branch compare: ${prHead.trim()} -> ${prBase.trim()}`,
             `Commits: ${String(compareResult.commits.length)}`,
             `Files changed: ${String(compareResult.files.length)}`,
-            `Additions: ${String(compareResult.additions ?? 0)}`,
-            `Deletions: ${String(compareResult.deletions ?? 0)}`,
+            `Additions: ${String(compareResult.additions)}`,
+            `Deletions: ${String(compareResult.deletions)}`,
             'Changed files:',
             ...changedFiles,
         ].join('\n');
@@ -901,7 +924,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 remainingFiles,
             },
             {
-                onSuccess: async () => {
+                onSuccess: () => {
                     auditLogMutation.mutate({
                         scope: 'review',
                         action: 'review-file',
@@ -912,7 +935,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             provider,
                         },
                     });
-                    await reviewSummaryQuery.refetch();
+                    void reviewSummaryQuery.refetch();
                 },
             }
         );
@@ -926,7 +949,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 reviewId: `${provider}:${String(selectedPR.number)}`,
             },
             {
-                onSuccess: async () => {
+                onSuccess: () => {
                     auditLogMutation.mutate({
                         scope: 'review',
                         action: 'review-reset',
@@ -937,7 +960,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             provider,
                         },
                     });
-                    await reviewSummaryQuery.refetch();
+                    void reviewSummaryQuery.refetch();
                 },
             }
         );
@@ -953,7 +976,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 remainingFiles: [],
             },
             {
-                onSuccess: async () => {
+                onSuccess: () => {
                     auditLogMutation.mutate({
                         scope: 'review',
                         action: 'review-complete',
@@ -965,7 +988,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             files: reviewFiles.length,
                         },
                     });
-                    await reviewSummaryQuery.refetch();
+                    void reviewSummaryQuery.refetch();
                 },
             }
         );
@@ -988,7 +1011,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                 note: reviewRequestDraft.note,
             },
             {
-                onSuccess: async () => {
+                onSuccess: () => {
                     notifySuccess(`Review requested from ${member.displayName}`);
                     auditLogMutation.mutate({
                         scope: 'review',
@@ -1892,6 +1915,31 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             </div>
                         ) : (
                             <div className='space-y-4 rounded-lg border p-4'>
+                                <div className='rounded-lg border border-border/70 bg-muted/20 p-3'>
+                                    <div className='mb-2 flex items-center gap-2 text-sm font-medium'>
+                                        <Server className='h-4 w-4' />
+	                                        {detectedProvider.name} capabilities
+                                    </div>
+                                    <div className='flex flex-wrap gap-2'>
+                                        {providerCapabilities.map((capability) => (
+                                            <Badge
+                                                key={capability.label}
+                                                variant='outline'
+                                                className={
+                                                    capability.supported
+                                                        ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                                                        : 'border-amber-500/30 text-amber-700 dark:text-amber-300'
+                                                }>
+                                                {capability.supported ? (
+                                                    <Check className='mr-1 h-3 w-3' />
+                                                ) : (
+                                                    <AlertCircle className='mr-1 h-3 w-3' />
+                                                )}
+                                                {capability.label}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
                                 {aiProdEnabled && (
                                     <div className='flex justify-end'>
                                         <Button

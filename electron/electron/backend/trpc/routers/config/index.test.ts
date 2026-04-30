@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const configStoreState: Record<string, unknown> = {};
 const instanceStoreState: Record<string, unknown> = {};
+const fetchMock = vi.fn();
 const appStoreState: Record<string, unknown> = {
     customCommands: [],
     notificationCenter: { notifications: [] },
@@ -36,6 +37,8 @@ const appStoreState: Record<string, unknown> = {
     },
 };
 
+global.fetch = fetchMock as typeof fetch;
+
 vi.mock('@/app/backend/store', () => ({
     configStore: {
         get: (key: string) => configStoreState[key],
@@ -43,7 +46,7 @@ vi.mock('@/app/backend/store', () => ({
             configStoreState[key] = value;
         },
         clear: () => {
-            for (const key of Object.keys(configStoreState)) delete configStoreState[key];
+            for (const key of Object.keys(configStoreState)) Reflect.deleteProperty(configStoreState, key);
         },
     },
     appStore: {
@@ -52,7 +55,7 @@ vi.mock('@/app/backend/store', () => ({
             appStoreState[key] = value;
         },
         clear: () => {
-            for (const key of Object.keys(appStoreState)) delete appStoreState[key];
+            for (const key of Object.keys(appStoreState)) Reflect.deleteProperty(appStoreState, key);
         },
     },
     instanceStore: {
@@ -61,7 +64,7 @@ vi.mock('@/app/backend/store', () => ({
             instanceStoreState[key] = value;
         },
         clear: () => {
-            for (const key of Object.keys(instanceStoreState)) delete instanceStoreState[key];
+            for (const key of Object.keys(instanceStoreState)) Reflect.deleteProperty(instanceStoreState, key);
         },
     },
 }));
@@ -80,6 +83,8 @@ describe('config router persistence procedures', () => {
         appStore.set('notificationCenter', { notifications: [] });
         appStore.set('onboardingState', { gitGraphCompleted: false, lensOnboardingSeen: false });
         appStore.set('secretVault', { version: 1, entries: {} });
+        appStore.set('issueTrackerConfig', { providers: {}, autoDetect: true, patterns: [] });
+        appStore.set('issueLinksByCommit', {});
         appStore.set('collaborationSyncConfig', {
             enabled: false,
             provider: 'self-host',
@@ -108,6 +113,7 @@ describe('config router persistence procedures', () => {
             lastSyncError: null,
         });
         instanceStore.set('appShellState', { sidebarOpen: true, repoNavMode: 'sidebar', openedRepos: [] });
+        fetchMock.mockReset();
     });
 
     it('persists custom commands', async () => {
@@ -211,6 +217,7 @@ describe('config router persistence procedures', () => {
         });
 
         await expect(caller.collaborationSyncConfig()).resolves.toEqual({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             config: expect.objectContaining({
                 enabled: true,
                 endpointUrl: 'https://sync.example.com/api/git-graph/collaboration',
@@ -244,11 +251,90 @@ describe('config router persistence procedures', () => {
         );
         expect(appStoreState.secretVault).toEqual(
             expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 entries: expect.objectContaining({
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     'collaborationSyncConfig.authToken': expect.any(String),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, no-secrets/no-secrets
                     'collaborationSyncConfig.memberApiKey': expect.any(String),
                 }),
             })
         );
+    });
+
+    it('searches configured GitHub issues through the backend', async () => {
+        appStore.set('issueTrackerConfig', {
+            providers: {
+                github: {
+                    enabled: true,
+                    projectKey: 'openai/codex',
+                },
+            },
+            autoDetect: true,
+            patterns: [],
+        });
+        fetchMock.mockResolvedValue({
+            ok: true,
+			json: () => Promise.resolve({
+                items: [
+                    {
+                        id: 123,
+                        number: 42,
+                        title: 'Fix graph layout',
+                        state: 'open',
+                        html_url: 'https://github.com/openai/codex/issues/42',
+                        labels: [{ name: 'bug' }],
+                        assignees: [{ login: 'ada' }],
+                    },
+                ],
+            }),
+        });
+
+        await expect(caller.issueSearch({ query: 'graph' })).resolves.toEqual({
+            issues: [
+                expect.objectContaining({
+                    key: '#42',
+                    title: 'Fix graph layout',
+                    provider: 'github',
+                    status: 'open',
+                }),
+            ],
+            errors: [],
+        });
+        expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining('https://api.github.com/search/issues?'),
+            expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                headers: expect.any(Headers),
+            })
+        );
+    });
+
+    it('persists issue links by commit', async () => {
+        const linked = await caller.linkIssue({
+            commitHash: 'abc123',
+            issue: {
+                id: 'github-42',
+                key: '#42',
+                title: 'Fix graph layout',
+                status: 'open',
+                provider: 'github',
+                url: 'https://github.com/openai/codex/issues/42',
+                labels: ['bug'],
+            },
+        });
+
+        await expect(caller.issueLinks({ commitHash: 'abc123' })).resolves.toEqual({
+            links: [
+                expect.objectContaining({
+                    id: linked.link.id,
+                    issueKey: '#42',
+                    title: 'Fix graph layout',
+                }),
+            ],
+        });
+
+        await caller.unlinkIssue({ commitHash: 'abc123', linkId: linked.link.id });
+        await expect(caller.issueLinks({ commitHash: 'abc123' })).resolves.toEqual({ links: [] });
     });
 });

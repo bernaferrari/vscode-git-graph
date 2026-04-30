@@ -5,7 +5,7 @@ import { GraphLayoutCalculator, type GraphConfig, type GraphLayout } from '../li
 interface WorkerCommit {
     hash: string;
     parents: string[];
-    stash?: unknown | null;
+    stash?: unknown;
 }
 
 interface GraphLayoutRequest {

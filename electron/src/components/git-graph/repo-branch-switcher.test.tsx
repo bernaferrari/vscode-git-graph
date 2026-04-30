@@ -21,7 +21,9 @@ describe('RepoBranchSwitcher', () => {
             />
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('my-repo')).toBeInTheDocument();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('main')).toBeInTheDocument();
     });
 

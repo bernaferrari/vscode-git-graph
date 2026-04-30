@@ -402,6 +402,7 @@ export class RepoManager extends Disposable {
 
     private async getSubdirectories(dirPath: string): Promise<string[]> {
         return new Promise((resolve) => {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             fs.readdir(dirPath, { withFileTypes: true }, (err, entries) => {
                 if (err) {
                     resolve([]);
@@ -452,6 +453,7 @@ export class RepoManager extends Disposable {
 
     private isDirectory(filePath: string): Promise<boolean> {
         return new Promise((resolve) => {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             fs.stat(filePath, (err, stats) => {
                 resolve(err ? false : stats.isDirectory());
             });
@@ -460,6 +462,7 @@ export class RepoManager extends Disposable {
 
     private pathExists(filePath: string): Promise<boolean> {
         return new Promise((resolve) => {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename
             fs.stat(filePath, (err) => {
                 resolve(!err);
             });

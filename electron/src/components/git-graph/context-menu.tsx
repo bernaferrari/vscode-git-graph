@@ -46,7 +46,7 @@ export function GitGraphContextMenu({
 	);
 
 	if (visibleGroups.length === 0) {
-		return <>{children}</>;
+		return children;
 	}
 
 	const handleOpenChange = (newOpen: boolean) => {

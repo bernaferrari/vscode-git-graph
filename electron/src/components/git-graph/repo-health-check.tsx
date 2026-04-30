@@ -1,25 +1,9 @@
-/**
- * Repository Health Check
- * Diagnose repository issues and show recommendations
- */
-
-import {
-	Check,
-	X,
-	AlertTriangle,
-	Loader2,
-	RefreshCw,
-	Activity,
-} from 'lucide-react';
+import { Check, X, AlertTriangle, Loader2, RefreshCw, Activity } from 'lucide-react';
 import { useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/lib/store';
@@ -31,6 +15,7 @@ interface HealthCheck {
 	description: string;
 	status: 'pass' | 'warn' | 'fail';
 	detail?: string;
+	metrics?: Record<string, number | string | boolean | null>;
 	action?: () => void;
 	actionLabel?: string;
 }
@@ -46,148 +31,75 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 	const [checks, setChecks] = useState<HealthCheck[]>([]);
 	const [score, setScore] = useState(0);
 
-	// Get repo info
-	const { data: repoInfo } = trpc.git.repoInfo.useQuery(
-		{
-			repo: activeRepo ?? '',
-			showRemoteBranches: false,
-			showStashes: false,
-			hideRemotes: [],
-		},
-		{ enabled: !!activeRepo && open }
-	);
-	const { data: statusData } = trpc.git.workingDirectoryStatus.useQuery(
+	const repoHealthQuery = trpc.git.repoHealth.useQuery(
 		{ repo: activeRepo ?? '' },
-		{ enabled: !!activeRepo && open }
-	);
-
-	const { data: remoteData } = trpc.git.remotes.useQuery(
-		{ repo: activeRepo ?? '' },
-		{ enabled: !!activeRepo && open }
+		{ enabled: false, retry: false }
 	);
 
 	const runHealthCheck = async () => {
 		if (!activeRepo) return;
 
 		setIsRunning(true);
-		const newChecks: HealthCheck[] = [];
-
-		// Check 1: Uncommitted changes
-			const unstagedCount = statusData?.unstaged?.length ?? 0;
-			const stagedCount = statusData?.staged?.length ?? 0;
-			const hasUncommitted = unstagedCount + stagedCount > 0;
-			newChecks.push({
-				id: 'uncommitted',
-				label: 'Working Directory',
-				description: 'Check for uncommitted changes',
-				status: hasUncommitted ? 'warn' : 'pass',
-				detail: hasUncommitted 
-					? `${unstagedCount} unstaged, ${stagedCount} staged`
-					: 'Clean working directory',
-			});
-
-		// Check 2: Remote configured
-		const hasRemote = (remoteData?.remotes?.length ?? 0) > 0;
-		newChecks.push({
-			id: 'remote',
-			label: 'Remote Configuration',
-			description: 'Check if remotes are configured',
-			status: hasRemote ? 'pass' : 'warn',
-			detail: hasRemote 
-				? `${remoteData?.remotes?.length} remote(s) configured`
-				: 'No remotes configured',
-		});
-
-		// Check 3: Default branch
-			const hasMain = repoInfo?.branches?.some((branch) => branch === 'main' || branch === 'master');
-		newChecks.push({
-			id: 'default-branch',
-			label: 'Default Branch',
-			description: 'Check for main/master branch',
-			status: hasMain ? 'pass' : 'warn',
-			detail: hasMain 
-				? 'Default branch exists'
-				: 'No main/master branch found',
-		});
-
-		// Check 4: Large files (placeholder - would need actual implementation)
-		newChecks.push({
-			id: 'large-files',
-			label: 'Large Files',
-			description: 'Check for large files in repo',
-			status: 'pass',
-			detail: 'No large files detected (placeholder)',
-		});
-
-		// Check 5: Merge conflicts
-			const hasConflicts = (statusData?.conflicted?.length ?? 0) > 0;
-		newChecks.push({
-			id: 'conflicts',
-			label: 'Merge Conflicts',
-			description: 'Check for unresolved conflicts',
-			status: hasConflicts ? 'fail' : 'pass',
-			detail: hasConflicts 
-				? `${statusData?.conflicted?.length} conflict(s) need resolution`
-				: 'No merge conflicts',
-		});
-
-		// Check 6: Stale branches (placeholder)
-			newChecks.push({
-				id: 'stale-branches',
-				label: 'Branch Hygiene',
-				description: 'Check for merged/stale branches',
-				status: repoInfo?.branches?.length && repoInfo.branches.length > 10 ? 'warn' : 'pass',
-				detail: `${repoInfo?.branches?.length ?? 0} branches`,
-			});
-
-		setChecks(newChecks);
-
-		// Calculate score
-		const passCount = newChecks.filter(c => c.status === 'pass').length;
-		const warnCount = newChecks.filter(c => c.status === 'warn').length;
-		const calculatedScore = Math.round((passCount * 100 + warnCount * 50) / newChecks.length);
-		setScore(calculatedScore);
-
-		setIsRunning(false);
+		try {
+			const result = await repoHealthQuery.refetch();
+			if (result.data?.error) {
+				setChecks([
+					{
+						id: 'diagnostics-error',
+						label: 'Diagnostics Failed',
+						description: 'Repository health checks could not complete.',
+						status: 'fail',
+						detail: result.data.error,
+					},
+				]);
+				setScore(0);
+				return;
+			}
+			setChecks((result.data?.checks ?? []) as HealthCheck[]);
+			setScore(result.data?.score ?? 0);
+		} finally {
+			setIsRunning(false);
+		}
 	};
 
 	const getStatusIcon = (status: string) => {
 		switch (status) {
-			case 'pass': return <Check className="h-4 w-4 text-green-600" />;
+			case 'pass': return <Check className="h-4 w-4 text-emerald-600" />;
 			case 'warn': return <AlertTriangle className="h-4 w-4 text-amber-600" />;
-			case 'fail': return <X className="h-4 w-4 text-red-600" />;
+			case 'fail': return <X className="h-4 w-4 text-destructive" />;
 			default: return null;
 		}
 	};
 
 	const getStatusColor = (status: string) => {
 		switch (status) {
-			case 'pass': return 'border-green-200 bg-green-50 dark:bg-green-950/30';
-			case 'warn': return 'border-amber-200 bg-amber-50 dark:bg-amber-950/30';
-			case 'fail': return 'border-red-200 bg-red-50 dark:bg-red-950/30';
-			default: return '';
+			case 'pass': return 'border-emerald-500/25 bg-emerald-500/10';
+			case 'warn': return 'border-amber-500/25 bg-amber-500/10';
+			case 'fail': return 'border-destructive/25 bg-destructive/10';
+			default: return 'border-border/70 bg-muted/20';
 		}
 	};
 
+	const scoreTone =
+		score >= 80 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-destructive';
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-2xl max-h-[85vh] flex flex-col ui-surface">
+			<DialogContent className="ui-surface flex max-h-[85vh] max-w-2xl flex-col">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<Activity className="h-5 w-5" />
-						Repository Health Check
+						<Activity className="h-4 w-4" />
+						Health
 					</DialogTitle>
 				</DialogHeader>
 
 				{checks.length > 0 && (
-					<div className="flex items-center gap-4 py-4 border-b">
+					<div className="border-border/70 flex items-center gap-4 border-b pb-4">
 						<div className="flex-1">
-							<p className="text-sm font-medium mb-2">Health Score</p>
+							<p className="mb-2 text-sm font-medium">Score</p>
 							<Progress value={score} className="h-2" />
 						</div>
-						<div className="text-3xl font-bold" style={{
-							color: score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444'
-						}}>
+						<div className={`text-2xl font-semibold tabular-nums ${scoreTone}`}>
 							{score}%
 						</div>
 					</div>
@@ -195,31 +107,29 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 
 				<ScrollArea className="flex-1">
 					{checks.length === 0 ? (
-						<div className="text-center py-12">
-							<Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-							<p className="text-muted-foreground mb-4">
-								Click "Run Check" to analyze your repository
-							</p>
+						<div className="py-12 text-center">
+							<Activity className="text-muted-foreground mx-auto mb-3 h-9 w-9 opacity-45" />
+							<p className="text-foreground text-sm font-medium">Run diagnostics.</p>
 						</div>
 					) : (
 						<div className="space-y-3">
 							{checks.map((check) => (
 								<div
 									key={check.id}
-									className={`p-4 rounded-lg border ${getStatusColor(check.status)}`}
+									className={`rounded-lg border p-3 ${getStatusColor(check.status)}`}
 								>
 									<div className="flex items-start gap-3">
 										<div className="mt-0.5">
 											{getStatusIcon(check.status)}
 										</div>
 										<div className="flex-1">
-											<div className="flex items-center justify-between mb-1">
+											<div className="mb-1 flex items-center justify-between gap-3">
 												<span className="font-medium">{check.label}</span>
-												<span className="text-xs uppercase font-medium">
+												<Badge variant="outline" className="uppercase">
 													{check.status}
-												</span>
+												</Badge>
 											</div>
-											<p className="text-sm text-muted-foreground mb-1">
+											<p className="text-muted-foreground mb-1 text-sm">
 												{check.description}
 											</p>
 											<p className="text-sm">
@@ -233,17 +143,17 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 					)}
 				</ScrollArea>
 
-				<div className="flex justify-end gap-2 pt-4 border-t">
+				<div className="border-border/70 flex justify-end gap-2 border-t pt-4">
 					<Button variant="outline" onClick={() => { setChecks([]); }}>
 						Clear
 					</Button>
-					<Button onClick={runHealthCheck} disabled={isRunning || !activeRepo}>
+					<Button onClick={() => { void runHealthCheck(); }} disabled={isRunning || !activeRepo}>
 						{isRunning ? (
 							<Loader2 className="h-4 w-4 mr-2 animate-spin" />
 						) : (
 							<RefreshCw className="h-4 w-4 mr-2" />
 						)}
-						{checks.length > 0 ? 'Re-run Check' : 'Run Check'}
+						{checks.length > 0 ? 'Re-run' : 'Run'}
 					</Button>
 				</div>
 			</DialogContent>

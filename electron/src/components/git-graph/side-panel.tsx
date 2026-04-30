@@ -6,6 +6,7 @@
 import { AlertTriangle, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { BranchRenameDialog } from './branch-rename-dialog';
 import {
     BranchItem,
     MoreItems,
@@ -54,6 +55,14 @@ interface RepoInfoData {
 
 interface WorktreesResult {
     worktrees: WorktreeEntry[];
+}
+
+interface RemoteEntry {
+    name: string;
+}
+
+interface RemotesResult {
+    remotes: RemoteEntry[];
 }
 
 interface SubmoduleListResult {
@@ -108,6 +117,9 @@ interface TrpcGitShape {
         list: {
             useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<WorktreesResult>;
         };
+    };
+    remotes: {
+        useQuery: (input: { repo: string }, options: QueryOptions) => QueryResult<RemotesResult>;
     };
     branch: {
         listPinned: {
@@ -167,6 +179,8 @@ export function SidePanel({
     });
     const [searchQuery, setSearchQuery] = useState('');
     const [branchChip, setBranchChip] = useState<'all' | 'pinned' | 'attention'>('all');
+    const [renameBranchOpen, setRenameBranchOpen] = useState(false);
+    const [renameBranchTarget, setRenameBranchTarget] = useState<string | null>(null);
 
     const { data: repoInfo } = typedTrpc.git.repoInfo.useQuery(
         {
@@ -179,6 +193,10 @@ export function SidePanel({
     );
 
     const { data: worktreesData } = typedTrpc.git.worktree.list.useQuery(
+        { repo: activeRepo ?? '' },
+        { enabled: !!activeRepo }
+    );
+    const { data: remotesData } = typedTrpc.git.remotes.useQuery(
         { repo: activeRepo ?? '' },
         { enabled: !!activeRepo }
     );
@@ -228,11 +246,13 @@ export function SidePanel({
 
     const localBranches = repoInfo?.branches.filter((b) => !b.startsWith('remotes/')) ?? [];
     const remoteBranches = repoInfo?.branches.filter((b) => b.startsWith('remotes/') && !b.endsWith('/HEAD')) ?? [];
+    const remoteBranchLookup = useMemo(() => new Set(remoteBranches), [remoteBranches]);
     const tags = repoInfo?.tags ?? [];
     const stashes = repoInfo?.stashes ?? [];
     const worktrees = worktreesData?.worktrees ?? [];
     const currentHead = repoInfo?.head;
-    const launchpadEntry = (launchpadQuery.data as LaunchpadResult | undefined)?.repos?.[0];
+    const launchpadEntry = (launchpadQuery.data as LaunchpadResult | undefined)?.repos[0];
+    const hasOriginRemote = (remotesData?.remotes ?? []).some((remote) => remote.name === 'origin');
 
     const filterBySearch = <T extends string>(items: T[]): T[] =>
         searchQuery ? items.filter((item) => item.toLowerCase().includes(searchQuery.toLowerCase())) : items;
@@ -292,6 +312,25 @@ export function SidePanel({
         },
         onDelete: (branch) => {
             void gitOps.deleteBranch(branch, false);
+        },
+        ...(hasOriginRemote
+            ? {
+                  onPublishBranch: (branch: string) => {
+                      void gitOps.push(branch, 'origin', true, 'normal');
+                  },
+              }
+            : {}),
+        canTrackBranch: (branch) => remoteBranchLookup.has(`remotes/origin/${branch}`),
+        onTrackBranch: (branch) => {
+            const matchingUpstream = `origin/${branch}`;
+            if (!remoteBranchLookup.has(`remotes/${matchingUpstream}`)) {
+                return;
+            }
+            void gitOps.setBranchUpstream(branch, matchingUpstream);
+        },
+        onRenameBranch: (branch) => {
+            setRenameBranchTarget(branch);
+            setRenameBranchOpen(true);
         },
         onPinToggle: (branch, pinned) => {
             if (!enableBranchPinning) {
@@ -354,6 +393,13 @@ export function SidePanel({
                         {...(onBranchSelect ? { onBranchSelect } : {})}
                         onCheckout={(branch) => {
                             void gitOps.checkout(branch);
+                        }}
+                        onDeleteRemoteBranch={(remote, branchName) => {
+                            // eslint-disable-next-line no-alert
+                            if (!confirm(`Delete remote branch ${remote}/${branchName}?`)) {
+                                return;
+                            }
+                            void gitOps.deleteRemoteBranch(remote, branchName);
                         }}
                         renderRemoteBranchItem={(props) => <RemoteBranchItem key={props.branch} {...props} />}
                         renderMoreItems={({ label, count, children }) => (
@@ -425,6 +471,19 @@ export function SidePanel({
                     />
                 </div>
             </ScrollArea>
+            <BranchRenameDialog
+                open={renameBranchOpen}
+                onOpenChange={(open) => {
+                    setRenameBranchOpen(open);
+                    if (!open) {
+                        setRenameBranchTarget(null);
+                    }
+                }}
+                branchName={renameBranchTarget ?? ''}
+                onRename={(oldName, newName, force) => {
+                    void gitOps.renameBranch(oldName, newName, force);
+                }}
+            />
         </div>
     );
 }
@@ -447,10 +506,10 @@ export function RepoAttentionSummary({
     statusSignals: string[];
 }) {
     const chips = [
-        dirtyCount > 0 ? `${dirtyCount} changed` : null,
-        ahead > 0 ? `${ahead} ahead` : null,
-        behind > 0 ? `${behind} behind` : null,
-        openPullRequests > 0 ? `${openPullRequests} PR` : null,
+        dirtyCount > 0 ? `${String(dirtyCount)} changed` : null,
+        ahead > 0 ? `${String(ahead)} ahead` : null,
+        behind > 0 ? `${String(behind)} behind` : null,
+        openPullRequests > 0 ? `${String(openPullRequests)} PR` : null,
         stale ? 'stale' : null,
     ].filter((value): value is string => Boolean(value));
 

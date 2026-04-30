@@ -13,7 +13,7 @@ vi.mock('@/app/backend/store', () => ({
             appStoreState[key] = value;
         },
         clear: () => {
-            for (const key of Object.keys(appStoreState)) delete appStoreState[key];
+            for (const key of Object.keys(appStoreState)) Reflect.deleteProperty(appStoreState, key);
         },
     },
     instanceStore: {
@@ -22,7 +22,7 @@ vi.mock('@/app/backend/store', () => ({
             instanceStoreState[key] = value;
         },
         clear: () => {
-            for (const key of Object.keys(instanceStoreState)) delete instanceStoreState[key];
+            for (const key of Object.keys(instanceStoreState)) Reflect.deleteProperty(instanceStoreState, key);
         },
     },
 }));
@@ -241,6 +241,7 @@ describe('repo commit filters procedures', () => {
             assignments: [],
         });
         await expect(caller.collaboration.activity({ limit: 10 })).resolves.toEqual({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             entries: expect.arrayContaining([expect.objectContaining({ type: 'bundle-import', action: 'imported' })]),
         });
     });
@@ -277,7 +278,7 @@ describe('repo commit filters procedures', () => {
         });
         fetchMock.mockResolvedValue({
             ok: true,
-            json: async () => ({
+            json: () => ({
                 bundle: {
                     version: 2,
                     projectId: 'desktop-app',
@@ -323,8 +324,11 @@ describe('repo commit filters procedures', () => {
         );
         expect(appStore.get('secretVault')).toEqual(
             expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 entries: expect.objectContaining({
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     'collaborationSyncConfig.authToken': expect.any(String),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, no-secrets/no-secrets
                     'collaborationSyncConfig.memberApiKey': expect.any(String),
                 }),
             })
@@ -361,7 +365,7 @@ describe('repo commit filters procedures', () => {
         });
         fetchMock.mockResolvedValue({
             ok: true,
-            json: async () => ({
+            json: () => ({
                 ok: true,
                 version: '1.0.0',
                 projectCount: 2,
@@ -372,6 +376,7 @@ describe('repo commit filters procedures', () => {
         await expect(caller.collaboration.probeRemote()).resolves.toEqual({
             success: true,
             error: null,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             health: expect.objectContaining({
                 ok: true,
                 version: '1.0.0',
@@ -499,7 +504,9 @@ describe('repo commit filters procedures', () => {
             ]);
 
             await expect(caller.collaboration.reviewDashboard()).resolves.toEqual({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 dashboard: expect.objectContaining({
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     summary: expect.objectContaining({
                         totalReviewTargets: 2,
                         openReviewTargets: 2,
@@ -508,6 +515,7 @@ describe('repo commit filters procedures', () => {
                         unresolvedThreads: 3,
                         lineThreadCount: 1,
                     }),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     reviewTargets: expect.arrayContaining([
                         expect.objectContaining({
                             rootTargetId: 'github:github.com%2Facme%2Frepo-one:1',
@@ -526,6 +534,7 @@ describe('repo commit filters procedures', () => {
                             blockedAssignments: 1,
                         }),
                     ]),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     repositories: expect.arrayContaining([
                         expect.objectContaining({
                             repoKey: 'github.com/acme/repo-one',
@@ -536,6 +545,7 @@ describe('repo commit filters procedures', () => {
                             reviewTargetCount: 1,
                         }),
                     ]),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     reviewerLoad: expect.arrayContaining([
                         expect.objectContaining({ memberId: 'ada', activeAssignments: 1 }),
                         expect.objectContaining({ memberId: 'grace', blockedAssignments: 1 }),
@@ -578,7 +588,7 @@ describe('repo commit filters procedures', () => {
         fetchMock
             .mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({
+                json: () => ({
                     entries: [
                         {
                             id: 'ada::desktop',
@@ -594,7 +604,7 @@ describe('repo commit filters procedures', () => {
             })
             .mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({
+                json: () => ({
                     entries: [
                         {
                             id: 'remote-1',
