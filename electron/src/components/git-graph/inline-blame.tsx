@@ -190,7 +190,7 @@ export function InlineBlame({ filePath, fileContent, onCommitClick }: InlineBlam
 											onClick={(e) => { handleCopyHash(blame.hash, e); }}
 										>
 											{copiedHash === blame.hash ? (
-												<Check className="h-3 w-3 text-green-600" />
+												<Check className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 											) : (
 												<Copy className="h-3 w-3" />
 											)}

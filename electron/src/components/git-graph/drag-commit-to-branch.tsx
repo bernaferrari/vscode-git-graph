@@ -163,7 +163,7 @@ export function DragCherryPickDialog({
 						</div>
 					</div>
 
-					<div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+					<div className="flex items-center gap-2 text-sm text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 						<AlertTriangle className="h-4 w-4" />
 						<span>This will checkout the branch and cherry-pick the commit</span>
 					</div>
@@ -263,7 +263,7 @@ export function DragCommitHandler({
 						</div>
 					</div>
 
-					<div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+					<div className="flex items-center gap-2 text-sm text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 						<AlertTriangle className="h-4 w-4" />
 						<span>This will checkout the branch and cherry-pick the commit</span>
 					</div>

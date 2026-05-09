@@ -83,26 +83,26 @@ function getFileIcon(name: string) {
 	const ext = name.split('.').pop()?.toLowerCase();
 
 	if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext ?? '')) {
-		return <Image className="h-4 w-4 text-purple-500" />;
+		return <Image className="h-3.5 w-3.5 text-chart-5" />;
 	}
 	if (['ts', 'tsx', 'js', 'jsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h'].includes(ext ?? '')) {
-		return <FileCode className="h-4 w-4 text-blue-500" />;
+		return <FileCode className="h-3.5 w-3.5 text-chart-1" />;
 	}
 	if (['md', 'txt', 'json', 'yaml', 'yml', 'toml', 'ini', 'cfg'].includes(ext ?? '')) {
-		return <FileText className="h-4 w-4 text-amber-500" />;
+		return <FileText className="h-3.5 w-3.5 text-chart-3" />;
 	}
 	if (['exe', 'dll', 'so', 'dylib', 'bin', 'pak'].includes(ext ?? '')) {
-		return <Binary className="h-4 w-4 text-gray-500" />;
+		return <Binary className="h-3.5 w-3.5 text-muted-foreground" />;
 	}
-	return <FileText className="h-4 w-4 text-gray-500" />;
+	return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
 }
 
 function getStatusColor(status?: string) {
 	switch (status) {
-		case 'added': return 'text-green-600';
-		case 'deleted': return 'text-red-600';
-		case 'renamed': return 'text-amber-600';
-		case 'modified': return 'text-amber-500';
+		case 'added': return 'text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]';
+		case 'deleted': return 'text-destructive';
+		case 'renamed': return 'text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]';
+		case 'modified': return 'text-[color-mix(in_oklch,var(--info)_70%,var(--foreground))]';
 		default: return '';
 	}
 }
@@ -134,23 +134,21 @@ function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
 				<CollapsibleTrigger className="w-full">
 					<div
 						className={cn(
-							"flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-accent/50",
-							isSelected && "bg-accent"
+							"group/folder flex h-7 items-center gap-1.5 rounded px-1.5 cursor-pointer text-[0.8125rem] transition-colors",
+							isSelected ? "bg-accent text-foreground" : "text-foreground/85 hover:bg-accent/55 hover:text-foreground"
 						)}
-						style={{ paddingLeft: `${String(level * 12 + 8)}px` }}
+						style={{ paddingLeft: `${String(level * 12 + 6)}px` }}
 					>
+						<span className="grid h-3 w-3 shrink-0 place-items-center text-muted-foreground">
+							{isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+						</span>
 						{isOpen ? (
-							<ChevronDown className="h-4 w-4 text-muted-foreground" />
+							<FolderOpen className="h-3.5 w-3.5 shrink-0 text-[color-mix(in_oklch,var(--warning)_55%,var(--foreground))]" />
 						) : (
-							<ChevronRight className="h-4 w-4 text-muted-foreground" />
+							<Folder className="h-3.5 w-3.5 shrink-0 text-[color-mix(in_oklch,var(--warning)_55%,var(--foreground))]" />
 						)}
-						{isOpen ? (
-							<FolderOpen className="h-4 w-4 text-amber-500" />
-						) : (
-							<Folder className="h-4 w-4 text-amber-500" />
-						)}
-						<span className="text-sm truncate">{node.name}</span>
-						<span className="text-xs text-muted-foreground ml-auto">
+						<span className="flex-1 truncate font-medium">{node.name}</span>
+						<span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground/70">
 							{node.children?.length}
 						</span>
 					</div>
@@ -173,24 +171,29 @@ function TreeNode({ node, level, onFileClick, selectedPath }: TreeNodeProps) {
 	return (
 		<div
 			className={cn(
-				"flex items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-accent/50 group",
-				isSelected && "bg-accent"
+				"group/file relative flex h-7 items-center gap-1.5 rounded px-1.5 cursor-pointer text-[0.8125rem] transition-colors",
+				isSelected ? "bg-accent text-foreground" : "text-foreground/85 hover:bg-accent/55 hover:text-foreground"
 			)}
-			style={{ paddingLeft: `${String(level * 12 + 28)}px` }}
+			style={{ paddingLeft: `${String(level * 12 + 22)}px` }}
 			onClick={() => onFileClick?.(node.path)}
 		>
+			{isSelected && (
+				<span aria-hidden className="absolute inset-y-1 left-0 w-[2px] rounded-r-full bg-primary" />
+			)}
 			{getFileIcon(node.name)}
-			<span className="text-sm truncate flex-1">{node.name}</span>
-			<span className={cn("text-xs font-mono", getStatusColor(node.status))}>
-				{getStatusLabel(node.status)}
-			</span>
+			<span className="font-mono truncate flex-1">{node.name}</span>
+			{node.status && (
+				<span className={cn("inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-bold leading-none", getStatusColor(node.status))}>
+					{getStatusLabel(node.status)}
+				</span>
+			)}
 			{(node.additions !== undefined || node.deletions !== undefined) && (
-				<div className="flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100">
+				<div className="flex items-center gap-1.5 font-mono text-[10px] tabular-nums opacity-60 group-hover/file:opacity-100">
 					{node.additions !== undefined && node.additions > 0 && (
-						<span className="text-green-600">+{node.additions}</span>
+						<span className="text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]">+{node.additions}</span>
 					)}
 					{node.deletions !== undefined && node.deletions > 0 && (
-						<span className="text-red-600">-{node.deletions}</span>
+						<span className="text-destructive">−{node.deletions}</span>
 					)}
 				</div>
 			)}
@@ -203,14 +206,14 @@ export function FileTree({ files, onFileClick, selectedPath }: FileTreeProps) {
 
 	if (files.length === 0) {
 		return (
-			<div className="text-center py-4 text-muted-foreground text-sm">
+			<div className="py-6 text-center text-muted-foreground/85 text-[0.8125rem]">
 				No files
 			</div>
 		);
 	}
 
 	return (
-		<div className="py-1">
+		<div className="space-y-px py-1">
 			{tree.map((node) => (
 				<TreeNode
 					key={node.path}

@@ -130,7 +130,7 @@ export function CollaborationReviewDashboardTab({
 													<div
 														className={cn(
 															'h-full rounded-full bg-primary/85',
-															entry.blockedAssignments > 0 && 'bg-amber-500/85'
+															entry.blockedAssignments > 0 && 'bg-[color-mix(in_oklch,var(--warning)_85%,transparent)]'
 														)}
 														style={{ width: `${String(loadWidth)}%` }}
 													/>
@@ -169,9 +169,9 @@ export function CollaborationReviewDashboardTab({
 												<div
 													className={cn(
 														'h-full rounded-full',
-														entry.status === 'done' && 'bg-emerald-500/85',
-														entry.status === 'blocked' && 'bg-amber-500/85',
-														entry.status === 'in-progress' && 'bg-sky-500/85',
+														entry.status === 'done' && 'bg-[color-mix(in_oklch,var(--success)_85%,transparent)]',
+														entry.status === 'blocked' && 'bg-[color-mix(in_oklch,var(--warning)_85%,transparent)]',
+														entry.status === 'in-progress' && 'bg-[color-mix(in_oklch,var(--info)_85%,transparent)]',
 														entry.status === 'open' && 'bg-primary/85'
 													)}
 													style={{ width: `${String(width)}%` }}
@@ -217,12 +217,12 @@ export function CollaborationReviewDashboardTab({
 													<div className='flex flex-wrap items-center justify-end gap-2'>
 														{target.unassigned && <Badge variant='secondary'>Unassigned</Badge>}
 														{target.stale && (
-															<Badge variant='outline' className='border-amber-500/35 text-amber-700 dark:text-amber-200'>
+															<Badge variant='outline' className='border-[color-mix(in_oklch,var(--warning)_35%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 																Stale
 															</Badge>
 														)}
 														{target.blockedAssignments > 0 && (
-															<Badge variant='outline' className='border-amber-500/35 text-amber-700 dark:text-amber-200'>
+															<Badge variant='outline' className='border-[color-mix(in_oklch,var(--warning)_35%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 																{target.blockedAssignments} blocked
 															</Badge>
 														)}
@@ -270,7 +270,7 @@ export function CollaborationReviewDashboardTab({
 														title={`${String(entry.assignments)} assignments`}
 													/>
 													<div
-														className='w-1/2 rounded-sm bg-sky-500/85'
+														className='w-1/2 rounded-sm bg-[color-mix(in_oklch,var(--info)_85%,transparent)]'
 														style={{ height: `${String(Math.max(10, (entry.comments / maxActivity) * 100))}%` }}
 														title={`${String(entry.comments)} comments`}
 													/>
@@ -286,7 +286,7 @@ export function CollaborationReviewDashboardTab({
 										Assignments
 									</div>
 									<div className='flex items-center gap-1.5'>
-										<span className='inline-block h-2.5 w-2.5 rounded-full bg-sky-500/85' />
+										<span className='inline-block h-2.5 w-2.5 rounded-full bg-[color-mix(in_oklch,var(--info)_85%,transparent)]' />
 										Comments
 									</div>
 									<div className='flex items-center gap-1.5'>
@@ -329,7 +329,7 @@ export function CollaborationReviewDashboardTab({
 											</div>
 											<div className='flex flex-wrap items-center justify-end gap-2'>
 												{entry.staleReviewTargets > 0 && (
-													<Badge variant='outline' className='border-amber-500/35 text-amber-700 dark:text-amber-200'>
+													<Badge variant='outline' className='border-[color-mix(in_oklch,var(--warning)_35%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 														{entry.staleReviewTargets} stale
 													</Badge>
 												)}

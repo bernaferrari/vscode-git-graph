@@ -132,15 +132,15 @@ export function EnhancedDiffViewer({
 			.replace(/\n/g, '↵\n');
 	};
 
-	// Get line background class
+	// Get line background class — semantic, low-saturation tints
 	const getLineClass = (type: LineDiff['type']) => {
 		switch (type) {
 			case 'removed':
-				return 'bg-red-100 dark:bg-red-900/30';
+				return 'bg-[color-mix(in_oklch,var(--destructive)_8%,transparent)]';
 			case 'added':
-				return 'bg-green-100 dark:bg-green-900/30';
+				return 'bg-[color-mix(in_oklch,var(--success)_8%,transparent)]';
 			case 'modified':
-				return 'bg-amber-50 dark:bg-amber-900/20';
+				return 'bg-[color-mix(in_oklch,var(--warning)_8%,transparent)]';
 			default:
 				return '';
 		}
@@ -175,7 +175,10 @@ export function EnhancedDiffViewer({
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-full">
-				<div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+				<div className="relative h-6 w-6">
+					<div className="absolute inset-0 rounded-full border-2 border-muted" />
+					<div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+				</div>
 			</div>
 		);
 	}
@@ -183,84 +186,78 @@ export function EnhancedDiffViewer({
 	return (
 		<div className="flex flex-col h-full">
 			{/* Toolbar */}
-			<div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30 gap-4">
+			<div className="ui-toolbar flex items-center justify-between gap-4 px-3 py-1.5">
 				<div className="flex items-center gap-2 min-w-0">
-					<span className="text-sm font-medium truncate max-w-[200px]" title={file.path}>
+					<span className="font-mono text-[0.8125rem] truncate max-w-[260px]" title={file.path}>
 						{file.path}
 					</span>
-					<span className="text-xs px-1.5 py-0.5 rounded bg-muted shrink-0">
+					<span className="inline-flex h-4 shrink-0 items-center rounded bg-muted px-1.5 font-mono text-[10px] font-bold leading-none text-muted-foreground">
 						{file.status}
 					</span>
 					{stats.total > 0 && (
-						<div className="flex items-center gap-1 text-xs shrink-0">
-							<span className="text-red-600">-{stats.removed}</span>
-							<span className="text-muted-foreground">/</span>
-							<span className="text-green-600">+{stats.added + stats.modified}</span>
+						<div className="flex shrink-0 items-center gap-1.5 font-mono text-[10.5px] tabular-nums">
+							<span className="text-destructive">−{stats.removed}</span>
+							<span className="text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]">+{stats.added + stats.modified}</span>
 						</div>
 					)}
 				</div>
-				
-				<div className="flex items-center gap-1">
+
+				<div className="flex items-center gap-0.5">
 					{/* Search */}
-					<div className="relative">
-						<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+					<div className="relative mr-1">
+						<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
 						<input
 							type="text"
-							placeholder="Search..."
+							placeholder="Search…"
 							value={searchQuery}
 							onChange={(e) => { handleSearch(e.target.value); }}
-							className="h-7 w-32 pl-7 pr-2 text-xs rounded border bg-background"
+							className="h-7 w-36 rounded-md border border-input bg-background/60 pl-7 pr-12 text-[0.8125rem] outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
 						/>
 						{searchResults.length > 0 && (
-							<span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+							<span className="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] tabular-nums text-muted-foreground">
 								{currentSearchIndex + 1}/{searchResults.length}
 							</span>
 						)}
 					</div>
-					
+
 					{/* View mode */}
-					<div className="flex items-center border rounded-md">
+					<div className="flex items-center rounded-md border border-border/70 p-0.5 mr-1">
 						<Button
-							variant={viewMode === 'side-by-side' ? 'default' : 'ghost'}
-							size="sm"
-							className="h-7 px-2 rounded-r-none"
+							variant={viewMode === 'side-by-side' ? 'secondary' : 'ghost'}
+							size="icon-xs"
 							onClick={() => { setViewMode('side-by-side'); }}
+							title="Side-by-side"
 						>
 							<Columns className="h-3 w-3" />
 						</Button>
 						<Button
-							variant={viewMode === 'unified' ? 'default' : 'ghost'}
-							size="sm"
-							className="h-7 px-2 rounded-l-none"
+							variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
+							size="icon-xs"
 							onClick={() => { setViewMode('unified'); }}
+							title="Unified"
 						>
 							<AlignLeft className="h-3 w-3" />
 						</Button>
 					</div>
-					
-					{/* Word diff toggle */}
+
 					<Toggle
 						pressed={wordDiff}
 						onPressedChange={setWordDiff}
 						size="sm"
 						className="h-7 w-7 p-0"
-						title="Toggle word-level diff"
+						title="Word-level diff"
 					>
 						<Eye className="h-3 w-3" />
 					</Toggle>
-					
-					{/* Word wrap toggle */}
 					<Toggle
 						pressed={wordWrap}
 						onPressedChange={setWordWrap}
 						size="sm"
 						className="h-7 w-7 p-0"
-						title="Toggle word wrap"
+						title="Wrap long lines"
 					>
 						<WrapText className="h-3 w-3" />
 					</Toggle>
-					
-					{/* Show whitespace toggle */}
 					<Toggle
 						pressed={showWhitespace}
 						onPressedChange={setShowWhitespace}
@@ -270,21 +267,20 @@ export function EnhancedDiffViewer({
 					>
 						{showWhitespace ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
 					</Toggle>
-					
-					{/* Copy */}
-					<Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
-						{copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+
+					<Button variant="ghost" size="icon-sm" onClick={handleCopy} title="Copy diff">
+						{copied ? <Check className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]" /> : <Copy className="h-3 w-3" />}
 					</Button>
-					
+
 					{/* Conflict resolution buttons */}
 					{file.status === 'U' && (
 						<>
-							<Button variant="outline" size="sm" className="h-7 px-2" onClick={onAcceptOurs}>
-								<Minus className="h-3 w-3 mr-1" />
+							<Button variant="outline" size="xs" className="ml-1" onClick={onAcceptOurs}>
+								<Minus className="h-3 w-3" />
 								Ours
 							</Button>
-							<Button variant="outline" size="sm" className="h-7 px-2" onClick={onAcceptTheirs}>
-								<Plus className="h-3 w-3 mr-1" />
+							<Button variant="outline" size="xs" onClick={onAcceptTheirs}>
+								<Plus className="h-3 w-3" />
 								Theirs
 							</Button>
 						</>
@@ -307,18 +303,18 @@ export function EnhancedDiffViewer({
 									<div 
 										key={i} 
 										className={`flex ${getLineClass(line.type)} ${
-											searchResults.includes(i) ? 'ring-1 ring-yellow-400' : ''
-										} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-yellow-500' : ''}`}
+											searchResults.includes(i) ? 'ring-1 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''
+										} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''}`}
 									>
 										<div className="w-12 text-right pr-2 text-muted-foreground select-none border-r bg-muted/30 shrink-0">
 											{line.leftLineNum || ''}
 										</div>
 										<div className="w-6 text-center select-none shrink-0 border-r bg-muted/30">
 											{line.type === 'removed' && (
-												<Minus className="h-3 w-3 mx-auto text-red-600" />
+												<Minus className="h-3 w-3 mx-auto text-destructive" />
 											)}
 											{line.type === 'modified' && (
-												<span className="text-amber-600">~</span>
+												<span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">~</span>
 											)}
 										</div>
 										<pre className={`px-2 py-0.5 flex-1 min-w-0 ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-hidden'}`}>
@@ -340,18 +336,18 @@ export function EnhancedDiffViewer({
 									<div 
 										key={i} 
 										className={`flex ${getLineClass(line.type)} ${
-											searchResults.includes(i) ? 'ring-1 ring-yellow-400' : ''
-										} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-yellow-500' : ''}`}
+											searchResults.includes(i) ? 'ring-1 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''
+										} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''}`}
 									>
 										<div className="w-12 text-right pr-2 text-muted-foreground select-none border-r bg-muted/30 shrink-0">
 											{line.rightLineNum || ''}
 										</div>
 										<div className="w-6 text-center select-none shrink-0 border-r bg-muted/30">
 											{line.type === 'added' && (
-												<Plus className="h-3 w-3 mx-auto text-green-600" />
+												<Plus className="h-3 w-3 mx-auto text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 											)}
 											{line.type === 'modified' && (
-												<span className="text-amber-600">~</span>
+												<span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">~</span>
 											)}
 										</div>
 										<pre className={`px-2 py-0.5 flex-1 min-w-0 ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-hidden'}`}>
@@ -370,8 +366,8 @@ export function EnhancedDiffViewer({
 								<div 
 									key={i} 
 									className={`flex ${getLineClass(line.type)} ${
-										searchResults.includes(i) ? 'ring-1 ring-yellow-400' : ''
-									} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-yellow-500' : ''}`}
+										searchResults.includes(i) ? 'ring-1 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''
+									} ${searchResults[currentSearchIndex] === i ? 'ring-2 ring-[color-mix(in_oklch,var(--warning)_30%,transparent)]' : ''}`}
 								>
 									<div className="w-10 text-right pr-2 text-muted-foreground select-none border-r bg-muted/30 shrink-0">
 										{line.leftLineNum || ''}
@@ -380,9 +376,9 @@ export function EnhancedDiffViewer({
 										{line.rightLineNum || ''}
 									</div>
 									<div className="w-6 text-center select-none shrink-0 border-r bg-muted/30">
-										{line.type === 'removed' && <Minus className="h-3 w-3 mx-auto text-red-600" />}
-										{line.type === 'added' && <Plus className="h-3 w-3 mx-auto text-green-600" />}
-										{line.type === 'modified' && <span className="text-amber-600">~</span>}
+										{line.type === 'removed' && <Minus className="h-3 w-3 mx-auto text-destructive" />}
+										{line.type === 'added' && <Plus className="h-3 w-3 mx-auto text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />}
+										{line.type === 'modified' && <span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">~</span>}
 									</div>
 									<pre className={`px-2 py-0.5 flex-1 min-w-0 ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-hidden'}`}>
 										{renderLineContent(line, line.type === 'removed' || line.type === 'modified' ? 'left' : 'right')}
@@ -398,19 +394,19 @@ export function EnhancedDiffViewer({
 			<div className="flex items-center justify-between px-4 py-1 border-t bg-muted/30 text-xs text-muted-foreground">
 				<div className="flex items-center gap-4">
 					<span>{parsedDiff.length} lines</span>
-					{wordDiff && <span className="text-green-600">Word diff enabled</span>}
+					{wordDiff && <span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">Word diff enabled</span>}
 				</div>
 				<div className="flex items-center gap-4">
 					<span className="flex items-center gap-1">
-						<span className="w-3 h-3 rounded bg-red-200 dark:bg-red-800" />
+						<span className="w-3 h-3 rounded bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]" />
 						Removed: {stats.removed}
 					</span>
 					<span className="flex items-center gap-1">
-						<span className="w-3 h-3 rounded bg-green-200 dark:bg-green-800" />
+						<span className="w-3 h-3 rounded bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_15%,transparent)]" />
 						Added: {stats.added}
 					</span>
 					<span className="flex items-center gap-1">
-						<span className="w-3 h-3 rounded bg-amber-200 dark:bg-amber-800" />
+						<span className="w-3 h-3 rounded bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]" />
 						Modified: {stats.modified}
 					</span>
 				</div>

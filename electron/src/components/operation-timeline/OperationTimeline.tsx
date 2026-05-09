@@ -270,8 +270,8 @@ function OperationItem({ operation, onUndo, isUndoing = false }: OperationItemPr
                         <StatusIcon
                             className={cn(
                                 'h-3.5 w-3.5',
-                                operation.status === 'success' && 'text-green-500',
-                                operation.status === 'failed' && 'text-red-500',
+                                operation.status === 'success' && 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
+                                operation.status === 'failed' && 'text-destructive',
                                 operation.status === 'undone' && 'text-muted-foreground'
                             )}
                         />
@@ -280,7 +280,7 @@ function OperationItem({ operation, onUndo, isUndoing = false }: OperationItemPr
                         {formatDistanceToNow(operation.timestamp, { addSuffix: true })}
                     </p>
                     {operation.error && (
-                        <p className='mt-1 flex items-center gap-1 text-xs text-red-500'>
+                        <p className='mt-1 flex items-center gap-1 text-xs text-destructive'>
                             <AlertCircle className='h-3 w-3' />
                             {operation.error}
                         </p>

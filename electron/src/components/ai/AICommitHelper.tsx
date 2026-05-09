@@ -99,12 +99,12 @@ export function AICommitHelper({
 								className="gap-1 cursor-pointer hover:bg-secondary/80"
 								onClick={handleApply}
 							>
-								<Sparkles className="h-3 w-3 text-amber-500" />
-								<span className="max-w-[150px] truncate">
+								<Sparkles className='h-3 w-3 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
+								<span className='max-w-[150px] truncate'>
 									{lastSuggestion.message}
 								</span>
 								{appliedMessage === lastSuggestion.message && (
-									<Check className="h-3 w-3 text-green-500" />
+									<Check className='h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
 								)}
 							</Badge>
 						</TooltipTrigger>

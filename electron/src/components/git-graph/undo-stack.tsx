@@ -64,27 +64,27 @@ function getOperationColor(type: string): string {
     switch (type) {
         case 'commit':
         case 'amend':
-            return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+            return 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]';
         case 'branch_create':
         case 'tag_create':
-            return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
+            return 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]';
         case 'branch_delete':
         case 'tag_delete':
         case 'reset':
         case 'clean':
-            return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+            return 'text-destructive bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]';
         case 'merge':
         case 'cherry_pick':
-            return 'text-purple-600 bg-purple-100 dark:bg-purple-900/30';
+            return 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)]';
         case 'push':
-            return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
+            return 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]';
         case 'pull':
         case 'fetch':
-            return 'text-cyan-600 bg-cyan-100 dark:bg-cyan-900/30';
+            return 'text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))] bg-[color-mix(in_oklch,var(--chart-7)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-7)_30%,transparent)]';
         case 'stash_push':
         case 'stash_pop':
         case 'stash_drop':
-            return 'text-amber-600 bg-amber-100 dark:bg-amber-900/30';
+            return 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]';
         default:
             return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
     }

@@ -48,16 +48,16 @@ export function RepoStatusIndicator({
 	className,
 }: RepoStatusIndicatorProps) {
 	const status = useMemo(() => {
-		if (isRebasing) return { type: 'rebase', label: 'Rebasing', color: 'text-amber-500', icon: RefreshCw };
-		if (isMerging) return { type: 'merge', label: 'Merging', color: 'text-amber-500', icon: RefreshCw };
-		if (hasConflicts) return { type: 'conflict', label: 'Conflicts', color: 'text-red-500', icon: AlertCircle };
-		if (isFetching) return { type: 'fetching', label: 'Fetching', color: 'text-blue-500', icon: RefreshCw };
-		if (behind > 0 && ahead > 0) return { type: 'diverged', label: `${String(behind)} behind, ${String(ahead)} ahead`, color: 'text-amber-500', icon: ArrowUp };
-		if (behind > 0) return { type: 'behind', label: `${String(behind)} behind`, color: 'text-amber-500', icon: ArrowDown };
-		if (ahead > 0) return { type: 'ahead', label: `${String(ahead)} ahead`, color: 'text-green-500', icon: ArrowUp };
-		if (hasStagedChanges || hasUnstagedChanges) return { type: 'changes', label: 'Changes pending', color: 'text-blue-500', icon: GitBranch };
-		if (protectedBranch) return { type: 'protected', label: 'Protected', color: 'text-green-500', icon: ShieldCheck };
-		return { type: 'clean', label: 'Up to date', color: 'text-green-500', icon: CheckCircle2 };
+		if (isRebasing) return { type: 'rebase', label: 'Rebasing', color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', icon: RefreshCw };
+		if (isMerging) return { type: 'merge', label: 'Merging', color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', icon: RefreshCw };
+		if (hasConflicts) return { type: 'conflict', label: 'Conflicts', color: 'text-destructive', icon: AlertCircle };
+		if (isFetching) return { type: 'fetching', label: 'Fetching', color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]', icon: RefreshCw };
+		if (behind > 0 && ahead > 0) return { type: 'diverged', label: `${String(behind)} behind, ${String(ahead)} ahead`, color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', icon: ArrowUp };
+		if (behind > 0) return { type: 'behind', label: `${String(behind)} behind`, color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', icon: ArrowDown };
+		if (ahead > 0) return { type: 'ahead', label: `${String(ahead)} ahead`, color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', icon: ArrowUp };
+		if (hasStagedChanges || hasUnstagedChanges) return { type: 'changes', label: 'Changes pending', color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]', icon: GitBranch };
+		if (protectedBranch) return { type: 'protected', label: 'Protected', color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', icon: ShieldCheck };
+		return { type: 'clean', label: 'Up to date', color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', icon: CheckCircle2 };
 	}, [isRebasing, isMerging, hasConflicts, isFetching, behind, ahead, hasStagedChanges, hasUnstagedChanges, protectedBranch]);
 
 	const StatusIcon = status.icon;
@@ -138,7 +138,7 @@ export function CompactStatusIndicator({
 
 	if (isFetching) {
 		return (
-			<div className="flex items-center gap-1 text-blue-500">
+			<div className="flex items-center gap-1 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">
 				<RefreshCw className="h-3.5 w-3.5 animate-spin" />
 				<span className="text-xs">Syncing...</span>
 			</div>
@@ -147,7 +147,7 @@ export function CompactStatusIndicator({
 
 	if (hasConflicts) {
 		return (
-			<div className="flex items-center gap-1 text-red-500">
+			<div className="flex items-center gap-1 text-destructive">
 				<AlertCircle className="h-3.5 w-3.5" />
 				<span className="text-xs font-medium">Conflicts</span>
 			</div>
@@ -156,7 +156,7 @@ export function CompactStatusIndicator({
 
 	if (behind > 0) {
 		return (
-			<div className="flex items-center gap-1 text-amber-500">
+			<div className="flex items-center gap-1 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 				<Cloud className="h-3.5 w-3.5" />
 				<span className="text-xs">{behind} behind</span>
 			</div>
@@ -165,7 +165,7 @@ export function CompactStatusIndicator({
 
 	if (ahead > 0) {
 		return (
-			<div className="flex items-center gap-1 text-green-500">
+			<div className="flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 				<Cloud className="h-3.5 w-3.5" />
 				<span className="text-xs">{ahead} ahead</span>
 			</div>
@@ -174,7 +174,7 @@ export function CompactStatusIndicator({
 
 	if (hasChanges) {
 		return (
-			<div className="flex items-center gap-1 text-blue-500">
+			<div className="flex items-center gap-1 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">
 				<GitBranch className="h-3.5 w-3.5" />
 				<span className="text-xs">Changes</span>
 			</div>
@@ -182,7 +182,7 @@ export function CompactStatusIndicator({
 	}
 
 	return (
-		<div className="flex items-center gap-1 text-green-500">
+		<div className="flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 			<CloudOff className="h-3.5 w-3.5" />
 			<span className="text-xs">Synced</span>
 		</div>

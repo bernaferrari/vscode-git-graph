@@ -18,6 +18,7 @@ export function CommitContextMenuOverlay({
     open,
     position,
     selectedCommit,
+    currentBranch,
     onClose,
     onCreateBranch,
     onCreateTag,
@@ -29,6 +30,7 @@ export function CommitContextMenuOverlay({
     open: boolean;
     position: { x: number; y: number };
     selectedCommit: SelectedCommitSummary | null;
+    currentBranch?: string | null;
     onClose: () => void;
     onCreateBranch: () => void;
     onCreateTag: () => void;
@@ -47,6 +49,7 @@ export function CommitContextMenuOverlay({
                 <Suspense fallback={<DialogLoadingFallback />}>
                     <CommitContextMenu
                         commit={selectedCommit}
+                        currentBranch={currentBranch ?? null}
                         onCreateBranch={onCreateBranch}
                         onCreateTag={onCreateTag}
                         onMerge={onMerge}

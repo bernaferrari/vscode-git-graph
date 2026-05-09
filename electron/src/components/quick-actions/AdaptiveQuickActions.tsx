@@ -245,7 +245,7 @@ export function AdaptiveQuickActions(props: AdaptiveQuickActionsProps) {
 						<TooltipContent>
 							<p>{action.label}</p>
 							{hasConflicts && action.id !== 'commit' && (
-								<p className="text-xs text-amber-500">Resolve conflicts first</p>
+								<p className="text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">Resolve conflicts first</p>
 							)}
 						</TooltipContent>
 					</Tooltip>

@@ -133,7 +133,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 					</div>
 
 					{targetBranch && targetBranch !== currentBranch && (
-						<div className="flex items-center gap-2 p-2 rounded bg-amber-50 text-amber-700 text-xs">
+						<div className="flex items-center gap-2 p-2 rounded bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] text-xs">
 							<AlertCircle className="h-4 w-4" />
 							<span>
 								You'll need to checkout {targetBranch} first, or the commit will be cherry-picked onto {currentBranch}.
@@ -142,7 +142,7 @@ export function DragDropCherryPick({ open, onOpenChange, sourceCommit }: DragDro
 					)}
 
 					{targetBranch === currentBranch && (
-						<div className="flex items-center gap-2 p-2 rounded bg-green-50 text-green-700 text-xs">
+						<div className="flex items-center gap-2 p-2 rounded bg-[color-mix(in_oklch,var(--success)_15%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] text-xs">
 							<Check className="h-4 w-4" />
 							<span>
 								Commit will be cherry-picked onto the current branch ({currentBranch}).

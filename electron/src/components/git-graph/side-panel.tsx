@@ -37,6 +37,8 @@ interface SidePanelProps {
     onCreateBranch?: () => void;
     onCreateTag?: () => void;
     onMergeBranch?: (branch: string) => void;
+    onBringInBranch?: (branch: string) => void;
+    onCreateWorktreeFromBranch?: (branch: string) => void;
     enableBranchPinning?: boolean;
     onOpenWorktrees?: () => void;
 }
@@ -160,6 +162,8 @@ export function SidePanel({
     onCreateBranch,
     onCreateTag,
     onMergeBranch,
+    onBringInBranch,
+    onCreateWorktreeFromBranch,
     enableBranchPinning = true,
     onOpenWorktrees,
 }: SidePanelProps) {
@@ -354,18 +358,24 @@ export function SidePanel({
     if (onMergeBranch) {
         branchesSectionProps.onMergeBranch = onMergeBranch;
     }
+    if (onBringInBranch) {
+        branchesSectionProps.onBringInBranch = onBringInBranch;
+    }
+    if (onCreateWorktreeFromBranch) {
+        branchesSectionProps.onCreateWorktreeFromBranch = onCreateWorktreeFromBranch;
+    }
 
     return (
-        <div className='ui-surface flex h-full w-64 shrink-0 flex-col rounded-none border-r-0'>
-            {/* Header */}
-            <div className='border-border/70 ui-toolbar border-b p-2.5'>
+        <div className='flex h-full w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground'>
+            {/* Header — search + repo attention summary */}
+            <div className='border-b border-sidebar-border/80 px-2 py-2'>
                 <div className='relative'>
-                    <Search className='text-muted-foreground absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2' />
+                    <Search className='text-muted-foreground absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 pointer-events-none' />
                     <Input
-                        placeholder='Filter...'
+                        placeholder='Filter branches, tags…'
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); }}
-                        className='border-border/70 bg-background/85 focus-visible:ring-primary/30 h-8 pl-8 text-sm focus-visible:ring-2'
+                        className='h-7 pl-7 text-[0.8125rem]'
                     />
                 </div>
                 {launchpadEntry && (
@@ -382,7 +392,7 @@ export function SidePanel({
             </div>
 
             <ScrollArea className='flex-1'>
-                <div className='ui-reveal space-y-1 p-2'>
+                <div className='ui-reveal space-y-0.5 p-1.5'>
                     <BranchesSection {...branchesSectionProps} />
 
                     <RemoteBranchesSection
@@ -518,23 +528,31 @@ export function RepoAttentionSummary({
     }
 
     return (
-        <div className='mt-2 rounded-lg border border-border/70 bg-background/80 p-2'>
+        <div className='mt-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5'>
             <div className='mb-1 flex items-center gap-1.5'>
-                <AlertTriangle className={`h-3.5 w-3.5 ${needsAttention ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                <span className='text-[11px] font-semibold'>Repo attention</span>
+                <AlertTriangle
+                    className={`h-3 w-3 ${
+                        needsAttention
+                            ? 'text-[color-mix(in_oklch,var(--warning)_70%,var(--foreground))]'
+                            : 'text-muted-foreground'
+                    }`}
+                />
+                <span className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                    Repo attention
+                </span>
             </div>
             <div className='flex flex-wrap gap-1'>
                 {chips.map((chip) => (
                     <span
                         key={chip}
-                        className='rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground'>
+                        className='inline-flex items-center rounded-md border border-border/50 bg-muted/60 px-1.5 py-[1px] text-[10px] leading-none text-muted-foreground tabular-nums'>
                         {chip}
                     </span>
                 ))}
                 {statusSignals.slice(0, 2).map((signal) => (
                     <span
                         key={signal}
-                        className='rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-200'>
+                        className='inline-flex items-center rounded-md border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_14%,transparent)] px-1.5 py-[1px] text-[10px] leading-none text-[color-mix(in_oklch,var(--warning)_55%,var(--foreground))]'>
                         {signal}
                     </span>
                 ))}

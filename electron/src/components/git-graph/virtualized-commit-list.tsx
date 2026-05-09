@@ -46,8 +46,9 @@ interface VirtualizedCommitListProps {
         remotesByHash: Record<string, string[]>;
     };
     selectedIndex: number | null;
+    multiSelectedHashes?: ReadonlySet<string>;
     expandedIndex: number | null;
-    onSelect: (index: number) => void;
+    onSelect: (index: number, modifiers?: { shift?: boolean; meta?: boolean }) => void;
     onExpand: (index: number | null) => void;
     onContextMenu?: (index: number, event: React.MouseEvent) => void;
     onVisibleRangeChange?: (startIndex: number, endIndex: number) => void;
@@ -109,17 +110,17 @@ function getAuthorWidthClass(width: CommitListColumnSettings['authorWidth']): st
 
 // Semantic commit types with colors
 const COMMIT_TYPES: Record<string, { color: string; bg: string }> = {
-    feat: { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
-    fix: { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    docs: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    style: { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30' },
-    refactor: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-    perf: { color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-    test: { color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
-    build: { color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+    feat: { color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]' },
+    fix: { color: 'text-destructive dark:text-destructive', bg: 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]' },
+    docs: { color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]' },
+    style: { color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)]' },
+    refactor: { color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]' },
+    perf: { color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]' },
+    test: { color: 'text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--chart-7)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-7)_30%,transparent)]' },
+    build: { color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)]' },
     ci: { color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-900/30' },
     chore: { color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/30' },
-    revert: { color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-100 dark:bg-pink-900/30' },
+    revert: { color: 'text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))]', bg: 'bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-4)_30%,transparent)]' },
 };
 
 // Parse semantic commit message
@@ -163,6 +164,7 @@ const CommitRow = memo(function CommitRow({
     tags,
     remotes,
     isSelected,
+    isMultiSelected,
     isMuted,
     graphOffset,
     onSelect,
@@ -178,9 +180,10 @@ const CommitRow = memo(function CommitRow({
     tags: string[];
     remotes: string[];
     isSelected: boolean;
+    isMultiSelected?: boolean;
     isMuted: boolean;
     graphOffset: number;
-    onSelect: () => void;
+    onSelect: (modifiers?: { shift?: boolean; meta?: boolean }) => void;
     onToggleExpand: () => void;
     onContextMenu?: (e: React.MouseEvent) => void;
     showAvatar: boolean;
@@ -191,12 +194,15 @@ const CommitRow = memo(function CommitRow({
     const isUncommitted = commit.hash === '*';
     const parsed = useMemo(() => parseCommitMessage(commit.message), [commit.message]);
     const typeInfo = parsed.type ? COMMIT_TYPES[parsed.type] : null;
+    const highlighted = isSelected || isMultiSelected;
 
     return (
         <div
             className={`${COMMIT_ROW_BASE_CLASS} ${
-                isSelected
-                    ? 'bg-accent/45 shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
+                highlighted
+                    ? isMultiSelected
+                        ? 'bg-[color-mix(in_oklch,var(--primary)_10%,transparent)] shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
+                        : 'bg-accent/45 shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
                     : 'hover:bg-accent/20 active:bg-accent/35'
             } ${isMuted ? 'opacity-50' : ''}`}
             tabIndex={0}
@@ -207,7 +213,9 @@ const CommitRow = memo(function CommitRow({
                     onSelect();
                 }
             }}
-            onClick={onSelect}
+            onClick={(event) => {
+                onSelect({ shift: event.shiftKey, meta: event.metaKey || event.ctrlKey });
+            }}
             onDoubleClick={onToggleExpand}
             onContextMenu={onContextMenu}
             style={{
@@ -252,7 +260,7 @@ const CommitRow = memo(function CommitRow({
                     {tags.map((tag) => (
                         <span
                             key={tag}
-                            className='inline-flex items-center gap-1 rounded-md border border-amber-200/70 bg-amber-50/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-400'>
+                            className='inline-flex items-center gap-1 rounded-md border border-[color-mix(in_oklch,var(--warning)_70%,transparent)] bg-[color-mix(in_oklch,var(--warning)_80%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:border-[color-mix(in_oklch,var(--warning)_40%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_40%,transparent)] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                             <Tag className='h-3 w-3' />
                             {tag}
                         </span>
@@ -307,6 +315,7 @@ export function VirtualizedCommitList({
     layout,
     refLookup,
     selectedIndex,
+    multiSelectedHashes,
     expandedIndex,
     onSelect,
     onExpand,
@@ -479,9 +488,10 @@ export function VirtualizedCommitList({
                                 tags={tags}
                                 remotes={remotes}
                                 isSelected={selectedIndex === virtualRow.index}
+                                isMultiSelected={multiSelectedHashes?.has(commit.hash) ?? false}
                                 isMuted={layout?.mutedCommits[virtualRow.index] ?? false}
                                 graphOffset={layout?.widthsAtVertices[virtualRow.index] ?? 0}
-                                onSelect={() => { onSelect(virtualRow.index); }}
+                                onSelect={(modifiers) => { onSelect(virtualRow.index, modifiers); }}
                                 onToggleExpand={() =>
                                     { onExpand(expandedIndex === virtualRow.index ? null : virtualRow.index); }
                                 }

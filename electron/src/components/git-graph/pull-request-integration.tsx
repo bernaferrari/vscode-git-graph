@@ -1190,7 +1190,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
         }
         if (comment.providerSync.status === 'failed') {
             return (
-                <Badge variant='outline' className='border-amber-500/35 text-[10px] text-amber-700 dark:text-amber-200'>
+                <Badge variant='outline' className='border-[color-mix(in_oklch,var(--warning)_35%,transparent)] text-[10px] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                     Sync failed
                 </Badge>
             );
@@ -1308,7 +1308,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             {!detectedProvider ? (
                                 <div className='flex flex-1 items-center justify-center p-6 text-center'>
                                     <div>
-                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-amber-500' />
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                                         <p className='font-medium'>No pull request provider detected</p>
                                         <p className='text-muted-foreground mt-1 text-sm'>
                                             Configure an `origin` remote for GitHub, GitLab, Bitbucket, or Azure DevOps.
@@ -1318,7 +1318,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             ) : !hasRequiredToken ? (
                                 <div className='flex flex-1 items-center justify-center p-6 text-center'>
                                     <div>
-                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-amber-500' />
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                                         <p className='font-medium'>Missing provider token</p>
                                         <p className='text-muted-foreground mt-1 text-sm'>
                                             Add a {provider} token in Settings to manage pull requests in-app.
@@ -1336,7 +1336,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                             ) : queryError ? (
                                 <div className='flex flex-1 items-center justify-center p-6 text-center'>
                                     <div>
-                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-red-500' />
+                                        <AlertCircle className='mx-auto mb-3 h-10 w-10 text-destructive' />
                                         <p className='font-medium'>Unable to load pull requests</p>
                                         <p className='text-muted-foreground mt-1 text-sm'>{queryError}</p>
                                     </div>
@@ -1401,7 +1401,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                             <p>State: {selectedPR.draft ? 'draft' : selectedPR.state}</p>
                                         </div>
                                         {repoPolicyQuery.data?.policy && (
-                                            <div className='rounded border border-amber-500/30 bg-amber-500/8 p-2 text-xs'>
+                                            <div className='rounded border border-[color-mix(in_oklch,var(--warning)_30%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] p-2 text-xs'>
                                                 <p className='font-medium text-foreground'>Repo policy guidance</p>
                                                 <p className='text-muted-foreground mt-1'>
                                                     Allowed merge methods: {repoPolicyQuery.data.policy.allowedMergeStrategies.join(', ')}
@@ -1434,7 +1434,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 </select>
                                                 {repoPolicyQuery.data?.policy &&
                                                     !repoPolicyQuery.data.policy.allowedMergeStrategies.includes(mergeMethod) && (
-                                                        <p className='mt-1 text-xs text-amber-600'>
+                                                        <p className='mt-1 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                                                             Current merge method is outside repo policy guidance.
                                                         </p>
                                                     )}
@@ -1648,7 +1648,7 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 </Button>
                                             </div>
                                             {reviewStateQuery.data?.error ? (
-                                                <p className='mt-3 text-xs text-amber-700 dark:text-amber-200'>{reviewStateQuery.data.error}</p>
+                                                <p className='mt-3 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>{reviewStateQuery.data.error}</p>
                                             ) : providerReviewState ? (
                                                 <>
                                                     <div className='mt-3 grid gap-2 sm:grid-cols-5'>
@@ -1927,8 +1927,8 @@ export function PullRequestIntegration({ open, onOpenChange }: PullRequestIntegr
                                                 variant='outline'
                                                 className={
                                                     capability.supported
-                                                        ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                                                        : 'border-amber-500/30 text-amber-700 dark:text-amber-300'
+                                                        ? 'border-[color-mix(in_oklch,var(--success)_30%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
+                                                        : 'border-[color-mix(in_oklch,var(--warning)_30%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
                                                 }>
                                                 {capability.supported ? (
                                                     <Check className='mr-1 h-3 w-3' />
@@ -2176,7 +2176,7 @@ function ReviewDiffThread({
     }
 
     if (diffQuery.data?.error) {
-        return <div className='mt-3 rounded-lg border border-amber-500/35 bg-amber-500/8 px-3 py-4 text-xs text-amber-700 dark:text-amber-200'>{diffQuery.data.error}</div>;
+        return <div className='mt-3 rounded-lg border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] px-3 py-4 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>{diffQuery.data.error}</div>;
     }
 
     if (parsed.length === 0) {

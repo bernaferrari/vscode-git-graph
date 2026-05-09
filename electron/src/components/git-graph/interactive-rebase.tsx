@@ -45,10 +45,10 @@ interface RebaseCommit {
 
 const ACTION_CONFIG: Record<RebaseAction, { label: string; color: string; shortcut: string }> = {
 	pick: { label: 'Pick', color: 'text-primary', shortcut: 'p' },
-	reword: { label: 'Reword', color: 'text-blue-500', shortcut: 'r' },
-	edit: { label: 'Edit', color: 'text-amber-500', shortcut: 'e' },
-	squash: { label: 'Squash', color: 'text-green-500', shortcut: 's' },
-	fixup: { label: 'Fixup', color: 'text-purple-500', shortcut: 'f' },
+	reword: { label: 'Reword', color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]', shortcut: 'r' },
+	edit: { label: 'Edit', color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', shortcut: 'e' },
+	squash: { label: 'Squash', color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', shortcut: 's' },
+	fixup: { label: 'Fixup', color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]', shortcut: 'f' },
 	drop: { label: 'Drop', color: 'text-destructive', shortcut: 'd' },
 };
 

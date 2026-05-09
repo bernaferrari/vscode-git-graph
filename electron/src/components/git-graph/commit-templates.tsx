@@ -233,7 +233,7 @@ export function CommitTemplatesDialog({
                                         <Button
                                             variant='ghost'
                                             size='sm'
-                                            className='h-7 w-7 p-0 text-red-600'
+                                            className='h-7 w-7 p-0 text-destructive'
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleDelete(template.id);

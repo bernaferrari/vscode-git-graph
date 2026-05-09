@@ -92,9 +92,9 @@ interface PullRequestResult {
 }
 
 const STATUS_CONFIG: Record<StackedBranch['status'], { icon: React.ElementType; color: string; label: string }> = {
-	draft: { icon: Clock, color: 'text-yellow-500', label: 'Draft' },
-	ready: { icon: Check, color: 'text-green-500', label: 'Ready' },
-	merged: { icon: GitPullRequest, color: 'text-purple-500', label: 'Merged' },
+	draft: { icon: Clock, color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]', label: 'Draft' },
+	ready: { icon: Check, color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]', label: 'Ready' },
+	merged: { icon: GitPullRequest, color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]', label: 'Merged' },
 	stale: { icon: AlertCircle, color: 'text-gray-500', label: 'Stale' },
 };
 
@@ -534,7 +534,7 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 					</div>
 				)}
 				{graphiteFallbackLocalMode && (
-					<div className='mb-3 rounded-md border border-amber-400/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-200'>
+					<div className='mb-3 rounded-md border border-[color-mix(in_oklch,var(--warning)_40%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] p-2 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 						<div className='mb-1 flex items-center gap-1 font-medium'>
 							<Link2Off className='h-3.5 w-3.5' />
 							Graphite CLI unavailable
@@ -545,14 +545,14 @@ export function StackedBranchesPanel({ children, enableGraphiteInterop = true }:
 				)}
 
 				{integrityWarnings.length > 0 && (
-					<div className='mb-3 rounded-md border border-red-400/40 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-200'>
+					<div className='mb-3 rounded-md border border-[color-mix(in_oklch,var(--destructive)_40%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] p-2 text-xs text-destructive dark:text-destructive'>
 						{integrityWarnings.map((warning) => (
 							<p key={warning}>{warning}</p>
 						))}
 					</div>
 				)}
 				{backendValidationWarnings.length > 0 && (
-					<div className='mb-3 rounded-md border border-amber-400/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-200'>
+					<div className='mb-3 rounded-md border border-[color-mix(in_oklch,var(--warning)_40%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] p-2 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 						{backendValidationWarnings.map((warning) => (
 							<p key={warning}>{warning}</p>
 						))}
@@ -654,7 +654,7 @@ function StackedBranchItem({
 			<div
 				className={cn(
 					'flex items-start gap-2 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors',
-					index === 0 && 'border-green-500/30'
+					index === 0 && 'border-[color-mix(in_oklch,var(--success)_30%,transparent)]'
 				)}
 			>
 				<div className="mt-0.5">
@@ -679,24 +679,24 @@ function StackedBranchItem({
 							className={cn(
 								'mt-1 text-[11px]',
 								branch.syncState === 'error'
-									? 'text-red-600'
+									? 'text-destructive'
 									: branch.syncState === 'warning'
-										? 'text-amber-600'
-										: 'text-emerald-600'
+										? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+										: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
 							)}
 						>
 							{branch.syncMessage ?? 'Synced'}
 						</p>
 					)}
 					{branch.baseDrift && (
-						<p className='mt-1 text-[11px] text-amber-600'>Base drift detected</p>
+						<p className='mt-1 text-[11px] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>Base drift detected</p>
 					)}
 					{branch.prUrl && (
 						<a
 							href={branch.prUrl}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-1"
+							className="text-xs text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] hover:underline flex items-center gap-1 mt-1"
 						>
 							<GitPullRequest className="h-3 w-3" />
 							View PR
@@ -709,7 +709,7 @@ function StackedBranchItem({
 						<Button
 							variant="ghost"
 							size="sm"
-							className="h-6 w-6 p-0 text-indigo-600"
+							className="h-6 w-6 p-0 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]"
 							onClick={onCreatePr}
 						>
 							{isCreatingPr ? <Loader2 className='h-3 w-3 animate-spin' /> : <GitPullRequest className='h-3 w-3' />}
@@ -736,7 +736,7 @@ function StackedBranchItem({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-6 w-6 p-0 text-red-500"
+						className="h-6 w-6 p-0 text-destructive"
 						onClick={onRemove}
 					>
 						<Trash2 className="h-3 w-3" />

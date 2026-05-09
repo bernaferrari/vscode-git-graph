@@ -199,18 +199,18 @@ export function MainNavigation({ activeItem, onItemSelect, className }: MainNavi
 									onClick={() => { toggleSection(section.id); }}
 									className={cn(
 										'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm font-medium transition-colors',
-										section.id === 'plan' ? 'text-amber-600' : 'text-muted-foreground',
+										section.id === 'plan' ? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' : 'text-muted-foreground',
 										'hover:bg-accent hover:text-foreground'
 									)}
 								>
-									{section.id === 'plan' && <Sparkles className="h-4 w-4 text-amber-500" />}
+									{section.id === 'plan' && <Sparkles className="h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />}
 									{isExpanded ? (
 										<ChevronDown className="h-4 w-4" />
 									) : (
 										<ChevronRight className="h-4 w-4" />
 									)}
-									<SectionIcon className={cn('h-4 w-4', section.id === 'plan' && 'text-amber-500')} />
-									<span className={cn(section.id === 'plan' && 'text-amber-600 dark:text-amber-400')}>
+									<SectionIcon className={cn('h-4 w-4', section.id === 'plan' && 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]')} />
+									<span className={cn(section.id === 'plan' && 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]')}>
 										{section.label}
 									</span>
 								</button>

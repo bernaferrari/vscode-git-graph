@@ -36,73 +36,114 @@ export function RepoTabs({
 	onStar,
 }: RepoTabsProps) {
     return (
-        <div className='bg-muted/20 border-border/70 flex items-center border-b px-1'>
+        <div className='flex items-center border-b border-border/70 bg-muted/20 px-1'>
             <ScrollArea className='flex-1'>
-                <div className='flex h-9 items-center gap-1'>
-                    {tabs.map((tab) => (
-                        <div
-                            key={tab.id}
-                            role='button'
-                            tabIndex={0}
-                            className={`group flex h-7 max-w-[180px] min-w-0 items-center gap-1.5 rounded-md border px-2 text-xs transition-[background-color,border-color,color] ${
-                                activeTabId === tab.id
-                                    ? 'border-primary/30 bg-background text-foreground shadow-sm'
-                                    : 'border-transparent text-muted-foreground hover:border-border/70 hover:bg-accent/45 hover:text-foreground'
-                            }`}
-                            title={tab.path}
-                            onClick={() => { onSelect(tab.id); }}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                    event.preventDefault();
-                                    onSelect(tab.id);
-                                }
-                            }}>
-                            {tab.isStarred ? (
-                                <Star className='h-3 w-3 fill-amber-500 text-amber-500' />
-                            ) : (
-                                <FolderGit2 className='h-3 w-3' />
-                            )}
-                            <span className='truncate'>{tab.name}</span>
-                            <Button
-                                variant='ghost'
-                                size='icon-xs'
-                                className='-mr-1 opacity-0 transition-opacity group-hover:opacity-100'
-                                title='Close repository'
-                                aria-label={`Close ${tab.name}`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onClose(tab.id);
+                <div className='flex h-9 items-center gap-0.5'>
+                    {tabs.map((tab) => {
+                        const active = activeTabId === tab.id;
+                        return (
+                            <div
+                                key={tab.id}
+                                role='button'
+                                tabIndex={0}
+                                aria-current={active ? 'page' : undefined}
+                                className={`group/tab relative flex h-7 min-w-0 max-w-[200px] items-center gap-1.5 rounded-md px-2 text-[11.5px] transition-[background-color,color,box-shadow] duration-150 ${
+                                    active
+                                        ? 'bg-background text-foreground shadow-[var(--shadow-sm)] ring-1 ring-border/70'
+                                        : 'text-muted-foreground hover:bg-accent/55 hover:text-foreground'
+                                }`}
+                                title={tab.path}
+                                onClick={() => { onSelect(tab.id); }}
+                                onAuxClick={(event) => {
+                                    if (event.button === 1) {
+                                        event.preventDefault();
+                                        onClose(tab.id);
+                                    }
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        onSelect(tab.id);
+                                    }
                                 }}>
-                                <X className='h-3 w-3' />
-                            </Button>
-                        </div>
-                    ))}
+                                {active && (
+                                    <span
+                                        aria-hidden
+                                        className='pointer-events-none absolute inset-x-1.5 top-0 h-[2px] rounded-b-full bg-primary'
+                                    />
+                                )}
+                                {tab.isStarred ? (
+                                    <Star
+                                        className='h-3 w-3 shrink-0 fill-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+                                        aria-hidden
+                                    />
+                                ) : (
+                                    <FolderGit2
+                                        className={`h-3 w-3 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground/85'}`}
+                                        aria-hidden
+                                    />
+                                )}
+                                <span className='truncate font-medium tracking-[-0.005em]'>{tab.name}</span>
+                                <Button
+                                    variant='ghost'
+                                    size='icon-xs'
+                                    className={`-mr-1 ml-0.5 shrink-0 transition-opacity ${
+                                        active
+                                            ? 'opacity-70 hover:opacity-100'
+                                            : 'opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100'
+                                    }`}
+                                    title='Close repository'
+                                    aria-label={`Close ${tab.name}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onClose(tab.id);
+                                    }}>
+                                    <X className='h-3 w-3' />
+                                </Button>
+                            </div>
+                        );
+                    })}
                 </div>
                 <ScrollBar orientation='horizontal' className='h-0' />
             </ScrollArea>
-            <Button variant='ghost' size='icon-sm' className='ml-1' onClick={onAdd} title='Open repository' aria-label='Open repository'>
+            <span aria-hidden className='mx-1 hidden h-5 w-px bg-border/70 md:block' />
+            <Button
+                variant='ghost'
+                size='icon-sm'
+                onClick={onAdd}
+                title='Open repository'
+                aria-label='Open repository'>
                 <Plus className='h-4 w-4' />
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant='ghost' size='icon-sm' title='Repository menu' aria-label='Repository menu'>
+                    <Button
+                        variant='ghost'
+                        size='icon-sm'
+                        title='Repository menu'
+                        aria-label='Repository menu'>
                         <MoreHorizontal className='h-4 w-4' />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align='end'>
-                    <DropdownMenuItem onClick={onAdd}>
-                        <Plus className='mr-2 h-4 w-4' />
-                        Open Repository
+                <DropdownMenuContent align='end' className='min-w-[14rem]'>
+                    <DropdownMenuItem onClick={onAdd} className='gap-2'>
+                        <Plus className='h-3.5 w-3.5' />
+                        Open repository
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {tabs.length > 0 && <DropdownMenuSeparator />}
                     {tabs.map((tab) => (
-                        <DropdownMenuItem key={tab.id} onClick={() => { onStar(tab.id); }}>
+                        <DropdownMenuItem
+                            key={tab.id}
+                            onClick={() => { onStar(tab.id); }}
+                            className='gap-2'>
                             {tab.isStarred ? (
-                                <StarOff className='mr-2 h-4 w-4' />
+                                <StarOff className='h-3.5 w-3.5 text-muted-foreground' />
                             ) : (
-                                <Star className='mr-2 h-4 w-4' />
+                                <Star className='h-3.5 w-3.5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                             )}
-                            {tab.isStarred ? 'Unstar' : 'Star'} {tab.name}
+                            <span className='truncate'>
+                                {tab.isStarred ? 'Unstar' : 'Star'} {tab.name}
+                            </span>
                         </DropdownMenuItem>
                     ))}
                 </DropdownMenuContent>

@@ -71,12 +71,12 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
     const getFileIcon = (path: string) => {
         const ext = path.split('.').pop()?.toLowerCase();
         if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext ?? '')) {
-            return <Image className='h-4 w-4 text-purple-500' />;
+            return <Image className='h-4 w-4 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' />;
         }
         if (['ts', 'tsx', 'js', 'jsx', 'py', 'rb', 'go', 'rs'].includes(ext ?? '')) {
-            return <FileCode className='h-4 w-4 text-blue-500' />;
+            return <FileCode className='h-4 w-4 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' />;
         }
-        return <FileText className='h-4 w-4 text-amber-500' />;
+        return <FileText className='h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />;
     };
 
     return (
@@ -139,11 +139,11 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                         <Badge variant='outline'>{behind} behind</Badge>
                         <span className='text-muted-foreground'>•</span>
                         <span>{totalChanges} files changed</span>
-                        <span className='flex items-center text-green-600'>
+                        <span className='flex items-center text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
                             <Plus className='mr-1 h-3 w-3' />
                             {additions}
                         </span>
-                        <span className='flex items-center text-red-600'>
+                        <span className='flex items-center text-destructive'>
                             <Minus className='mr-1 h-3 w-3' />
                             {deletions}
                         </span>
@@ -176,10 +176,10 @@ export function BranchComparison({ open, onOpenChange, initialBase, initialCompa
                                     <span
                                         className={`font-mono text-xs ${
                                             file.status === 'A'
-                                                ? 'text-green-600'
+                                                ? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
                                                 : file.status === 'D'
-                                                  ? 'text-red-600'
-                                                  : 'text-amber-600'
+                                                  ? 'text-destructive'
+                                                  : 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
                                         }`}>
                                         {file.status.toUpperCase() || 'M'}
                                     </span>

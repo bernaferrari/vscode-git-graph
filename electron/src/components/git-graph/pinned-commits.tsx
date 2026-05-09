@@ -4,15 +4,11 @@
  */
 
 import {
-	Star,
+	GitBranch,
+	MessageSquare,
+	MoreHorizontal,
 	Pin,
 	PinOff,
-	MessageSquare,
-	User,
-	Calendar,
-	Hash,
-	GitBranch,
-	MoreHorizontal,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -20,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
@@ -29,6 +26,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { trpc } from '@/trpc/client';
 
@@ -75,130 +73,148 @@ export function PinnedCommitsDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col ui-surface">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<Pin className="h-5 w-5" />
-						Pinned Commits
-						<span className="text-sm font-normal text-muted-foreground">
-							({pinnedCommits.length})
+			<DialogContent className='flex max-h-[80vh] max-w-xl flex-col gap-0 overflow-hidden p-0'>
+				<DialogHeader className='space-y-1 border-b border-border/60 px-5 py-4'>
+					<DialogTitle className='flex items-center gap-2 text-[0.9375rem]'>
+						<span className='grid h-7 w-7 place-items-center rounded-md bg-primary/12 ring-1 ring-primary/20'>
+							<Pin className='h-3.5 w-3.5 text-primary' />
+						</span>
+						<span className='font-semibold'>Pinned commits</span>
+						<span className='ml-1 rounded-full border border-border/70 bg-card/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground/85'>
+							{pinnedCommits.length}
 						</span>
 					</DialogTitle>
+					<DialogDescription className='text-[11px] text-muted-foreground/85'>
+						Bookmarks that survive across sessions. Pin a commit to keep it within reach.
+					</DialogDescription>
 				</DialogHeader>
 
-				<ScrollArea className="flex-1 -mx-6">
-					<div className="px-6 py-2 space-y-2">
-						{sortedCommits.length === 0 ? (
-							<div className="text-center py-8 text-muted-foreground">
-								<Star className="h-8 w-8 mx-auto mb-2 opacity-50" />
-								<p className="text-sm">No pinned commits yet</p>
-								<p className="text-xs mt-1">
-									Right-click on a commit and select "Pin Commit"
-								</p>
-							</div>
-						) : (
-							sortedCommits.map((commit) => (
-								<div
+				<ScrollArea className='flex-1'>
+					{sortedCommits.length === 0 ? (
+						<div className='flex flex-col items-center justify-center px-4 py-12 text-center'>
+							<span className='mb-3 grid h-10 w-10 place-items-center rounded-lg bg-muted/60 text-muted-foreground/85 ring-1 ring-border/50'>
+								<Pin className='h-4 w-4' />
+							</span>
+							<p className='text-[0.8125rem] font-semibold tracking-[-0.005em]'>No pinned commits yet</p>
+							<p className='mt-0.5 max-w-[20rem] text-xs text-muted-foreground/85'>
+								Right-click any commit and choose <span className='font-mono'>Pin commit</span>. They&rsquo;ll show up here, sorted newest first.
+							</p>
+						</div>
+					) : (
+						<ul className='divide-y divide-border/40'>
+							{sortedCommits.map((commit) => (
+								<li
 									key={commit.hash}
-									className="p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-								>
-									<div className="flex items-start gap-3">
-										<div className="flex-1 min-w-0">
-											<div className="flex items-center gap-2 mb-1">
-												<Hash className="h-3 w-3 text-muted-foreground" />
-												<span className="font-mono text-xs">{commit.hash.slice(0, 8)}</span>
+									className='group/pinned relative px-5 py-3 transition-colors hover:bg-muted/30'>
+									<div className='flex items-start gap-3'>
+										<button
+											type='button'
+											className='-mx-1 -my-1 flex min-w-0 flex-1 flex-col gap-1.5 rounded-md px-1 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
+											onClick={() => { onJumpToCommit(commit.hash); }}
+											title='Jump to this commit'>
+											<div className='flex flex-wrap items-center gap-1.5 leading-none'>
+												<span className='inline-flex items-center rounded-md border border-border/70 bg-card/70 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-foreground/85'>
+													{commit.hash.slice(0, 8)}
+												</span>
 												{commit.branch && (
-													<>
-														<GitBranch className="h-3 w-3 text-muted-foreground" />
-														<span className="text-xs text-muted-foreground truncate">
-															{commit.branch}
-														</span>
-													</>
+													<span className='inline-flex items-center gap-1 font-mono text-[10px] tabular-nums text-muted-foreground/85'>
+														<GitBranch className='h-2.5 w-2.5' />
+														{commit.branch}
+													</span>
 												)}
 											</div>
-											<p className="text-sm font-medium truncate mb-1">
+											<p className='line-clamp-2 text-[12.5px] font-medium leading-snug tracking-[-0.005em]'>
 												{commit.message}
 											</p>
-											<div className="flex items-center gap-3 text-xs text-muted-foreground">
-												<span className="flex items-center gap-1">
-													<User className="h-3 w-3" />
-													{commit.author}
-												</span>
-												<span className="flex items-center gap-1">
-													<Calendar className="h-3 w-3" />
-													{new Date(commit.date).toLocaleDateString()}
-												</span>
+											<div className='flex items-center gap-2 text-[11px] text-muted-foreground/85'>
+												<span className='truncate'>{commit.author}</span>
+												<span aria-hidden className='inline-block h-0.5 w-0.5 rounded-full bg-muted-foreground/50' />
+												<span className='tabular-nums'>{new Date(commit.date).toLocaleDateString()}</span>
 											</div>
-
-											{commit.note && (
-												<div className="mt-2 p-2 rounded bg-background text-xs">
-													<span className="text-muted-foreground">Note: </span>
-													{commit.note}
-												</div>
-											)}
-
-											{editingNote === commit.hash && (
-												<div className="mt-2 flex gap-2">
-													<input
-														type="text"
-														value={noteText}
-														onChange={(e) => { setNoteText(e.target.value); }}
-														placeholder="Add a note..."
-														className="flex-1 px-2 py-1 text-xs border rounded"
-														autoFocus
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') handleSaveNote(commit.hash);
-															if (e.key === 'Escape') {
-																setEditingNote(null);
-																setNoteText('');
-															}
-														}}
-													/>
-													<Button
-														size="sm"
-														className="h-6 px-2 text-xs"
-														onClick={() => { handleSaveNote(commit.hash); }}
-													>
-														Save
-													</Button>
-												</div>
-											)}
-										</div>
+										</button>
 
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
-												<Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-													<MoreHorizontal className="h-4 w-4" />
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-6 w-6 shrink-0 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pinned:opacity-100'
+													aria-label='More actions'>
+													<MoreHorizontal className='h-4 w-4' />
 												</Button>
 											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem onClick={() => { onJumpToCommit(commit.hash); }}>
-													<GitBranch className="h-4 w-4 mr-2" />
-													Jump to Commit
+											<DropdownMenuContent align='end' className='min-w-[12rem]'>
+												<DropdownMenuItem onClick={() => { onJumpToCommit(commit.hash); }} className='gap-2'>
+													<GitBranch className='h-3.5 w-3.5' />
+													Jump to commit
 												</DropdownMenuItem>
 												<DropdownMenuItem
 													onClick={() => {
 														setEditingNote(commit.hash);
 														setNoteText(commit.note ?? '');
 													}}
-												>
-													<MessageSquare className="h-4 w-4 mr-2" />
-													{commit.note ? 'Edit Note' : 'Add Note'}
+													className='gap-2'>
+													<MessageSquare className='h-3.5 w-3.5' />
+													{commit.note ? 'Edit note' : 'Add note'}
 												</DropdownMenuItem>
 												<DropdownMenuItem
 													onClick={() => { onUnpin(commit.hash); }}
-													className="text-red-600"
-												>
-													<PinOff className="h-4 w-4 mr-2" />
-													Unpin Commit
+													className='gap-2 text-destructive'>
+													<PinOff className='h-3.5 w-3.5' />
+													Unpin commit
 												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
 									</div>
-								</div>
-							))
-						)}
-					</div>
+
+									{commit.note && editingNote !== commit.hash && (
+										<p className='mt-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/85'>
+											<span className='mr-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+												Note
+											</span>
+											{commit.note}
+										</p>
+									)}
+
+									{editingNote === commit.hash && (
+										<div className='mt-2 flex gap-1.5'>
+											<Input
+												type='text'
+												value={noteText}
+												onChange={(e) => { setNoteText(e.target.value); }}
+												placeholder='Add a note…'
+												className='h-7 flex-1 text-[11px]'
+												autoFocus
+												onKeyDown={(e) => {
+													if (e.key === 'Enter') handleSaveNote(commit.hash);
+													if (e.key === 'Escape') {
+														setEditingNote(null);
+														setNoteText('');
+													}
+												}}
+											/>
+											<Button
+												size='sm'
+												className='h-7 px-2 text-[11px]'
+												onClick={() => { handleSaveNote(commit.hash); }}>
+												Save
+											</Button>
+											<Button
+												variant='outline'
+												size='sm'
+												className='h-7 px-2 text-[11px]'
+												onClick={() => {
+													setEditingNote(null);
+													setNoteText('');
+												}}>
+												Cancel
+											</Button>
+										</div>
+									)}
+								</li>
+							))}
+						</ul>
+					)}
 				</ScrollArea>
 			</DialogContent>
 		</Dialog>

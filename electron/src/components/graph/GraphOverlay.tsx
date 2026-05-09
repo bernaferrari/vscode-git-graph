@@ -100,10 +100,10 @@ export function GraphOverlay({
 	}), [changes]);
 
 	const actionColors = {
-		unchanged: 'bg-blue-500',
-		new: 'bg-green-500',
-		rewritten: 'bg-amber-500',
-		dropped: 'bg-red-500',
+		unchanged: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)]',
+		new: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]',
+		rewritten: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]',
+		dropped: 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]',
 	};
 
 	const actionLabels = {
@@ -198,8 +198,8 @@ export function GraphOverlay({
 										className={cn(
 											'flex items-center gap-2 p-1.5 rounded text-xs transition-all',
 											isHighlighted && 'ring-2 ring-primary',
-											action === 'new' && 'bg-green-50 dark:bg-green-950/30 border border-green-200',
-											action === 'rewritten' && 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200',
+											action === 'new' && 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)] border border-[color-mix(in_oklch,var(--success)_35%,transparent)]',
+											action === 'rewritten' && 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)] border border-[color-mix(in_oklch,var(--warning)_35%,transparent)]',
 											!showGhosts && action !== 'unchanged' && 'hidden'
 										)}
 									>
@@ -227,19 +227,19 @@ export function GraphOverlay({
 			{/* Summary */}
 			<div className="flex items-center gap-4 text-xs text-muted-foreground">
 				{stats.dropped > 0 && (
-					<span className="flex items-center gap-1 text-red-600">
+					<span className="flex items-center gap-1 text-destructive">
 						<Minus className="h-3 w-3" />
 						{stats.dropped} commit(s) will be removed
 					</span>
 				)}
 				{stats.new > 0 && (
-					<span className="flex items-center gap-1 text-green-600">
+					<span className="flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 						<Plus className="h-3 w-3" />
 						{stats.new} new commit(s)
 					</span>
 				)}
 				{stats.rewritten > 0 && (
-					<span className="flex items-center gap-1 text-amber-600">
+					<span className="flex items-center gap-1 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 						<RefreshCw className="h-3 w-3" />
 						{stats.rewritten} rewritten (new hashes)
 					</span>
@@ -259,23 +259,23 @@ export function CompactGraphDiff({
 	return (
 		<div className="flex items-center gap-3">
 			<div className="flex items-center gap-1.5">
-				<div className="w-2 h-2 rounded-full bg-blue-500" />
+				<div className="w-2 h-2 rounded-full bg-[color-mix(in_oklch,var(--info)_15%,transparent)]" />
 				<span className="text-xs">{stats.unchanged}</span>
 			</div>
 			{stats.new > 0 && (
-				<div className="flex items-center gap-1.5 text-green-600">
+				<div className="flex items-center gap-1.5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 					<Plus className="h-3 w-3" />
 					<span className="text-xs font-medium">+{stats.new}</span>
 				</div>
 			)}
 			{stats.rewritten > 0 && (
-				<div className="flex items-center gap-1.5 text-amber-600">
+				<div className="flex items-center gap-1.5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 					<RefreshCw className="h-3 w-3" />
 					<span className="text-xs font-medium">{stats.rewritten}</span>
 				</div>
 			)}
 			{stats.dropped > 0 && (
-				<div className="flex items-center gap-1.5 text-red-600">
+				<div className="flex items-center gap-1.5 text-destructive">
 					<Minus className="h-3 w-3" />
 					<span className="text-xs font-medium">-{stats.dropped}</span>
 				</div>

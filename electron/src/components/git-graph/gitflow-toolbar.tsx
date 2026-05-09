@@ -101,19 +101,19 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 	const FLOW_CONFIG = {
 		feature: {
 			icon: GitBranch,
-			color: 'text-blue-500',
+			color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]',
 			label: 'Feature',
 			description: 'Start a new feature branch from develop',
 		},
 		release: {
 			icon: Flag,
-			color: 'text-green-500',
+			color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
 			label: 'Release',
 			description: 'Start a new release branch from develop',
 		},
 		hotfix: {
 			icon: Flame,
-			color: 'text-red-500',
+			color: 'text-destructive',
 			label: 'Hotfix',
 			description: 'Start a new hotfix branch from master',
 		},
@@ -126,19 +126,19 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-							<GitBranch className="h-3 w-3 text-blue-500" />
+							<GitBranch className="h-3 w-3 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]" />
 							<span className="hidden sm:inline">Feature</span>
 							<ChevronDown className="h-3 w-3" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
 						<DropdownMenuItem onClick={() => { openDialog('feature', 'start'); }}>
-							<Play className="h-4 w-4 mr-2 text-blue-500" />
+							<Play className="h-4 w-4 mr-2 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]" />
 							Start New Feature
 						</DropdownMenuItem>
 						{branchInfo?.type === 'feature' && (
 							<DropdownMenuItem onClick={() => { openDialog('feature', 'finish'); }}>
-								<Check className="h-4 w-4 mr-2 text-green-500" />
+								<Check className="h-4 w-4 mr-2 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 								Finish Feature: {branchInfo.name}
 							</DropdownMenuItem>
 						)}
@@ -149,19 +149,19 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-							<Flag className="h-3 w-3 text-green-500" />
+							<Flag className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							<span className="hidden sm:inline">Release</span>
 							<ChevronDown className="h-3 w-3" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
 						<DropdownMenuItem onClick={() => { openDialog('release', 'start'); }}>
-							<Play className="h-4 w-4 mr-2 text-green-500" />
+							<Play className="h-4 w-4 mr-2 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Start New Release
 						</DropdownMenuItem>
 						{branchInfo?.type === 'release' && (
 							<DropdownMenuItem onClick={() => { openDialog('release', 'finish'); }}>
-								<Check className="h-4 w-4 mr-2 text-green-500" />
+								<Check className="h-4 w-4 mr-2 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 								Finish Release: {branchInfo.name}
 							</DropdownMenuItem>
 						)}
@@ -172,19 +172,19 @@ export function GitFlowToolbar({ currentBranch }: GitFlowToolbarProps) {
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-							<Flame className="h-3 w-3 text-red-500" />
+							<Flame className="h-3 w-3 text-destructive" />
 							<span className="hidden sm:inline">Hotfix</span>
 							<ChevronDown className="h-3 w-3" />
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start">
 						<DropdownMenuItem onClick={() => { openDialog('hotfix', 'start'); }}>
-							<Play className="h-4 w-4 mr-2 text-red-500" />
+							<Play className="h-4 w-4 mr-2 text-destructive" />
 							Start New Hotfix
 						</DropdownMenuItem>
 						{branchInfo?.type === 'hotfix' && (
 							<DropdownMenuItem onClick={() => { openDialog('hotfix', 'finish'); }}>
-								<Check className="h-4 w-4 mr-2 text-green-500" />
+								<Check className="h-4 w-4 mr-2 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 								Finish Hotfix: {branchInfo.name}
 							</DropdownMenuItem>
 						)}

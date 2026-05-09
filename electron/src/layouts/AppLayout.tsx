@@ -48,17 +48,17 @@ function MainViewLoadingFallback() {
 
     return (
         <div className='flex flex-1 items-center justify-center p-6'>
-            <div className='ui-surface w-full max-w-lg space-y-4 p-5'>
+            <div className='ui-surface w-full max-w-md space-y-3.5 p-5'>
                 <div className='flex items-center gap-2'>
-                    <Loader2 className='text-primary h-4 w-4 animate-spin' />
-                    <p className='text-sm font-medium'>Loading view</p>
+                    <Loader2 className='text-primary h-3.5 w-3.5 animate-spin' />
+                    <p className='text-[0.8125rem] font-semibold tracking-[-0.01em]'>Loading view</p>
                 </div>
-                <p className='text-muted-foreground text-xs'>
-                    {showSlowHint ? 'Still loading. Preparing interface modules...' : 'Preparing interface...'}
+                <p className='text-muted-foreground text-xs leading-relaxed'>
+                    {showSlowHint ? 'Still loading. Preparing interface modules…' : 'Preparing interface…'}
                 </p>
                 <div className='space-y-2'>
-                    <div className='bg-muted h-8 w-full rounded-md motion-safe:animate-pulse' />
-                    <div className='bg-muted h-8 w-[88%] rounded-md motion-safe:animate-pulse' />
+                    <div className='bg-muted/70 h-6 w-full rounded-md motion-safe:animate-pulse' />
+                    <div className='bg-muted/70 h-6 w-[82%] rounded-md motion-safe:animate-pulse' />
                 </div>
             </div>
         </div>
@@ -299,44 +299,44 @@ export default function AppLayout() {
             </a>
             {repoNavMode === 'sidebar' && (
                 <aside
-                    className={`app-shell-sidebar ui-reveal flex flex-col ${sidebarOpen ? 'w-64' : 'w-12'}`}
+                    className={`app-shell-sidebar ui-reveal flex flex-col transition-[width] duration-200 ease-out ${sidebarOpen ? 'w-60' : 'w-12'}`}
                     role='navigation'
                     aria-label='Repository navigation'>
                     <div
-                        className={`sidebar-header border-sidebar-border flex items-center border-b ${
-                            sidebarOpen ? 'justify-between px-3' : 'justify-center px-1'
+                        className={`sidebar-header flex items-center ${
+                            sidebarOpen ? 'justify-between px-3 py-2' : 'justify-center p-1.5'
                         }`}
                         style={{ WebkitAppRegion: 'drag' }}>
                         {sidebarOpen && (
                             <div className='flex items-center gap-2'>
-                                <FolderGit2 className='text-primary h-4 w-4' />
-                                <span className='text-sm font-semibold select-none'>Git Graph</span>
+                                <div className='flex h-6 w-6 items-center justify-center rounded-md bg-primary/12 text-primary ring-1 ring-primary/20'>
+                                    <FolderGit2 className='h-3.5 w-3.5' />
+                                </div>
+                                <span className='text-[0.8125rem] font-semibold tracking-[-0.01em] select-none'>GitLizard</span>
                             </div>
                         )}
                         <div
-                            className={`flex items-center ${sidebarOpen ? 'ml-auto gap-1' : 'w-full justify-center'}`}
+                            className={`flex items-center ${sidebarOpen ? 'ml-auto gap-0.5' : 'w-full justify-center'}`}
                             style={{ WebkitAppRegion: 'no-drag' }}>
                             {sidebarOpen && (
                                 <Button
                                     variant='ghost'
-                                    size='sm'
+                                    size='icon-sm'
                                     onClick={() => { setRepoNavMode('tabs'); }}
-                                    className='h-9 w-9 p-0'
                                     title='Switch to tabbed repositories'
                                     aria-label='Switch to tabbed repositories'>
-                                    <PanelTop className='h-4 w-4' />
+                                    <PanelTop className='h-3.5 w-3.5' />
                                 </Button>
                             )}
                             <Button
                                 variant='ghost'
-                                size='sm'
+                                size='icon-sm'
                                 onClick={() => { setSidebarOpen(!sidebarOpen); }}
-                                className='h-9 w-9 p-0'
                                 aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                                 {sidebarOpen ? (
-                                    <ChevronLeft className='h-4 w-4' />
+                                    <ChevronLeft className='h-3.5 w-3.5' />
                                 ) : (
-                                    <ChevronRight className='h-4 w-4' />
+                                    <ChevronRight className='h-3.5 w-3.5' />
                                 )}
                             </Button>
                         </div>
@@ -344,87 +344,88 @@ export default function AppLayout() {
 
                     {sidebarOpen && (
                         <>
-                            <div className='border-sidebar-border border-b p-3'>
-                                <div className='space-y-3'>
-                                    <div>
-                                        <p className='text-sm font-medium'>Repositories</p>
-                                        <p className='text-muted-foreground mt-1 text-xs leading-5'>
-                                            {activeRepo ? 'Switch context.' : 'Start with a local folder.'}
-                                        </p>
-                                    </div>
-                                    <Button
-                                        className='w-full justify-start gap-2'
-                                        onClick={() => { void handleOpenFolder(); }}
-                                        disabled={isRepoBusy || isRepoLoading}>
-                                        {isRepoLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Plus className='h-4 w-4' />}
-                                        {repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Open Repository'}
-                                    </Button>
-                                </div>
+                            <div className='px-3 pt-1 pb-3'>
+                                <Button
+                                    size='sm'
+                                    className='w-full justify-center gap-1.5'
+                                    onClick={() => { void handleOpenFolder(); }}
+                                    disabled={isRepoBusy || isRepoLoading}>
+                                    {isRepoLoading ? (
+                                        <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                                    ) : (
+                                        <Plus className='h-3.5 w-3.5' />
+                                    )}
+                                    <span>{repoLoadPhase === 'dialog-open' ? 'Choose Folder' : 'Open Repository'}</span>
+                                </Button>
                             </div>
 
-                            <ScrollArea className='flex-1 px-2'>
+                            <ScrollArea className='flex-1'>
+                                <div className='px-2 pb-3'>
                                 {Object.keys(groupedRepos).length > 0 && (
-                                    <div className='pb-2'>
-                                        <div className='text-muted-foreground mb-1.5 flex items-center gap-1.5 px-2 pt-1 text-xs font-medium'>
-                                            <FolderOpen className='h-3 w-3' />
-                                            <span>All Repositories</span>
-                                        </div>
+                                    <div className='space-y-3'>
                                         {Object.entries(groupedRepos).map(([folder, repos]) => (
-                                            <div key={folder} className='mb-2'>
-                                                <div className='text-muted-foreground/60 px-2 py-1 text-[10px] font-medium tracking-wider uppercase'>
+                                            <div key={folder} className='space-y-0.5'>
+                                                <div className='text-muted-foreground/70 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-[0.06em] uppercase'>
                                                     {folder}
                                                 </div>
-                                                <div className='space-y-0.5'>
-                                                    {repos.map((repo) => (
+                                                {repos.map((repo) => {
+                                                    const isActive = activeRepo === repo.path;
+                                                    return (
                                                         <button
                                                             type='button'
                                                             key={repo.path}
-                                                            className={`w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-                                                                activeRepo === repo.path
-                                                                    ? 'bg-accent text-accent-foreground'
-                                                                    : 'hover:bg-accent/50 text-foreground'
+                                                            className={`group/repo relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.8125rem] transition-colors ${
+                                                                isActive
+                                                                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                                                    : 'text-foreground/85 hover:bg-sidebar-accent/60 hover:text-foreground'
                                                             }`}
                                                             onClick={() => {
                                                                 void handleActivateRepo(repo.path);
                                                             }}>
-                                                            <div className='flex items-center gap-2'>
-                                                                <FolderGit2 className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-                                                                <span className='truncate'>{repo.name}</span>
-                                                            </div>
+                                                            {isActive && (
+                                                                <span className='absolute inset-y-1.5 left-0 w-[2px] rounded-r-full bg-primary' />
+                                                            )}
+                                                            <FolderGit2
+                                                                className={`h-3.5 w-3.5 shrink-0 ${
+                                                                    isActive ? 'text-primary' : 'text-muted-foreground'
+                                                                }`}
+                                                            />
+                                                            <span className='truncate'>{repo.name}</span>
                                                         </button>
-                                                    ))}
-                                                </div>
+                                                    );
+                                                })}
                                             </div>
                                         ))}
                                     </div>
                                 )}
 
                                 {repoEntries.length === 0 ? (
-                                    <div className='empty-state ui-reveal'>
-                                        <FolderOpen className='text-muted-foreground h-6 w-6' />
-                                        <div className='text-foreground font-medium'>No repositories yet</div>
-                                        <div className='text-xs'>Open a folder to start using Git Graph.</div>
+                                    <div className='ui-reveal mt-6 flex flex-col items-center justify-center gap-2 px-4 py-8 text-center'>
+                                        <div className='flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground'>
+                                            <FolderOpen className='h-4 w-4' />
+                                        </div>
+                                        <div className='text-foreground text-[0.8125rem] font-medium'>No repositories yet</div>
+                                        <div className='text-muted-foreground text-[11px]'>Open a folder to begin.</div>
                                     </div>
                                 ) : null}
+                                </div>
                             </ScrollArea>
                         </>
                     )}
 
                     {!sidebarOpen && (
-                        <div className='flex flex-col items-center gap-1 p-2'>
+                        <div className='flex flex-col items-center gap-1 p-1.5'>
                             <Button
                                 variant='ghost'
-                                size='sm'
-                                className='h-11 w-11 p-0'
+                                size='icon-sm'
                                 onClick={() => { setSidebarOpen(true); }}
                                 title='Expand sidebar'
                                 aria-label='Expand sidebar'>
-                                <ChevronRight className='h-4 w-4' />
+                                <ChevronRight className='h-3.5 w-3.5' />
                             </Button>
                             <Button
                                 variant='ghost'
-                                size='sm'
-                                className='h-11 w-11 p-0'
+                                size='icon-sm'
                                 onClick={() => { void handleOpenFolder(); }}
                                 onPointerEnter={() => {
                                     void preloadGitGraph();
@@ -436,19 +437,18 @@ export default function AppLayout() {
                                 title='Open Repository'
                                 aria-label='Open Repository'>
                                 {isRepoLoading ? (
-                                    <Loader2 className='h-4 w-4 animate-spin' />
+                                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
                                 ) : (
-                                    <Plus className='h-4 w-4' />
+                                    <Plus className='h-3.5 w-3.5' />
                                 )}
                             </Button>
                             <Button
                                 variant='ghost'
-                                size='sm'
-                                className='h-11 w-11 p-0'
+                                size='icon-sm'
                                 onClick={() => { setRepoNavMode('tabs'); }}
                                 title='Switch to tabbed repositories'
                                 aria-label='Switch to tabbed repositories'>
-                                <PanelTop className='h-4 w-4' />
+                                <PanelTop className='h-3.5 w-3.5' />
                             </Button>
                         </div>
                     )}
@@ -457,115 +457,127 @@ export default function AppLayout() {
 
             <div id='main-content' className='app-shell-main ui-reveal flex flex-1 flex-col overflow-hidden'>
                 {repoLoading && (
-                    <div className='border-b border-amber-400/25 bg-amber-500/12 px-3 py-1.5'>
-                        <div className='flex items-center gap-2 text-xs'>
-                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    <div className='ui-banner ui-banner-warning'>
+                        <div className='flex items-center gap-2 text-[11px]'>
+                            <Loader2 className='h-3 w-3 animate-spin text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]' />
                             <span className='font-medium'>{repoLoadingLabel}</span>
                             <span className='text-muted-foreground'>{repoLoadingHint}</span>
                         </div>
                     </div>
                 )}
                 {repoLoadPhase === 'error' && repoLoadError && (
-                    <div className='border-b border-red-500/35 bg-red-500/10 px-3 py-2'>
-                        <div className='flex flex-wrap items-center gap-2 text-xs'>
-                            <span className='font-medium text-red-500'>Repository load failed.</span>
+                    <div className='ui-banner ui-banner-error'>
+                        <div className='flex flex-wrap items-center gap-2 text-[11px]'>
+                            <span className='font-semibold text-destructive'>Repository load failed.</span>
                             <span className='text-muted-foreground'>{repoLoadError}</span>
                             <Button
                                 variant='outline'
-                                size='sm'
-                                className='ml-auto h-7'
+                                size='xs'
+                                className='ml-auto'
                                 onClick={() => { resetRepoLoadState(activeRepo ? 'ready' : 'idle'); }}>
                                 Dismiss
                             </Button>
-                            <Button variant='outline' size='sm' className='h-7' onClick={() => void handleOpenFolder()}>
+                            <Button variant='outline' size='xs' onClick={() => void handleOpenFolder()}>
                                 Try again
                             </Button>
                         </div>
                     </div>
                 )}
                 {error && (
-                    <div className='border-b border-red-500/35 bg-red-500/10 px-3 py-2'>
-                        <div className='flex items-center gap-2 text-xs'>
-                            <span className='font-medium text-red-500'>Unexpected runtime error.</span>
+                    <div className='ui-banner ui-banner-error'>
+                        <div className='flex items-center gap-2 text-[11px]'>
+                            <span className='font-semibold text-destructive'>Unexpected runtime error.</span>
                             <span className='text-muted-foreground truncate'>{error}</span>
-                            <Button variant='outline' size='sm' className='ml-auto h-7' onClick={() => { setError(null); }}>
+                            <Button variant='outline' size='xs' className='ml-auto' onClick={() => { setError(null); }}>
                                 Dismiss
                             </Button>
                         </div>
                     </div>
                 )}
                 {operationLoading && (
-                    <div className='border-b border-sky-500/25 bg-sky-500/10 px-3 py-1.5'>
-                        <div className='flex items-center gap-2 text-xs'>
-                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    <div className='ui-banner ui-banner-info'>
+                        <div className='flex items-center gap-2 text-[11px]'>
+                            <Loader2 className='h-3 w-3 animate-spin text-[color-mix(in_oklch,var(--info)_70%,var(--foreground))]' />
                             <span className='font-medium'>{operationLabel ?? 'Running Git operation...'}</span>
-                            <span className='text-muted-foreground'>You can keep browsing while this runs.</span>
+                            <span className='text-muted-foreground'>Continue browsing while this runs.</span>
                             {operationQueue.length > 1 && (
                                 <span className='text-muted-foreground tabular-nums'>
-                                    ({operationQueue.length - 1} queued)
+                                    +{operationQueue.length - 1} queued
                                 </span>
                             )}
                         </div>
                     </div>
                 )}
                 {repoNavMode === 'tabs' && (
-                    <div className='ui-toolbar tabs-nav-toolbar flex items-center gap-2 border-b px-2 py-1.5'>
+                    <div className='ui-toolbar tabs-nav-toolbar flex items-center gap-1.5 border-b px-1.5 py-1'>
                         <Button
                             variant='ghost'
-                            size='sm'
-                            className='h-9 w-9 shrink-0 p-0'
+                            size='icon-sm'
+                            className='shrink-0'
                             onClick={() => {
                                 setRepoNavMode('sidebar');
                                 setSidebarOpen(true);
                             }}
                             title='Switch to sidebar navigation'
                             aria-label='Switch to sidebar navigation'>
-                            <PanelLeft className='h-4 w-4' />
+                            <PanelLeft className='h-3.5 w-3.5' />
                         </Button>
-                        <ScrollArea className='flex-1'>
-                            <div className='flex items-center gap-1 py-0.5'>
-                                {openedRepoEntries.map((repo) => (
-                                    <div
-                                        key={repo.path}
-                                        role='button'
-                                        tabIndex={0}
-                                        className={`group flex h-8 max-w-[220px] min-w-[160px] items-center gap-1.5 rounded-md border px-2 text-sm transition-colors ${
-                                            activeRepo === repo.path
-                                                ? 'bg-accent text-accent-foreground border-border/80'
-                                                : 'hover:bg-accent/45 border-transparent'
-                                        }`}
-                                        onClick={() => {
-                                            void handleActivateRepo(repo.path);
-                                        }}
-                                        onKeyDown={(event) => {
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                                event.preventDefault();
-                                                void handleActivateRepo(repo.path);
-                                            }
-                                        }}>
-                                        <FolderGit2 className='text-muted-foreground h-3.5 w-3.5 shrink-0' />
-                                        <span className='flex-1 truncate'>{repo.name}</span>
-                                        <button
-                                            type='button'
-                                            className='hover:bg-accent/80 text-muted-foreground hover:text-foreground h-6 w-6 rounded p-0 opacity-0 transition-opacity group-hover:opacity-100'
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                handleCloseOpenedRepo(repo.path);
-                                            }}
-                                            aria-label={`Close ${repo.name}`}>
-                                            <X className='mx-auto h-3 w-3' />
-                                        </button>
-                                    </div>
-                                ))}
-                                {openedRepoEntries.length === 0 && (
-                                    <div className='text-muted-foreground px-2 text-sm'>No opened repositories</div>
-                                )}
-                            </div>
-                        </ScrollArea>
+                        <div className='flex-1 overflow-hidden'>
+                            <ScrollArea>
+                                <div className='flex items-center gap-0.5 py-0.5'>
+                                    {openedRepoEntries.map((repo) => {
+                                        const isActive = activeRepo === repo.path;
+                                        return (
+                                            <div
+                                                key={repo.path}
+                                                role='button'
+                                                tabIndex={0}
+                                                className={`group/tab relative flex h-7 max-w-[220px] min-w-[140px] items-center gap-1.5 rounded-md px-2 text-[0.8125rem] transition-colors ${
+                                                    isActive
+                                                        ? 'bg-accent text-accent-foreground'
+                                                        : 'text-foreground/75 hover:bg-accent/60 hover:text-foreground'
+                                                }`}
+                                                onClick={() => {
+                                                    void handleActivateRepo(repo.path);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter' || event.key === ' ') {
+                                                        event.preventDefault();
+                                                        void handleActivateRepo(repo.path);
+                                                    }
+                                                }}>
+                                                {isActive && (
+                                                    <span className='absolute inset-x-2 -bottom-1 h-[2px] rounded-full bg-primary' />
+                                                )}
+                                                <FolderGit2
+                                                    className={`h-3.5 w-3.5 shrink-0 ${
+                                                        isActive ? 'text-primary' : 'text-muted-foreground'
+                                                    }`}
+                                                />
+                                                <span className='flex-1 truncate font-medium'>{repo.name}</span>
+                                                <button
+                                                    type='button'
+                                                    className='text-muted-foreground hover:bg-foreground/8 hover:text-foreground -mr-1 grid h-5 w-5 place-items-center rounded opacity-0 transition-opacity group-hover/tab:opacity-100 focus-visible:opacity-100'
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleCloseOpenedRepo(repo.path);
+                                                    }}
+                                                    aria-label={`Close ${repo.name}`}>
+                                                    <X className='h-3 w-3' />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {openedRepoEntries.length === 0 && (
+                                        <div className='text-muted-foreground px-2 text-[0.8125rem]'>No opened repositories</div>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
                         <Button
                             variant='outline'
                             size='sm'
-                            className='h-8 shrink-0 gap-1.5'
+                            className='shrink-0 gap-1.5'
                             onClick={() => { void handleOpenFolder(); }}
                             onPointerEnter={() => {
                                 void preloadGitGraph();

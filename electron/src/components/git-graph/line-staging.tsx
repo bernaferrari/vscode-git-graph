@@ -264,7 +264,7 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 									{/* Hunk header */}
 									<div
 										className={`flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-accent/50 ${
-											hunk.selected ? 'bg-green-500/10' : ''
+											hunk.selected ? 'bg-[color-mix(in_oklch,var(--success)_10%,transparent)]' : ''
 										}`}
 										onClick={() => { toggleHunk(hunkIndex); }}
 									>
@@ -283,8 +283,8 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 												<ChevronRight className="h-3 w-3" />
 											)}
 										</Button>
-										<Check className={`h-3 w-3 ${hunk.selected ? 'text-green-600' : 'text-muted-foreground'}`} />
-										<span className="text-blue-600 dark:text-blue-400">{hunk.header}</span>
+										<Check className={`h-3 w-3 ${hunk.selected ? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' : 'text-muted-foreground'}`} />
+										<span className="text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">{hunk.header}</span>
 									</div>
 
 									{/* Hunk lines */}
@@ -292,10 +292,10 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 										<div
 											key={lineIndex}
 											className={`flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-accent/30 ${
-												line.selected ? 'bg-green-500/10' : ''
+												line.selected ? 'bg-[color-mix(in_oklch,var(--success)_10%,transparent)]' : ''
 											} ${
-												line.type === 'added' ? 'bg-green-500/5' :
-												line.type === 'removed' ? 'bg-red-500/5' : ''
+												line.type === 'added' ? 'bg-[color-mix(in_oklch,var(--success)_5%,transparent)]' :
+												line.type === 'removed' ? 'bg-[color-mix(in_oklch,var(--destructive)_5%,transparent)]' : ''
 											}`}
 											onClick={() => { if (line.type !== 'context') toggleLine(hunkIndex, lineIndex); }}
 										>
@@ -306,11 +306,11 @@ export function LineStaging({ open, onOpenChange, filePath, onStaged }: LineStag
 												{line.newLineNumber ?? ''}
 											</div>
 											<div className="w-4 text-center select-none">
-												{line.type === 'added' && <Plus className="h-3 w-3 text-green-600 inline" />}
-												{line.type === 'removed' && <Minus className="h-3 w-3 text-red-600 inline" />}
+												{line.type === 'added' && <Plus className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] inline" />}
+												{line.type === 'removed' && <Minus className="h-3 w-3 text-destructive inline" />}
 											</div>
 											{line.type !== 'context' && (
-												<Check className={`h-3 w-3 ${line.selected ? 'text-green-600' : 'text-muted-foreground/30'}`} />
+												<Check className={`h-3 w-3 ${line.selected ? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' : 'text-muted-foreground/30'}`} />
 											)}
 											<pre className="flex-1 whitespace-pre overflow-hidden">
 												{line.content}

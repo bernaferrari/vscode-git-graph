@@ -27,8 +27,10 @@ interface CommitListProps {
     commits: DisplayCommit[];
     layout: GraphLayout | null;
     selectedIndex: number | null;
+    /** Hashes of all rows currently in the multi-select set (>= 2 entries). */
+    multiSelectedHashes?: ReadonlySet<string>;
     expandedIndex: number | null;
-    onSelect: (index: number) => void;
+    onSelect: (index: number, modifiers?: { shift?: boolean; meta?: boolean }) => void;
     onExpand: (index: number | null) => void;
     onContextMenu?: (index: number, event: React.MouseEvent) => void;
     showAvatars?: boolean;
@@ -38,23 +40,23 @@ interface CommitListProps {
 
 // Row height - must match graph grid Y spacing
 // eslint-disable-next-line react-refresh/only-export-components
-export const ROW_HEIGHT = 32;
+export const ROW_HEIGHT = 30;
 const COMMIT_ROW_BASE_CLASS =
-    'commit-row ui-commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/35 transition-[background-color,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-inset';
+    'commit-row ui-commit-row group relative flex cursor-pointer items-center gap-2.5 border-b border-border/25 transition-[background-color,box-shadow,opacity] duration-100 focus-visible:outline-none focus-visible:bg-accent/40';
 
-// Semantic commit types with colors
+// Semantic commit type chips — soft tinted, low chroma, used for at-a-glance scanning
 const COMMIT_TYPES: Record<string, { color: string; bg: string }> = {
-    feat: { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
-    fix: { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    docs: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    style: { color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30' },
-    refactor: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-    perf: { color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-    test: { color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
-    build: { color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    ci: { color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-900/30' },
-    chore: { color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/30' },
-    revert: { color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-100 dark:bg-pink-900/30' },
+    feat:     { color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',  bg: 'bg-[color-mix(in_oklch,var(--success)_12%,transparent)]' },
+    fix:      { color: 'text-destructive dark:text-destructive',        bg: 'bg-[color-mix(in_oklch,var(--destructive)_12%,transparent)]' },
+    docs:     { color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]',          bg: 'bg-[color-mix(in_oklch,var(--info)_12%,transparent)]' },
+    style:    { color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]',    bg: 'bg-[color-mix(in_oklch,var(--primary)_12%,transparent)]' },
+    refactor: { color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]',      bg: 'bg-[color-mix(in_oklch,var(--warning)_12%,transparent)]' },
+    perf:     { color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]',    bg: 'bg-[color-mix(in_oklch,var(--warning)_12%,transparent)]' },
+    test:     { color: 'text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]',        bg: 'bg-[color-mix(in_oklch,var(--chart-7)_12%,transparent)]' },
+    build:    { color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]',    bg: 'bg-[color-mix(in_oklch,var(--primary)_12%,transparent)]' },
+    ci:       { color: 'text-slate-700 dark:text-slate-300',      bg: 'bg-slate-500/12' },
+    chore:    { color: 'text-zinc-700 dark:text-zinc-300',        bg: 'bg-zinc-500/12' },
+    revert:   { color: 'text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))]',        bg: 'bg-[color-mix(in_oklch,var(--chart-4)_12%,transparent)]' },
 };
 
 // Parse semantic commit message
@@ -76,6 +78,7 @@ export function CommitList({
     commits,
     layout,
     selectedIndex,
+    multiSelectedHashes,
     expandedIndex,
     onSelect,
     onExpand,
@@ -92,9 +95,10 @@ export function CommitList({
                     commit={commit}
                     index={index}
                     isSelected={selectedIndex === index}
+                    isMultiSelected={multiSelectedHashes?.has(commit.hash) ?? false}
                     isMuted={layout?.mutedCommits[index] ?? false}
                     graphOffset={layout?.widthsAtVertices[index] ?? 0}
-                    onSelect={() => { onSelect(index); }}
+                    onSelect={(modifiers) => { onSelect(index, modifiers); }}
                     onToggleExpand={() => { onExpand(expandedIndex === index ? null : index); }}
                     showAvatar={showAvatars}
                     hideRefs={hideRefs}
@@ -110,9 +114,10 @@ interface CommitRowProps {
     commit: DisplayCommit;
     index: number;
     isSelected: boolean;
+    isMultiSelected?: boolean;
     isMuted: boolean;
     graphOffset: number;
-    onSelect: () => void;
+    onSelect: (modifiers?: { shift?: boolean; meta?: boolean }) => void;
     onToggleExpand: () => void;
     onContextMenu?: (e: React.MouseEvent) => void;
     showAvatar?: boolean;
@@ -124,6 +129,7 @@ function CommitRow({
     commit,
     index,
     isSelected,
+    isMultiSelected,
     isMuted,
     graphOffset,
     onSelect,
@@ -134,15 +140,18 @@ function CommitRow({
     repo,
 }: CommitRowProps) {
     const isUncommitted = commit.hash === '*';
+    const highlighted = isSelected || isMultiSelected;
 
     return (
         <div
             data-index={index}
             className={`${COMMIT_ROW_BASE_CLASS} ${
-                isSelected
-                    ? 'bg-accent/45 shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
-                    : 'hover:bg-accent/20 active:bg-accent/35'
-            } ${isMuted ? 'opacity-50' : ''}`}
+                highlighted
+                    ? isMultiSelected
+                        ? 'bg-[color-mix(in_oklch,var(--primary)_10%,transparent)] shadow-[inset_2px_0_0_0_var(--primary)]'
+                        : 'bg-accent/55 shadow-[inset_2px_0_0_0_var(--primary)]'
+                    : 'hover:bg-accent/25 active:bg-accent/40'
+            } ${isMuted ? 'opacity-45' : ''}`}
             tabIndex={0}
             title={commit.message.split('\n')[0] ?? ''}
             onKeyDown={(event) => {
@@ -151,7 +160,9 @@ function CommitRow({
                     onSelect();
                 }
             }}
-            onClick={onSelect}
+            onClick={(event) => {
+                onSelect({ shift: event.shiftKey, meta: event.metaKey || event.ctrlKey });
+            }}
             onDoubleClick={onToggleExpand}
             onContextMenu={onContextMenu}
             style={{
@@ -171,18 +182,18 @@ function CommitRow({
             {/* Refs - branches, tags, remotes (only if not hidden) */}
             {!hideRefs && (
                 <div className='flex shrink-0 items-center gap-1'>
-                    {/* Current branch (first head) */}
+                    {/* Current branch (first head) — primary chip */}
                     {commit.heads && commit.heads.length > 0 && (
-                        <span className='bg-primary/15 text-primary border-primary/30 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-tight'>
-                            <GitBranch className='h-3 w-3' />
+                        <span className='bg-primary/12 text-primary border-primary/25 inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] text-[10px] font-semibold leading-none'>
+                            <GitBranch className='h-2.5 w-2.5' />
                             {commit.heads[0]}
                         </span>
                     )}
-                    {/* Other heads */}
+                    {/* Other heads — muted */}
                     {commit.heads?.slice(1).map((head: string) => (
                         <span
                             key={head}
-                            className='bg-muted/75 text-muted-foreground rounded-md px-1.5 py-0.5 text-[10px]'>
+                            className='bg-muted text-muted-foreground border-border/50 rounded-md border px-1.5 py-[1px] text-[10px] leading-none'>
                             {head}
                         </span>
                     ))}
@@ -190,17 +201,17 @@ function CommitRow({
                     {commit.remotes?.map((remote: string, i: number) => (
                         <span
                             key={i}
-                            className='border-border/70 text-muted-foreground inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px]'>
-                            <Globe2 className='h-3 w-3' />
+                            className='border-border/60 text-muted-foreground inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] text-[10px] leading-none'>
+                            <Globe2 className='h-2.5 w-2.5' />
                             {remote}
                         </span>
                     ))}
-                    {/* Tags */}
+                    {/* Tags — semantic warning */}
                     {commit.tags?.map((tag: string) => (
                         <span
                             key={tag}
-                            className='inline-flex items-center gap-1 rounded-md border border-amber-200/70 bg-amber-50/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-400'>
-                            <Tag className='h-3 w-3' />
+                            className='inline-flex items-center gap-1 rounded-md border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_14%,transparent)] px-1.5 py-[1px] text-[10px] font-medium leading-none text-[color-mix(in_oklch,var(--warning)_55%,var(--foreground))]'>
+                            <Tag className='h-2.5 w-2.5' />
                             {tag}
                         </span>
                     ))}
@@ -219,15 +230,15 @@ function CommitRow({
             {/* Author, hash, date */}
             {!isUncommitted && (
                 <div
-                    className={`text-muted-foreground flex shrink-0 items-center gap-4 text-xs transition-opacity ${
-                        isSelected ? 'opacity-100' : 'opacity-45 group-hover:opacity-85'
+                    className={`text-muted-foreground flex shrink-0 items-center gap-3.5 text-[11px] transition-opacity ${
+                        isSelected ? 'opacity-100' : 'opacity-55 group-hover:opacity-90'
                     }`}>
                     <span className='w-24 truncate font-medium'>{commit.author}</span>
                     <CIStatusMini commitHash={commit.hash} {...(repo !== undefined ? { repo } : {})} />
-                    <span className='bg-muted/85 rounded px-1.5 py-0.5 font-mono text-[10px] tracking-tight'>
+                    <span className='font-mono text-[10.5px] text-muted-foreground/75 tracking-[0.01em]'>
                         {commit.hash.slice(0, 7)}
                     </span>
-                    <span className='w-16 text-right tabular-nums'>{formatDate(commit.date)}</span>
+                    <span className='w-12 text-right tabular-nums text-muted-foreground/85'>{formatDate(commit.date)}</span>
                 </div>
             )}
         </div>
@@ -243,7 +254,7 @@ function CommitMessage({ message }: { message: string }) {
         return (
             <>
                 <span
-                    className={`${typeInfo.bg} ${typeInfo.color} mr-1 rounded px-1.5 py-0.5 text-[10px] font-semibold`}>
+                    className={`${typeInfo.bg} ${typeInfo.color} mr-1.5 inline-flex items-center rounded-md px-1.5 py-[1px] text-[10px] font-semibold leading-none tracking-[0.005em]`}>
                     {parsed.type}
                     {parsed.scope && <span className='opacity-70'>({parsed.scope})</span>}
                 </span>

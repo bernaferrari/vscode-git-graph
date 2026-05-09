@@ -79,22 +79,22 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 	const getOperationIcon = (operation: string) => {
 		switch (operation.toLowerCase()) {
 			case 'commit':
-				return <Check className="h-3 w-3 text-green-600" />;
+				return <Check className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />;
 			case 'reset':
-				return <RotateCcw className="h-3 w-3 text-amber-600" />;
+				return <RotateCcw className="h-3 w-3 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />;
 			case 'checkout':
-				return <GitBranch className="h-3 w-3 text-blue-600" />;
+				return <GitBranch className="h-3 w-3 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]" />;
 			case 'rebase':
-				return <History className="h-3 w-3 text-purple-600" />;
+				return <History className="h-3 w-3 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]" />;
 			case 'merge':
-				return <GitBranch className="h-3 w-3 text-cyan-600" />;
+				return <GitBranch className="h-3 w-3 text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]" />;
 			case 'branch':
-				return <GitBranch className="h-3 w-3 text-indigo-600" />;
+				return <GitBranch className="h-3 w-3 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]" />;
 			case 'cherry-pick':
-				return <ArrowRight className="h-3 w-3 text-pink-600" />;
+				return <ArrowRight className="h-3 w-3 text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))]" />;
 			case 'pull':
 			case 'clone':
-				return <History className="h-3 w-3 text-teal-600" />;
+				return <History className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />;
 			default:
 				return <History className="h-3 w-3 text-muted-foreground" />;
 		}
@@ -195,7 +195,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 												onClick={() => { handleCopyHash(entry.hash); }}
 											>
 												{copiedHash === entry.hash ? (
-													<Check className="h-3 w-3 text-green-600" />
+													<Check className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 												) : (
 													<Copy className="h-3 w-3" />
 												)}
@@ -212,7 +212,7 @@ export function ReflogViewer({ open, onOpenChange, onCreateBranchFromHash }: Ref
 											<Button
 												variant="ghost"
 												size="sm"
-												className="h-7 px-2 text-xs text-amber-600"
+												className="h-7 px-2 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]"
 												onClick={() => { handleResetTo(entry.hash, 'mixed'); }}
 											>
 												<RotateCcw className="h-3 w-3 mr-1" />

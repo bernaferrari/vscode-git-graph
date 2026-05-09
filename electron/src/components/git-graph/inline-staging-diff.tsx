@@ -172,10 +172,10 @@ export function InlineStagingDiff({
 					<Badge variant='outline' className='text-xs'>
 						{diffStats.hunks} hunks
 					</Badge>
-					<Badge variant='outline' className='border-green-500/25 text-green-700 dark:text-green-300'>
+					<Badge variant='outline' className='border-[color-mix(in_oklch,var(--success)_25%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
 						+{diffStats.added}
 					</Badge>
-					<Badge variant='outline' className='border-red-500/25 text-red-700 dark:text-red-300'>
+					<Badge variant='outline' className='border-[color-mix(in_oklch,var(--destructive)_25%,transparent)] text-destructive dark:text-destructive'>
 						-{diffStats.removed}
 					</Badge>
 				</div>
@@ -205,7 +205,7 @@ export function InlineStagingDiff({
 						{/* Staged changes section */}
 						{stagedHunks.length > 0 && (
 							<div className="border-b">
-								<div className="px-4 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-sans text-xs font-medium flex items-center gap-2">
+								<div className="px-4 py-1 bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] font-sans text-xs font-medium flex items-center gap-2">
 									<Check className="h-3 w-3" />
 									Staged Changes
 								</div>
@@ -224,7 +224,7 @@ export function InlineStagingDiff({
 						{/* Unstaged changes section */}
 						{unstagedHunks.length > 0 && (
 							<div>
-								<div className="px-4 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-sans text-xs font-medium flex items-center gap-2">
+								<div className="px-4 py-1 bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] font-sans text-xs font-medium flex items-center gap-2">
 									<Minus className="h-3 w-3" />
 									Unstaged Changes
 								</div>
@@ -359,8 +359,8 @@ function HunkDisplay({
 				<div
 					key={lineIndex}
 					className={`group flex items-center ${
-						line.type === 'added' ? 'bg-green-50 dark:bg-green-900/20' :
-						line.type === 'removed' ? 'bg-red-50 dark:bg-red-900/20' : ''
+						line.type === 'added' ? 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_20%,transparent)]' :
+						line.type === 'removed' ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_20%,transparent)]' : ''
 					} hover:bg-accent/30`}
 				>
 					{/* Line number */}
@@ -373,8 +373,8 @@ function HunkDisplay({
 
 					{/* Diff indicator */}
 					<div className="w-6 text-center select-none border-r bg-muted/20">
-						{line.type === 'added' && <Plus className="h-3 w-3 mx-auto text-green-600" />}
-						{line.type === 'removed' && <Minus className="h-3 w-3 mx-auto text-red-600" />}
+						{line.type === 'added' && <Plus className="h-3 w-3 mx-auto text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />}
+						{line.type === 'removed' && <Minus className="h-3 w-3 mx-auto text-destructive" />}
 					</div>
 
 					{/* Content */}

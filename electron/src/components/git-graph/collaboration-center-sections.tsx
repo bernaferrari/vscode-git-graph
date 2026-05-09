@@ -132,23 +132,33 @@ function SummaryCard({
 	description: string;
 	tone?: 'default' | 'success' | 'attention';
 }) {
-	const accentClassName =
+	const accentDot =
 		tone === 'success'
-			? 'from-emerald-500/16 to-teal-500/8'
+			? 'bg-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
 			: tone === 'attention'
-				? 'from-amber-500/16 to-orange-500/8'
-				: 'from-sky-500/12 to-transparent';
+				? 'bg-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+				: 'bg-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]';
+
+	const accentValue =
+		tone === 'success'
+			? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
+			: tone === 'attention'
+				? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+				: 'text-foreground';
 
 	return (
-		<Card className={`relative overflow-hidden border-border/70 bg-gradient-to-br ${accentClassName}`}>
-			<CardHeader className='space-y-1 pb-2'>
-				<CardDescription className='text-[11px] uppercase tracking-[0.18em]'>{title}</CardDescription>
-				<CardTitle className='text-2xl font-semibold tabular-nums'>{value}</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<p className='text-muted-foreground text-xs leading-5'>{description}</p>
-			</CardContent>
-		</Card>
+		<div className='rounded-xl border border-border/70 bg-card/40 p-3'>
+			<div className='flex items-center gap-1.5'>
+				<span aria-hidden className={`h-1.5 w-1.5 rounded-full ${accentDot}`} />
+				<span className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+					{title}
+				</span>
+			</div>
+			<div className={`mt-1 text-[1.5rem] font-semibold leading-none tracking-tight tabular-nums ${accentValue}`}>
+				{value}
+			</div>
+			<p className='mt-1.5 text-[11px] leading-snug text-muted-foreground/85'>{description}</p>
+		</div>
 	);
 }
 
@@ -169,8 +179,8 @@ export function CollaborationSummaryStrip({
 				: 'default';
 
 	return (
-		<div className='border-border/60 bg-muted/20 border-b px-5 py-4'>
-			<div className='grid gap-3 md:grid-cols-3'>
+		<div className='border-b border-border/60 bg-muted/15 px-5 py-3'>
+			<div className='grid gap-2.5 md:grid-cols-3'>
 				<SummaryCard
 					title='Handoffs'
 					value={String(workspaceShares.length)}
@@ -178,7 +188,7 @@ export function CollaborationSummaryStrip({
 					tone={workspaceShares.length > 0 ? 'success' : 'default'}
 				/>
 				<SummaryCard
-					title='Patch Shelf'
+					title='Patch shelf'
 					value={String(patchShelf.length)}
 					description='Reusable binary patches ready to copy, pull, or hand off.'
 					tone={patchShelf.length > 0 ? 'success' : 'default'}
@@ -551,7 +561,7 @@ function ActivityItem({ entry }: { entry: CollaborationActivityEntry }) {
 	return (
 		<div className='relative pl-6'>
 			<div className='bg-border absolute left-[7px] top-0 h-full w-px' />
-			<div className={cn('absolute left-0 top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-background', entry.status === 'success' ? 'border-emerald-500/40 text-emerald-600' : entry.status === 'failed' ? 'border-amber-500/45 text-amber-600' : 'border-border/70 text-muted-foreground')}>
+			<div className={cn('absolute left-0 top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-background', entry.status === 'success' ? 'border-[color-mix(in_oklch,var(--success)_40%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' : entry.status === 'failed' ? 'border-[color-mix(in_oklch,var(--warning)_45%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' : 'border-border/70 text-muted-foreground')}>
 				<Icon className='h-3 w-3' />
 			</div>
 			<div className='rounded-xl border border-border/60 bg-background/80 p-3'>
@@ -816,7 +826,7 @@ export function CollaborationSyncTab({
 								<div className='flex flex-wrap items-center gap-2'>
 									<Badge variant='outline'>{syncConfig.enabled ? 'remote enabled' : 'local only'}</Badge>
 									<Badge variant='outline'>{syncConfig.lastSyncStatus}</Badge>
-									{syncConfig.lastSyncStatus === 'success' && <CheckCircle2 className='h-4 w-4 text-emerald-600' />}
+									{syncConfig.lastSyncStatus === 'success' && <CheckCircle2 className='h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />}
 								</div>
 								<div className='rounded-xl border border-border/60 bg-background/80 p-3 text-sm'>
 									<p className='font-medium'>Last sync</p>
@@ -831,15 +841,15 @@ export function CollaborationSyncTab({
 											<p>Server time: {remoteHealth.serverTime ?? 'unknown'}</p>
 										</div>
 									) : probeError ? (
-										<p className='mt-1 text-xs text-amber-700/90 dark:text-amber-100/85'>{probeError}</p>
+										<p className='mt-1 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]/90 dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]/85'>{probeError}</p>
 									) : (
 										<p className='text-muted-foreground mt-1 text-xs'>Probe the endpoint to verify health and storage details.</p>
 									)}
 								</div>
 								{syncConfig.lastSyncError && (
-									<div className='rounded-xl border border-amber-500/35 bg-amber-500/8 p-3 text-sm'>
-										<p className='font-medium text-amber-800 dark:text-amber-200'>Last error</p>
-										<p className='mt-1 text-xs leading-5 text-amber-700/90 dark:text-amber-100/85'>{syncConfig.lastSyncError}</p>
+									<div className='rounded-xl border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] p-3 text-sm'>
+										<p className='font-medium text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>Last error</p>
+										<p className='mt-1 text-xs leading-5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]/90 dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]/85'>{syncConfig.lastSyncError}</p>
 									</div>
 								)}
 								<div className='rounded-xl border border-border/60 bg-background/80 p-3 text-xs leading-5 text-muted-foreground'>

@@ -339,7 +339,7 @@ export function BulkCommitOperations({ open, onOpenChange, commits, onComplete }
                                     }}>
                                     <Checkbox checked={isSelected} className='pointer-events-none' />
 
-                                    <code className='w-16 font-mono text-xs text-blue-600'>
+                                    <code className='w-16 font-mono text-xs text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'>
                                         {commit.hash.slice(0, 7)}
                                     </code>
 

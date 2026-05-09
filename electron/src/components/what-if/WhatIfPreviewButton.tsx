@@ -80,42 +80,42 @@ export function WhatIfPreviewButton({
 					<ArrowRight className="h-3 w-3 opacity-50" />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-48">
-				<div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
-					Preview Operation
+			<DropdownMenuContent align='start' className='w-60'>
+				<div className='px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+					Preview operation
 				</div>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem {...(onPreviewMerge ? { onClick: onPreviewMerge } : {})} className="gap-2">
-					<Merge className="h-4 w-4 text-purple-500" />
-					<div className="flex flex-col">
-						<span>Merge</span>
-						<span className="text-xs text-muted-foreground">
-							Combine branches (keeps history)
+				<DropdownMenuItem {...(onPreviewMerge ? { onClick: onPreviewMerge } : {})} className='items-start gap-2 px-2 py-1.5'>
+					<Merge className='mt-0.5 h-4 w-4 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' />
+					<div className='flex flex-col leading-snug'>
+						<span className='text-[0.8125rem] font-medium'>Merge</span>
+						<span className='text-[11px] text-muted-foreground/85'>
+							Combine branches, keep history.
 						</span>
 					</div>
 				</DropdownMenuItem>
-				<DropdownMenuItem {...(onPreviewRebase ? { onClick: onPreviewRebase } : {})} className="gap-2">
-					<RotateCcw className="h-4 w-4 text-blue-500" />
-					<div className="flex flex-col">
-						<span>Rebase</span>
-						<span className="text-xs text-muted-foreground">
-							Put your work on top (rewrites)
+				<DropdownMenuItem {...(onPreviewRebase ? { onClick: onPreviewRebase } : {})} className='items-start gap-2 px-2 py-1.5'>
+					<RotateCcw className='mt-0.5 h-4 w-4 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' />
+					<div className='flex flex-col leading-snug'>
+						<span className='text-[0.8125rem] font-medium'>Rebase</span>
+						<span className='text-[11px] text-muted-foreground/85'>
+							Replay your work on top, rewrites SHAs.
 						</span>
 					</div>
 				</DropdownMenuItem>
-				<DropdownMenuItem {...(onPreviewSquash ? { onClick: onPreviewSquash } : {})} className="gap-2">
-					<GitBranch className="h-4 w-4 text-amber-500" />
-					<div className="flex flex-col">
-						<span>Squash</span>
-						<span className="text-xs text-muted-foreground">
-							Combine commits into one
+				<DropdownMenuItem {...(onPreviewSquash ? { onClick: onPreviewSquash } : {})} className='items-start gap-2 px-2 py-1.5'>
+					<GitBranch className='mt-0.5 h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
+					<div className='flex flex-col leading-snug'>
+						<span className='text-[0.8125rem] font-medium'>Squash</span>
+						<span className='text-[11px] text-muted-foreground/85'>
+							Combine commits into one.
 						</span>
 					</div>
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem className="gap-2 text-muted-foreground">
-					<Sparkles className="h-4 w-4" />
-					<span>AI suggests best approach</span>
+				<DropdownMenuItem className='items-center gap-2 px-2 py-1.5 text-muted-foreground/85'>
+					<Sparkles className='h-3.5 w-3.5' />
+					<span className='text-[11px]'>AI suggests best approach</span>
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
@@ -134,8 +134,8 @@ export function PreviewIndicator({
 }) {
 	if (status === 'idle') {
 		return (
-			<div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-				<Eye className="h-4 w-4" />
+			<div className='flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground/85'>
+				<Eye className='h-3.5 w-3.5' />
 				<span>Click Preview to see results</span>
 			</div>
 		);
@@ -143,17 +143,17 @@ export function PreviewIndicator({
 
 	if (status === 'previewing') {
 		return (
-			<div className="flex items-center gap-1.5 text-sm text-blue-500">
-				<Clock className="h-4 w-4 animate-pulse" />
-				<span>Generating preview...</span>
+			<div className='flex items-center gap-1.5 text-[0.8125rem] text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'>
+				<Clock className='h-3.5 w-3.5 animate-pulse' />
+				<span>Generating preview…</span>
 			</div>
 		);
 	}
 
 	if (status === 'error') {
 		return (
-			<div className="flex items-center gap-1.5 text-sm text-red-500">
-				<AlertTriangle className="h-4 w-4" />
+			<div className='flex items-center gap-1.5 text-[0.8125rem] text-destructive'>
+				<AlertTriangle className='h-3.5 w-3.5' />
 				<span>Preview failed</span>
 			</div>
 		);
@@ -161,20 +161,20 @@ export function PreviewIndicator({
 
 	// Ready state
 	return (
-		<div className="flex items-center gap-3">
-			<div className="flex items-center gap-1.5 text-sm text-green-600">
-				<CheckCircle2 className="h-4 w-4" />
+		<div className='flex flex-wrap items-center gap-2'>
+			<div className='flex items-center gap-1.5 text-[0.8125rem] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
+				<CheckCircle2 className='h-3.5 w-3.5' />
 				<span>Ready to apply</span>
 			</div>
 			{conflicts !== undefined && conflicts > 0 && (
-				<Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
-					<AlertTriangle className="h-3 w-3" />
+				<Badge variant='warning' className='gap-1'>
+					<AlertTriangle className='h-3 w-3' />
 					{conflicts} conflict{conflicts !== 1 ? 's' : ''}
 				</Badge>
 			)}
 			{willRewrite && (
-				<Badge variant="outline" className="gap-1 text-blue-600 border-blue-300">
-					<RotateCcw className="h-3 w-3" />
+				<Badge variant='info' className='gap-1'>
+					<RotateCcw className='h-3 w-3' />
 					Rewrites history
 				</Badge>
 			)}

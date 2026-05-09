@@ -385,7 +385,7 @@ export function MergeConflictEditor({
 			>
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<span className="text-amber-500">⚠️</span>
+						<span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">⚠️</span>
 						Resolve Conflicts: {conflict.path}
 					</DialogTitle>
 				</DialogHeader>
@@ -519,14 +519,14 @@ export function MergeConflictEditor({
 					</div>
 
 					{isBinaryConflict ? (
-						<div className="border-b px-2 py-1.5 text-xs text-amber-600">
+						<div className="border-b px-2 py-1.5 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 							<AlertTriangle className="mr-1 inline h-3.5 w-3.5 align-text-top" />
 							Binary conflict detected. Preview/edit is limited to side selection.
 						</div>
 					) : null}
 
 				{hasUnresolvedConflicts && (
-					<div className="flex items-center gap-2 px-2 py-1.5 text-xs text-amber-600">
+					<div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 						<AlertTriangle className="h-3.5 w-3.5" />
 						<span>
 							{unresolvedConflicts.length} unresolved conflict marker block
@@ -538,14 +538,14 @@ export function MergeConflictEditor({
 
 				{aiProdEnabled && aiSummary && (
 					<div className="border-b px-2 py-2 text-xs">
-						<div className="rounded-md border border-emerald-500/35 bg-emerald-500/10 p-2">
-							<p className="font-semibold text-emerald-700 dark:text-emerald-300">AI Summary</p>
-							<p className="mt-1 whitespace-pre-wrap text-emerald-900 dark:text-emerald-100">{aiSummary}</p>
+						<div className="rounded-md border border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] p-2">
+							<p className="font-semibold text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">AI Summary</p>
+							<p className="mt-1 whitespace-pre-wrap text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">{aiSummary}</p>
 							{aiSuggestions.length > 0 && (
 								<div className="mt-2 space-y-1">
-									<p className="font-semibold text-amber-700 dark:text-amber-300">Suggestions</p>
+									<p className="font-semibold text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">Suggestions</p>
 									{aiSuggestions.map((item) => (
-										<p key={item} className="text-amber-900 dark:text-amber-100">
+										<p key={item} className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 											- {item}
 										</p>
 									))}
@@ -596,8 +596,8 @@ export function MergeConflictEditor({
 					{viewMode === 'split' ? (
 						<div className={`grid gap-2 p-2 ${hasBase ? 'grid-cols-3' : 'grid-cols-2'}`}>
 								<div>
-									<div className="flex items-center justify-between p-2 bg-green-500/10 rounded-t border-b border-green-500/20">
-										<span className="text-xs font-medium text-green-600">Ours (Current)</span>
+									<div className="flex items-center justify-between p-2 bg-[color-mix(in_oklch,var(--success)_10%,transparent)] rounded-t border-b border-[color-mix(in_oklch,var(--success)_20%,transparent)]">
+										<span className="text-xs font-medium text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">Ours (Current)</span>
 										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptOurs}>
 											Use This
 										</Button>
@@ -632,8 +632,8 @@ export function MergeConflictEditor({
 									</div>
 								) : null}
 								<div>
-								<div className="flex items-center justify-between p-2 bg-blue-500/10 rounded-t border-b border-blue-500/20">
-									<span className="text-xs font-medium text-blue-600">Theirs (Incoming)</span>
+								<div className="flex items-center justify-between p-2 bg-[color-mix(in_oklch,var(--info)_10%,transparent)] rounded-t border-b border-[color-mix(in_oklch,var(--info)_20%,transparent)]">
+									<span className="text-xs font-medium text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">Theirs (Incoming)</span>
 										<Button variant="ghost" size="sm" className="h-5 text-xs" onClick={acceptTheirs}>
 											Use This
 										</Button>

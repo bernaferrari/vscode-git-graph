@@ -60,69 +60,69 @@ interface VisualRebaseTodoEditorProps {
 }
 
 const ACTION_CONFIG: Record<CommandTodoAction, { label: string; color: string; icon: React.ReactNode; description: string }> = {
-	pick: { 
-		label: 'pick', 
-		color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30', 
+	pick: {
+		label: 'pick',
+		color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]',
 		icon: <Check className="h-3 w-3" />,
 		description: 'Use commit'
 	},
-	reword: { 
-		label: 'reword', 
-		color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30', 
+	reword: {
+		label: 'reword',
+		color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]',
 		icon: <Edit3 className="h-3 w-3" />,
 		description: 'Use commit, but edit the commit message'
 	},
-	edit: { 
-		label: 'edit', 
-		color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/30', 
+	edit: {
+		label: 'edit',
+		color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)]',
 		icon: <Square className="h-3 w-3" />,
 		description: 'Use commit, but stop for amending'
 	},
-	squash: { 
-		label: 'squash', 
-		color: 'text-green-600 bg-green-50 dark:bg-green-950/30', 
+	squash: {
+		label: 'squash',
+		color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]',
 		icon: <ChevronUp className="h-3 w-3" />,
 		description: 'Use commit, meld into previous commit'
 	},
-	fixup: { 
-		label: 'fixup', 
-		color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/30', 
+	fixup: {
+		label: 'fixup',
+		color: 'text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))] bg-[color-mix(in_oklch,var(--chart-7)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-7)_30%,transparent)]',
 		icon: <ChevronUp className="h-3 w-3" />,
 		description: 'Like squash, but discard commit message'
 	},
-	drop: { 
-		label: 'drop', 
-		color: 'text-red-600 bg-red-50 dark:bg-red-950/30', 
+	drop: {
+		label: 'drop',
+		color: 'text-destructive bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]',
 		icon: <Trash2 className="h-3 w-3" />,
 		description: 'Remove commit'
 	},
-	exec: { 
-		label: 'exec', 
-		color: 'text-gray-600 bg-gray-50 dark:bg-gray-950/30', 
+	exec: {
+		label: 'exec',
+		color: 'text-gray-600 bg-gray-50 dark:bg-gray-950/30',
 		icon: <MessageSquare className="h-3 w-3" />,
 		description: 'Run command'
 	},
-	break: { 
-		label: 'break', 
-		color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/30', 
+	break: {
+		label: 'break',
+		color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]',
 		icon: <Square className="h-3 w-3" />,
 		description: 'Stop here'
 	},
 	label: {
 		label: 'label',
-		color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/30',
+		color: 'text-destructive bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]',
 		icon: <MessageSquare className="h-3 w-3" />,
 		description: 'Create a branch label'
 	},
 	reset: {
 		label: 'reset',
-		color: 'text-sky-600 bg-sky-50 dark:bg-sky-950/30',
+		color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]',
 		icon: <RotateCcw className="h-3 w-3" />,
 		description: 'Reset HEAD to commit'
 	},
 	merge: {
 		label: 'merge',
-		color: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30',
+		color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]',
 		icon: <GitCommit className="h-3 w-3" />,
 		description: 'Create a merge commit'
 	},
@@ -507,7 +507,7 @@ export function VisualRebaseTodoEditor({
 
 	const changeAction = (id: string, action: TodoAction) => {
 		if (!isCommandAction(action)) return;
-		setTodos(prev => prev.map(todo => 
+		setTodos(prev => prev.map(todo =>
 			todo.id === id ? { ...todo, action } : todo
 		));
 		setHasLocalChanges(true);
@@ -516,7 +516,7 @@ export function VisualRebaseTodoEditor({
 	const resetTodo = (id: string) => {
 		const target = todos.find((todo) => todo.id === id);
 		if (!target || target.kind !== 'command') return;
-		setTodos(prev => prev.map(todo => 
+		setTodos(prev => prev.map(todo =>
 			todo.id === id ? { ...todo, action: todo.originalAction } : todo
 		));
 		setHasLocalChanges(true);
@@ -532,7 +532,7 @@ export function VisualRebaseTodoEditor({
 		setHasLocalChanges(false);
 	};
 
-	const hasChanges = todos.some((todo, index) => 
+	const hasChanges = todos.some((todo, index) =>
 		todo.kind === 'command' && (todo.action !== todo.originalAction || index !== todo.originalIndex)
 	);
 
@@ -603,9 +603,9 @@ export function VisualRebaseTodoEditor({
 				{/* Action Legend */}
 				<div className="flex flex-wrap gap-2 py-2 border-b text-xs">
 					{Object.entries(ACTION_CONFIG).map(([key, config]) => (
-						<Badge 
-							key={key} 
-							variant="outline" 
+						<Badge
+							key={key}
+							variant="outline"
 							className={`${config.color} border-0 cursor-pointer`}
 							// eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
 							onClick={() => selectedTodo && changeAction(selectedTodo, key as TodoAction)}
@@ -671,8 +671,8 @@ export function VisualRebaseTodoEditor({
 
 										{/* Action Badge */}
 										{config ? (
-											<Badge 
-												variant="outline" 
+											<Badge
+												variant="outline"
 												className={`${config.color} border-0 min-w-[60px] justify-center`}
 											>
 												{config.icon}
@@ -686,7 +686,7 @@ export function VisualRebaseTodoEditor({
 
 										{/* Hash */}
 										{todo.kind === 'command' && (
-											<code className="text-xs font-mono text-blue-600">
+											<code className="text-xs font-mono text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">
 												{todo.hash ? todo.hash.substring(0, 7) : '—'}
 											</code>
 										)}
@@ -748,7 +748,7 @@ export function VisualRebaseTodoEditor({
 												<Button
 													variant="ghost"
 													size="sm"
-													className="h-6 w-6 p-0 text-red-600"
+													className="h-6 w-6 p-0 text-destructive"
 													onClick={(e) => {
 														e.stopPropagation();
 														changeAction(todo.id, 'drop');
@@ -779,7 +779,7 @@ export function VisualRebaseTodoEditor({
 								Reset
 							</Button>
 						)}
-						<Button variant="outline" onClick={() => { void handleAbort(); }} className="text-red-600">
+						<Button variant="outline" onClick={() => { void handleAbort(); }} className="text-destructive">
 							Abort
 						</Button>
 						<Button

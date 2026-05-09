@@ -334,7 +334,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className='ui-surface flex max-h-[85vh] max-w-4xl flex-col'>
+            <DialogContent className='flex max-h-[85vh] max-w-4xl flex-col sm:max-w-4xl'>
                 <DialogHeader>
                     <DialogTitle className='flex items-center gap-2'>
                         <Download className='h-5 w-5' />
@@ -501,7 +501,7 @@ export function CloneRepositoryDialog({ open, onOpenChange, onCloned }: CloneRep
                         </div>
 
                         {listRepositoriesQuery.data?.error ? (
-                            <div className='rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700'>
+                            <div className='rounded border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] p-3 text-sm text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                                 {listRepositoriesQuery.data.error}
                             </div>
                         ) : null}

@@ -169,11 +169,11 @@ export default function HomePage() {
                     {/* Version badges */}
                     <div className='animate-slide-up mt-12 flex flex-wrap items-center justify-center gap-3 delay-300'>
                         {[
-                            { name: 'TypeScript 5.9', color: 'bg-blue-500/20 text-blue-300' },
-                            { name: 'React 19', color: 'bg-cyan-500/20 text-cyan-300' },
-                            { name: 'Electron 40', color: 'bg-violet-500/20 text-violet-300' },
-                            { name: 'Vite 7', color: 'bg-amber-500/20 text-amber-300' },
-                            { name: 'tRPC 11', color: 'bg-emerald-500/20 text-emerald-300' },
+                            { name: 'TypeScript 5.9', color: 'bg-[color-mix(in_oklch,var(--info)_20%,transparent)] text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' },
+                            { name: 'React 19', color: 'bg-[color-mix(in_oklch,var(--chart-7)_20%,transparent)] text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]' },
+                            { name: 'Electron 40', color: 'bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' },
+                            { name: 'Vite 7', color: 'bg-[color-mix(in_oklch,var(--warning)_20%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' },
+                            { name: 'tRPC 11', color: 'bg-[color-mix(in_oklch,var(--success)_20%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' },
                         ].map((tech) => (
                             <span
                                 key={tech.name}
@@ -256,7 +256,7 @@ export default function HomePage() {
                         <div className='flex items-center justify-between border-b border-white/10 bg-white/5 px-6 py-4'>
                             <div className='flex gap-2'>
                                 <div className='bg-coral-500/80 h-3 w-3 rounded-full' />
-                                <div className='h-3 w-3 rounded-full bg-amber-400/80' />
+                                <div className='h-3 w-3 rounded-full bg-[color-mix(in_oklch,var(--warning)_80%,transparent)]' />
                                 <div className='bg-mint-500/80 h-3 w-3 rounded-full' />
                             </div>
                             <span className='font-mono text-xs text-white/30'>store.ts</span>
@@ -307,7 +307,7 @@ export default function HomePage() {
 
                 {/* Convex Recommendation */}
                 <section className='animate-slide-up mb-32 delay-800'>
-                    <div className='glass-card group relative overflow-hidden rounded-3xl border-2 border-amber-500/20 p-10'>
+                    <div className='glass-card group relative overflow-hidden rounded-3xl border-2 border-[color-mix(in_oklch,var(--warning)_20%,transparent)] p-10'>
                         <div className='absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5' />
                         <div className='absolute -top-32 -right-32 h-64 w-64 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/10 blur-3xl' />
 
@@ -317,7 +317,7 @@ export default function HomePage() {
                             </div>
 
                             <div className='flex-1'>
-                                <div className='mb-2 inline-block rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold tracking-wider text-amber-300 uppercase'>
+                                <div className='mb-2 inline-block rounded-full bg-[color-mix(in_oklch,var(--warning)_20%,transparent)] px-3 py-1 text-xs font-bold tracking-wider text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] uppercase'>
                                     Recommended
                                 </div>
                                 <h3 className='mb-3 text-2xl font-bold text-white'>Convex for Backend</h3>

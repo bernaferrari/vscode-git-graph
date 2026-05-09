@@ -55,13 +55,14 @@ export function BranchListSkeleton({ count = 5 }: { count?: number }) {
 
 export function GraphSkeleton() {
 	return (
-		<div className="flex flex-col items-center justify-center h-full py-20">
-			<div className="relative w-20 h-20">
-				<div className="absolute inset-0 border-4 border-muted rounded-full animate-ping opacity-25" />
-				<div className="absolute inset-2 border-4 border-primary/30 rounded-full animate-pulse" />
-				<GitCommit className="absolute inset-0 m-auto h-6 w-6 text-muted-foreground" />
+		<div className='flex h-full flex-col items-center justify-center py-20'>
+			<div className='relative h-14 w-14'>
+				<span aria-hidden className='absolute inset-0 animate-ping rounded-full bg-primary/15 [animation-duration:1800ms]' />
+				<div className='relative grid h-full w-full place-items-center rounded-full bg-[color-mix(in_oklch,var(--primary)_8%,var(--card))] ring-1 ring-primary/25'>
+					<GitCommit className='h-5 w-5 text-primary/85' />
+				</div>
 			</div>
-			<p className="mt-4 text-sm text-muted-foreground animate-pulse">Loading commits...</p>
+			<p className='mt-4 text-[0.8125rem] text-muted-foreground'>Reading commits…</p>
 		</div>
 	);
 }
@@ -115,12 +116,16 @@ interface EmptyStateProps {
 export function EmptyState({ icon, title, description, action, variant = 'card' }: EmptyStateProps) {
 	if (variant === 'inline') {
 		return (
-			<div className="flex flex-col items-center justify-center py-8 text-center">
-				{icon && <div className="mb-2 text-muted-foreground opacity-40">{icon}</div>}
-				<p className="text-sm font-medium mb-1">{title}</p>
-				<p className="text-xs text-muted-foreground">{description}</p>
+			<div className='flex flex-col items-center justify-center px-4 py-8 text-center'>
+				{icon && (
+					<div className='mb-3 grid h-10 w-10 place-items-center rounded-lg bg-muted/60 text-muted-foreground/85 ring-1 ring-border/50 [&>*]:!h-4 [&>*]:!w-4'>
+						{icon}
+					</div>
+				)}
+				<p className='mb-0.5 text-[0.8125rem] font-semibold tracking-[-0.005em]'>{title}</p>
+				<p className='max-w-xs text-xs leading-relaxed text-muted-foreground/85'>{description}</p>
 				{action && (
-					<Button variant="link" size="sm" onClick={action.onClick} className="mt-2">
+					<Button variant='outline' size='xs' onClick={action.onClick} className='mt-3'>
 						{action.label}
 					</Button>
 				)}
@@ -129,16 +134,20 @@ export function EmptyState({ icon, title, description, action, variant = 'card' 
 	}
 
 	return (
-		<Card className="ui-surface border-dashed border-border/70">
-			<CardContent className="flex flex-col items-center justify-center py-12 text-center">
+		<Card className='border-dashed border-border/60 bg-card/40 shadow-none'>
+			<CardContent className='flex flex-col items-center justify-center px-6 py-12 text-center'>
 				{icon && (
-					<div className="mb-4 text-muted-foreground opacity-50">{icon}</div>
+					<div className='relative mb-4 grid h-12 w-12 place-items-center rounded-xl bg-[color-mix(in_oklch,var(--primary)_8%,var(--muted))] text-primary/85 ring-1 ring-primary/15 [&>*]:!h-5 [&>*]:!w-5'>
+						<span
+							aria-hidden
+							className='pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-card/50'
+						/>
+						{icon}
+					</div>
 				)}
-				<h3 className="font-medium text-lg mb-1">{title}</h3>
-				<p className="text-sm text-muted-foreground mb-4 max-w-sm">{description}</p>
-				{action && (
-					<Button onClick={action.onClick}>{action.label}</Button>
-				)}
+				<h3 className='mb-1 text-[0.9375rem] font-semibold tracking-[-0.012em]'>{title}</h3>
+				<p className='mb-4 max-w-sm text-[0.8125rem] leading-relaxed text-muted-foreground'>{description}</p>
+				{action && <Button onClick={action.onClick} size='sm'>{action.label}</Button>}
 			</CardContent>
 		</Card>
 	);
@@ -159,11 +168,15 @@ export function InlineEmptyState({
 	};
 }) {
 	return (
-		<div className="flex flex-col items-center justify-center py-8 text-center">
-			{icon && <div className="mb-2 text-muted-foreground opacity-40">{icon}</div>}
-			<p className="text-sm text-muted-foreground">{message}</p>
+		<div className='flex flex-col items-center justify-center px-4 py-8 text-center'>
+			{icon && (
+				<div className='mb-2 grid h-9 w-9 place-items-center rounded-lg bg-muted/60 text-muted-foreground/85 ring-1 ring-border/50 [&>*]:!h-4 [&>*]:!w-4'>
+					{icon}
+				</div>
+			)}
+			<p className='text-[0.8125rem] leading-relaxed text-muted-foreground'>{message}</p>
 			{action && (
-				<Button variant="link" size="sm" onClick={action.onClick} className="mt-1">
+				<Button variant='outline' size='xs' onClick={action.onClick} className='mt-2.5'>
 					{action.label}
 				</Button>
 			)}
@@ -186,13 +199,15 @@ export function ErrorState({
 }) {
 	if (variant === 'inline') {
 		return (
-			<div className="flex flex-col items-center justify-center py-6 text-center px-4">
-				<AlertCircle className="h-6 w-6 text-red-500 mb-2" />
-				<p className="text-sm font-medium">{title}</p>
-				{message && <p className="text-xs text-muted-foreground mt-1">{message}</p>}
+			<div className='flex flex-col items-center justify-center px-4 py-6 text-center'>
+				<div className='mb-2 grid h-9 w-9 place-items-center rounded-lg bg-destructive/10 text-destructive ring-1 ring-destructive/20'>
+					<AlertCircle className='h-4 w-4' />
+				</div>
+				<p className='text-[0.8125rem] font-semibold tracking-[-0.005em]'>{title}</p>
+				{message && <p className='mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground/85'>{message}</p>}
 				{onRetry && (
-					<Button variant="ghost" size="sm" onClick={onRetry} className="mt-2">
-						<RefreshCw className="h-3 w-3 mr-1" />
+					<Button variant='outline' size='xs' onClick={onRetry} className='mt-2.5'>
+						<RefreshCw className='h-3 w-3' />
 						Retry
 					</Button>
 				)}
@@ -201,18 +216,19 @@ export function ErrorState({
 	}
 
 	return (
-		<div className="flex flex-col items-center justify-center py-12 text-center px-4">
-			<div className="h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
-				<AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+		<div className='flex flex-col items-center justify-center px-4 py-12 text-center'>
+			<div className='relative mb-3.5 grid h-12 w-12 place-items-center rounded-xl bg-destructive/10 text-destructive ring-1 ring-destructive/20'>
+				<span aria-hidden className='pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-card/50' />
+				<AlertCircle className='h-5 w-5' />
 			</div>
-			<h3 className="font-medium text-lg mb-1">{title}</h3>
+			<h3 className='mb-1 text-[0.9375rem] font-semibold tracking-[-0.012em]'>{title}</h3>
 			{message && (
-				<p className="text-sm text-muted-foreground mb-4 max-w-sm">{message}</p>
+				<p className='mb-4 max-w-sm text-[0.8125rem] leading-relaxed text-muted-foreground'>{message}</p>
 			)}
 			{onRetry && (
-				<Button variant="outline" onClick={onRetry}>
-					<RefreshCw className="h-4 w-4 mr-2" />
-					Try Again
+				<Button variant='outline' onClick={onRetry} size='sm'>
+					<RefreshCw className='h-3.5 w-3.5' />
+					Try again
 				</Button>
 			)}
 		</div>
@@ -223,17 +239,21 @@ export function ErrorState({
 
 export function NoRepoSelected({ onSelectRepo }: { onSelectRepo: () => void }) {
 	return (
-		<div className="flex flex-col items-center justify-center h-full text-center p-8 ui-surface">
-			<div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-				<FolderGit2 className="h-10 w-10 text-primary" />
+		<div className='relative flex h-full flex-col items-center justify-center overflow-hidden p-8 text-center'>
+			<div
+				aria-hidden
+				className='pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(80%_50%_at_50%_0%,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_60%)]'
+			/>
+			<div className='mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 shadow-[var(--shadow-md)] ring-1 ring-primary/25'>
+				<FolderGit2 className='h-7 w-7 text-primary' />
 			</div>
-			<h2 className="text-2xl font-semibold mb-2">Welcome to Git Graph</h2>
-			<p className="text-muted-foreground mb-6 max-w-md">
-				Open a Git repository to visualize your commit history, manage branches, and collaborate.
+			<h2 className='mb-1.5 text-[1.5rem] font-semibold tracking-[-0.022em]'>Welcome to GitLizard</h2>
+			<p className='mb-6 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground'>
+				Open a Git repository to see history at a glance, branch with confidence, and undo anything.
 			</p>
-			<Button onClick={onSelectRepo} size="lg">
-				<FolderGit2 className="h-5 w-5 mr-2" />
-				Open Repository
+			<Button onClick={onSelectRepo} size='lg'>
+				<FolderGit2 className='h-4 w-4' />
+				Open repository
 			</Button>
 		</div>
 	);
@@ -242,10 +262,10 @@ export function NoRepoSelected({ onSelectRepo }: { onSelectRepo: () => void }) {
 export function NoCommits({ onCommit }: { onCommit?: () => void }) {
 	return (
 		<EmptyState
-			icon={<History className="h-12 w-12" />}
-			title="No Commits Yet"
-			description="This repository doesn't have any commits. Make your first commit to get started!"
-			action={onCommit ? { label: 'Create Initial Commit', onClick: onCommit } : undefined}
+			icon={<History />}
+			title='No commits yet'
+			description='Make your first commit and the history will start showing up here.'
+			action={onCommit ? { label: 'Create initial commit', onClick: onCommit } : undefined}
 		/>
 	);
 }
@@ -253,10 +273,10 @@ export function NoCommits({ onCommit }: { onCommit?: () => void }) {
 export function NoBranches({ onCreateBranch }: { onCreateBranch: () => void }) {
 	return (
 		<EmptyState
-			icon={<GitBranch className="h-12 w-12" />}
-			title="No Branches"
-			description="Create a branch to start working on a new feature or fix."
-			action={{ label: 'Create Branch', onClick: onCreateBranch }}
+			icon={<GitBranch />}
+			title='No branches'
+			description='Create a branch to start working on a new feature or fix.'
+			action={{ label: 'Create branch', onClick: onCreateBranch }}
 		/>
 	);
 }
@@ -264,11 +284,11 @@ export function NoBranches({ onCreateBranch }: { onCreateBranch: () => void }) {
 export function NoStashes({ onStash }: { onStash?: () => void }) {
 	return (
 		<EmptyState
-			icon={<Archive className="h-12 w-12" />}
-			title="No Stashes"
-			description="Stashes let you save your work temporarily."
-			action={onStash ? { label: 'Stash Changes', onClick: onStash } : undefined}
-			variant="inline"
+			icon={<Archive />}
+			title='No stashes'
+			description='Stashes let you set work aside without committing it.'
+			action={onStash ? { label: 'Stash changes', onClick: onStash } : undefined}
+			variant='inline'
 		/>
 	);
 }
@@ -276,11 +296,11 @@ export function NoStashes({ onStash }: { onStash?: () => void }) {
 export function NoTags({ onCreateTag }: { onCreateTag?: () => void }) {
 	return (
 		<EmptyState
-			icon={<Tag className="h-12 w-12" />}
-			title="No Tags"
-			description="Tags mark important points like releases."
-			action={onCreateTag ? { label: 'Create Tag', onClick: onCreateTag } : undefined}
-			variant="inline"
+			icon={<Tag />}
+			title='No tags'
+			description='Tags mark important points in history — releases, milestones.'
+			action={onCreateTag ? { label: 'Create tag', onClick: onCreateTag } : undefined}
+			variant='inline'
 		/>
 	);
 }
@@ -288,11 +308,11 @@ export function NoTags({ onCreateTag }: { onCreateTag?: () => void }) {
 export function NoRemotes({ onAddRemote }: { onAddRemote?: () => void }) {
 	return (
 		<EmptyState
-			icon={<GitPullRequest className="h-12 w-12" />}
-			title="No Remotes"
-			description="Add a remote to push and pull changes."
-			action={onAddRemote ? { label: 'Add Remote', onClick: onAddRemote } : undefined}
-			variant="inline"
+			icon={<GitPullRequest />}
+			title='No remotes'
+			description='Add a remote to push and pull changes.'
+			action={onAddRemote ? { label: 'Add remote', onClick: onAddRemote } : undefined}
+			variant='inline'
 		/>
 	);
 }
@@ -300,35 +320,42 @@ export function NoRemotes({ onAddRemote }: { onAddRemote?: () => void }) {
 export function NoMergeConflicts() {
 	return (
 		<EmptyState
-			icon={<GitMerge className="h-12 w-12" />}
-			title="No Conflicts"
-			description="Great! There are no merge conflicts to resolve."
+			icon={<GitMerge />}
+			title='No conflicts'
+			description='Nothing to resolve — the working tree is clean.'
 		/>
 	);
 }
 
 export function NoSearchResults({ query, onClear }: { query: string; onClear?: () => void }) {
 	return (
-		<div className="flex flex-col items-center justify-center py-12 text-center">
-			<Search className="h-12 w-12 text-muted-foreground opacity-50 mb-4" />
-			<h3 className="font-medium mb-1">No results for "{query}"</h3>
-			<p className="text-sm text-muted-foreground mb-4">
-				Try a different search term
+		<div className='flex flex-col items-center justify-center px-4 py-12 text-center'>
+			<div className='mb-3.5 grid h-12 w-12 place-items-center rounded-xl bg-muted/60 text-muted-foreground/85 ring-1 ring-border/50'>
+				<Search className='h-5 w-5' />
+			</div>
+			<h3 className='mb-0.5 max-w-[18rem] truncate text-[0.9375rem] font-semibold tracking-[-0.012em]'>
+				No results for <span className='font-mono text-foreground/90'>&ldquo;{query}&rdquo;</span>
+			</h3>
+			<p className='mb-3 text-[0.8125rem] leading-relaxed text-muted-foreground'>
+				Try a different search term.
 			</p>
 			{onClear && (
-				<Button variant="outline" size="sm" onClick={onClear}>
-					Clear Search
+				<Button variant='outline' size='sm' onClick={onClear}>
+					Clear search
 				</Button>
 			)}
 		</div>
 	);
 }
 
-export function LoadingState({ message = 'Loading...' }: { message?: string }) {
+export function LoadingState({ message = 'Loading…' }: { message?: string }) {
 	return (
-		<div className="flex flex-col items-center justify-center py-12">
-			<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4" />
-			<p className="text-sm text-muted-foreground">{message}</p>
+		<div className='flex flex-col items-center justify-center py-12'>
+			<div className='relative mb-3 h-7 w-7'>
+				<div className='absolute inset-0 rounded-full border-2 border-muted' />
+				<div className='absolute inset-0 animate-spin rounded-full border-2 border-primary border-t-transparent' />
+			</div>
+			<p className='text-[0.8125rem] text-muted-foreground'>{message}</p>
 		</div>
 	);
 }

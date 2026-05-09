@@ -64,8 +64,8 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 
 	const getStatusIcon = (status: string) => {
 		switch (status) {
-			case 'pass': return <Check className="h-4 w-4 text-emerald-600" />;
-			case 'warn': return <AlertTriangle className="h-4 w-4 text-amber-600" />;
+			case 'pass': return <Check className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />;
+			case 'warn': return <AlertTriangle className="h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />;
 			case 'fail': return <X className="h-4 w-4 text-destructive" />;
 			default: return null;
 		}
@@ -73,15 +73,15 @@ export function RepoHealthCheck({ open, onOpenChange }: RepoHealthCheckProps) {
 
 	const getStatusColor = (status: string) => {
 		switch (status) {
-			case 'pass': return 'border-emerald-500/25 bg-emerald-500/10';
-			case 'warn': return 'border-amber-500/25 bg-amber-500/10';
+			case 'pass': return 'border-[color-mix(in_oklch,var(--success)_25%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)]';
+			case 'warn': return 'border-[color-mix(in_oklch,var(--warning)_25%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)]';
 			case 'fail': return 'border-destructive/25 bg-destructive/10';
 			default: return 'border-border/70 bg-muted/20';
 		}
 	};
 
 	const scoreTone =
-		score >= 80 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-destructive';
+		score >= 80 ? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' : score >= 50 ? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' : 'text-destructive';
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>

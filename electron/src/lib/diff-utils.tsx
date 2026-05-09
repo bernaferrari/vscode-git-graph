@@ -35,10 +35,10 @@ export interface LineDiff {
 function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x === y): [number, number][] {
 	const m = a.length;
 	const n = b.length;
-	
+
 	// Use dynamic programming with optimization for space
 	const dp: number[][] = Array.from({ length: m + 1 }, (): number[] => Array<number>(n + 1).fill(0));
-	
+
 	for (let i = 1; i <= m; i++) {
 		const previousRow = dp[i - 1] as number[];
 		const currentRow = dp[i] as number[];
@@ -52,7 +52,7 @@ function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x ==
 			}
 		}
 	}
-	
+
 	// Backtrack to find the LCS
 	const result: [number, number][] = [];
 	let i = m, j = n;
@@ -71,7 +71,7 @@ function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x ==
 			j--;
 		}
 	}
-	
+
 	return result;
 }
 
@@ -81,30 +81,30 @@ function lcs<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean = (x, y) => x ==
  */
 export function tokenizeText(text: string): string[] {
 	if (!text) return [];
-	
+
 	// Split into tokens: words, whitespace, punctuation
 	const tokens: string[] = [];
 	let current = '';
 	let currentType: 'word' | 'space' | 'punct' | 'other' = 'other';
-	
+
 	for (let i = 0; i < text.length; i++) {
 		const char = text.charAt(i);
-		const charType: 'word' | 'space' | 'punct' | 'other' = 
+		const charType: 'word' | 'space' | 'punct' | 'other' =
 			/[a-zA-Z0-9]/.test(char) ? 'word' :
 			/\s/.test(char) ? 'space' :
 			/[.,;:!?'"()[\]{}<>@#$%^&*+=|\\/~`-]/.test(char) ? 'punct' :
 			'other';
-		
-		if (current && charType !== currentType && 
+
+		if (current && charType !== currentType &&
 			!(currentType === 'word' && charType === 'punct' && /[_.-]/.test(char))) {
 			tokens.push(current);
 			current = '';
 		}
-		
+
 		current += char;
 		currentType = charType;
 	}
-	
+
 	if (current) tokens.push(current);
 	return tokens;
 }
@@ -117,14 +117,14 @@ export function diffChars(oldStr: string, newStr: string): { old: DiffChar[]; ne
 	const oldChars = oldStr.split('');
 	const newChars = newStr.split('');
 	const common = lcs(oldChars, newChars);
-	
+
 	const oldResult: DiffChar[] = [];
 	const newResult: DiffChar[] = [];
-	
+
 	let oldIdx = 0;
 	let newIdx = 0;
 	let commonIdx = 0;
-	
+
 	while (oldIdx < oldChars.length || newIdx < newChars.length) {
 		const commonPair = common[commonIdx];
 		if (commonPair && oldIdx === commonPair[0] && newIdx === commonPair[1]) {
@@ -146,7 +146,7 @@ export function diffChars(oldStr: string, newStr: string): { old: DiffChar[]; ne
 			newIdx++;
 		}
 	}
-	
+
 	return { old: oldResult, new: newResult };
 }
 
@@ -158,14 +158,14 @@ export function diffWords(oldStr: string, newStr: string): { old: DiffWord[]; ne
 	const oldWords = tokenizeText(oldStr);
 	const newWords = tokenizeText(newStr);
 	const common = lcs(oldWords, newWords);
-	
+
 	const oldResult: DiffWord[] = [];
 	const newResult: DiffWord[] = [];
-	
+
 	let oldIdx = 0;
 	let newIdx = 0;
 	let commonIdx = 0;
-	
+
 	while (oldIdx < oldWords.length || newIdx < newWords.length) {
 		const commonPair = common[commonIdx];
 		if (commonPair && oldIdx === commonPair[0] && newIdx === commonPair[1]) {
@@ -185,7 +185,7 @@ export function diffWords(oldStr: string, newStr: string): { old: DiffWord[]; ne
 			newIdx++;
 		}
 	}
-	
+
 	return { old: oldResult, new: newResult };
 }
 
@@ -199,11 +199,11 @@ export function computeInlineDiff(removedLine: string, addedLine: string): {
 	} {
 		// First, try word-level diff
 		const wordDiff = diffWords(removedLine, addedLine);
-		
+
 		// For each changed word, compute character-level diff
 		const removedChars: DiffChar[] = [];
 		const addedChars: DiffChar[] = [];
-		
+
 		const oldWords = wordDiff.old;
 		const newWords = wordDiff.new;
 		const pushChars = (target: DiffChar[], text: string, type: DiffChar['type']): void => {
@@ -257,7 +257,7 @@ export function computeInlineDiff(removedLine: string, addedLine: string): {
 				newIndex++;
 			}
 		}
-	
+
 	return {
 		removed: {
 			chars: removedChars,
@@ -277,15 +277,15 @@ export function renderInlineDiff(chars: DiffChar[], lineType: 'removed' | 'added
 	let html = '';
 	let currentType: 'removed' | 'added' | 'unchanged' | null = null;
 	let currentText = '';
-	
+
 	const flush = () => {
 		if (!currentType || !currentText) return;
-		
+
 		const escaped = currentText
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;');
-		
+
 		if (currentType === 'unchanged') {
 			html += escaped;
 		} else if (lineType === 'removed') {
@@ -303,10 +303,10 @@ export function renderInlineDiff(chars: DiffChar[], lineType: 'removed' | 'added
 				html += escaped;
 			}
 		}
-		
+
 		currentText = '';
 	};
-	
+
 	for (const char of chars) {
 		if (char.type !== currentType) {
 			flush();
@@ -315,7 +315,7 @@ export function renderInlineDiff(chars: DiffChar[], lineType: 'removed' | 'added
 		currentText += char.char;
 	}
 	flush();
-	
+
 	return html;
 }
 
@@ -327,14 +327,14 @@ export function isModifiedPair(removedLine: string, addedLine: string): boolean 
 	// Simple heuristic: if lines share significant content, they're a modification pair
 	const oldWords = new Set(tokenizeText(removedLine).filter(w => w.trim().length > 1));
 	const newWords = new Set(tokenizeText(addedLine).filter(w => w.trim().length > 1));
-	
+
 	if (oldWords.size === 0 || newWords.size === 0) return false;
-	
+
 	let common = 0;
 	for (const word of oldWords) {
 		if (newWords.has(word)) common++;
 	}
-	
+
 	// If at least 30% of words match, consider it a modification
 	return common / Math.min(oldWords.size, newWords.size) >= 0.3;
 }
@@ -345,11 +345,11 @@ export function isModifiedPair(removedLine: string, addedLine: string): boolean 
 export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 	const lines = diffText.split('\n');
 	const result: LineDiff[] = [];
-	
+
 	let leftLineNum = 0;
 	let rightLineNum = 0;
 	let pendingRemoved: { line: string; lineNum: number } | null = null;
-	
+
 	for (const line of lines) {
 		if (line.startsWith('@@')) {
 			// Flush any pending removed line
@@ -366,7 +366,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 				});
 				pendingRemoved = null;
 			}
-			
+
 			const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
 			if (match) {
 				const leftMatch = match[1];
@@ -378,11 +378,11 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 			}
 			continue;
 		}
-		
+
 		if (line.startsWith('---') || line.startsWith('+++')) {
 			continue;
 		}
-		
+
 		if (line.startsWith('-')) {
 			if (pendingRemoved) {
 				// Flush previous removed line
@@ -401,7 +401,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 			leftLineNum++;
 		} else if (line.startsWith('+')) {
 			const addedLine = line.slice(1);
-			
+
 			if (pendingRemoved && isModifiedPair(pendingRemoved.line, addedLine)) {
 				// Compute inline diff for the pair
 				const inlineDiff = computeInlineDiff(pendingRemoved.line, addedLine);
@@ -428,7 +428,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 					});
 					pendingRemoved = null;
 				}
-				
+
 				result.push({
 					left: null,
 					right: {
@@ -456,7 +456,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 				});
 				pendingRemoved = null;
 			}
-			
+
 			const content = line.startsWith(' ') ? line.slice(1) : line;
 			result.push({
 				left: {
@@ -475,7 +475,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 			rightLineNum++;
 		}
 	}
-	
+
 	// Flush final pending removed line
 	if (pendingRemoved) {
 		result.push({
@@ -489,7 +489,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 			type: 'removed',
 		});
 	}
-	
+
 	return result;
 }
 
@@ -499,7 +499,7 @@ export function parseDiffWithInlineDiffs(diffText: string): LineDiff[] {
 export function DiffCharRenderer({ chars, baseClass }: { chars: DiffChar[]; baseClass: 'removed' | 'added' }) {
 	const segments: { text: string; type: 'removed' | 'added' | 'unchanged' }[] = [];
 	let currentSegment: { text: string; type: 'removed' | 'added' | 'unchanged' } | null = null;
-	
+
 	for (const char of chars) {
 		if (!currentSegment || currentSegment.type !== char.type) {
 			if (currentSegment) segments.push(currentSegment);
@@ -509,7 +509,7 @@ export function DiffCharRenderer({ chars, baseClass }: { chars: DiffChar[]; base
 		}
 	}
 	if (currentSegment) segments.push(currentSegment);
-	
+
 	return (
 		<>
 			{segments.map((seg, i) => {
@@ -517,11 +517,11 @@ export function DiffCharRenderer({ chars, baseClass }: { chars: DiffChar[]; base
 					return <span key={i}>{seg.text}</span>;
 				}
 				return (
-					<span 
-						key={i} 
-						className={baseClass === 'removed' 
-							? 'bg-red-300 dark:bg-red-800 text-red-900 dark:text-red-100' 
-							: 'bg-green-300 dark:bg-green-800 text-green-900 dark:text-green-100'
+					<span
+						key={i}
+						className={baseClass === 'removed'
+							? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] text-destructive dark:text-destructive'
+							: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_15%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
 						}
 					>
 						{seg.text}

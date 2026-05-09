@@ -9,6 +9,36 @@ import { trpc } from '@/trpc/client';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
+const TYPE_TONE: Record<
+    NotificationType,
+    {
+        icon: typeof CheckCircle;
+        cssVar: string;
+        iconColor: string;
+    }
+> = {
+    success: {
+        icon: CheckCircle,
+        cssVar: 'var(--success)',
+        iconColor: 'color-mix(in oklch, var(--success) 72%, var(--foreground))',
+    },
+    warning: {
+        icon: AlertTriangle,
+        cssVar: 'var(--warning)',
+        iconColor: 'color-mix(in oklch, var(--warning) 72%, var(--foreground))',
+    },
+    error: {
+        icon: AlertCircle,
+        cssVar: 'var(--destructive)',
+        iconColor: 'var(--destructive)',
+    },
+    info: {
+        icon: Info,
+        cssVar: 'var(--info)',
+        iconColor: 'color-mix(in oklch, var(--info) 72%, var(--foreground))',
+    },
+};
+
 interface NotificationActionInput {
     label: string;
     onClick: () => void;
@@ -144,31 +174,22 @@ export function NotificationCenter() {
         useNotifications();
     const [open, setOpen] = useState(false);
 
-    const getIcon = (type: NotificationType) => {
-        switch (type) {
-            case 'success':
-                return <CheckCircle className='h-4 w-4 text-green-600' />;
-            case 'warning':
-                return <AlertTriangle className='h-4 w-4 text-amber-600' />;
-            case 'error':
-                return <AlertCircle className='h-4 w-4 text-red-600' />;
-            default:
-                return <Info className='h-4 w-4 text-blue-600' />;
-        }
+    const getIconNode = (type: NotificationType) => {
+        const tone = TYPE_TONE[type];
+        const Icon = tone.icon;
+        return (
+            <span
+                className='grid h-7 w-7 shrink-0 place-items-center rounded-md ring-1'
+                style={{
+                    background: `color-mix(in oklch, ${tone.cssVar} 12%, transparent)`,
+                    boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${tone.cssVar} 22%, transparent)`,
+                }}>
+                <Icon className='h-3.5 w-3.5' style={{ color: tone.iconColor }} />
+            </span>
+        );
     };
 
-    const getBgColor = (type: NotificationType) => {
-        switch (type) {
-            case 'success':
-                return 'bg-green-50 dark:bg-green-950/30';
-            case 'warning':
-                return 'bg-amber-50 dark:bg-amber-950/30';
-            case 'error':
-                return 'bg-red-50 dark:bg-red-950/30';
-            default:
-                return 'bg-blue-50 dark:bg-blue-950/30';
-        }
-    };
+    const getRailColor = (type: NotificationType) => TYPE_TONE[type].cssVar;
 
     const formatTime = (timestamp: number) => {
         const diffMs = Date.now() - timestamp;
@@ -189,31 +210,35 @@ export function NotificationCenter() {
                 <Button
                     variant='ghost'
                     size='sm'
-                    className='hover:bg-accent text-muted-foreground hover:border-border/70 hover:text-foreground focus-visible:ring-primary/40 relative h-8 w-8 rounded-md border border-transparent p-0 transition-all duration-150 focus-visible:ring-2 active:scale-[0.98]'
-                    aria-label='Notifications'
-                    title='Notifications'>
+                    className='relative h-8 w-8 rounded-md border border-transparent p-0 text-muted-foreground transition-all duration-150 hover:border-border/70 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.98]'
+                    aria-label={unreadCount > 0 ? `Notifications (${String(unreadCount)} unread)` : 'Notifications'}
+                    title={unreadCount > 0 ? `${String(unreadCount)} unread` : 'Notifications'}>
                     <Bell className='h-4 w-4' />
                     {unreadCount > 0 && (
-                        <span className='absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white'>
+                        <span className='absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground shadow-[0_0_0_2px_var(--background)]'>
                             {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className='w-80 p-0' align='end'>
-                <div className='flex items-center justify-between border-b px-4 py-3'>
+            <PopoverContent className='w-[22rem] gap-0 overflow-hidden p-0' align='end'>
+                <div className='flex items-center justify-between border-b border-border/60 bg-muted/15 px-4 py-2.5'>
                     <div className='flex items-center gap-2'>
-                        <span className='font-medium'>Notifications</span>
+                        <span className='text-[0.8125rem] font-semibold tracking-[-0.005em]'>Notifications</span>
                         {unreadCount > 0 && (
-                            <Badge variant='secondary' className='text-xs'>
+                            <Badge variant='soft' className='h-5 px-1.5 font-mono text-[10px] tabular-nums'>
                                 {unreadCount} new
                             </Badge>
                         )}
                     </div>
-                    <div className='flex items-center gap-1'>
+                    <div className='flex items-center gap-0.5'>
                         {unreadCount > 0 && (
-                            <Button variant='ghost' size='sm' className='h-7 px-2 text-xs' onClick={markAllAsRead}>
-                                <CheckCheck className='mr-1 h-3 w-3' />
+                            <Button
+                                variant='ghost'
+                                size='sm'
+                                className='h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground'
+                                onClick={markAllAsRead}>
+                                <CheckCheck className='h-3 w-3' />
                                 Mark all read
                             </Button>
                         )}
@@ -221,8 +246,9 @@ export function NotificationCenter() {
                             <Button
                                 variant='ghost'
                                 size='sm'
-                                className='h-7 px-2 text-xs text-red-600'
+                                className='h-6 w-6 p-0 text-muted-foreground hover:text-destructive'
                                 onClick={clearAll}
+                                title='Clear all'
                                 aria-label='Clear notifications'>
                                 <Trash2 className='h-3 w-3' />
                             </Button>
@@ -232,32 +258,46 @@ export function NotificationCenter() {
 
                 <ScrollArea className='h-80'>
                     {notifications.length === 0 ? (
-                        <div className='text-muted-foreground flex flex-col items-center justify-center py-8'>
-                            <Bell className='mb-2 h-8 w-8 opacity-50' />
-                            <p className='text-sm'>No notifications</p>
+                        <div className='flex flex-col items-center justify-center px-4 py-12 text-center'>
+                            <span className='mb-3 grid h-10 w-10 place-items-center rounded-lg bg-muted/60 text-muted-foreground/85 ring-1 ring-border/50'>
+                                <Bell className='h-4 w-4' />
+                            </span>
+                            <p className='text-[0.8125rem] font-semibold tracking-[-0.005em]'>You&rsquo;re all caught up</p>
+                            <p className='mt-0.5 max-w-[14rem] text-xs text-muted-foreground/85'>
+                                Activity from your repos will show up here.
+                            </p>
                         </div>
                     ) : (
-                        <div className='divide-y'>
+                        <ul className='divide-y divide-border/50'>
                             {notifications.map((notification: Notification) => {
                                 const action = getAction(notification.actionId);
+                                const unread = !notification.read;
+                                const railColor = getRailColor(notification.type);
                                 return (
-                                    <div
+                                    <li
                                         key={notification.id}
-                                        className={`p-3 ${!notification.read ? getBgColor(notification.type) : ''}`}
+                                        className={`group/notif relative px-3.5 py-2.5 transition-colors ${unread ? 'bg-[color-mix(in_oklch,var(--accent)_45%,transparent)]' : 'hover:bg-muted/40'}`}
                                         onClick={() => {
-                                            if (!notification.read) {
-                                                markAsRead(notification.id);
-                                            }
+                                            if (unread) markAsRead(notification.id);
                                         }}>
-                                        <div className='flex items-start gap-3'>
-                                            {getIcon(notification.type)}
-                                            <div className='min-w-0 flex-1'>
-                                                <div className='mb-1 flex items-center justify-between gap-2'>
-                                                    <span className='truncate text-sm font-medium'>{notification.title}</span>
+                                        {unread && (
+                                            <span
+                                                aria-hidden
+                                                className='absolute inset-y-2 left-0 w-[2px] rounded-r-full'
+                                                style={{ background: railColor }}
+                                            />
+                                        )}
+                                        <div className='flex items-start gap-2.5'>
+                                            {getIconNode(notification.type)}
+                                            <div className='min-w-0 flex-1 leading-tight'>
+                                                <div className='flex items-start justify-between gap-2'>
+                                                    <span className='line-clamp-2 text-[0.8125rem] font-semibold tracking-[-0.005em]'>
+                                                        {notification.title}
+                                                    </span>
                                                     <Button
                                                         variant='ghost'
                                                         size='sm'
-                                                        className='h-5 w-5 p-0'
+                                                        className='-mr-1 -mt-1 h-5 w-5 shrink-0 p-0 text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground group-hover/notif:opacity-100 focus-visible:opacity-100'
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             removeNotification(notification);
@@ -267,19 +307,19 @@ export function NotificationCenter() {
                                                     </Button>
                                                 </div>
                                                 {notification.message && (
-                                                    <p className='text-muted-foreground mb-2 text-xs'>
+                                                    <p className='mt-0.5 text-xs leading-relaxed text-muted-foreground line-clamp-3'>
                                                         {notification.message}
                                                     </p>
                                                 )}
-                                                <div className='flex items-center justify-between gap-2'>
-                                                    <span className='text-muted-foreground text-xs'>
+                                                <div className='mt-1.5 flex items-center justify-between gap-2'>
+                                                    <span className='text-[10px] tabular-nums text-muted-foreground/75'>
                                                         {formatTime(notification.timestamp)}
                                                     </span>
                                                     {action && notification.actionLabel && (
                                                         <Button
                                                             variant='outline'
                                                             size='sm'
-                                                            className='h-6 px-2 text-xs'
+                                                            className='h-6 px-2 text-[11px]'
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
                                                                 markAsRead(notification.id);
@@ -292,10 +332,10 @@ export function NotificationCenter() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </li>
                                 );
                             })}
-                        </div>
+                        </ul>
                     )}
                 </ScrollArea>
             </PopoverContent>

@@ -67,97 +67,92 @@ export function FindWidget({
 
 	if (!open) return null;
 
-	return (
-		<div className="fixed top-3 right-3 z-50 flex items-center gap-1 rounded-lg border bg-background/95 backdrop-blur shadow-lg p-1">
-			{/* Search icon */}
-			<Search className="h-4 w-4 text-muted-foreground ml-2 mr-1" />
+	const hasNoMatches = query.length > 0 && totalMatches === 0;
 
-			{/* Search Input */}
+	return (
+		<div
+			className="fixed top-3 right-3 z-50 flex items-center gap-0.5 rounded-lg border border-border/70 bg-popover/95 p-1 backdrop-blur"
+			style={{ boxShadow: 'var(--shadow-lg)' }}>
+			<Search className={`h-3.5 w-3.5 ml-1.5 mr-0.5 ${hasNoMatches ? 'text-destructive' : 'text-muted-foreground'}`} />
+
 			<Input
 				value={query}
 				onChange={handleQueryChange}
 				onKeyDown={handleKeyDown}
-				placeholder="Find in commits..."
-				className="w-56 h-8 border-0 shadow-none focus-visible:ring-0 text-sm"
+				placeholder="Find in commits…"
+				className="h-7 w-56 border-0 bg-transparent px-1 text-[0.8125rem] shadow-none focus-visible:ring-0"
 				autoFocus
 			/>
 
-			{/* Match Count */}
 			{query && (
-				<span className="text-xs text-muted-foreground px-2 min-w-[50px] text-center">
-					{totalMatches > 0 ? `${String(currentIndex + 1)}/${String(totalMatches)}` : 'No matches'}
+				<span className={`px-2 min-w-[60px] text-center font-mono text-[10.5px] tabular-nums ${
+					hasNoMatches ? 'text-destructive' : 'text-muted-foreground'
+				}`}>
+					{totalMatches > 0
+						? `${String(currentIndex + 1)} / ${String(totalMatches)}`
+						: 'No matches'}
 				</span>
 			)}
 
-			{/* Case Sensitive Toggle */}
 			<Button
 				variant={caseSensitive ? 'secondary' : 'ghost'}
-				size="sm"
+				size="icon-xs"
 				onClick={() => {
 					setCaseSensitive(!caseSensitive);
 					if (query) {
 						onFind(query, { caseSensitive: !caseSensitive, regex });
 					}
 				}}
-				className="h-7 w-7 p-0"
-				title="Case sensitive"
+				title="Match case"
 			>
-				<CaseSensitive className="h-4 w-4" />
+				<CaseSensitive className="h-3 w-3" />
 			</Button>
 
-			{/* Regex Toggle */}
 			<Button
 				variant={regex ? 'secondary' : 'ghost'}
-				size="sm"
+				size="icon-xs"
 				onClick={() => {
 					setRegex(!regex);
 					if (query) {
 						onFind(query, { caseSensitive, regex: !regex });
 					}
 				}}
-				className="h-7 w-7 p-0"
 				title="Regular expression"
 			>
-				<Regex className="h-4 w-4" />
+				<Regex className="h-3 w-3" />
 			</Button>
 
-			<div className="w-px h-5 bg-border mx-1" />
+			<div className="w-px h-4 bg-border/70 mx-1" />
 
-			{/* Previous */}
 			<Button
 				variant="ghost"
-				size="sm"
+				size="icon-xs"
 				onClick={onFindPrevious}
 				disabled={totalMatches === 0}
-				className="h-7 w-7 p-0"
-				title="Previous match (Shift+Enter)"
+				title="Previous match (⇧↵)"
 			>
-				<ArrowUp className="h-4 w-4" />
+				<ArrowUp className="h-3 w-3" />
 			</Button>
 
-			{/* Next */}
 			<Button
 				variant="ghost"
-				size="sm"
+				size="icon-xs"
 				onClick={onFindNext}
 				disabled={totalMatches === 0}
-				className="h-7 w-7 p-0"
-				title="Next match (Enter)"
+				title="Next match (↵)"
 			>
-				<ArrowDown className="h-4 w-4" />
+				<ArrowDown className="h-3 w-3" />
 			</Button>
 
-			<div className="w-px h-5 bg-border mx-1" />
+			<div className="w-px h-4 bg-border/70 mx-1" />
 
-			{/* Close */}
 			<Button
 				variant="ghost"
-				size="sm"
+				size="icon-xs"
 				onClick={onClose}
-				className="h-7 w-7 p-0"
 				title="Close (Esc)"
 			>
-				<X className="h-4 w-4" />
+				<X className="h-3 w-3" />
 			</Button>
 		</div>
 	);

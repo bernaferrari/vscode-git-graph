@@ -193,7 +193,7 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
                         <Package className='h-5 w-5' />
                         Git LFS
                         {isInstalled ? (
-                            <span className='rounded bg-green-100 px-1.5 py-0.5 text-xs font-normal text-green-700'>
+                            <span className='rounded bg-[color-mix(in_oklch,var(--success)_15%,transparent)] px-1.5 py-0.5 text-xs font-normal text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
                                 Installed
                             </span>
                         ) : null}
@@ -206,7 +206,7 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
                     </div>
                 ) : !isInstalled ? (
                     <div className='py-8 text-center'>
-                        <AlertCircle className='mx-auto mb-4 h-12 w-12 text-amber-500' />
+                        <AlertCircle className='mx-auto mb-4 h-12 w-12 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                         <h3 className='mb-2 font-medium'>Git LFS Not Installed</h3>
                         <p className='mb-4 text-sm text-muted-foreground'>
                             Install Git LFS to manage large files in your repository.
@@ -215,7 +215,7 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
                             href='https://git-lfs.github.com/'
                             target='_blank'
                             rel='noopener noreferrer'
-                            className='text-sm text-blue-600 hover:underline'>
+                            className='text-sm text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] hover:underline'>
                             Learn how to install Git LFS
                         </a>
                     </div>
@@ -336,7 +336,7 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
                                             <Button
                                                 variant='ghost'
                                                 size='sm'
-                                                className='h-7 w-7 p-0 text-red-600'
+                                                className='h-7 w-7 p-0 text-destructive'
                                                 onClick={() => {
                                                     handleRemovePattern(pattern);
                                                 }}
@@ -395,7 +395,7 @@ export function LFSSupport({ open, onOpenChange }: LFSSupportProps) {
 
                         <div className='border-t pt-2 text-xs text-muted-foreground'>
                             <div className='flex items-center gap-1'>
-                                <Check className='h-3.5 w-3.5 text-emerald-600' />
+                                <Check className='h-3.5 w-3.5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
                                 <span>
                                     LFS stores large files outside the Git repository for faster clones and fetches.
                                 </span>

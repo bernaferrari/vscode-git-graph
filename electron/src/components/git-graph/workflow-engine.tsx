@@ -955,7 +955,7 @@ export function WorkflowEngineDialog({
 													))}
 												</div>
 												{dryRunWarnings.length > 0 && (
-													<div className='mt-2 rounded border border-amber-500/40 bg-amber-500/10 p-2'>
+													<div className='mt-2 rounded border border-[color-mix(in_oklch,var(--warning)_40%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] p-2'>
 														<p className='mb-1 font-medium'>Warnings</p>
 														{dryRunWarnings.map((warning) => (
 															<p key={warning}>{warning}</p>

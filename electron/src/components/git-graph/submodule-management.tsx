@@ -259,7 +259,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 												</div>
 											)}
 										{sm.status && (
-											<div className="text-xs text-amber-600 mt-1">
+											<div className="text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] mt-1">
 												{sm.status}
 											</div>
 										)}
@@ -284,7 +284,7 @@ export function SubmoduleManagement({ open, onOpenChange }: SubmoduleManagementP
 										<Button
 											variant="ghost"
 											size="sm"
-											className="text-red-600"
+											className="text-destructive"
 											onClick={() => { handleRemoveSubmodule(sm.path); }}
 											disabled={removeMutation.isPending}
 										>

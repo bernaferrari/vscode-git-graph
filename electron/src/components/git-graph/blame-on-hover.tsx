@@ -195,11 +195,11 @@ export function BlameOnHover({
 								onClick={handleCopyHash}
 							>
 								<GitCommit className="h-3 w-3 text-muted-foreground" />
-								<code className="text-xs font-mono text-blue-600">
+								<code className="text-xs font-mono text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">
 									{blameInfo.hash.slice(0, 7)}
 								</code>
 								{copied ? (
-									<Check className="h-3 w-3 text-green-600" />
+									<Check className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 								) : (
 									<Copy className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
 								)}

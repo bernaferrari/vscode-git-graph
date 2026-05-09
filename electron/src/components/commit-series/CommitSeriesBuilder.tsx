@@ -59,12 +59,12 @@ interface CommitSeriesBuilderProps {
 
 // Suggested commit types
 const COMMIT_TYPES = [
-	{ prefix: 'feat', label: 'Feature', color: 'text-green-500' },
-	{ prefix: 'fix', label: 'Fix', color: 'text-red-500' },
-	{ prefix: 'docs', label: 'Docs', color: 'text-blue-500' },
-	{ prefix: 'style', label: 'Style', color: 'text-purple-500' },
-	{ prefix: 'refactor', label: 'Refactor', color: 'text-amber-500' },
-	{ prefix: 'test', label: 'Test', color: 'text-cyan-500' },
+	{ prefix: 'feat', label: 'Feature', color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' },
+	{ prefix: 'fix', label: 'Fix', color: 'text-destructive' },
+	{ prefix: 'docs', label: 'Docs', color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' },
+	{ prefix: 'style', label: 'Style', color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' },
+	{ prefix: 'refactor', label: 'Refactor', color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' },
+	{ prefix: 'test', label: 'Test', color: 'text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]' },
 	{ prefix: 'chore', label: 'Chore', color: 'text-gray-500' },
 ];
 
@@ -234,13 +234,13 @@ export function CommitSeriesBuilder({
 											key={i}
 											className={cn(
 												'flex items-center gap-2 p-2 rounded text-sm cursor-pointer hover:bg-accent',
-												file.staged ? 'bg-green-50 dark:bg-green-950/20' : 'bg-yellow-50 dark:bg-yellow-950/20'
+												file.staged ? 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_20%,transparent)]' : 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_20%,transparent)]'
 											)}
 											draggable
 										>
-											{file.status === 'added' && <Plus className="h-3 w-3 text-green-500" />}
-											{file.status === 'modified' && <Edit className="h-3 w-3 text-blue-500" />}
-											{file.status === 'deleted' && <Trash2 className="h-3 w-3 text-red-500" />}
+											{file.status === 'added' && <Plus className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />}
+											{file.status === 'modified' && <Edit className="h-3 w-3 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]" />}
+											{file.status === 'deleted' && <Trash2 className="h-3 w-3 text-destructive" />}
 											<span className="truncate flex-1">{file.path}</span>
 											{file.staged && <Badge variant="outline" className="text-[10px]">staged</Badge>}
 										</div>
@@ -295,7 +295,7 @@ export function CommitSeriesBuilder({
 									</div>
 								) : (
 									commits.map((commit, index) => (
-										<Card key={commit.id} className={cn(!commit.isValid && 'border-amber-300')}>
+										<Card key={commit.id} className={cn(!commit.isValid && 'border-[color-mix(in_oklch,var(--warning)_35%,transparent)]')}>
 											<CardContent className="p-3">
 												<div className="flex items-start gap-2">
 													{/* Order controls */}
@@ -332,9 +332,9 @@ export function CommitSeriesBuilder({
 																</Badge>
 															)}
 															{commit.isValid ? (
-																<Check className="h-4 w-4 text-green-500" />
+																<Check className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 															) : (
-																<X className="h-4 w-4 text-amber-500" />
+																<X className="h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />
 															)}
 														</div>
 														
@@ -365,7 +365,7 @@ export function CommitSeriesBuilder({
 													<Button
 														variant="ghost"
 														size="sm"
-														className="h-8 w-8 p-0 text-red-500"
+														className="h-8 w-8 p-0 text-destructive"
 														onClick={() => { removeCommit(commit.id); }}
 													>
 														<Trash2 className="h-4 w-4" />

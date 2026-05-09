@@ -238,7 +238,7 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 						</div>
 					) : conflicts.length === 0 ? (
 						<div className="text-center py-8">
-							<Check className="h-12 w-12 mx-auto mb-4 text-green-600" />
+							<Check className="h-12 w-12 mx-auto mb-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							<p className="text-muted-foreground">No conflicts found</p>
 						</div>
 					) : (
@@ -251,14 +251,14 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 									<div
 										key={index}
 										className={`border rounded-lg overflow-hidden ${
-											isResolved ? 'border-green-300' : 'border-amber-300'
+											isResolved ? 'border-[color-mix(in_oklch,var(--success)_35%,transparent)]' : 'border-[color-mix(in_oklch,var(--warning)_35%,transparent)]'
 										}`}
 									>
 										<div className="flex items-center justify-between px-3 py-2 bg-muted/50">
 											<span className="text-sm font-medium">
 												Conflict {index + 1}
 												{isResolved && (
-													<span className="text-green-600 ml-2">
+													<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] ml-2">
 														({resolution})
 													</span>
 												)}
@@ -292,8 +292,8 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 
 										<div className="grid grid-cols-2 divide-x">
 											{/* Our changes */}
-											<div className="bg-green-50 dark:bg-green-950/30">
-												<div className="px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/50">
+											<div className="bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]">
+												<div className="px-3 py-1 text-xs font-medium text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_50%,transparent)]">
 													Current Change (Ours)
 												</div>
 												<div className="p-2 font-mono text-xs">
@@ -306,8 +306,8 @@ export function ThreeWayMergeEditor({ open, onOpenChange, filePath, onResolved }
 											</div>
 
 											{/* Their changes */}
-											<div className="bg-blue-50 dark:bg-blue-950/30">
-												<div className="px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50">
+											<div className="bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]">
+												<div className="px-3 py-1 text-xs font-medium text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_50%,transparent)]">
 													Incoming Change (Theirs)
 												</div>
 												<div className="p-2 font-mono text-xs">

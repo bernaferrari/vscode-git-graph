@@ -30,9 +30,9 @@ const LENS_DETAILS = [
         icon: Compass,
         title: 'Guided Mode',
         subtitle: 'Safe & Simple',
-        color: 'text-green-500',
-        bgColor: 'bg-green-500/10',
-        borderColor: 'border-green-500/30',
+        color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
+        bgColor: 'bg-[color-mix(in_oklch,var(--success)_10%,transparent)]',
+        borderColor: 'border-[color-mix(in_oklch,var(--success)_30%,transparent)]',
         features: [
             { icon: Shield, text: 'Safety first - previews show what will happen' },
             { icon: Sparkles, text: 'Simple "Sync" button for fetch + pull + push' },
@@ -46,9 +46,9 @@ const LENS_DETAILS = [
         icon: Wand2,
         title: 'Craft Mode',
         subtitle: 'Balanced Power',
-        color: 'text-blue-500',
-        bgColor: 'bg-blue-500/10',
-        borderColor: 'border-blue-500/30',
+        color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]',
+        bgColor: 'bg-[color-mix(in_oklch,var(--info)_10%,transparent)]',
+        borderColor: 'border-[color-mix(in_oklch,var(--info)_30%,transparent)]',
         features: [
             { icon: Zap, text: 'Keyboard-first workflow with shortcuts' },
             { icon: ArrowRight, text: 'Full staging granularity (hunks, lines)' },
@@ -62,9 +62,9 @@ const LENS_DETAILS = [
         icon: Terminal,
         title: 'Control Mode',
         subtitle: 'Full Power',
-        color: 'text-purple-500',
-        bgColor: 'bg-purple-500/10',
-        borderColor: 'border-purple-500/30',
+        color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]',
+        bgColor: 'bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]',
+        borderColor: 'border-[color-mix(in_oklch,var(--primary)_30%,transparent)]',
         features: [
             { icon: Terminal, text: 'See raw Git commands as they run' },
             { icon: Zap, text: 'Full access to advanced Git operations' },
@@ -109,7 +109,7 @@ export function LensOnboarding({ open, onOpenChange }: LensOnboardingProps) {
             <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
                 <DialogHeader>
                     <DialogTitle className='flex items-center gap-2 text-xl'>
-                        <Sparkles className='h-5 w-5 text-amber-500' />
+                        <Sparkles className='h-5 w-5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                         Choose Your Experience
                     </DialogTitle>
                     <DialogDescription className='text-base'>

@@ -288,7 +288,7 @@ export function FileEditorWithBlame({
 											style={{ minHeight: `${String(group.count * 20)}px` }}
 										>
 											<div className="flex items-center gap-2 mb-1">
-												<code className="text-blue-600 font-mono">
+												<code className="text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] font-mono">
 													{getShortHash(group.hash)}
 												</code>
 												<Avatar
@@ -373,7 +373,7 @@ export function FileEditorWithBlame({
 					<div className="flex items-center gap-4">
 						<span>{lineNumbers.length} lines</span>
 						{hasChanges && (
-							<span className="text-amber-600">Modified</span>
+							<span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">Modified</span>
 						)}
 					</div>
 					<div className="flex items-center gap-2">

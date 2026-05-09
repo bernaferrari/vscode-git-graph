@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Dialog,
 	DialogContent,
@@ -23,10 +22,56 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/trpc/client';
+
+const SECTION_LABEL = 'text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85';
+const SECTION_DESC = 'text-[11px] text-muted-foreground/85 leading-relaxed';
+const FIELD_LABEL = 'text-[0.8125rem] font-medium text-foreground/90';
+const FIELD_HINT = 'text-[11px] text-muted-foreground/85 leading-snug';
+
+interface SectionProps {
+	title: string;
+	description?: string;
+	children: React.ReactNode;
+	footer?: React.ReactNode;
+}
+
+function Section({ title, description, children, footer }: SectionProps) {
+	return (
+		<section className='space-y-2.5 rounded-xl border border-border/70 bg-card/40 p-3.5'>
+			<header className='space-y-0.5'>
+				<h3 className={SECTION_LABEL}>{title}</h3>
+				{description ? <p className={SECTION_DESC}>{description}</p> : null}
+			</header>
+			<div className='space-y-2.5'>{children}</div>
+			{footer ? <div className='pt-1.5'>{footer}</div> : null}
+		</section>
+	);
+}
+
+function ToggleRow({
+	label,
+	description,
+	checked,
+	onCheckedChange,
+}: {
+	label: string;
+	description?: string;
+	checked: boolean;
+	onCheckedChange: (next: boolean) => void;
+}) {
+	return (
+		<div className='flex min-h-7 items-center justify-between gap-3'>
+			<div className='min-w-0 space-y-0.5'>
+				<Label className={FIELD_LABEL}>{label}</Label>
+				{description ? <p className={FIELD_HINT}>{description}</p> : null}
+			</div>
+			<Switch checked={checked} onCheckedChange={onCheckedChange} />
+		</div>
+	);
+}
 
 interface SettingsDialogProps {
 	open: boolean;
@@ -331,257 +376,204 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-2xl max-h-[80vh] ui-surface">
+			<DialogContent className='max-w-2xl max-h-[82vh] sm:max-w-2xl'>
 				<DialogHeader>
 					<DialogTitle>Settings</DialogTitle>
 				</DialogHeader>
 
-				<Tabs defaultValue="general" className="w-full">
-					<TabsList className="grid grid-cols-4 w-full">
-						<TabsTrigger value="general">General</TabsTrigger>
-						<TabsTrigger value="graph">Graph</TabsTrigger>
-						<TabsTrigger value="repository">Repository</TabsTrigger>
-						<TabsTrigger value="dialogs">Dialogs</TabsTrigger>
+				<Tabs defaultValue='general' className='w-full'>
+					<TabsList className='grid grid-cols-4 w-full'>
+						<TabsTrigger value='general'>General</TabsTrigger>
+						<TabsTrigger value='graph'>Graph</TabsTrigger>
+						<TabsTrigger value='repository'>Repository</TabsTrigger>
+						<TabsTrigger value='dialogs'>Dialogs</TabsTrigger>
 					</TabsList>
 
-					<ScrollArea className="h-[50vh] mt-4">
-						<TabsContent value="general" className="space-y-4 p-4">
-							<Card>
-								<CardHeader>
-									<CardTitle>Date Format</CardTitle>
-									<CardDescription>Configure how dates are displayed</CardDescription>
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label>Format</Label>
-											<Select
-												value={dateFormat}
-												onValueChange={(value) => {
-													setDateFormat(toDateFormat(value));
-												}}>
-												<SelectTrigger>
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="dateAndTime">Date & Time</SelectItem>
-													<SelectItem value="dateOnly">Date Only</SelectItem>
-													<SelectItem value="relative">Relative</SelectItem>
-													<SelectItem value="isoDateAndTime">ISO Date & Time</SelectItem>
-													<SelectItem value="isoDateOnly">ISO Date Only</SelectItem>
-												</SelectContent>
-											</Select>
-										</div>
-										<div className="space-y-2">
-											<Label>Date Type</Label>
-											<Select
-												value={dateType}
-												onValueChange={(value) => {
-													setDateType(toDateType(value));
-												}}>
-												<SelectTrigger>
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="author">Author Date</SelectItem>
-													<SelectItem value="commit">Commit Date</SelectItem>
-												</SelectContent>
-											</Select>
-										</div>
-									</div>
-									<Button onClick={handleSaveDate} disabled={saveDateMutation.isPending}>
-										Save Date Settings
+					<ScrollArea className='h-[55vh] mt-3 -mx-1'>
+						<TabsContent value='general' className='space-y-3 px-1 py-1'>
+							<Section
+								title='Date format'
+								description='How commit dates appear throughout the app.'
+								footer={
+									<Button size='sm' onClick={handleSaveDate} disabled={saveDateMutation.isPending}>
+										Save date settings
 									</Button>
-								</CardContent>
-							</Card>
-
-							<Card>
-								<CardHeader>
-									<CardTitle>Accessibility</CardTitle>
-									<CardDescription>Accessibility and display options</CardDescription>
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="flex items-center justify-between">
-										<div className="space-y-0.5">
-											<Label>Enhanced Accessibility</Label>
-											<p className="text-sm text-muted-foreground">Enable enhanced accessibility features</p>
-										</div>
-										<Switch checked={enhancedAccessibility} onCheckedChange={setEnhancedAccessibility} />
-									</div>
-									<Separator />
-									<div className="flex items-center justify-between">
-										<div className="space-y-0.5">
-											<Label>Render Markdown</Label>
-											<p className="text-sm text-muted-foreground">Render markdown in commit messages</p>
-										</div>
-										<Switch checked={markdown} onCheckedChange={setMarkdown} />
-									</div>
-									<Button onClick={handleSaveUi} disabled={saveUiMutation.isPending}>
-										Save UI Settings
-									</Button>
-								</CardContent>
-							</Card>
-						</TabsContent>
-
-						<TabsContent value="graph" className="space-y-4 p-4">
-							<Card>
-								<CardHeader>
-									<CardTitle>Graph Appearance</CardTitle>
-									<CardDescription>Customize the visual style of the commit graph</CardDescription>
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="space-y-2">
-										<Label>Graph Style</Label>
+								}>
+								<div className='grid grid-cols-2 gap-3'>
+									<div className='space-y-1.5'>
+										<Label className={FIELD_LABEL}>Format</Label>
 										<Select
-											value={graphStyle}
-											onValueChange={(value) => {
-												setGraphStyle(toGraphStyle(value));
-											}}>
-											<SelectTrigger>
+											value={dateFormat}
+											onValueChange={(value) => { setDateFormat(toDateFormat(value)); }}>
+											<SelectTrigger className='w-full'>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="rounded">Rounded</SelectItem>
-												<SelectItem value="angular">Angular</SelectItem>
+												<SelectItem value='dateAndTime'>Date & time</SelectItem>
+												<SelectItem value='dateOnly'>Date only</SelectItem>
+												<SelectItem value='relative'>Relative</SelectItem>
+												<SelectItem value='isoDateAndTime'>ISO date & time</SelectItem>
+												<SelectItem value='isoDateOnly'>ISO date only</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
-
-									<div className="space-y-2">
-										<Label>Branch Colors (one per line, hex format)</Label>
-										<textarea
-											className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-											value={graphColors}
-											onChange={(e) => { setGraphColors(e.target.value); }}
-											placeholder="#0085d9&#10;#d9008f&#10;#00d90a"
-										/>
+									<div className='space-y-1.5'>
+										<Label className={FIELD_LABEL}>Source</Label>
+										<Select
+											value={dateType}
+											onValueChange={(value) => { setDateType(toDateType(value)); }}>
+											<SelectTrigger className='w-full'>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value='author'>Author date</SelectItem>
+												<SelectItem value='commit'>Commit date</SelectItem>
+											</SelectContent>
+										</Select>
 									</div>
+								</div>
+							</Section>
 
-									<Button onClick={handleSaveGraph} disabled={saveGraphMutation.isPending}>
-										Save Graph Settings
+							<Section
+								title='Accessibility'
+								description='Accessibility and display options.'
+								footer={
+									<Button size='sm' onClick={handleSaveUi} disabled={saveUiMutation.isPending}>
+										Save UI settings
 									</Button>
-								</CardContent>
-							</Card>
+								}>
+								<ToggleRow
+									label='Enhanced accessibility'
+									description='Increase contrast and disable backdrop blur.'
+									checked={enhancedAccessibility}
+									onCheckedChange={setEnhancedAccessibility}
+								/>
+								<ToggleRow
+									label='Render markdown'
+									description='Render markdown in commit messages and PR bodies.'
+									checked={markdown}
+									onCheckedChange={setMarkdown}
+								/>
+							</Section>
 						</TabsContent>
 
-						<TabsContent value="repository" className="space-y-4 p-4">
-							<Card>
-								<CardHeader>
-									<CardTitle>Repository Display</CardTitle>
-									<CardDescription>Configure what is shown in the repository view</CardDescription>
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="space-y-2">
-										<Label>Initial Commits to Load</Label>
-										<Input
-											type="number"
-											value={initialLoadCommits}
-											onChange={(e) => { setInitialLoadCommits(parseInt(e.target.value) || 300); }}
-											min={50}
-											max={1000}
-										/>
-									</div>
-
-									<Separator />
-
-									<div className="space-y-3">
-										<div className="flex items-center justify-between">
-											<Label>Show Remote Branches</Label>
-											<Switch checked={showRemoteBranches} onCheckedChange={setShowRemoteBranches} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Show Stashes</Label>
-											<Switch checked={showStashes} onCheckedChange={setShowStashes} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Show Tags</Label>
-											<Switch checked={showTags} onCheckedChange={setShowTags} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Show Uncommitted Changes</Label>
-											<Switch checked={showUncommittedChanges} onCheckedChange={setShowUncommittedChanges} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Mute Merge Commits</Label>
-											<Switch checked={muteMergeCommits} onCheckedChange={setMuteMergeCommits} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Only Follow First Parent</Label>
-											<Switch checked={onlyFollowFirstParent} onCheckedChange={setOnlyFollowFirstParent} />
-										</div>
-									</div>
-
-									<Button onClick={handleSaveRepository} disabled={saveRepositoryMutation.isPending}>
-										Save Repository Settings
+						<TabsContent value='graph' className='space-y-3 px-1 py-1'>
+							<Section
+								title='Graph appearance'
+								description='Customize the visual style of the commit graph.'
+								footer={
+									<Button size='sm' onClick={handleSaveGraph} disabled={saveGraphMutation.isPending}>
+										Save graph settings
 									</Button>
-								</CardContent>
-							</Card>
+								}>
+								<div className='space-y-1.5'>
+									<Label className={FIELD_LABEL}>Style</Label>
+									<Select
+										value={graphStyle}
+										onValueChange={(value) => { setGraphStyle(toGraphStyle(value)); }}>
+										<SelectTrigger className='w-full'>
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value='rounded'>Rounded</SelectItem>
+											<SelectItem value='angular'>Angular</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className='space-y-1.5'>
+									<Label className={FIELD_LABEL}>Branch colors</Label>
+									<p className={FIELD_HINT}>One hex color per line. Falls back to the chart palette when empty.</p>
+									<textarea
+										className='flex min-h-[120px] w-full rounded-md border border-border bg-background px-3 py-2 text-[0.8125rem] font-mono placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
+										value={graphColors}
+										onChange={(e) => { setGraphColors(e.target.value); }}
+										placeholder='#0085d9&#10;#d9008f&#10;#00d90a'
+									/>
+								</div>
+							</Section>
 						</TabsContent>
 
-						<TabsContent value="dialogs" className="space-y-4 p-4">
-							<Card>
-								<CardHeader>
-									<CardTitle>Dialog Defaults</CardTitle>
-									<CardDescription>Set default values for dialog options</CardDescription>
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="space-y-2">
-										<Label>Reset Mode</Label>
+						<TabsContent value='repository' className='space-y-3 px-1 py-1'>
+							<Section
+								title='Repository display'
+								description='What appears in the repository view.'
+								footer={
+									<Button size='sm' onClick={handleSaveRepository} disabled={saveRepositoryMutation.isPending}>
+										Save repository settings
+									</Button>
+								}>
+								<div className='space-y-1.5'>
+									<Label className={FIELD_LABEL}>Initial commits to load</Label>
+									<Input
+										type='number'
+										value={initialLoadCommits}
+										onChange={(e) => { setInitialLoadCommits(parseInt(e.target.value) || 300); }}
+										min={50}
+										max={1000}
+										className='font-mono tabular-nums w-32'
+									/>
+								</div>
+
+								<div className='-mx-3.5 my-1 h-px bg-border/60' />
+
+								<ToggleRow label='Show remote branches' checked={showRemoteBranches} onCheckedChange={setShowRemoteBranches} />
+								<ToggleRow label='Show stashes' checked={showStashes} onCheckedChange={setShowStashes} />
+								<ToggleRow label='Show tags' checked={showTags} onCheckedChange={setShowTags} />
+								<ToggleRow label='Show uncommitted changes' checked={showUncommittedChanges} onCheckedChange={setShowUncommittedChanges} />
+								<ToggleRow label='Mute merge commits' description='Render merge commits at lower opacity.' checked={muteMergeCommits} onCheckedChange={setMuteMergeCommits} />
+								<ToggleRow label='Only follow first parent' checked={onlyFollowFirstParent} onCheckedChange={setOnlyFollowFirstParent} />
+							</Section>
+						</TabsContent>
+
+						<TabsContent value='dialogs' className='space-y-3 px-1 py-1'>
+							<Section
+								title='Dialog defaults'
+								description='Default values used when opening common dialogs.'
+								footer={
+									<Button size='sm' onClick={handleSaveDialog} disabled={saveDialogMutation.isPending}>
+										Save dialog settings
+									</Button>
+								}>
+								<div className='grid grid-cols-2 gap-3'>
+									<div className='space-y-1.5'>
+										<Label className={FIELD_LABEL}>Reset mode</Label>
 										<Select
 											value={resetCommitMode}
-											onValueChange={(value) => {
-												setResetCommitMode(toResetCommitMode(value));
-											}}>
-											<SelectTrigger>
+											onValueChange={(value) => { setResetCommitMode(toResetCommitMode(value)); }}>
+											<SelectTrigger className='w-full'>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="soft">Soft</SelectItem>
-												<SelectItem value="mixed">Mixed</SelectItem>
-												<SelectItem value="hard">Hard</SelectItem>
+												<SelectItem value='soft'>Soft</SelectItem>
+												<SelectItem value='mixed'>Mixed</SelectItem>
+												<SelectItem value='hard'>Hard</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
 
-									<div className="space-y-2">
-										<Label>Add Tag Type</Label>
+									<div className='space-y-1.5'>
+										<Label className={FIELD_LABEL}>Tag type</Label>
 										<Select
 											value={addTagType}
-											onValueChange={(value) => {
-												setAddTagType(toAddTagType(value));
-											}}>
-											<SelectTrigger>
+											onValueChange={(value) => { setAddTagType(toAddTagType(value)); }}>
+											<SelectTrigger className='w-full'>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="annotated">Annotated</SelectItem>
-												<SelectItem value="lightweight">Lightweight</SelectItem>
+												<SelectItem value='annotated'>Annotated</SelectItem>
+												<SelectItem value='lightweight'>Lightweight</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
+								</div>
 
-									<Separator />
+								<div className='-mx-3.5 my-1 h-px bg-border/60' />
 
-									<div className="space-y-3">
-										<div className="flex items-center justify-between">
-											<Label>Checkout after creating branch</Label>
-											<Switch checked={createBranchCheckout} onCheckedChange={setCreateBranchCheckout} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>No fast-forward merge by default</Label>
-											<Switch checked={mergeNoFastForward} onCheckedChange={setMergeNoFastForward} />
-										</div>
-										<div className="flex items-center justify-between">
-											<Label>Interactive rebase by default</Label>
-											<Switch checked={rebaseInteractive} onCheckedChange={setRebaseInteractive} />
-										</div>
-									</div>
-
-									<Button onClick={handleSaveDialog} disabled={saveDialogMutation.isPending}>
-										Save Dialog Settings
-									</Button>
-								</CardContent>
-							</Card>
+								<ToggleRow label='Checkout after creating branch' checked={createBranchCheckout} onCheckedChange={setCreateBranchCheckout} />
+								<ToggleRow label='No fast-forward merge by default' checked={mergeNoFastForward} onCheckedChange={setMergeNoFastForward} />
+								<ToggleRow label='Interactive rebase by default' checked={rebaseInteractive} onCheckedChange={setRebaseInteractive} />
+							</Section>
 						</TabsContent>
 					</ScrollArea>
 				</Tabs>

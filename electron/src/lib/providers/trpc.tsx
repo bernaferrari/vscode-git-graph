@@ -39,7 +39,7 @@ function BrowserRuntimeFallback(): ReactNode {
         <main className='bg-background text-foreground flex min-h-screen items-center justify-center p-6'>
             <section className='ui-surface w-full max-w-2xl p-5'>
                 <div className='flex items-start gap-3'>
-                    <div className='bg-amber-500/10 text-amber-700 dark:text-amber-300 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/25'>
+                    <div className='bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color-mix(in_oklch,var(--warning)_25%,transparent)]'>
                         <AlertTriangle className='h-5 w-5' />
                     </div>
                     <div className='min-w-0 space-y-3'>

@@ -31,9 +31,12 @@ const LENS_ICONS: Record<LensMode, ElementType> = {
 };
 
 const LENS_COLORS: Record<LensMode, string> = {
-	guided: 'text-green-500 border-green-500/30 bg-green-500/10',
-	craft: 'text-blue-500 border-blue-500/30 bg-blue-500/10',
-	control: 'text-purple-500 border-purple-500/30 bg-purple-500/10',
+	guided:
+		'text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))] border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)]',
+	craft:
+		'text-[color-mix(in_oklch,var(--info)_70%,var(--foreground))] border-[color-mix(in_oklch,var(--info)_35%,transparent)] bg-[color-mix(in_oklch,var(--info)_10%,transparent)]',
+	control:
+		'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]',
 };
 
 interface LensSwitcherProps {
@@ -51,54 +54,29 @@ export function LensSwitcher({
 
 	const CurrentIcon = LENS_ICONS[mode];
 
-	if (variant === 'inline') {
+	if (variant === 'inline' || variant === 'toolbar') {
 		return (
-			<div className="flex items-center gap-1">
+			<div className='inline-flex items-center gap-0.5 rounded-md border border-border/70 bg-muted/40 p-0.5'>
 				{lensOptions.map((lens) => {
 					const Icon = LENS_ICONS[lens.mode];
 					const isActive = lens.mode === mode;
 					return (
 						<Button
 							key={lens.mode}
-							variant={isActive ? 'default' : 'ghost'}
-							size="sm"
+							variant='ghost'
+							size='xs'
 							onClick={() => { setLensMode(lens.mode); }}
 							className={cn(
-								'h-7 px-2 gap-1.5',
+								'h-6 gap-1.5 px-2 text-[11px] font-medium',
+								isActive
+									? 'bg-background ring-1 ring-border shadow-[var(--shadow-xs)]'
+									: 'text-muted-foreground/85 hover:text-foreground',
 								isActive && LENS_COLORS[lens.mode],
 								className
 							)}
-						>
-							<Icon className="h-3.5 w-3.5" />
+							title={lens.description}>
+							<Icon className='h-3.5 w-3.5' />
 							{showLabel && <span>{lens.label}</span>}
-						</Button>
-					);
-				})}
-			</div>
-		);
-	}
-
-	if (variant === 'toolbar') {
-		return (
-			<div className="flex items-center gap-1">
-				{lensOptions.map((lens) => {
-					const Icon = LENS_ICONS[lens.mode];
-					const isActive = lens.mode === mode;
-					return (
-						<Button
-							key={lens.mode}
-							variant={isActive ? 'secondary' : 'ghost'}
-							size="sm"
-							onClick={() => { setLensMode(lens.mode); }}
-							className={cn(
-								'h-7 px-2 gap-1',
-								isActive && LENS_COLORS[lens.mode],
-								className
-							)}
-							title={lens.description}
-						>
-							<Icon className="h-3.5 w-3.5" />
-							{showLabel && <span className="text-xs">{lens.label}</span>}
 						</Button>
 					);
 				})}
@@ -111,26 +89,25 @@ export function LensSwitcher({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button
-					variant="outline"
-					size="sm"
+					variant='outline'
+					size='sm'
 					className={cn(
-						'h-8 gap-1.5 border-dashed',
+						'h-8 gap-1.5',
 						LENS_COLORS[mode],
 						className
-					)}
-				>
-					<CurrentIcon className="h-4 w-4" />
+					)}>
+					<CurrentIcon className='h-4 w-4' />
 					{showLabel && (
 						<>
-							<span>{config.label} Mode</span>
-							<ChevronDown className="h-3 w-3 opacity-50" />
+							<span>{config.label}</span>
+							<ChevronDown className='h-3 w-3 opacity-60' />
 						</>
 					)}
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-64">
-				<div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
-					Select Lens Mode
+			<DropdownMenuContent align='start' className='w-64'>
+				<div className='px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+					Select lens
 				</div>
 				<DropdownMenuSeparator />
 				{lensOptions.map((lens) => {
@@ -141,29 +118,28 @@ export function LensSwitcher({
 							key={lens.mode}
 							onClick={() => { setLensMode(lens.mode); }}
 							className={cn(
-								'flex items-center gap-2 cursor-pointer',
-								isActive && 'bg-accent'
-							)}
-						>
-							<Icon
-								className={cn(
-									'h-4 w-4',
-									isActive ? 'opacity-100' : 'opacity-50'
-								)}
-							/>
-							<div className="flex flex-col">
-								<span className="font-medium">{lens.label}</span>
-								<span className="text-xs text-muted-foreground">
+								'flex cursor-pointer items-start gap-2 px-2 py-1.5',
+								isActive && 'bg-accent/70'
+							)}>
+							<Icon className={cn('mt-0.5 h-4 w-4', isActive ? 'opacity-100' : 'opacity-60')} />
+							<div className='flex min-w-0 flex-1 flex-col leading-snug'>
+								<span className='text-[0.8125rem] font-medium'>{lens.label}</span>
+								<span className='text-[11px] text-muted-foreground/85'>
 									{lens.description}
 								</span>
 							</div>
-							{isActive && <Check className="h-4 w-4 ml-auto" />}
+							{isActive && <Check className='ml-auto h-3.5 w-3.5 text-primary' />}
 						</DropdownMenuItem>
 					);
 				})}
 				<DropdownMenuSeparator />
-				<div className="px-2 py-1.5 text-xs text-muted-foreground">
-					<p>Press Ctrl+1, Ctrl+2, Ctrl+3 to quickly switch</p>
+				<div className='flex items-center justify-between gap-2 px-2 py-1.5 text-[11px] text-muted-foreground/85'>
+					<span>Quick switch</span>
+					<span className='flex items-center gap-1'>
+						<kbd className='ui-kbd'>⌃1</kbd>
+						<kbd className='ui-kbd'>⌃2</kbd>
+						<kbd className='ui-kbd'>⌃3</kbd>
+					</span>
 				</div>
 			</DropdownMenuContent>
 		</DropdownMenu>

@@ -155,7 +155,7 @@ export function GitGraphFeatureDialogs({
     onSelectCommit: (hash: string) => void;
     lfs: OpenState;
     pullRequests: OpenState;
-    worktree: OpenState;
+    worktree: OpenState & { initialBranch?: string | null };
     workflow: OpenState;
     submodule: OpenState;
     keyboardHelp: OpenState;
@@ -241,7 +241,11 @@ export function GitGraphFeatureDialogs({
             )}
             {featureFlags.worktreePro && worktree.open && (
                 <Suspense fallback={<DialogLoadingFallback />}>
-                    <WorktreeManagement open={worktree.open} onOpenChange={worktree.onOpenChange} />
+                    <WorktreeManagement
+                        open={worktree.open}
+                        onOpenChange={worktree.onOpenChange}
+                        {...(worktree.initialBranch ? { initialBranch: worktree.initialBranch } : {})}
+                    />
                 </Suspense>
             )}
             {featureFlags.workflowEngine && workflow.open && (

@@ -8,10 +8,17 @@ import { WorktreeCenter } from './worktree-center';
 interface WorktreeManagementProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    initialBranch?: string | null;
 }
 
-export function WorktreeManagement({ open, onOpenChange }: WorktreeManagementProps) {
-    return <WorktreeCenter open={open} onOpenChange={onOpenChange} />;
+export function WorktreeManagement({ open, onOpenChange, initialBranch }: WorktreeManagementProps) {
+    return (
+        <WorktreeCenter
+            open={open}
+            onOpenChange={onOpenChange}
+            {...(initialBranch ? { initialBranch } : {})}
+        />
+    );
 }
 
 export default WorktreeManagement;

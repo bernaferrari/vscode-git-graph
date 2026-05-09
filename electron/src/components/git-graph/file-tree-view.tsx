@@ -98,11 +98,11 @@ export function FileTreeView({ files, selectedFiles, onToggle, onToggleFolder }:
 	const getStatusIcon = (status?: string) => {
 		switch (status) {
 			case 'A':
-				return <Plus className="h-3 w-3 text-green-600" />;
+				return <Plus className="h-3 w-3 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />;
 			case 'D':
-				return <Minus className="h-3 w-3 text-red-600" />;
+				return <Minus className="h-3 w-3 text-destructive" />;
 			case 'R':
-				return <RotateCcw className="h-3 w-3 text-amber-600" />;
+				return <RotateCcw className="h-3 w-3 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />;
 			default:
 				return <FileText className="h-3 w-3 text-muted-foreground" />;
 		}
@@ -141,7 +141,7 @@ export function FileTreeView({ files, selectedFiles, onToggle, onToggleFolder }:
 						) : (
 							<ChevronRight className="h-3 w-3 text-muted-foreground" />
 						)}
-						<Folder className="h-3 w-3 text-amber-600" />
+						<Folder className="h-3 w-3 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />
 						<span className="text-xs truncate flex-1">{node.name}</span>
 						<span className="text-[10px] text-muted-foreground">
 							{allFiles.length}

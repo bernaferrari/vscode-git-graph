@@ -38,12 +38,12 @@ interface InteractiveRebaseDialogProps {
 }
 
 const ACTION_LABELS: Record<RebaseCommit['action'], { label: string; description: string; color: string }> = {
-	pick: { label: 'pick', description: 'Use commit', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' },
-	reword: { label: 'reword', description: 'Use commit, but edit message', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' },
-	edit: { label: 'edit', description: 'Use commit, but stop for amending', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100' },
-	squash: { label: 'squash', description: 'Use commit, meld into previous', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100' },
-	fixup: { label: 'fixup', description: 'Like squash, but discard message', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100' },
-	drop: { label: 'drop', description: 'Remove commit', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' },
+	pick: { label: 'pick', description: 'Use commit', color: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' },
+	reword: { label: 'reword', description: 'Use commit, but edit message', color: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)] text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' },
+	edit: { label: 'edit', description: 'Use commit, but stop for amending', color: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' },
+	squash: { label: 'squash', description: 'Use commit, meld into previous', color: 'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] dark:bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' },
+	fixup: { label: 'fixup', description: 'Like squash, but discard message', color: 'bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)] text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))] dark:bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)] dark:text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))]' },
+	drop: { label: 'drop', description: 'Remove commit', color: 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] text-destructive dark:bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:text-destructive' },
 };
 
 export function InteractiveRebaseDialog({

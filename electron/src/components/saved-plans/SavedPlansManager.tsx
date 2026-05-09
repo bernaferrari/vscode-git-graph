@@ -142,9 +142,9 @@ export function SavedPlansManager({
 	}, []);
 
 	const statusColors = {
-		draft: 'bg-yellow-500',
-		validated: 'bg-blue-500',
-		applied: 'bg-green-500',
+		draft: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]',
+		validated: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)]',
+		applied: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]',
 	};
 
 	return (
@@ -220,7 +220,7 @@ export function SavedPlansManager({
 															{plan.operations.length} ops
 														</Badge>
 														{plan.shared && (
-															<Share2 className="h-3 w-3 text-blue-500" />
+															<Share2 className="h-3 w-3 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]" />
 														)}
 													</div>
 												</div>
@@ -266,7 +266,7 @@ export function SavedPlansManager({
 													<Button
 														variant="ghost"
 														size="sm"
-														className="h-8 w-8 p-0 text-red-500"
+														className="h-8 w-8 p-0 text-destructive"
 														onClick={() => { deletePlan(selectedPlan.id); }}
 													>
 														<Trash2 className="h-4 w-4" />

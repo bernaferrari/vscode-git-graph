@@ -56,16 +56,16 @@ export interface WorkspaceRepo {
 }
 
 const COLORS = [
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-amber-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-cyan-500',
-    'bg-orange-500',
-    'bg-indigo-500',
+    'bg-[color-mix(in_oklch,var(--info)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--chart-7)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)]',
 ];
-const DEFAULT_WORKSPACE_COLOR = 'bg-blue-500';
+const DEFAULT_WORKSPACE_COLOR = 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)]';
 
 interface LaunchpadRepoStatus {
     path: string;
@@ -466,7 +466,7 @@ export function WorkspacesManager({
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={() => { handleDeleteWorkspace(selectedWorkspace.id); }}
-                                                    className='text-red-600'>
+                                                    className='text-destructive'>
                                                     <Trash2 className='mr-2 h-4 w-4' />
                                                     Delete
                                                 </DropdownMenuItem>
@@ -562,7 +562,7 @@ export function WorkspacesManager({
                                                         {launchpad ? (
                                                             <div className='text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]'>
                                                                 {launchpad.error ? (
-                                                                    <span className='inline-flex items-center gap-1 text-amber-600'>
+                                                                    <span className='inline-flex items-center gap-1 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                                                                         <CircleAlert className='h-3 w-3' />
                                                                         {launchpad.error}
                                                                     </span>
@@ -570,20 +570,20 @@ export function WorkspacesManager({
                                                                     <>
                                                                         <span>{launchpad.head ?? 'detached'}</span>
                                                                         {launchpad.dirtyCount > 0 && (
-                                                                            <span className='rounded bg-amber-100 px-1.5 py-0.5 text-amber-700'>
+                                                                            <span className='rounded bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] px-1.5 py-0.5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
                                                                                 {launchpad.dirtyCount} changed
                                                                             </span>
                                                                         )}
                                                                         {(launchpad.ahead > 0 || launchpad.behind > 0) && (
                                                                             <span className='inline-flex items-center gap-1'>
                                                                                 {launchpad.ahead > 0 && (
-                                                                                    <span className='inline-flex items-center gap-0.5 text-emerald-600'>
+                                                                                    <span className='inline-flex items-center gap-0.5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
                                                                                         <ArrowUp className='h-3 w-3' />
                                                                                         {launchpad.ahead}
                                                                                     </span>
                                                                                 )}
                                                                                 {launchpad.behind > 0 && (
-                                                                                    <span className='inline-flex items-center gap-0.5 text-sky-600'>
+                                                                                    <span className='inline-flex items-center gap-0.5 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'>
                                                                                         <ArrowDown className='h-3 w-3' />
                                                                                         {launchpad.behind}
                                                                                     </span>
@@ -591,7 +591,7 @@ export function WorkspacesManager({
                                                                             </span>
                                                                         )}
                                                                         {(launchpad.openPullRequests ?? 0) > 0 && (
-                                                                            <span className='inline-flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700'>
+                                                                            <span className='inline-flex items-center gap-1 rounded bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] px-1.5 py-0.5 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]'>
                                                                                 <GitPullRequest className='h-3 w-3' />
                                                                                 {launchpad.openPullRequests}
                                                                             </span>
@@ -606,10 +606,10 @@ export function WorkspacesManager({
                                                                                 key={status.key}
                                                                                 className={`rounded px-1.5 py-0.5 ${
                                                                                     status.severity === 'error'
-                                                                                        ? 'bg-red-100 text-red-700'
+                                                                                        ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] text-destructive'
                                                                                         : status.severity === 'warn'
-                                                                                            ? 'bg-amber-100 text-amber-700'
-                                                                                            : 'bg-sky-100 text-sky-700'
+                                                                                            ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+                                                                                            : 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)] text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'
                                                                                 }`}>
                                                                                 {status.label}
                                                                             </span>
@@ -620,7 +620,7 @@ export function WorkspacesManager({
                                                         ) : null}
                                                     </div>
                                                     {repo.isFavorite && (
-                                                        <Star className='h-4 w-4 fill-amber-500 text-amber-500' />
+                                                        <Star className='h-4 w-4 fill-amber-500 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                                                     )}
                                                     <div className='flex items-center gap-1 opacity-0 group-hover:opacity-100'>
                                                         <Button
@@ -640,7 +640,7 @@ export function WorkspacesManager({
                                                         <Button
                                                             variant='ghost'
                                                             size='sm'
-                                                            className='h-6 w-6 p-0 text-red-600'
+                                                            className='h-6 w-6 p-0 text-destructive'
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleRemoveRepo(selectedWorkspace.id, repo.path);

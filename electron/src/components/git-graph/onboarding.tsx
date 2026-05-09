@@ -80,15 +80,15 @@ export function OnboardingDialog({
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Select commits to open review details and file-level patches
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Use the side panel to inspect branch tracking, publish status, and stashes
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Search and filter when the visible graph gets noisy
 						</li>
 					</ul>
@@ -107,15 +107,15 @@ export function OnboardingDialog({
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Stage by line, hunk, or file
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Quick review of staged versus unstaged files before you commit
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Commit templates and signing are built in
 						</li>
 					</ul>
@@ -134,15 +134,15 @@ export function OnboardingDialog({
 					</p>
 					<ul className="space-y-2 text-sm text-muted-foreground">
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Publish and track upstream branches without dropping to the terminal
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Use force-with-lease for rewrite-history pushes
 						</li>
 						<li className="flex items-center gap-2">
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 							Create a branch from a stash when recovery is safer than re-applying in place
 						</li>
 					</ul>

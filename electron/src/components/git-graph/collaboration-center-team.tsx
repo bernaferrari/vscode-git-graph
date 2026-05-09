@@ -61,8 +61,8 @@ function TeamActivityItem({ entry }: { entry: CollaborationRemoteActivityEntry }
 					variant='outline'
 					className={cn(
 						'shrink-0',
-						entry.status === 'success' && 'border-emerald-500/35 text-emerald-700 dark:text-emerald-200',
-						entry.status === 'failed' && 'border-amber-500/35 text-amber-700 dark:text-amber-200'
+						entry.status === 'success' && 'border-[color-mix(in_oklch,var(--success)_35%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
+						entry.status === 'failed' && 'border-[color-mix(in_oklch,var(--warning)_35%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
 					)}>
 					{formatDistanceToNow(entry.timestamp, { addSuffix: true })}
 				</Badge>
@@ -375,7 +375,7 @@ export function CollaborationTeamTab({
 						</CardHeader>
 						<CardContent className='space-y-3'>
 							{presenceError ? (
-								<div className='rounded-xl border border-amber-500/35 bg-amber-500/8 px-3 py-4 text-sm leading-6 text-amber-700 dark:text-amber-200'>
+								<div className='rounded-xl border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] px-3 py-4 text-sm leading-6 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 									{presenceError}
 								</div>
 							) : loadingPresence && presence.length === 0 ? (
@@ -401,7 +401,7 @@ export function CollaborationTeamTab({
 							</CardHeader>
 							<CardContent className='space-y-3'>
 								{memberError ? (
-									<div className='rounded-xl border border-amber-500/35 bg-amber-500/8 px-3 py-4 text-sm leading-6 text-amber-700 dark:text-amber-200'>
+									<div className='rounded-xl border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] px-3 py-4 text-sm leading-6 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 										{memberError}
 									</div>
 								) : loadingMembers && members.length === 0 ? (
@@ -454,7 +454,7 @@ export function CollaborationTeamTab({
 						</CardHeader>
 						<CardContent className='space-y-3'>
 							{activityError ? (
-								<div className='rounded-xl border border-amber-500/35 bg-amber-500/8 px-3 py-4 text-sm leading-6 text-amber-700 dark:text-amber-200'>
+								<div className='rounded-xl border border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] px-3 py-4 text-sm leading-6 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 									{activityError}
 								</div>
 							) : loadingRemoteActivity && remoteActivity.length === 0 ? (

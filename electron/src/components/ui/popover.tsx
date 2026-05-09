@@ -36,7 +36,7 @@ function PopoverContent({
   align = "center",
   alignOffset = 0,
   side = "bottom",
-  sideOffset = 4,
+  sideOffset = 6,
   ...props
 }: PopoverPrimitive.Popup.Props &
   Pick<
@@ -55,7 +55,14 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "bg-popover/95 border border-border/70 text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ring-foreground/20 flex flex-col gap-2.5 rounded-lg p-2.5 text-sm shadow-[0_18px_90px_-40px_rgba(0,0,0,0.45)] ring-1 duration-100 backdrop-blur-sm data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 w-72 origin-(--transform-origin) outline-hidden",
+            "z-50 w-72 origin-(--transform-origin) outline-hidden",
+            "flex flex-col gap-2 rounded-lg p-2 text-sm",
+            "border border-border/70 bg-popover text-popover-foreground",
+            "shadow-[var(--shadow-popover)]",
+            "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-[0.97] data-open:zoom-in-[0.97]",
+            "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+            "data-[side=inline-start]:slide-in-from-right-1 data-[side=inline-end]:slide-in-from-left-1",
+            "duration-100",
             className
           )}
           {...props}
@@ -69,7 +76,7 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="popover-header"
-      className={cn("flex flex-col gap-0.5 text-sm", className)}
+      className={cn("flex flex-col gap-0.5 px-1 pt-0.5 text-sm", className)}
       {...props}
     />
   )
@@ -79,7 +86,7 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   return (
     <PopoverPrimitive.Title
       data-slot="popover-title"
-      className={cn("font-medium", className)}
+      className={cn("font-semibold tracking-[-0.01em]", className)}
       {...props}
     />
   )
@@ -92,7 +99,7 @@ function PopoverDescription({
   return (
     <PopoverPrimitive.Description
       data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
+      className={cn("text-muted-foreground text-[0.8125rem] leading-relaxed", className)}
       {...props}
     />
   )

@@ -234,11 +234,11 @@ export function InteractiveMergeEditor({
 						<span>Conflicts</span>
 						<div className="flex gap-2 text-muted-foreground">
 							<span className="flex items-center gap-1">
-								<span className="w-3 h-3 rounded bg-blue-500/30 border border-blue-500" />
+								<span className="w-3 h-3 rounded bg-[color-mix(in_oklch,var(--info)_30%,transparent)] border border-[color-mix(in_oklch,var(--info)_35%,transparent)]" />
 								Ours
 							</span>
 							<span className="flex items-center gap-1">
-								<span className="w-3 h-3 rounded bg-green-500/30 border border-green-500" />
+								<span className="w-3 h-3 rounded bg-[color-mix(in_oklch,var(--success)_30%,transparent)] border border-[color-mix(in_oklch,var(--success)_35%,transparent)]" />
 								Theirs
 							</span>
 						</div>
@@ -248,8 +248,8 @@ export function InteractiveMergeEditor({
 							{hunks.map((hunk, hunkIdx) => (
 								<div key={hunkIdx} className="border-b last:border-b-0">
 									{hunk.isConflict && (
-										<div className="bg-yellow-500/10 px-2 py-1 flex items-center justify-between sticky top-0 z-10 border-b">
-											<span className="text-yellow-700 text-xs font-medium">
+										<div className="bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] px-2 py-1 flex items-center justify-between sticky top-0 z-10 border-b">
+											<span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] text-xs font-medium">
 												Conflict #{hunkIdx + 1}
 											</span>
 											<div className="flex gap-1">
@@ -285,12 +285,12 @@ export function InteractiveMergeEditor({
 													line.type === 'context' && 'hover:bg-muted cursor-default',
 													line.type === 'delete' && 'cursor-pointer',
 													line.type === 'add' && 'cursor-pointer',
-													line.type === 'delete' && selectedSide === 'ours' && 'bg-blue-500/30',
-													line.type === 'delete' && selectedSide === 'theirs' && 'bg-red-500/20 line-through opacity-50',
-													line.type === 'delete' && selectedSide === 'none' && 'bg-yellow-500/20',
-													line.type === 'add' && selectedSide === 'theirs' && 'bg-green-500/30',
-													line.type === 'add' && selectedSide === 'ours' && 'bg-red-500/20 line-through opacity-50',
-													line.type === 'add' && selectedSide === 'none' && 'bg-yellow-500/20',
+													line.type === 'delete' && selectedSide === 'ours' && 'bg-[color-mix(in_oklch,var(--info)_30%,transparent)]',
+													line.type === 'delete' && selectedSide === 'theirs' && 'bg-[color-mix(in_oklch,var(--destructive)_20%,transparent)] line-through opacity-50',
+													line.type === 'delete' && selectedSide === 'none' && 'bg-[color-mix(in_oklch,var(--warning)_20%,transparent)]',
+													line.type === 'add' && selectedSide === 'theirs' && 'bg-[color-mix(in_oklch,var(--success)_30%,transparent)]',
+													line.type === 'add' && selectedSide === 'ours' && 'bg-[color-mix(in_oklch,var(--destructive)_20%,transparent)] line-through opacity-50',
+													line.type === 'add' && selectedSide === 'none' && 'bg-[color-mix(in_oklch,var(--warning)_20%,transparent)]',
 												)}
 												disabled={line.type === 'context'}
 											>
@@ -303,8 +303,8 @@ export function InteractiveMergeEditor({
 												<span
 													className={cn(
 														'w-6 shrink-0 text-center select-none',
-														line.type === 'delete' && 'text-red-600',
-														line.type === 'add' && 'text-green-600',
+														line.type === 'delete' && 'text-destructive',
+														line.type === 'add' && 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
 													)}
 												>
 													{line.type === 'delete' ? '-' : line.type === 'add' ? '+' : ' '}

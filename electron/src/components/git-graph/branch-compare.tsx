@@ -107,8 +107,8 @@ export function BranchCompare({
 						<span className="text-muted-foreground">•</span>
 						<span>{files.length} files changed</span>
 						<span className="text-muted-foreground">•</span>
-						<span className="text-green-600">+{additions}</span>
-						<span className="text-red-600">-{deletions}</span>
+						<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">+{additions}</span>
+						<span className="text-destructive">-{deletions}</span>
 					</div>
 				)}
 
@@ -160,13 +160,13 @@ export function BranchCompare({
 												className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-accent/50 text-sm"
 											>
 												{file.status === 'A' && (
-													<Plus className="h-3.5 w-3.5 text-green-600" />
+													<Plus className="h-3.5 w-3.5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]" />
 												)}
 												{file.status === 'D' && (
-													<Minus className="h-3.5 w-3.5 text-red-600" />
+													<Minus className="h-3.5 w-3.5 text-destructive" />
 												)}
 												{file.status === 'M' && (
-													<FileText className="h-3.5 w-3.5 text-amber-600" />
+													<FileText className="h-3.5 w-3.5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]" />
 												)}
 												<span className="truncate flex-1">{file.path}</span>
 											</div>

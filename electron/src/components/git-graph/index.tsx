@@ -25,7 +25,7 @@ import { CommitGraphLegend } from './commit-graph-legend';
 import { DragCommitHandler } from './drag-commit-to-branch';
 import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
-import { FeatureHubStrip } from './feature-hub-strip';
+import { ToolsMenu } from './tools-menu';
 import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
 import { GitGraphShellOverlays } from './git-graph-shell-overlays';
@@ -39,7 +39,11 @@ import { QuickActionsToolbar } from './quick-actions-toolbar';
 import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
 import { RepoBranchSwitcher } from './repo-branch-switcher';
 import { SidePanel } from './side-panel';
+import { CommitDotQuickActions } from './commit-dot-quick-actions';
+import { CommitMultiSelectBar } from './commit-multi-select-bar';
 import { UndoStackProvider } from './undo-stack-provider';
+import { UndoToastHost } from './undo-toast-host';
+import { OutcomePickerProvider, useOutcomePicker } from '@/components/outcome-preview/useOutcomePicker';
 import { useCollaborationPresence } from './use-collaboration-presence';
 import { useCollaborationRealtime } from './use-collaboration-realtime';
 import { useCommandPaletteActions } from './use-command-palette-actions';
@@ -256,13 +260,13 @@ function classifyPerfTrend(stats: PerfStatsSummary): PerfTrend {
 function perfTrendBadgeClass(level: PerfTrendLevel): string {
     switch (level) {
         case 'regressed':
-            return 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-200';
+            return 'border-[color-mix(in_oklch,var(--destructive)_40%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] text-destructive dark:text-destructive';
         case 'watch':
-            return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-200';
+            return 'border-[color-mix(in_oklch,var(--warning)_40%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]';
         case 'improving':
-            return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200';
+            return 'border-[color-mix(in_oklch,var(--success)_40%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]';
         case 'stable':
-            return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200';
+            return 'border-[color-mix(in_oklch,var(--success)_30%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]';
         case 'warming':
         default:
             return 'border-border/70 bg-muted/60 text-muted-foreground';
@@ -311,6 +315,13 @@ export function GitGraph() {
     // Local state
     const [expandedCommit, setExpandedCommit] = useState<number | null>(null);
     const [selectedCommitIndex, setSelectedCommitIndex] = useState<number | null>(null);
+    /**
+     * Multi-select state. When the user shift- or cmd/ctrl-clicks a row,
+     * the row's hash is added to this Set and a CommitMultiSelectBar slides up.
+     * Hashes (not indices) so the set survives commit-list reorderings.
+     */
+    const [multiSelectedHashes, setMultiSelectedHashes] = useState<Set<string>>(new Set());
+    const [lastSelectionAnchor, setLastSelectionAnchor] = useState<number | null>(null);
     const [findWidgetOpen, setFindWidgetOpen] = useState(false);
     const [findMatches, setFindMatches] = useState<number[]>([]);
     const [findCurrentIndex, setFindCurrentIndex] = useState(0);
@@ -722,6 +733,16 @@ export function GitGraph() {
         { enabled: !!activeRepo && !!repoInfo?.head, staleTime: 5000, refetchOnWindowFocus: false }
     );
     const currentHead = repoInfo?.head ?? 'main';
+    const bringInBranchHandlerRef = useRef<((branch: string) => void) | null>(null);
+    const [worktreePrefillBranch, setWorktreePrefillBranch] = useState<string | null>(null);
+    const [commitDotQuickOpen, setCommitDotQuickOpen] = useState(false);
+    const [commitDotQuickTarget, setCommitDotQuickTarget] = useState<{
+        hash: string;
+        message: string;
+        author: string;
+        email?: string;
+    } | null>(null);
+    const [commitDotQuickPosition, setCommitDotQuickPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     useCollaborationPresence(activeRepo, repoInfo?.head ?? null);
     useCollaborationRealtime();
     const { data: workingTreeStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -1132,19 +1153,94 @@ export function GitGraph() {
 
     // Handlers
     const handleSelectCommit = useCallback(
-        (index: number) => {
-            setSelectedCommitIndex(index);
+        (index: number, modifiers?: { shift?: boolean; meta?: boolean }) => {
             const commit = commitsData?.commits[index];
-            if (commit) {
+            if (!commit) return;
+
+            // Cmd/Ctrl-click: toggle membership in the multi-select set.
+            if (modifiers?.meta) {
+                setMultiSelectedHashes((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(commit.hash)) {
+                        next.delete(commit.hash);
+                    } else {
+                        // Seed the set with the currently-selected commit so the
+                        // user's first cmd-click extends to two, not collapses to one.
+                        if (next.size === 0 && selectedCommitIndex !== null) {
+                            const anchor = commitsData?.commits[selectedCommitIndex];
+                            if (anchor && anchor.hash !== commit.hash) {
+                                next.add(anchor.hash);
+                            }
+                        }
+                        next.add(commit.hash);
+                    }
+                    return next;
+                });
+                setLastSelectionAnchor(index);
+                setSelectedCommitIndex(index);
                 setSelectedCommit(commit.hash);
-                // Auto-open details panel on click
-                if (!commitDetailsOpen) {
-                    setCommitDetailsOpen(true);
-                }
+                return;
+            }
+
+            // Shift-click: extend a contiguous range from the anchor.
+            if (modifiers?.shift && lastSelectionAnchor !== null && commitsData?.commits) {
+                const a = Math.min(lastSelectionAnchor, index);
+                const b = Math.max(lastSelectionAnchor, index);
+                const range = commitsData.commits.slice(a, b + 1);
+                setMultiSelectedHashes(new Set(range.map((c: ClientCommit) => c.hash)));
+                setSelectedCommitIndex(index);
+                setSelectedCommit(commit.hash);
+                return;
+            }
+
+            // Plain click: collapse multi-select, single selection.
+            if (multiSelectedHashes.size > 0) {
+                setMultiSelectedHashes(new Set());
+            }
+            setSelectedCommitIndex(index);
+            setLastSelectionAnchor(index);
+            setSelectedCommit(commit.hash);
+            if (!commitDetailsOpen) {
+                setCommitDetailsOpen(true);
             }
         },
-        [commitsData, setSelectedCommit, commitDetailsOpen, setCommitDetailsOpen]
+        [
+            commitsData,
+            selectedCommitIndex,
+            multiSelectedHashes,
+            lastSelectionAnchor,
+            setSelectedCommit,
+            commitDetailsOpen,
+            setCommitDetailsOpen,
+        ]
     );
+
+    const clearMultiSelection = useCallback(() => {
+        setMultiSelectedHashes(new Set());
+    }, []);
+
+    /**
+     * Selected commits in graph order (newest → oldest), filtered to the loaded
+     * window. Contiguity test: the selected hashes form an unbroken slice of
+     * commitsData.commits.
+     */
+    const multiSelectionPayload = useMemo(() => {
+        if (multiSelectedHashes.size < 2 || !commitsData?.commits) {
+            return { commits: [] as { hash: string; message: string }[], contiguous: false };
+        }
+        const indices: number[] = [];
+        const orderedSelection: { hash: string; message: string }[] = [];
+        commitsData.commits.forEach((c: ClientCommit, i: number) => {
+            if (multiSelectedHashes.has(c.hash)) {
+                indices.push(i);
+                orderedSelection.push({ hash: c.hash, message: c.message });
+            }
+        });
+        const contiguous =
+            indices.length > 1 &&
+            indices[indices.length - 1]! - indices[0]! === indices.length - 1;
+        return { commits: orderedSelection, contiguous };
+    }, [multiSelectedHashes, commitsData]);
 
     // Navigate to a commit by hash
     const handleNavigateToCommit = useCallback(
@@ -1916,6 +2012,33 @@ export function GitGraph() {
 
     return (
         <UndoStackProvider>
+            <OutcomePickerProvider
+                handlers={{
+                    merge: async (branch, options) =>
+                        gitOps.merge(branch, options),
+                    rebase: async (onto, interactive) => {
+                        await gitOps.rebase(onto, interactive);
+                    },
+                    cherryPick: async (commitHash) => {
+                        await gitOps.cherryPick(commitHash);
+                    },
+                    resetMixed: async (commitHash) => {
+                        await gitOps.reset(commitHash, 'mixed');
+                    },
+                    squashCommits: async (commitHashes) => {
+                        await gitOps.squashCommits(commitHashes);
+                    },
+                    dropCommits: async (commitHashes) => {
+                        await gitOps.dropCommits(commitHashes);
+                    },
+                }}>
+            <OutcomePickerBridge
+                currentHead={currentHead}
+                onReady={(handler) => {
+                    bringInBranchHandlerRef.current = handler;
+                }}
+            />
+            <UndoToastHost />
             <TooltipProvider>
                 <div className='flex h-full flex-1 flex-col overflow-hidden'>
                     {/* Top Toolbar */}
@@ -2022,7 +2145,50 @@ export function GitGraph() {
                                 onUndoLastCommit={() => { void gitOps.undoLastCommit(); }}
                             />
                         }
-                        notifications={<NotificationCenter />}
+                        notifications={
+                            <>
+                                <ToolsMenu
+                                    worktreeCount={featureHubData.worktreeCount}
+                                    worktreeAttentionCount={featureHubData.worktreeAttentionCount}
+                                    workflowCount={featureHubData.workflowCount}
+                                    workflowFailureCount={featureHubData.workflowFailureCount}
+                                    auditCount={featureHubData.auditCount}
+                                    protocolRegistered={featureHubData.protocolRegistered}
+                                    collaborationSummary={featureHubData.collaborationSummary}
+                                    prSummary={featureHubData.prSummary}
+                                    repoPolicy={featureHubData.repoPolicy}
+                                    onOpenWorktrees={() => {
+                                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                        if (featureFlags.worktreePro) {
+                                            setWorktreeOpen(true);
+                                            return;
+                                        }
+                                        openSettingsAt('integrations');
+                                    }}
+                                    onOpenWorkflows={() => {
+                                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                        if (featureFlags.workflowEngine) {
+                                            setWorkflowOpen(true);
+                                            return;
+                                        }
+                                        openSettingsAt('integrations');
+                                    }}
+                                    onOpenPullRequests={() => {
+                                        setPrIntegrationOpen(true);
+                                    }}
+                                    onOpenCollaboration={() => {
+                                        setCollaborationOpen(true);
+                                    }}
+                                    onOpenRepoPolicy={() => {
+                                        openSettingsAt('integrations', 'repo-policy');
+                                    }}
+                                    onOpenDiagnostics={() => {
+                                        openSettingsAt('integrations', 'diagnostics');
+                                    }}
+                                />
+                                <NotificationCenter />
+                            </>
+                        }
                         onSync={async () => {
                             await gitOps.fetch();
                             await gitOps.pull(currentHead, 'origin', false, false);
@@ -2072,46 +2238,6 @@ export function GitGraph() {
                     />
                     <QuickActionsToolbar className='border-border/60 border-t' />
 
-                    <FeatureHubStrip
-                        worktreeCount={featureHubData.worktreeCount}
-                        worktreeAttentionCount={featureHubData.worktreeAttentionCount}
-                        workflowCount={featureHubData.workflowCount}
-                        workflowFailureCount={featureHubData.workflowFailureCount}
-                        auditCount={featureHubData.auditCount}
-                        protocolRegistered={featureHubData.protocolRegistered}
-                        collaborationSummary={featureHubData.collaborationSummary}
-                        prSummary={featureHubData.prSummary}
-                        repoPolicy={featureHubData.repoPolicy}
-                        onOpenWorktrees={() => {
-                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                            if (featureFlags.worktreePro) {
-                                setWorktreeOpen(true);
-                                return;
-                            }
-                            openSettingsAt('integrations');
-                        }}
-                        onOpenWorkflows={() => {
-                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                            if (featureFlags.workflowEngine) {
-                                setWorkflowOpen(true);
-                                return;
-                            }
-                            openSettingsAt('integrations');
-                        }}
-                        onOpenPullRequests={() => {
-                            setPrIntegrationOpen(true);
-                        }}
-                        onOpenCollaboration={() => {
-                            setCollaborationOpen(true);
-                        }}
-                        onOpenRepoPolicy={() => {
-                            openSettingsAt('integrations', 'repo-policy');
-                        }}
-                        onOpenDiagnostics={() => {
-                            openSettingsAt('integrations', 'diagnostics');
-                        }}
-                    />
-
                     {/* Find Widget */}
                     {findWidgetOpen && (
                         <Suspense fallback={<DialogLoadingFallback />}>
@@ -2141,6 +2267,13 @@ export function GitGraph() {
                                 }}
                                 onMergeBranch={(branch) => {
                                     commitActionController.openMerge(branch);
+                                }}
+                                onBringInBranch={(branch) => {
+                                    bringInBranchHandlerRef.current?.(branch);
+                                }}
+                                onCreateWorktreeFromBranch={(branch) => {
+                                    setWorktreePrefillBranch(branch);
+                                    setWorktreeOpen(true);
                                 }}
                                 enableBranchPinning={featureFlags.branchPinning}
                                 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -2225,6 +2358,21 @@ export function GitGraph() {
                                                         expandedIndex={expandedCommit ?? -1}
                                                         selectedIndex={selectedCommitIndex}
                                                         onVertexClick={handleSelectCommit}
+                                                        onVertexQuickActions={(index, pos) => {
+                                                            const full = layoutCommits[index] as
+                                                                | { hash: string; author: string; email?: string; message?: string; parents?: string[] }
+                                                                | undefined;
+                                                            if (!full) return;
+                                                            handleSelectCommit(index);
+                                                            setCommitDotQuickTarget({
+                                                                hash: full.hash,
+                                                                message: full.message ?? '',
+                                                                author: full.author,
+                                                                ...(full.email !== undefined ? { email: full.email } : {}),
+                                                            });
+                                                            setCommitDotQuickPosition(pos);
+                                                            setCommitDotQuickOpen(true);
+                                                        }}
                                                         onVertexHover={() => {}}
                                                         commits={commitGraphCommits}
 		                                                        showAvatars={commitGraphCommits.length < 2500}
@@ -2252,6 +2400,7 @@ export function GitGraph() {
                                                         refLookup={refsLookup}
                                                         repo={activeRepo}
                                                         selectedIndex={selectedCommitIndex}
+                                                        multiSelectedHashes={multiSelectedHashes}
                                                         expandedIndex={expandedCommit}
                                                         onSelect={handleSelectCommit}
                                                         onExpand={handleExpandCommit}
@@ -2301,21 +2450,27 @@ export function GitGraph() {
                         )}
                     </div>
 
-                    {/* Status bar */}
-                    <div className='ui-status-bar flex items-center gap-3 px-4 py-1.5 text-xs'>
-                        {/* Left side - commit info */}
-                        <div className='flex items-center gap-3'>
-                            <span className='text-muted-foreground'>
-                                <span className='text-foreground font-medium'>{commitsData?.commits.length ?? 0}</span>{' '}
+                    {/* Status bar — branch identity + sync state + counts + attention */}
+                    <div className='ui-status-bar flex items-center gap-3 px-3 text-[11px] leading-none'>
+                        {/* Left — current branch */}
+                        <div className='flex items-center gap-2'>
+                            {repoInfo?.head && (
+                                <span className='text-foreground inline-flex items-center gap-1 font-medium'>
+                                    <GitBranch className='h-3 w-3 text-primary' />
+                                    <span className='truncate max-w-[16rem]'>{repoInfo.head}</span>
+                                </span>
+                            )}
+                            <span className='text-muted-foreground/70'>
+                                <span className='text-foreground/85 font-medium tabular-nums'>{commitsData?.commits.length ?? 0}</span>{' '}
                                 commits
                             </span>
                             {commitsData?.moreCommitsAvailable && maxCommits < maxCommitsLimit && (
                                 <button className='text-primary font-medium hover:underline' onClick={handleLoadMore}>
-                                    Load more...
+                                    Load more
                                 </button>
                             )}
                             {commitsData?.moreCommitsAvailable && maxCommits >= maxCommitsLimit && (
-                                <span className='text-muted-foreground/80'>
+                                <span className='text-muted-foreground/70'>
                                     Limit reached ({maxCommitsLimit.toLocaleString()})
                                 </span>
                             )}
@@ -2323,37 +2478,37 @@ export function GitGraph() {
 
                         <div className='flex-1' />
 
-                        {/* Center - repo status */}
-                        <div className='text-muted-foreground flex items-center gap-3'>
+                        {/* Center - sync state */}
+                        <div className='flex items-center gap-3'>
                             {(aheadBehindData?.ahead ?? 0) > 0 && (
-                                <span className='flex items-center gap-1 text-emerald-600 dark:text-emerald-400'>
+                                <span className='inline-flex items-center gap-1 tabular-nums text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'>
                                     <ArrowUp className='h-3 w-3' />
-                                    {aheadBehindData?.ahead} ahead
+                                    {aheadBehindData?.ahead}
                                 </span>
                             )}
                             {(aheadBehindData?.behind ?? 0) > 0 && (
-                                <span className='flex items-center gap-1 text-amber-600 dark:text-amber-400'>
+                                <span className='inline-flex items-center gap-1 tabular-nums text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]'>
                                     <ArrowDown className='h-3 w-3' />
-                                    {aheadBehindData?.behind} behind
+                                    {aheadBehindData?.behind}
                                 </span>
                             )}
                             {(workingTreeStatus?.unstaged.length ?? 0) > 0 && (
-                                <span className='flex items-center gap-1'>
+                                <span className='text-muted-foreground inline-flex items-center gap-1 tabular-nums'>
                                     <GitCommit className='h-3 w-3' />
-                                    {workingTreeStatus?.unstaged.length ?? 0} changes
+                                    {workingTreeStatus?.unstaged.length ?? 0}
                                 </span>
                             )}
                         </div>
 
                         <div className='flex-1' />
 
-                        {/* Right side - counts */}
-                        <div className='text-muted-foreground flex items-center gap-3'>
-                            <span className='flex items-center gap-1'>
+                        {/* Right - counts + perf */}
+                        <div className='text-muted-foreground/85 flex items-center gap-3'>
+                            <span className='inline-flex items-center gap-1 tabular-nums'>
                                 <GitBranch className='h-3 w-3' />
                                 {repoInfo?.branches.length ?? 0}
                             </span>
-                            <span className='flex items-center gap-1'>
+                            <span className='inline-flex items-center gap-1 tabular-nums'>
                                 <Tag className='h-3 w-3' />
                                 {repoInfo?.tags.length ?? 0}
                             </span>
@@ -2371,10 +2526,10 @@ export function GitGraph() {
                                     <Activity
                                         className={`h-3 w-3 ${
                                             hasPerfRegression
-                                                ? 'text-rose-500'
+                                                ? 'text-destructive'
                                                 : hasPerfWatch
-                                                  ? 'text-amber-500'
-                                                  : 'text-emerald-500'
+                                                  ? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+                                                  : 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
                                         }`}
                                     />
                                     <span className='text-[11px]'>Perf</span>
@@ -2382,10 +2537,10 @@ export function GitGraph() {
                                         aria-hidden='true'
                                         className={`h-1.5 w-1.5 rounded-full ${
                                             hasPerfRegression
-                                                ? 'bg-rose-500'
+                                                ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]'
                                                 : hasPerfWatch
-                                                  ? 'bg-amber-500'
-                                                  : 'bg-emerald-500'
+                                                  ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]'
+                                                  : 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]'
                                         }`}
                                     />
                                 </button>
@@ -2606,6 +2761,7 @@ export function GitGraph() {
                     <CommitContextMenuOverlay
                         open={contextMenuOpen}
                         position={contextMenuPosition}
+                        currentBranch={currentHead}
                         selectedCommit={
                             commitActionController.selectedCommitData
                                 ? {
@@ -2680,7 +2836,18 @@ export function GitGraph() {
                         }}
                         lfs={{ open: lfsOpen, onOpenChange: setLfsOpen }}
                         pullRequests={{ open: prIntegrationOpen, onOpenChange: setPrIntegrationOpen }}
-                        worktree={{ open: worktreeOpen, onOpenChange: setWorktreeOpen }}
+                        worktree={{
+                            open: worktreeOpen,
+                            onOpenChange: (next) => {
+                                if (typeof next === 'function') {
+                                    setWorktreeOpen(next);
+                                } else {
+                                    setWorktreeOpen(next);
+                                    if (!next) setWorktreePrefillBranch(null);
+                                }
+                            },
+                            initialBranch: worktreePrefillBranch,
+                        }}
                         workflow={{ open: workflowOpen, onOpenChange: setWorkflowOpen }}
                         submodule={{ open: submoduleOpen, onOpenChange: setSubmoduleOpen }}
                         keyboardHelp={{ open: keyboardHelpOpen, onOpenChange: setKeyboardHelpOpen }}
@@ -2759,6 +2926,28 @@ export function GitGraph() {
                     {/* Quick Look Panel */}
                     <QuickLookPanel />
 
+                    <CommitMultiSelectBar
+                        selectedCommits={multiSelectionPayload.commits}
+                        currentBranch={currentHead}
+                        contiguous={multiSelectionPayload.contiguous}
+                        onCurrentBranch={true}
+                        onClear={clearMultiSelection}
+                    />
+
+                    <CommitDotQuickActions
+                        open={commitDotQuickOpen}
+                        position={commitDotQuickPosition}
+                        commit={commitDotQuickTarget}
+                        currentBranch={currentHead}
+                        onClose={() => { setCommitDotQuickOpen(false); }}
+                        onOpenFullDetails={(hash) => {
+                            const idx = (layoutCommits ?? []).findIndex(
+                                (c: { hash: string }) => c.hash === hash
+                            );
+                            if (idx >= 0) handleSelectCommit(idx);
+                        }}
+                    />
+
                     {activeRepo && (
                         <OperationStatusBar
                             repo={activeRepo}
@@ -2774,6 +2963,25 @@ export function GitGraph() {
                     )}
                 </div>
             </TooltipProvider>
+            </OutcomePickerProvider>
         </UndoStackProvider>
     );
+}
+
+function OutcomePickerBridge({
+    currentHead,
+    onReady,
+}: {
+    currentHead: string;
+    onReady: (handler: (branch: string) => void) => void;
+}) {
+    const { openIntegration } = useOutcomePicker();
+    const headRef = useRef(currentHead);
+    headRef.current = currentHead;
+    useEffect(() => {
+        onReady((branch: string) => {
+            openIntegration({ source: branch, target: headRef.current });
+        });
+    }, [onReady, openIntegration]);
+    return null;
 }

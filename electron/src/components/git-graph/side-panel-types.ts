@@ -18,6 +18,11 @@ export interface WorktreeEntry {
     path: string;
     branch?: string;
     isMain?: boolean;
+    isCurrent?: boolean;
+    isLocked?: boolean;
+    isPrunable?: boolean;
+    dirtyCount?: number;
+    head?: string | null;
 }
 
 export interface SubmoduleEntry {

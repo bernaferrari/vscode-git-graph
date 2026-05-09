@@ -419,7 +419,7 @@ export function GitConfigEditor({
 														<div
 															key={configKey.key}
 															className={`flex items-center gap-4 px-4 py-2 ${
-																isModified ? 'bg-amber-50 dark:bg-amber-900/10' : ''
+																isModified ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_10%,transparent)]' : ''
 															}`}
 														>
 															<div className="flex-1 min-w-0">
@@ -479,7 +479,7 @@ export function GitConfigEditor({
 																	<Button
 																		variant="ghost"
 																		size="sm"
-																		className="h-7 w-7 p-0 text-red-600"
+																		className="h-7 w-7 p-0 text-destructive"
 																		onClick={() => { void handleDeleteKey(section.name, configKey.key); }}
 																	>
 																		<Trash2 className="h-4 w-4" />

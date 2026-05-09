@@ -4,7 +4,7 @@
  * with abort/continue/skip buttons
  */
 
-import { CheckCheck, FileText, FolderOpen } from 'lucide-react';
+import { AlertTriangle, CheckCheck, FileText, FolderOpen, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -18,9 +18,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -482,155 +480,169 @@ export function OperationStatusBar({
                 ? 'Continue merge to finalize the merge commit.'
                 : 'Finish the current operation to proceed.';
 
+    const accentTextClass = hasConflicts
+        ? 'text-destructive'
+        : 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]';
+    const accentIconBg = hasConflicts
+        ? 'bg-[color-mix(in_oklch,var(--destructive)_18%,transparent)]'
+        : 'bg-[color-mix(in_oklch,var(--warning)_22%,transparent)]';
+
     return (
         <>
-            <Card
+            <div
                 className={cn(
-                    'border-2',
-                    hasConflicts ? 'border-destructive bg-destructive/5' : 'border-yellow-500 bg-yellow-500/5'
+                    'ui-banner flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2',
+                    hasConflicts ? 'ui-banner-error' : 'ui-banner-warning'
                 )}>
-                <CardContent className='p-3'>
-                    <div className='flex items-center justify-between gap-4'>
-                        {/* Operation info */}
-                        <div className='flex items-center gap-3'>
-                            <Badge variant={hasConflicts ? 'destructive' : 'outline'} className='capitalize'>
-                                {operationType} in progress
-                            </Badge>
+                {/* Operation info */}
+                <div className='flex min-w-0 items-center gap-2.5'>
+                    <span
+                        className={cn(
+                            'grid h-6 w-6 shrink-0 place-items-center rounded-md ring-1 ring-inset ring-border/40',
+                            accentIconBg
+                        )}>
+                        {hasConflicts ? (
+                            <AlertTriangle className={cn('h-3.5 w-3.5', accentTextClass)} />
+                        ) : (
+                            <GitBranch className={cn('h-3.5 w-3.5', accentTextClass)} />
+                        )}
+                    </span>
+                    <div className='flex min-w-0 flex-col leading-tight'>
+                        <span className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                            {operationType} in progress
+                        </span>
+                        <span className={cn('text-[0.8125rem] font-medium', accentTextClass)}>
+                            {hasConflicts
+                                ? `${String(state.conflicts.length)} conflict${state.conflicts.length === 1 ? '' : 's'} blocking ${operationType}`
+                                : nextActionHint}
+                        </span>
+                    </div>
 
-                            {hasConflicts && (
-                                <span className='text-destructive text-sm'>
-                                    {state.conflicts.length} conflict{state.conflicts.length !== 1 ? 's' : ''}
-                                </span>
-                            )}
-
-                            {/* Conflicts list */}
-                            {state.conflicts.length > 0 && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger
-                                        render={
-                                            <Button variant='ghost' size='sm' className='h-6 px-2 text-xs'>
-                                                View files
-                                            </Button>
-                                        }
-                                    />
-                                    <DropdownMenuContent align='start'>
-                                        <ScrollArea className='max-h-48'>
-                                            {state.conflicts.map((file) => (
-                                                <div key={file} className='space-y-0.5'>
+                    {state.conflicts.length > 0 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button variant='ghost' size='xs' className='h-6 px-2 font-mono text-[11px] tabular-nums'>
+                                        {state.conflicts.length} file{state.conflicts.length === 1 ? '' : 's'}
+                                    </Button>
+                                }
+                            />
+                            <DropdownMenuContent align='start' className='w-[22rem]'>
+                                <ScrollArea className='max-h-64'>
+                                    <div className='py-1'>
+                                        {state.conflicts.map((file) => (
+                                            <div key={file} className='border-b border-border/40 px-2 py-1.5 last:border-b-0'>
+                                                <div className='mb-1 flex items-center gap-1.5 font-mono text-[11px]'>
+                                                    <FileText className='h-3 w-3 shrink-0 text-muted-foreground' />
+                                                    <span className='flex-1 truncate'>{file}</span>
+                                                </div>
+                                                <div className='flex flex-wrap gap-1'>
                                                     <DropdownMenuItem
-                                                        className='flex items-center justify-between gap-2 px-2 py-1 font-mono text-xs'
+                                                        className='h-6 rounded px-1.5 text-[11px]'
                                                         onSelect={(event) => {
                                                             event.preventDefault();
                                                             onOpenConflictFile?.(file);
                                                         }}>
-                                                        <span className='flex-1 truncate'>{file}</span>
-                                                        <span className='text-muted-foreground flex shrink-0 items-center gap-1'>
-                                                            <FileText className='h-3.5 w-3.5' />
-                                                            Open
-                                                        </span>
+                                                        Open
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
-                                                        className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
+                                                        className='h-6 rounded px-1.5 text-[11px]'
                                                         onSelect={(event) => {
                                                             event.preventDefault();
                                                             void handleResolveConflictFile(file, 'ours');
                                                         }}>
-                                                        <span className='truncate'>{`Resolve ${file} with ours`}</span>
-                                                        <CheckCheck className='h-3.5 w-3.5' />
+                                                        <CheckCheck className='mr-1 h-3 w-3' />
+                                                        Ours
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
-                                                        className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
+                                                        className='h-6 rounded px-1.5 text-[11px]'
                                                         onSelect={(event) => {
                                                             event.preventDefault();
                                                             void handleResolveConflictFile(file, 'theirs');
                                                         }}>
-                                                        <span className='truncate'>{`Resolve ${file} with theirs`}</span>
-                                                        <CheckCheck className='h-3.5 w-3.5' />
+                                                        <CheckCheck className='mr-1 h-3 w-3' />
+                                                        Theirs
                                                     </DropdownMenuItem>
                                                     {onRevealConflictFile ? (
                                                         <DropdownMenuItem
-                                                            className='text-muted-foreground flex items-center justify-between gap-2 px-2 py-1 text-xs'
+                                                            className='h-6 rounded px-1.5 text-[11px]'
                                                             onSelect={(event) => {
                                                                 event.preventDefault();
                                                                 onRevealConflictFile(file);
                                                             }}>
-                                                            <span className='truncate'>{`Reveal ${file}`}</span>
-                                                            <FolderOpen className='h-3.5 w-3.5' />
+                                                            <FolderOpen className='mr-1 h-3 w-3' />
+                                                            Reveal
                                                         </DropdownMenuItem>
                                                     ) : null}
                                                 </div>
-                                            ))}
-                                        </ScrollArea>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
-                        </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+                </div>
 
-                        {/* Actions */}
-                        <div className='flex items-center gap-2'>
-                            <span className='text-muted-foreground text-xs'>{nextActionHint}</span>
-
-                            {hasConflicts && onOpenConflictFile && (
-                                <Button
-                                    variant='outline'
-                                    size='sm'
-                                    onClick={handleOpenNextConflict}
-                                    disabled={isLoading}>
-                                    Open next conflict
-                                    <span className='text-muted-foreground ml-2 text-[10px] tabular-nums'>
-                                        {Math.min(activeConflictIndex + 1, state.conflicts.length)}/
-                                        {state.conflicts.length}
-                                    </span>
-                                </Button>
-                            )}
-                            {hasConflicts && (
-                                <>
-                                    <Button
-                                        variant='outline'
-                                        size='sm'
-                                        onClick={() => void handleResolveAllConflicts('ours')}
-                                        disabled={isLoading}>
-                                        <CheckCheck className='mr-2 h-3.5 w-3.5' />
-                                        Resolve all (ours)
-                                    </Button>
-                                    <Button
-                                        variant='outline'
-                                        size='sm'
-                                        onClick={() => void handleResolveAllConflicts('theirs')}
-                                        disabled={isLoading}>
-                                        <CheckCheck className='mr-2 h-3.5 w-3.5' />
-                                        Resolve all (theirs)
-                                    </Button>
-                                </>
-                            )}
-
-                            {canSkip && (
-                                <Button variant='outline' size='sm' onClick={handleSkip} disabled={isLoading}>
-                                    Skip
-                                </Button>
-                            )}
-
-                            {operationType === 'rebase' && (
-                                <Button variant='outline' size='sm' onClick={handleOpenRebaseTodo} disabled={isLoading}>
-                                    Edit todo list
-                                </Button>
-                            )}
-
+                {/* Actions */}
+                <div className='ml-auto flex flex-wrap items-center gap-1.5'>
+                    {hasConflicts && onOpenConflictFile && (
+                        <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={handleOpenNextConflict}
+                            disabled={isLoading}>
+                            Open next
+                            <span className='ml-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/85'>
+                                {Math.min(activeConflictIndex + 1, state.conflicts.length)}/
+                                {state.conflicts.length}
+                            </span>
+                        </Button>
+                    )}
+                    {hasConflicts && (
+                        <>
                             <Button
-                                variant='default'
+                                variant='outline'
                                 size='sm'
-                                onClick={handleContinue}
-                                disabled={isLoading || hasConflicts}>
-                                Continue
+                                onClick={() => void handleResolveAllConflicts('ours')}
+                                disabled={isLoading}>
+                                Use ours
                             </Button>
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() => void handleResolveAllConflicts('theirs')}
+                                disabled={isLoading}>
+                                Use theirs
+                            </Button>
+                        </>
+                    )}
 
-                            <Button variant='destructive' size='sm' onClick={handleAbort} disabled={isLoading}>
-                                Abort
-                            </Button>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    {canSkip && (
+                        <Button variant='outline' size='sm' onClick={handleSkip} disabled={isLoading}>
+                            Skip
+                        </Button>
+                    )}
+
+                    {operationType === 'rebase' && (
+                        <Button variant='outline' size='sm' onClick={handleOpenRebaseTodo} disabled={isLoading}>
+                            Edit todo
+                        </Button>
+                    )}
+
+                    <Button
+                        variant='default'
+                        size='sm'
+                        onClick={handleContinue}
+                        disabled={isLoading || hasConflicts}>
+                        Continue
+                    </Button>
+
+                    <Button variant='destructive' size='sm' onClick={handleAbort} disabled={isLoading}>
+                        Abort
+                    </Button>
+                </div>
+            </div>
 
             {/* Abort confirmation dialog */}
             <AlertDialog open={showAbortConfirm} onOpenChange={setShowAbortConfirm}>

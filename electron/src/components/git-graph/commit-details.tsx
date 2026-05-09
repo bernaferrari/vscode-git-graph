@@ -270,21 +270,20 @@ export function CommitDetailsPanel({
     };
 
     return (
-        <div className='ui-surface flex h-full flex-col'>
+        <div className='flex h-full flex-col border-l border-border bg-card'>
             {/* Header */}
-            <div className='ui-toolbar flex items-center justify-between px-3 py-2.5'>
+            <div className='ui-toolbar flex items-center justify-between px-3 py-1.5'>
                 <div className='flex items-center gap-2'>
-                    <GitCommit className='text-muted-foreground h-4 w-4' />
-                    <span className='text-sm font-semibold tracking-tight'>Commit</span>
-                    <code className='text-muted-foreground bg-muted/70 rounded px-1.5 py-0.5 font-mono text-[10px]'>
+                    <GitCommit className='text-muted-foreground h-3.5 w-3.5' />
+                    <span className='text-[0.8125rem] font-semibold tracking-[-0.005em]'>Commit</span>
+                    <code className='font-mono text-[10.5px] text-muted-foreground/85 tabular-nums'>
                         {details.hash.slice(0, 7)}
                     </code>
                 </div>
-                <div className='flex items-center gap-1'>
+                <div className='flex items-center gap-0.5'>
                     <Button
                         variant='ghost'
-                        size='sm'
-                        className='hover:bg-accent h-6 w-6 rounded-md p-0'
+                        size='icon-xs'
                         onClick={() => { copyToClipboard(details.hash); }}
                         title='Copy full SHA'
                         aria-label='Copy full SHA'>
@@ -293,55 +292,54 @@ export function CommitDetailsPanel({
                     {onClose && (
                         <Button
                             variant='ghost'
-                            size='sm'
-                            className='hover:bg-accent h-6 w-6 rounded-md p-0'
+                            size='icon-xs'
                             onClick={onClose}
                             aria-label='Close commit details'>
-                            <X className='h-4 w-4' />
+                            <X className='h-3 w-3' />
                         </Button>
                     )}
                 </div>
             </div>
 
             <ScrollArea className='flex-1'>
-                <div className='space-y-4 p-3'>
-                    <div className='border-border/70 bg-background/55 space-y-3 rounded-xl border p-3'>
-                        <div className='mb-1 flex items-center justify-between gap-2'>
-                            <div className='space-y-1'>
-                                <div className='text-muted-foreground flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em]'>
-                                    <span>Review Focus</span>
-                                    <span className='text-border'>•</span>
-                                    <span>{reviewFocus}</span>
+                <div className='space-y-3 p-3'>
+                    <div className='space-y-3 rounded-lg border border-border/60 bg-muted/25 p-3'>
+                        <div className='flex items-start justify-between gap-2'>
+                            <div className='min-w-0 space-y-1.5'>
+                                <div className='flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80'>
+                                    <span>Review focus</span>
+                                    <span className='text-border'>·</span>
+                                    <span className='text-muted-foreground'>{reviewFocus}</span>
                                 </div>
-                                <p className='text-[15px] leading-snug font-semibold tracking-tight'>{commitSubject}</p>
+                                <p className='text-[0.95rem] leading-snug font-semibold tracking-[-0.012em]'>
+                                    {commitSubject}
+                                </p>
                             </div>
                             {aiProdEnabled && (
                                 <div className='flex shrink-0 items-center gap-1'>
                                     <Button
                                         type='button'
                                         variant='outline'
-                                        size='sm'
-                                        className='h-7 text-xs'
+                                        size='xs'
                                         onClick={handleExplainCommit}
                                         disabled={explainCommitMutation.isPending}>
                                         {explainCommitMutation.isPending ? (
-                                            <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
+                                            <div className='border-primary h-3 w-3 animate-spin rounded-full border-b-2' />
                                         ) : (
-                                            <Wand2 className='mr-1 h-3.5 w-3.5' />
+                                            <Wand2 className='h-3 w-3' />
                                         )}
                                         Explain
                                     </Button>
                                     <Button
                                         type='button'
                                         variant='outline'
-                                        size='sm'
-                                        className='h-7 text-xs'
+                                        size='xs'
                                         onClick={handleReviewDiff}
                                         disabled={reviewDiffMutation.isPending}>
                                         {reviewDiffMutation.isPending ? (
-                                            <div className='border-primary mr-1 h-3 w-3 animate-spin rounded-full border-b-2' />
+                                            <div className='border-primary h-3 w-3 animate-spin rounded-full border-b-2' />
                                         ) : (
-                                            <AlertTriangle className='mr-1 h-3.5 w-3.5' />
+                                            <AlertTriangle className='h-3 w-3' />
                                         )}
                                         Review
                                     </Button>
@@ -349,162 +347,169 @@ export function CommitDetailsPanel({
                             )}
                         </div>
                         {commitBody && (
-                            <p className='text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap'>
+                            <p className='text-muted-foreground text-[0.8125rem] leading-relaxed whitespace-pre-wrap'>
                                 {commitBody}
                             </p>
                         )}
-                        {!commitBody && <p className='text-muted-foreground text-xs'>Single-line commit message</p>}
+                        {!commitBody && (
+                            <p className='text-muted-foreground/70 text-xs italic'>Single-line commit message</p>
+                        )}
                         <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-4'>
-                            <SummaryMetric label='Files changed' value={String(details.fileChanges.length)} />
-                            <SummaryMetric label='Lines added' value={`+${String(totalAdditions)}`} tone='positive' />
-                            <SummaryMetric label='Lines removed' value={`-${String(totalDeletions)}`} tone='negative' />
+                            <SummaryMetric label='Files' value={String(details.fileChanges.length)} />
+                            <SummaryMetric label='Added' value={`+${String(totalAdditions)}`} tone='positive' />
+                            <SummaryMetric label='Removed' value={`-${String(totalDeletions)}`} tone='negative' />
                             <SummaryMetric
-                                label={details.parents.length > 1 ? 'Parent commits' : 'Parent commit'}
+                                label={details.parents.length > 1 ? 'Parents' : 'Parent'}
                                 value={String(details.parents.length)}
                             />
                         </div>
                         {aiProdEnabled && aiExplanation && (
-                            <div className='mt-2 rounded-md border border-emerald-500/35 bg-emerald-500/10 p-2'>
-                                <p className='text-xs font-semibold text-emerald-700 dark:text-emerald-300'>
-                                    AI Explanation
+                            <div className='rounded-md border border-[color-mix(in_oklch,var(--success)_30%,transparent)] bg-[color-mix(in_oklch,var(--success)_8%,transparent)] p-2.5'>
+                                <p className='flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'>
+                                    <Wand2 className='h-3 w-3' />
+                                    AI explanation
                                 </p>
-                                <p className='mt-1 text-xs whitespace-pre-wrap text-emerald-900 dark:text-emerald-100'>
+                                <p className='mt-1.5 text-[0.8125rem] leading-relaxed whitespace-pre-wrap text-foreground/90'>
                                     {aiExplanation}
                                 </p>
                                 {aiRiskAreas.length > 0 && (
-                                    <div className='mt-2'>
-                                        <p className='mb-1 flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300'>
-                                            <AlertTriangle className='h-3.5 w-3.5' />
-                                            Risk Areas
+                                    <div className='mt-2.5'>
+                                        <p className='mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]'>
+                                            <AlertTriangle className='h-3 w-3' />
+                                            Risk areas
                                         </p>
-                                        <div className='space-y-1'>
+                                        <ul className='space-y-0.5 pl-1'>
                                             {aiRiskAreas.map((risk) => (
-                                                <p key={risk} className='text-xs text-amber-900 dark:text-amber-100'>
-                                                    - {risk}
-                                                </p>
+                                                <li key={risk} className='text-[0.8125rem] text-foreground/80 leading-relaxed before:mr-2 before:content-["·"] before:text-muted-foreground/60'>
+                                                    {risk}
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     </div>
                                 )}
                             </div>
                         )}
                         {aiProdEnabled && aiReviewSummary && (
-                            <div className='mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 p-2'>
-                                <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
-                                    AI Review Notes
+                            <div className='rounded-md border border-[color-mix(in_oklch,var(--warning)_30%,transparent)] bg-[color-mix(in_oklch,var(--warning)_8%,transparent)] p-2.5'>
+                                <p className='flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]'>
+                                    <AlertTriangle className='h-3 w-3' />
+                                    AI review notes
                                 </p>
-                                <p className='mt-1 text-xs whitespace-pre-wrap text-amber-950 dark:text-amber-50'>
+                                <p className='mt-1.5 text-[0.8125rem] leading-relaxed whitespace-pre-wrap text-foreground/90'>
                                     {aiReviewSummary}
                                 </p>
                                 {aiReviewRisks.length > 0 && (
-                                    <div className='mt-2'>
-                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
+                                    <div className='mt-2.5'>
+                                        <p className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
                                             Risks
                                         </p>
-                                        <div className='mt-1 space-y-1'>
+                                        <ul className='mt-1 space-y-0.5 pl-1'>
                                             {aiReviewRisks.map((risk) => (
-                                                <p key={risk} className='text-xs text-amber-950 dark:text-amber-50'>
-                                                    - {risk}
-                                                </p>
+                                                <li key={risk} className='text-[0.8125rem] text-foreground/80 leading-relaxed before:mr-2 before:content-["·"] before:text-muted-foreground/60'>
+                                                    {risk}
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     </div>
                                 )}
                                 {aiReviewSuggestions.length > 0 && (
-                                    <div className='mt-2'>
-                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
-                                            Suggested Follow-ups
+                                    <div className='mt-2.5'>
+                                        <p className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                                            Suggested follow-ups
                                         </p>
-                                        <div className='mt-1 space-y-1'>
+                                        <ul className='mt-1 space-y-0.5 pl-1'>
                                             {aiReviewSuggestions.map((suggestion) => (
-                                                <p key={suggestion} className='text-xs text-amber-950 dark:text-amber-50'>
-                                                    - {suggestion}
-                                                </p>
+                                                <li key={suggestion} className='text-[0.8125rem] text-foreground/80 leading-relaxed before:mr-2 before:content-["·"] before:text-muted-foreground/60'>
+                                                    {suggestion}
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     </div>
                                 )}
                                 {aiReviewTests.length > 0 && (
-                                    <div className='mt-2'>
-                                        <p className='text-xs font-semibold text-amber-700 dark:text-amber-300'>
-                                            Test Focus
+                                    <div className='mt-2.5'>
+                                        <p className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                                            Test focus
                                         </p>
-                                        <div className='mt-1 space-y-1'>
+                                        <ul className='mt-1 space-y-0.5 pl-1'>
                                             {aiReviewTests.map((testIdea) => (
-                                                <p key={testIdea} className='text-xs text-amber-950 dark:text-amber-50'>
-                                                    - {testIdea}
-                                                </p>
+                                                <li key={testIdea} className='text-[0.8125rem] text-foreground/80 leading-relaxed before:mr-2 before:content-["·"] before:text-muted-foreground/60'>
+                                                    {testIdea}
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    <div className='grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]'>
+                    <div className='grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]'>
                         <div
-                            className={`border-border/70 bg-muted/25 flex items-start gap-2.5 rounded-xl border p-3 ${onFilterByAuthor ? 'group hover:bg-accent/45 cursor-pointer transition-colors' : ''}`}
+                            className={`flex items-start gap-2.5 rounded-lg border border-border/60 bg-background/50 p-2.5 ${onFilterByAuthor ? 'group/author cursor-pointer transition-colors hover:bg-accent/45' : ''}`}
                             onClick={() => onFilterByAuthor?.(details.authorEmail)}
                             title={onFilterByAuthor ? 'Click to filter by author' : undefined}>
                             <img
                                 src={getGravatarUrl(details.authorEmail, 64)}
                                 alt={details.author}
-                                className='border-border/60 h-9 w-9 shrink-0 rounded-full border'
+                                className='h-8 w-8 shrink-0 rounded-full ring-1 ring-border/60'
                             />
                             <div className='min-w-0 flex-1'>
-                                <p className={`text-sm font-medium ${onFilterByAuthor ? 'group-hover:text-primary' : ''}`}>
+                                <p className={`text-[0.8125rem] font-semibold tracking-[-0.005em] ${onFilterByAuthor ? 'group-hover/author:text-primary' : ''}`}>
                                     {details.author}
                                 </p>
-                                <p className='text-muted-foreground truncate text-xs'>{details.authorEmail}</p>
-                                <div className='text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]'>
-                                    <Calendar className='h-3 w-3' />
+                                <p className='text-muted-foreground truncate font-mono text-[10.5px]'>{details.authorEmail}</p>
+                                <div className='text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]'>
+                                    <Calendar className='h-2.5 w-2.5' />
                                     <span>{formatDate(details.authorDate)}</span>
-                                    <span className='text-border'>•</span>
-                                    <span>{formatRelative(details.authorDate)}</span>
+                                    <span className='text-border'>·</span>
+                                    <span className='text-muted-foreground/85'>{formatRelative(details.authorDate)}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className='border-border/70 bg-muted/20 space-y-2 rounded-xl border p-3'>
-                            <p className='text-muted-foreground text-[11px] font-medium uppercase tracking-[0.18em]'>
-                                Safety
+                        <div className='space-y-2 rounded-lg border border-border/60 bg-muted/25 p-2.5'>
+                            <p className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                                Signature
                             </p>
-                            <p className='text-sm leading-relaxed'>
-                                Open a file to inspect the diff. Use the overflow menu for file history before branch,
-                                tag, or reset actions.
-                            </p>
-                            {details.signature && (
+                            {details.signature ? (
                                 <div
-                                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ${
+                                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium ${
                                         isGoodSignature(details.signature.status)
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                                            : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                            ? 'border-[color-mix(in_oklch,var(--success)_30%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'
+                                            : 'border-destructive/30 bg-destructive/10 text-destructive'
                                     }`}>
-                                    <span className='font-medium'>{formatSignatureStatus(details.signature.status)}</span>
-                                    <span className='opacity-70'>•</span>
+                                    <span>{formatSignatureStatus(details.signature.status)}</span>
+                                    <span className='opacity-70'>·</span>
                                     <span className='truncate'>{details.signature.signer}</span>
                                 </div>
+                            ) : (
+                                <p className='text-muted-foreground/85 text-[11px] leading-relaxed'>
+                                    Unsigned commit. Configure GPG/SSH signing in settings to verify authorship.
+                                </p>
                             )}
                         </div>
                     </div>
 
                     {details.parents.length > 0 && (
-                        <div className='space-y-2'>
+                        <div className='space-y-1.5'>
                             <div className='flex items-center justify-between gap-2'>
-                                <span className='text-muted-foreground text-xs font-medium'>Parent Commits</span>
-                                <span className='text-muted-foreground text-[11px]'>
-                                    {details.parents.length > 1 ? 'Compare ancestry before rewriting history' : 'Trace previous state'}
+                                <span className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                                    Parents
+                                </span>
+                                <span className='text-muted-foreground/70 text-[10.5px]'>
+                                    {details.parents.length > 1 ? 'Compare ancestry before rewriting' : 'Trace previous state'}
                                 </span>
                             </div>
-                            <div className='flex flex-wrap gap-1.5'>
+                            <div className='flex flex-wrap gap-1'>
                                 {details.parents.map((parent: string, i: number) => (
                                     <button
                                         key={parent}
-                                        className='bg-muted hover:bg-primary hover:text-primary-foreground inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs transition-colors'
+                                        type='button'
+                                        className='inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 font-mono text-[10.5px] tabular-nums transition-colors hover:border-primary/40 hover:bg-primary/8 hover:text-primary'
                                         onClick={() => onNavigateToCommit?.(parent)}
                                         title={`Go to ${parent}`}>
-                                        {i === 0 ? <ArrowRight className='h-3.5 w-3.5' /> : <GitCommit className='h-3.5 w-3.5' />}
+                                        {i === 0 ? <ArrowRight className='h-3 w-3' /> : <GitCommit className='h-3 w-3' />}
                                         {parent.slice(0, 7)}
                                     </button>
                                 ))}
@@ -516,55 +521,60 @@ export function CommitDetailsPanel({
                     <CIStatusPanel commitHash={details.hash} {...(activeRepo ? { repo: activeRepo } : {})} />
 
                     {/* File Changes */}
-                    <div className='space-y-2'>
-                        <div className='flex items-center justify-between'>
-                            <div>
-                                <span className='text-muted-foreground text-xs font-medium'>
-                                    Changed Files ({details.fileChanges.length})
+                    <div className='space-y-1.5'>
+                        <div className='flex items-center justify-between gap-2'>
+                            <div className='min-w-0'>
+                                <span className='text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+                                    Changed files
                                 </span>
-                                <p className='text-muted-foreground mt-1 text-[11px]'>
-                                    Open any row to inspect the patch. Use the overflow menu to jump into file history.
-                                </p>
+                                <span className='ml-1.5 font-mono text-[10.5px] tabular-nums text-muted-foreground/70'>
+                                    {details.fileChanges.length}
+                                </span>
                             </div>
-                            <div className='flex items-center gap-2 text-xs tabular-nums'>
-                                <span className='text-green-600 dark:text-green-400'>+{String(totalAdditions)}</span>
-                                <span className='text-red-600 dark:text-red-400'>-{String(totalDeletions)}</span>
+                            <div className='flex items-center gap-2 font-mono text-[10.5px] tabular-nums'>
+                                <span className='text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'>
+                                    +{String(totalAdditions)}
+                                </span>
+                                <span className='text-destructive'>-{String(totalDeletions)}</span>
                             </div>
                         </div>
 
-                        <div className='border-border/65 bg-background/45 space-y-0.5 rounded-lg border p-1'>
+                        <div className='space-y-px rounded-md border border-border/60 bg-background/50 p-1'>
                             {details.fileChanges.map((file: FileChange, index: number) => (
                                 <div
                                     key={index}
-                                    className={`group border-border/40 flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition-all duration-150 ${
+                                    className={`group/file relative flex h-7 cursor-pointer items-center gap-2 rounded px-1.5 text-[0.8125rem] transition-colors duration-100 ${
                                         selectedFile === file.newFilePath
-                                            ? 'bg-accent border-primary/35 shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
-                                            : 'hover:bg-accent/45'
+                                            ? 'bg-accent text-foreground'
+                                            : 'text-foreground/85 hover:bg-accent/55 hover:text-foreground'
                                     }`}
                                     onClick={() => { handleFileClick(file.newFilePath); }}>
+                                    {selectedFile === file.newFilePath && (
+                                        <span aria-hidden className='absolute inset-y-1 left-0 w-[2px] rounded-r-full bg-primary' />
+                                    )}
                                     {/* Change type icon */}
                                     <FileChangeIcon type={file.type} />
                                     <span
-                                        className={`rounded px-1 py-0.5 text-[10px] font-semibold ${fileChangeBadgeClass(file.type)}`}>
+                                        className={`inline-flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold leading-none ${fileChangeBadgeClass(file.type)}`}>
                                         {file.type}
                                     </span>
 
                                     {/* File path with middle truncation */}
-                                    <span className='min-w-0 flex-1 truncate' title={file.newFilePath}>
+                                    <span className='min-w-0 flex-1 truncate font-mono' title={file.newFilePath}>
                                         {middleTruncate(file.newFilePath)}
                                     </span>
 
                                     {/* Additions/deletions */}
                                     {(file.additions !== null || file.deletions !== null) && (
-                                        <div className='flex shrink-0 items-center gap-1 font-mono text-[10px] opacity-55 transition-opacity group-hover:opacity-100'>
+                                        <div className='flex shrink-0 items-center gap-1.5 font-mono text-[10px] tabular-nums'>
                                             {file.additions !== null && file.additions > 0 && (
-                                                <span className='text-green-600 dark:text-green-400'>
+                                                <span className='text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'>
                                                     +{file.additions}
                                                 </span>
                                             )}
                                             {file.deletions !== null && file.deletions > 0 && (
-                                                <span className='text-red-600 dark:text-red-400'>
-                                                    -{file.deletions}
+                                                <span className='text-destructive'>
+                                                    −{file.deletions}
                                                 </span>
                                             )}
                                         </div>
@@ -573,10 +583,10 @@ export function CommitDetailsPanel({
                                     {/* More actions */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger
-                                            className={`hover:bg-accent inline-flex h-5 w-5 items-center justify-center rounded-sm transition-opacity ${
+                                            className={`grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground ${
                                                 selectedFile === file.newFilePath
                                                     ? 'opacity-100'
-                                                    : 'opacity-0 group-hover:opacity-100'
+                                                    : 'opacity-0 group-hover/file:opacity-100'
                                             }`}
                                             onClick={(e) => { e.stopPropagation(); }}>
                                             <MoreHorizontal className='h-3 w-3' />
@@ -707,7 +717,7 @@ export function CommitDetailsPanel({
                 <Button
                     variant='outline'
                     size='sm'
-                    className='hover:bg-accent h-7 gap-1 rounded-md border-amber-500/30 text-xs font-medium text-amber-700 dark:text-amber-300'
+                    className='hover:bg-accent h-7 gap-1 rounded-md border-[color-mix(in_oklch,var(--warning)_30%,transparent)] text-xs font-medium text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
                     onClick={handleResetCommit}>
                     <RotateCcw className='h-3 w-3' />
                     Reset to Commit
@@ -728,24 +738,24 @@ interface FileChange {
 function FileChangeIcon({ type }: { type: string }) {
     switch (type) {
         case 'A':
-            return <Plus className='h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400' />;
+            return <Plus className='h-3 w-3 shrink-0 text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]' />;
         case 'D':
-            return <Minus className='h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400' />;
+            return <Minus className='h-3 w-3 shrink-0 text-destructive' />;
         case 'R':
-            return <ArrowRight className='h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400' />;
+            return <ArrowRight className='h-3 w-3 shrink-0 text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]' />;
         default:
-            return <FileText className='text-muted-foreground h-3.5 w-3.5 shrink-0' />;
+            return <FileText className='text-muted-foreground h-3 w-3 shrink-0' />;
     }
 }
 
 function fileChangeBadgeClass(type: string): string {
     switch (type) {
         case 'A':
-            return 'bg-green-500/15 text-green-700 dark:text-green-400';
+            return 'bg-[color-mix(in_oklch,var(--success)_18%,transparent)] text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]';
         case 'D':
-            return 'bg-red-500/15 text-red-700 dark:text-red-400';
+            return 'bg-destructive/15 text-destructive';
         case 'R':
-            return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+            return 'bg-[color-mix(in_oklch,var(--warning)_18%,transparent)] text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]';
         default:
             return 'bg-muted text-muted-foreground';
     }
@@ -762,15 +772,17 @@ function SummaryMetric({
 }) {
     const toneClass =
         tone === 'positive'
-            ? 'text-green-700 dark:text-green-400'
+            ? 'text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'
             : tone === 'negative'
-              ? 'text-red-700 dark:text-red-400'
+              ? 'text-destructive'
               : 'text-foreground';
 
     return (
-        <div className='bg-muted/35 rounded-lg border border-border/60 px-3 py-2'>
-            <p className='text-muted-foreground text-[11px] font-medium uppercase tracking-[0.16em]'>{label}</p>
-            <p className={`mt-1 text-sm font-semibold tabular-nums ${toneClass}`}>{value}</p>
+        <div className='rounded-md border border-border/60 bg-background/50 px-2.5 py-1.5'>
+            <p className='text-[9px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70'>
+                {label}
+            </p>
+            <p className={`mt-0.5 text-[0.875rem] font-semibold tabular-nums ${toneClass}`}>{value}</p>
         </div>
     );
 }

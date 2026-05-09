@@ -407,7 +407,7 @@ export function ExternalDiffConfig({
 										<Button
 											variant="ghost"
 											size="sm"
-											className="h-7 w-7 p-0 text-red-600"
+											className="h-7 w-7 p-0 text-destructive"
 											onClick={() => { handleDeleteTool(tool.id); }}
 										>
 											<Trash2 className="h-4 w-4" />

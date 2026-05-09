@@ -28,8 +28,8 @@ import {
 import type { ElementType, ReactNode } from 'react';
 
 const TOOLBAR_CONTROL_CHROME =
-    'rounded-md border border-transparent text-[12px] font-medium text-muted-foreground transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:border-border/70 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.98] disabled:opacity-40';
-const TOOLBAR_DROPDOWN_TRIGGER_CLASS = `inline-flex h-8 items-center gap-1.5 px-2.5 ${TOOLBAR_CONTROL_CHROME}`;
+    'rounded-md border border-transparent text-[12px] font-medium text-muted-foreground transition-[background-color,border-color,color,box-shadow] duration-100 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/45 active:translate-y-[0.5px] disabled:opacity-40';
+const TOOLBAR_DROPDOWN_TRIGGER_CLASS = `inline-flex h-7 items-center gap-1.5 px-2 ${TOOLBAR_CONTROL_CHROME}`;
 
 function ToolbarButton({
     icon: Icon,
@@ -52,12 +52,12 @@ function ToolbarButton({
         <Button
             variant={variant}
             size='sm'
-            className={`h-8 gap-1.5 px-2.5 ${TOOLBAR_CONTROL_CHROME}`}
+            className={`h-7 gap-1.5 px-2 ${TOOLBAR_CONTROL_CHROME}`}
             onClick={onClick}
             disabled={disabled}
             title={title}
             aria-label={label}>
-            <Icon className='h-4 w-4' />
+            <Icon className='h-3.5 w-3.5' />
             <span className='hidden sm:inline'>{label}</span>
         </Button>
     );
@@ -121,10 +121,10 @@ export function GitGraphToolbar({
     notifications,
 }: GitGraphToolbarProps) {
     return (
-        <div className='ui-toolbar flex items-center gap-2 px-2 py-1.5'>
+        <div className='ui-toolbar flex items-center gap-1 px-2 py-1'>
             {leftSlots}
 
-            <div className='bg-border mx-1 h-5 w-px shrink-0' />
+            <div className='bg-border/70 mx-1.5 h-4 w-px shrink-0' />
 
             {isGuided ? (
                 <ToolbarButton icon={RefreshCw} label='Sync' onClick={() => void onSync()} />
@@ -136,17 +136,17 @@ export function GitGraphToolbar({
                             className={TOOLBAR_DROPDOWN_TRIGGER_CLASS}
                             title='Push options'
                             aria-label='Push options'>
-                            <Upload className='h-4 w-4' />
+                            <Upload className='h-3.5 w-3.5' />
                             <span className='hidden sm:inline'>Push</span>
-                            <ChevronDown className='h-3 w-3' />
+                            <ChevronDown className='h-3 w-3 opacity-60' />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='start'>
                             <DropdownMenuItem onClick={onPush}>
-                                <Upload className='mr-2 h-4 w-4' />
+                                <Upload />
                                 Push
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={onForcePush}>
-                                <Upload className='mr-2 h-4 w-4 text-amber-600' />
+                                <Upload className='!text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]' />
                                 Force Push
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -156,17 +156,17 @@ export function GitGraphToolbar({
                             className={TOOLBAR_DROPDOWN_TRIGGER_CLASS}
                             title='Pull options'
                             aria-label='Pull options'>
-                            <Download className='h-4 w-4' />
+                            <Download className='h-3.5 w-3.5' />
                             <span className='hidden sm:inline'>Pull</span>
-                            <ChevronDown className='h-3 w-3' />
+                            <ChevronDown className='h-3 w-3 opacity-60' />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='start'>
                             <DropdownMenuItem onClick={onPull}>
-                                <Download className='mr-2 h-4 w-4' />
+                                <Download />
                                 Pull
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={onPullFfOnly}>
-                                <Download className='mr-2 h-4 w-4 text-emerald-600' />
+                                <Download className='!text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]' />
                                 Pull (Fast-forward only)
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -174,26 +174,26 @@ export function GitGraphToolbar({
                 </>
             )}
 
-            <div className='bg-border mx-1 h-5 w-px shrink-0' />
+            <div className='bg-border/70 mx-1.5 h-4 w-px shrink-0' />
 
             <DropdownMenu>
                 <DropdownMenuTrigger className={TOOLBAR_DROPDOWN_TRIGGER_CLASS} title='New ref or stash' aria-label='New'>
-                    <Plus className='h-4 w-4' />
+                    <Plus className='h-3.5 w-3.5' />
                     <span className='hidden sm:inline'>New</span>
-                    <ChevronDown className='h-3 w-3' />
+                    <ChevronDown className='h-3 w-3 opacity-60' />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align='start'>
                     <DropdownMenuItem onClick={onCreateBranch}>
-                        <GitBranch className='mr-2 h-4 w-4' />
-                        Branch...
+                        <GitBranch />
+                        Branch…
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onCreateTag}>
-                        <Tag className='mr-2 h-4 w-4' />
-                        Tag...
+                        <Tag />
+                        Tag…
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onStash}>
-                        <Archive className='mr-2 h-4 w-4' />
+                        <Archive />
                         Stash
                     </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -209,11 +209,11 @@ export function GitGraphToolbar({
             </div>
 
             {hasFilters && (
-                <Badge variant='secondary' className='ml-2 shrink-0 gap-1'>
-                    <Filter className='h-3 w-3' />
-                    <span className='text-xs'>Filtered</span>
-                    <Button variant='ghost' size='sm' className='ml-1 h-4 w-4 p-0' onClick={onClearFilters}>
-                        <X className='h-3 w-3' />
+                <Badge variant='info' className='ml-1.5 shrink-0 gap-1 h-6'>
+                    <Filter className='h-2.5 w-2.5' />
+                    <span>Filtered</span>
+                    <Button variant='ghost' size='icon-xs' className='ml-0.5 -mr-1' onClick={onClearFilters}>
+                        <X className='h-2.5 w-2.5' />
                     </Button>
                 </Badge>
             )}
@@ -228,13 +228,13 @@ export function GitGraphToolbar({
             <Button
                 variant='ghost'
                 size='sm'
-                className={`relative h-8 w-8 p-0 ${TOOLBAR_CONTROL_CHROME}`}
+                className={`relative h-7 w-7 p-0 ${TOOLBAR_CONTROL_CHROME}`}
                 onClick={onOpenPinnedCommits}
                 title='Pinned Commits'
                 aria-label='Pinned Commits'>
-                <Pin className='h-4 w-4' />
+                <Pin className='h-3.5 w-3.5' />
                 {pinnedCommitCount > 0 && (
-                    <span className='bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]'>
+                    <span className='bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold ring-2 ring-background tabular-nums'>
                         {pinnedCommitCount}
                     </span>
                 )}

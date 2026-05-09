@@ -75,7 +75,7 @@ export function SigningConfig({ repo }: SigningConfigProps) {
 				<CardTitle className="text-sm flex items-center justify-between">
 					<span>Commit Signing</span>
 					{signingEnabled && (
-						<span className="text-xs text-green-600">Enabled</span>
+						<span className="text-xs text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">Enabled</span>
 					)}
 				</CardTitle>
 			</CardHeader>

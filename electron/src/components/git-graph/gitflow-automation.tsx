@@ -302,7 +302,7 @@ export function GitFlowAutomation({ open, onOpenChange }: GitFlowAutomationProps
                             <Button
                                 variant='ghost'
                                 size='sm'
-                                className='text-red-600'
+                                className='text-destructive'
                                 onClick={() => {
                                     setDeleteTarget(branch.name);
                                 }}>

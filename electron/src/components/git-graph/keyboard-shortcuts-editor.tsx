@@ -233,7 +233,7 @@ export function KeyboardShortcutsEditor({
 
 				{/* Conflicts warning */}
 				{conflicts.size > 0 && (
-					<div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm text-amber-600 dark:text-amber-400">
+					<div className="flex items-center gap-2 p-3 bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_20%,transparent)] rounded-lg text-sm text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">
 						<AlertTriangle className="h-4 w-4" />
 						<span>{conflicts.size} shortcut(s) have conflicting key bindings</span>
 					</div>
@@ -258,7 +258,7 @@ export function KeyboardShortcutsEditor({
 											<div
 												key={shortcut.id}
 												className={`flex items-center justify-between p-2 rounded-lg ${
-													hasConflict ? 'bg-amber-50 dark:bg-amber-900/20' : ''
+													hasConflict ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_20%,transparent)]' : ''
 												}`}
 											>
 												<div className="flex-1">

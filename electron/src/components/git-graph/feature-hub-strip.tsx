@@ -67,9 +67,9 @@ function FeatureCard({
 }: FeatureCardProps) {
     const badgeClassName =
         tone === 'attention'
-            ? 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-200'
+            ? 'border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
             : tone === 'success'
-              ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+              ? 'border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
               : 'border-border/70 bg-background/80 text-muted-foreground';
 
     return (
@@ -138,8 +138,8 @@ export function FeatureHubStrip({
                         variant='outline'
                         className={
                             attentionCount > 0
-                                ? 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-200'
-                                : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                                ? 'border-[color-mix(in_oklch,var(--warning)_35%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+                                : 'border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
                         }>
                         {attentionCount > 0 ? `${String(attentionCount)} alerts` : 'Quiet'}
                     </Badge>

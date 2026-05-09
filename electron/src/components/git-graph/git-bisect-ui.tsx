@@ -420,14 +420,14 @@ export function GitBisectUI({ open, onOpenChange, currentCommitHash }: GitBisect
                     ) : null}
 
                     {bisectState.culprit ? (
-                        <div className='rounded-lg border border-green-200 bg-green-100 p-4 dark:border-green-800 dark:bg-green-900/30'>
+                        <div className='rounded-lg border border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] p-4 dark:border-[color-mix(in_oklch,var(--success)_35%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]'>
                             <div className='flex items-center gap-3'>
-                                <CheckCircle className='h-6 w-6 text-green-600' />
+                                <CheckCircle className='h-6 w-6 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
                                 <div>
-                                    <p className='font-medium text-green-700 dark:text-green-400'>Culprit Found!</p>
-                                    <p className='text-sm text-green-600 dark:text-green-300'>
+                                    <p className='font-medium text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>Culprit Found!</p>
+                                    <p className='text-sm text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
                                         Commit{' '}
-                                        <code className='rounded bg-green-200 px-1 dark:bg-green-800'>
+                                        <code className='rounded bg-[color-mix(in_oklch,var(--success)_15%,transparent)] px-1 dark:bg-[color-mix(in_oklch,var(--success)_15%,transparent)]'>
                                             {shortHash(bisectState.culprit)}
                                         </code>{' '}
                                         introduced the bug
@@ -447,7 +447,7 @@ export function GitBisectUI({ open, onOpenChange, currentCommitHash }: GitBisect
                             {currentCommitData ? (
                                 <div className='mb-4 rounded bg-muted/50 p-3'>
                                     <div className='mb-1 flex items-center gap-2'>
-                                        <code className='text-sm font-mono text-blue-600'>
+                                        <code className='text-sm font-mono text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'>
                                             {shortHash(bisectState.currentCommit)}
                                         </code>
                                         <span className='text-xs text-muted-foreground'>{currentCommitData.author}</span>
@@ -467,7 +467,7 @@ export function GitBisectUI({ open, onOpenChange, currentCommitHash }: GitBisect
                                     {isLoading ? (
                                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                                     ) : (
-                                        <Check className='mr-2 h-4 w-4 text-green-600' />
+                                        <Check className='mr-2 h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
                                     )}
                                     Good
                                 </Button>
@@ -481,7 +481,7 @@ export function GitBisectUI({ open, onOpenChange, currentCommitHash }: GitBisect
                                     {isLoading ? (
                                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                                     ) : (
-                                        <X className='mr-2 h-4 w-4 text-red-600' />
+                                        <X className='mr-2 h-4 w-4 text-destructive' />
                                     )}
                                     Bad
                                 </Button>
@@ -542,23 +542,23 @@ export function GitBisectUI({ open, onOpenChange, currentCommitHash }: GitBisect
                                             key={String(index)}
                                             className={`flex items-center gap-3 px-3 py-2 ${
                                                 entry.type === 'good'
-                                                    ? 'bg-green-50 dark:bg-green-900/20'
+                                                    ? 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_20%,transparent)]'
                                                     : entry.type === 'bad'
-                                                      ? 'bg-red-50 dark:bg-red-900/20'
+                                                      ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_20%,transparent)]'
                                                       : entry.type === 'found'
-                                                        ? 'bg-amber-50 dark:bg-amber-900/20'
+                                                        ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_20%,transparent)]'
                                                         : ''
                                             }`}>
                                             {entry.type === 'good' ? (
-                                                <Check className='h-4 w-4 text-green-600' />
+                                                <Check className='h-4 w-4 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
                                             ) : entry.type === 'bad' ? (
-                                                <X className='h-4 w-4 text-red-600' />
+                                                <X className='h-4 w-4 text-destructive' />
                                             ) : entry.type === 'skip' ? (
                                                 <SkipForward className='h-4 w-4 text-muted-foreground' />
                                             ) : entry.type === 'start' ? (
-                                                <Flag className='h-4 w-4 text-blue-600' />
+                                                <Flag className='h-4 w-4 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' />
                                             ) : entry.type === 'found' ? (
-                                                <CheckCircle className='h-4 w-4 text-amber-600' />
+                                                <CheckCircle className='h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                                             ) : null}
                                             <code className='text-xs font-mono text-muted-foreground'>
                                                 {shortHash(entry.commit)}

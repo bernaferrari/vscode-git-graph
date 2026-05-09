@@ -130,7 +130,7 @@ export function GitGraphPage() {
                             void handleActivateRepo(path);
                         }}
                     />
-                    {openRepoError && <p className='text-muted-foreground mt-3 text-xs text-red-500'>{openRepoError}</p>}
+                    {openRepoError && <p className='text-muted-foreground mt-3 text-xs text-destructive'>{openRepoError}</p>}
                 </div>
             </div>
         );

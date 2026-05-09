@@ -33,23 +33,23 @@ interface CIStatusBadgeProps {
 
 const STATUS_CONFIG: Record<CIStatus, { color: string; bg: string; icon: ReactNode }> = {
 	success: {
-		color: 'text-green-600 dark:text-green-400',
-		bg: 'bg-green-100 dark:bg-green-900/30',
+		color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
+		bg: 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]',
 		icon: <CheckCircle className='h-3 w-3' />,
 	},
 	failure: {
-		color: 'text-red-600 dark:text-red-400',
-		bg: 'bg-red-100 dark:bg-red-900/30',
+		color: 'text-destructive dark:text-destructive',
+		bg: 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]',
 		icon: <XCircle className='h-3 w-3' />,
 	},
 	pending: {
-		color: 'text-amber-600 dark:text-amber-400',
-		bg: 'bg-amber-100 dark:bg-amber-900/30',
+		color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]',
+		bg: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]',
 		icon: <Clock className='h-3 w-3' />,
 	},
 	running: {
-		color: 'text-blue-600 dark:text-blue-400',
-		bg: 'bg-blue-100 dark:bg-blue-900/30',
+		color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]',
+		bg: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]',
 		icon: <Loader2 className='h-3 w-3 animate-spin' />,
 	},
 	cancelled: {
@@ -112,7 +112,7 @@ export function CIStatusBadge({ commitHash, repo }: CIStatusBadgeProps) {
 						<span className='font-medium capitalize'>{statusInfo.status}</span>
 					</div>
 					{statusInfo.workflowName && <p className='text-xs text-muted-foreground'>{statusInfo.workflowName}</p>}
-					{statusInfo.error && <p className='text-xs text-amber-600'>{statusInfo.error}</p>}
+					{statusInfo.error && <p className='text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>{statusInfo.error}</p>}
 					{statusInfo.url && (
 						<a
 							href={statusInfo.url}
@@ -185,7 +185,7 @@ export function CIStatusPanel({ commitHash, repo }: { commitHash: string; repo?:
 						<span>{statusInfo.runId}</span>
 					</div>
 				)}
-				{statusInfo.error && <p className='text-xs text-amber-600'>{statusInfo.error}</p>}
+				{statusInfo.error && <p className='text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>{statusInfo.error}</p>}
 				{statusInfo.url && (
 					<a
 						href={statusInfo.url}

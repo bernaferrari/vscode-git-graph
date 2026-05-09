@@ -538,47 +538,50 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 
 	return (
 		<Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setQuery(''); }}>
-			<DialogContent className="p-0 max-w-xl gap-0 ui-surface">
-				<div className="ui-toolbar flex items-center px-3 py-2">
-					<Search className="h-4 w-4 text-muted-foreground mr-2" />
+			<DialogContent
+				className="p-0 max-w-xl gap-0 top-[22%] translate-y-0 overflow-hidden rounded-xl"
+				showCloseButton={false}>
+				<div className="flex items-center gap-2 border-b border-border/60 px-3.5 h-11">
+					<Search className="h-4 w-4 shrink-0 text-muted-foreground" />
 					<Input
-						placeholder="Type a command or search..."
+						placeholder="Type a command or search…"
 						value={query}
 						onChange={(e) => { setQuery(e.target.value); }}
 						onKeyDown={handleKeyDown}
-						className="border-0 focus-visible:ring-0 px-0"
+						className="h-auto border-0 bg-transparent px-0 text-[0.9375rem] shadow-none focus-visible:ring-0"
 						autoFocus
 					/>
 				</div>
 
-				<ScrollArea className="max-h-80">
+				<ScrollArea className="max-h-[420px]">
 					{filteredCommands.length === 0 ? (
-						<div className="py-6 text-center text-muted-foreground text-sm">
+						<div className="py-10 text-center text-muted-foreground text-sm">
 							No commands found
 						</div>
 					) : (
-						<div className="py-2">
-								{Object.entries(
-									filteredCommands.reduce<Record<string, Command[]>>((acc, cmd) => {
-										const bucket = acc[cmd.category] ?? [];
-										bucket.push(cmd);
-										acc[cmd.category] = bucket;
-										return acc;
-									}, {})
-								).map(([category, cmds]) => (
-								<div key={category}>
-									<div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
+						<div className="p-1.5">
+							{Object.entries(
+								filteredCommands.reduce<Record<string, Command[]>>((acc, cmd) => {
+									const bucket = acc[cmd.category] ?? [];
+									bucket.push(cmd);
+									acc[cmd.category] = bucket;
+									return acc;
+								}, {})
+							).map(([category, cmds]) => (
+								<div key={category} className="space-y-0.5">
+									<div className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
 										{category}
 									</div>
 									{cmds.map((cmd) => {
 										const globalIndex = filteredCommands.indexOf(cmd);
+										const isActive = globalIndex === selectedIndex;
 										return (
 											<div
 												key={cmd.id}
-												className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
-													globalIndex === selectedIndex 
-														? 'bg-accent' 
-														: 'hover:bg-accent/50'
+												className={`relative flex cursor-default items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.875rem] transition-colors duration-75 ${
+													isActive
+														? 'bg-accent text-accent-foreground'
+														: 'text-foreground/90 hover:bg-accent/55'
 												}`}
 												onClick={() => {
 													cmd.action();
@@ -587,17 +590,19 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 												}}
 												onMouseEnter={() => { setSelectedIndex(globalIndex); }}
 											>
-												<div className="text-muted-foreground">
+												<div className={`grid h-4 w-4 shrink-0 place-items-center ${
+													isActive ? 'text-foreground' : 'text-muted-foreground'
+												} [&_svg]:size-3.5`}>
 													{cmd.icon}
 												</div>
 												<div className="flex-1 min-w-0">
-													<div className="text-sm">{cmd.label}</div>
+													<div className="font-medium tracking-[-0.005em]">{cmd.label}</div>
 													{cmd.description && (
-														<div className="text-muted-foreground truncate text-xs">{cmd.description}</div>
+														<div className="text-muted-foreground/85 truncate text-[11px] leading-tight mt-0.5">{cmd.description}</div>
 													)}
 												</div>
 												{cmd.shortcut && (
-													<kbd className="ui-kbd">
+													<kbd className="ui-kbd shrink-0">
 														{cmd.shortcut}
 													</kbd>
 												)}
@@ -610,10 +615,11 @@ export function CommandPalette({ open, onOpenChange, actions }: CommandPalettePr
 					)}
 				</ScrollArea>
 
-				<div className="ui-toolbar px-3 py-2 text-xs text-muted-foreground flex items-center gap-4">
-					<span>↑↓ to navigate</span>
-					<span>↵ to select</span>
-					<span>esc to close</span>
+				<div className="flex items-center gap-3 border-t border-border/60 bg-muted/30 px-3 py-1.5 text-[10.5px] text-muted-foreground">
+					<span className="inline-flex items-center gap-1"><kbd className="ui-kbd">↑↓</kbd> navigate</span>
+					<span className="inline-flex items-center gap-1"><kbd className="ui-kbd">↵</kbd> select</span>
+					<span className="inline-flex items-center gap-1"><kbd className="ui-kbd">esc</kbd> close</span>
+					<span className="ml-auto tabular-nums">{filteredCommands.length} commands</span>
 				</div>
 			</DialogContent>
 		</Dialog>

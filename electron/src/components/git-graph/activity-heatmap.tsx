@@ -34,11 +34,11 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // Color intensity levels
 const HEAT_COLORS = [
     'bg-gray-100 dark:bg-gray-800',
-    'bg-green-100 dark:bg-green-900/40',
-    'bg-green-200 dark:bg-green-800/50',
-    'bg-green-300 dark:bg-green-700/60',
-    'bg-green-400 dark:bg-green-600/70',
-    'bg-green-500 dark:bg-green-500/80',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_40%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_50%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_60%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_70%,transparent)]',
+    'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_80%,transparent)]',
 ];
 
 export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
@@ -231,22 +231,22 @@ export function ActivityHeatmap({ open, onOpenChange }: ActivityHeatmapProps) {
                 {/* Stats */}
                 <div className='mb-4 grid grid-cols-4 gap-4'>
                     <div className='bg-muted/50 rounded-lg p-3 text-center'>
-                        <GitCommit className='mx-auto mb-1 h-5 w-5 text-blue-500' />
+                        <GitCommit className='mx-auto mb-1 h-5 w-5 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' />
                         <p className='text-2xl font-bold'>{stats.totalCommits}</p>
                         <p className='text-muted-foreground text-xs'>Total Commits</p>
                     </div>
                     <div className='bg-muted/50 rounded-lg p-3 text-center'>
-                        <Calendar className='mx-auto mb-1 h-5 w-5 text-green-500' />
+                        <Calendar className='mx-auto mb-1 h-5 w-5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />
                         <p className='text-2xl font-bold'>{stats.activeDays}</p>
                         <p className='text-muted-foreground text-xs'>Active Days</p>
                     </div>
                     <div className='bg-muted/50 rounded-lg p-3 text-center'>
-                        <TrendingUp className='mx-auto mb-1 h-5 w-5 text-orange-500' />
+                        <TrendingUp className='mx-auto mb-1 h-5 w-5 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                         <p className='text-2xl font-bold'>{stats.longestStreak}</p>
                         <p className='text-muted-foreground text-xs'>Longest Streak</p>
                     </div>
                     <div className='bg-muted/50 rounded-lg p-3 text-center'>
-                        <Users className='mx-auto mb-1 h-5 w-5 text-purple-500' />
+                        <Users className='mx-auto mb-1 h-5 w-5 text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' />
                         <p className='text-2xl font-bold'>{stats.totalAuthors}</p>
                         <p className='text-muted-foreground text-xs'>Contributors</p>
                     </div>

@@ -61,7 +61,17 @@ function DropdownMenuContent({
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("bg-popover/95 border border-border/70 ring-foreground/20 data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 min-w-32 max-w-(--available-width) rounded-lg p-1 py-1.5 shadow-[0_18px_90px_-40px_rgba(0,0,0,0.55)] ring-1 duration-150 data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 max-h-(--available-height) w-(--anchor-width) origin-(--transform-origin) overflow-x-hidden overflow-y-auto outline-none data-closed:overflow-hidden backdrop-blur-sm", className )}
+          className={cn(
+            "z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 max-w-(--available-width) origin-(--transform-origin)",
+            "rounded-lg border border-border/70 bg-popover text-popover-foreground p-1",
+            "shadow-[var(--shadow-popover)]",
+            "overflow-x-hidden overflow-y-auto outline-none",
+            "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-[0.97] data-open:zoom-in-[0.97]",
+            "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+            "data-[side=inline-start]:slide-in-from-right-1 data-[side=inline-end]:slide-in-from-left-1",
+            "data-closed:overflow-hidden duration-100",
+            className
+          )}
           {...props}
         />
       </MenuPrimitive.Positioner>
@@ -84,7 +94,7 @@ function DropdownMenuLabel({
     <MenuPrimitive.GroupLabel
       data-slot="dropdown-menu-label"
       data-inset={inset}
-      className={cn("text-muted-foreground px-1.5 py-1 text-xs font-medium data-inset:pl-7", className)}
+      className={cn("text-muted-foreground/80 px-2 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.06em] data-inset:pl-7", className)}
       {...props}
     />
   )
@@ -105,7 +115,13 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "focus-visible:bg-accent focus-visible:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus-visible:bg-destructive/10 dark:data-[variant=destructive]:focus-visible:bg-destructive/20 data-[variant=destructive]:focus-visible:text-destructive data-[variant=destructive]:*:[svg]:text-destructive not-data-[variant=destructive]:focus-visible:**:text-accent-foreground gap-1.5 rounded-md px-1.5 py-1 text-sm data-inset:pl-7 [&_svg:not([class*='size-'])]:size-4 group/dropdown-menu-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "group/dropdown-menu-item relative flex cursor-default items-center select-none outline-hidden",
+        "gap-2 rounded-md px-2 py-1.5 text-[0.8125rem] data-inset:pl-7",
+        "[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
+        "transition-colors duration-75",
+        "focus-visible:bg-accent focus-visible:text-accent-foreground not-data-[variant=destructive]:focus-visible:**:text-accent-foreground",
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:focus-visible:bg-destructive/10 dark:data-[variant=destructive]:focus-visible:bg-destructive/20 data-[variant=destructive]:focus-visible:text-destructive data-[variant=destructive]:*:[svg]:text-destructive",
+        "data-disabled:pointer-events-none data-disabled:opacity-50",
         className
       )}
       {...props}
@@ -243,7 +259,7 @@ function DropdownMenuSeparator({
   return (
     <MenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("bg-border -mx-1 my-1 h-px", className)}
+      className={cn("bg-border/70 -mx-1 my-1 h-px", className)}
       {...props}
     />
   )
@@ -256,7 +272,11 @@ function DropdownMenuShortcut({
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn("text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground ml-auto text-xs tracking-widest", className)}
+      className={cn(
+        "text-muted-foreground/80 group-focus/dropdown-menu-item:text-accent-foreground/85",
+        "ml-auto font-mono text-[10px] tracking-[0.04em]",
+        className
+      )}
       {...props}
     />
   )

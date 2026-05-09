@@ -877,12 +877,12 @@ export function SettingsDialog({
                                     <span>
                                         Runtime key status:{' '}
                                         {aiConfigQuery.data?.hasRuntimeKey ? (
-                                            <span className='text-emerald-600'>Configured</span>
+                                            <span className='text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>Configured</span>
                                         ) : (
                                             <span>Not configured</span>
                                         )}
                                     </span>
-                                    {aiConfigQuery.data?.hasRuntimeKey && <Check className='h-3.5 w-3.5 text-emerald-600' />}
+                                    {aiConfigQuery.data?.hasRuntimeKey && <Check className='h-3.5 w-3.5 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' />}
                                 </div>
                                 <div className='flex justify-end pt-2'>
                                     <Button onClick={handleSaveAiConfig} disabled={saveAIConfigMutation.isPending}>

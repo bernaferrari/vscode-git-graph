@@ -687,40 +687,47 @@ export function CollaborationCenter({ open, onOpenChange }: CollaborationCenterP
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className='ui-surface max-h-[88vh] max-w-6xl overflow-hidden p-0'>
-				<DialogHeader className='border-border/70 border-b px-5 py-4'>
-					<DialogTitle className='flex items-center gap-2 text-base'>
-						<Users className='h-5 w-5' />
-						Collaboration Center
+			<DialogContent className='max-h-[88vh] max-w-6xl overflow-hidden p-0'>
+				<DialogHeader className='border-b border-border/60 px-5 py-3'>
+					<DialogTitle className='flex items-center gap-2 text-[0.9375rem]'>
+						<span className='grid h-7 w-7 place-items-center rounded-md bg-primary/12 ring-1 ring-primary/20'>
+							<Users className='h-3.5 w-3.5 text-primary' />
+						</span>
+						<div className='flex flex-col leading-tight'>
+							<span className='font-semibold'>Collaboration center</span>
+							<span className='text-[11px] font-normal text-muted-foreground/85'>
+								Workspace handoffs, patches, reviewers, and sync.
+							</span>
+						</div>
 					</DialogTitle>
 				</DialogHeader>
 
 				<CollaborationSummaryStrip workspaceShares={workspaceShares} patchShelf={patchShelf} syncConfig={syncConfig} />
 
 				<Tabs defaultValue='handoffs' className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-					<TabsList className='mx-5 mt-4 w-fit'>
-						<TabsTrigger value='handoffs' className='text-xs'>
-							<FolderGit2 className='mr-1 h-3 w-3' />
-							Workspace Handoffs
+					<TabsList className='mx-5 mt-3 w-fit'>
+						<TabsTrigger value='handoffs' className='gap-1.5 text-[11px]'>
+							<FolderGit2 className='h-3.5 w-3.5' />
+							Handoffs
 						</TabsTrigger>
-						<TabsTrigger value='patches' className='text-xs'>
-							<PackageOpen className='mr-1 h-3 w-3' />
-							Patch Shelf
+						<TabsTrigger value='patches' className='gap-1.5 text-[11px]'>
+							<PackageOpen className='h-3.5 w-3.5' />
+							Patches
 						</TabsTrigger>
-						<TabsTrigger value='team' className='text-xs'>
-							<Users className='mr-1 h-3 w-3' />
+						<TabsTrigger value='team' className='gap-1.5 text-[11px]'>
+							<Users className='h-3.5 w-3.5' />
 							Team
 						</TabsTrigger>
-						<TabsTrigger value='reporting' className='text-xs'>
-							<BarChart3 className='mr-1 h-3 w-3' />
+						<TabsTrigger value='reporting' className='gap-1.5 text-[11px]'>
+							<BarChart3 className='h-3.5 w-3.5' />
 							Reporting
 						</TabsTrigger>
-						<TabsTrigger value='sync' className='text-xs'>
-							<Server className='mr-1 h-3 w-3' />
+						<TabsTrigger value='sync' className='gap-1.5 text-[11px]'>
+							<Server className='h-3.5 w-3.5' />
 							Sync
 						</TabsTrigger>
-						<TabsTrigger value='activity' className='text-xs'>
-							<Users className='mr-1 h-3 w-3' />
+						<TabsTrigger value='activity' className='gap-1.5 text-[11px]'>
+							<Users className='h-3.5 w-3.5' />
 							Activity
 						</TabsTrigger>
 					</TabsList>

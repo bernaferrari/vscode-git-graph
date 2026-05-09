@@ -168,14 +168,14 @@ export function FileAnnotationsPanel({
 	// Color assignment for commits
 	const commitColors = useMemo(() => {
 		const colors = [
-			'bg-blue-100 dark:bg-blue-900/30 border-l-blue-400',
-			'bg-green-100 dark:bg-green-900/30 border-l-green-400',
-			'bg-amber-100 dark:bg-amber-900/30 border-l-amber-400',
-			'bg-purple-100 dark:bg-purple-900/30 border-l-purple-400',
-			'bg-pink-100 dark:bg-pink-900/30 border-l-pink-400',
-			'bg-cyan-100 dark:bg-cyan-900/30 border-l-cyan-400',
-			'bg-orange-100 dark:bg-orange-900/30 border-l-orange-400',
-			'bg-indigo-100 dark:bg-indigo-900/30 border-l-indigo-400',
+			'bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)] border-l-blue-400',
+			'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)] border-l-green-400',
+			'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)] border-l-amber-400',
+			'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)] border-l-purple-400',
+			'bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-4)_30%,transparent)] border-l-pink-400',
+			'bg-[color-mix(in_oklch,var(--chart-7)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--chart-7)_30%,transparent)] border-l-cyan-400',
+			'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)] border-l-orange-400',
+			'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)] border-l-indigo-400',
 		];
 		const colorMap = new Map<string, string>();
 		let colorIndex = 0;
@@ -363,7 +363,7 @@ export function FileAnnotationsPanel({
 											{showAnnotation && (
 												<div className={`shrink-0 flex items-center gap-2 px-2 py-0.5 text-xs border-r bg-muted/10 ${compactMode ? 'w-48' : 'w-64'}`}>
 													{showCommitColumn && (
-														<code className="text-blue-600 dark:text-blue-400">
+														<code className="text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">
 															{line.commitHash.slice(0, 7)}
 														</code>
 													)}

@@ -37,6 +37,7 @@ interface WorktreeCenterProps {
     onOpenChange: (open: boolean) => void;
     repo?: string;
     embedded?: boolean;
+    initialBranch?: string | null;
 }
 
 interface LaunchpadEntry {
@@ -80,7 +81,7 @@ function toFolderName(worktreePath: string): string {
     return worktreePath.split('/').filter(Boolean).pop() ?? worktreePath;
 }
 
-export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeCenterProps) {
+export function WorktreeCenter({ open, onOpenChange, repo, embedded, initialBranch }: WorktreeCenterProps) {
     const { activeRepo } = useAppStore();
     const { activateRepoPath, isRepoBusy } = useRepoActivation();
     const targetRepo = repo ?? activeRepo ?? '';
@@ -293,6 +294,13 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
             setBranch(prefs.lastSelectedBranch);
         }
     }, [open, prefsQuery.data?.prefs]);
+
+    // Pre-populate the new-worktree form when opened with an initialBranch.
+    useEffect(() => {
+        if (open && initialBranch) {
+            setBranch(initialBranch);
+        }
+    }, [open, initialBranch]);
 
     const persistViewPrefs = (patch: {
         showLocked?: boolean;
@@ -669,7 +677,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                             placeholder='../feature-review'
                         />
                         {createPath && (
-                            <p className={`text-xs ${validatePathQuery.data?.valid ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            <p className={`text-xs ${validatePathQuery.data?.valid ? 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]' : 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'}`}>
                                 {validatePathQuery.isFetching
                                     ? 'Validating path...'
                                     : validatePathQuery.data?.valid
@@ -770,7 +778,7 @@ export function WorktreeCenter({ open, onOpenChange, repo, embedded }: WorktreeC
                     </div>
                     <div className='rounded-lg border p-3'>
                         <div className='mb-2 flex items-center gap-2 text-sm font-medium'>
-                            <AlertTriangle className='h-4 w-4 text-amber-500' />
+                            <AlertTriangle className='h-4 w-4 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' />
                             Prune Preview
                         </div>
                         <ScrollArea className='h-52'>

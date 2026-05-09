@@ -99,8 +99,8 @@ export function MergeEditor({
 				<div className="flex-1 grid grid-cols-3 gap-2 min-h-0">
 					{/* Ours panel */}
 					<div className="flex flex-col border rounded overflow-hidden">
-						<div className="bg-blue-500/20 px-2 py-1 text-xs font-medium border-b flex items-center justify-between">
-							<span className="text-blue-700">OURS (Current Branch)</span>
+						<div className="bg-[color-mix(in_oklch,var(--info)_20%,transparent)] px-2 py-1 text-xs font-medium border-b flex items-center justify-between">
+							<span className="text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]">OURS (Current Branch)</span>
 							<Button
 								variant="ghost"
 								size="sm"
@@ -113,7 +113,7 @@ export function MergeEditor({
 						<ScrollArea className="flex-1">
 							<div className="font-mono text-xs p-2">
 								{oursLines.map((line, i) => (
-									<div key={i} className="flex hover:bg-blue-500/10">
+									<div key={i} className="flex hover:bg-[color-mix(in_oklch,var(--info)_10%,transparent)]">
 										<span className="w-8 shrink-0 text-right pr-2 text-muted-foreground select-none">
 											{i + 1}
 										</span>
@@ -145,8 +145,8 @@ export function MergeEditor({
 
 					{/* Theirs panel */}
 					<div className="flex flex-col border rounded overflow-hidden">
-						<div className="bg-green-500/20 px-2 py-1 text-xs font-medium border-b flex items-center justify-between">
-							<span className="text-green-700">THEIRS (Incoming)</span>
+						<div className="bg-[color-mix(in_oklch,var(--success)_20%,transparent)] px-2 py-1 text-xs font-medium border-b flex items-center justify-between">
+							<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">THEIRS (Incoming)</span>
 							<Button
 								variant="ghost"
 								size="sm"
@@ -159,7 +159,7 @@ export function MergeEditor({
 						<ScrollArea className="flex-1">
 							<div className="font-mono text-xs p-2">
 								{theirsLines.map((line, i) => (
-									<div key={i} className="flex hover:bg-green-500/10">
+									<div key={i} className="flex hover:bg-[color-mix(in_oklch,var(--success)_10%,transparent)]">
 										<span className="w-8 shrink-0 text-right pr-2 text-muted-foreground select-none">
 											{i + 1}
 										</span>

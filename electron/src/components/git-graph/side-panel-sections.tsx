@@ -25,23 +25,31 @@ export function SidePanelSection({
 }) {
     const Icon = icon;
     return (
-        <div className='mb-1'>
-            <div className='flex items-center gap-1'>
+        <div>
+            <div className='flex items-center gap-0.5'>
                 <button
+                    type='button'
                     onClick={onToggle}
-                    className='text-muted-foreground hover:bg-accent/55 hover:border-border/65 hover:text-foreground focus-visible:ring-primary/30 flex flex-1 items-center gap-1.5 rounded-md border border-transparent px-2 py-1.5 text-xs font-semibold transition-all duration-150 focus-visible:ring-2'>
-                    {expanded ? (
-                        <svg className='h-3.5 w-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='m6 9 6 6 6-6'/></svg>
-                    ) : (
-                        <svg className='h-3.5 w-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='m9 18 6-6-6-6'/></svg>
-                    )}
-                    <Icon className='h-3.5 w-3.5 shrink-0' />
+                    className='group/section flex flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85 transition-colors hover:bg-accent/55 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'>
+                    <svg
+                        className={`h-2.5 w-2.5 shrink-0 transition-transform duration-150 ${
+                            expanded ? 'rotate-90' : ''
+                        }`}
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='2'>
+                        <path d='m9 18 6-6-6-6' />
+                    </svg>
+                    <Icon className='h-3 w-3 shrink-0 text-muted-foreground/70 group-hover/section:text-foreground' />
                     <span className='flex-1 text-left'>{title}</span>
-                    <span className='bg-muted/80 rounded px-1.5 py-0.5 text-[10px] tabular-nums'>{count}</span>
+                    <span className='font-mono text-[10px] tabular-nums text-muted-foreground/70 normal-case'>
+                        {count}
+                    </span>
                 </button>
                 {action && <div className='shrink-0'>{action}</div>}
             </div>
-            {expanded && <div className='mt-1 ml-1.5 space-y-0.5'>{children}</div>}
+            {expanded && <div className='mt-0.5 mb-1.5 space-y-px'>{children}</div>}
         </div>
     );
 }
@@ -65,6 +73,8 @@ export function BranchesSection({
     onTrackBranch,
     onRenameBranch,
     onMergeBranch,
+    onBringInBranch,
+    onCreateWorktreeFromBranch,
     onPinToggle,
     renderBranchItem,
 }: {
@@ -86,6 +96,8 @@ export function BranchesSection({
     onTrackBranch?: (branch: string) => void;
     onRenameBranch?: (branch: string) => void;
     onMergeBranch?: (branch: string) => void;
+    onBringInBranch?: (branch: string) => void;
+    onCreateWorktreeFromBranch?: (branch: string) => void;
     onPinToggle: (branch: string, pinned: boolean) => void;
     renderBranchItem: (props: {
         branch: string;
@@ -100,6 +112,8 @@ export function BranchesSection({
         onTrackUpstream?: () => unknown;
         onRename?: () => unknown;
         onMerge?: () => unknown;
+        onBringIn?: () => unknown;
+        onCreateWorktree?: () => unknown;
         onDelete: () => unknown;
         onPinToggle?: () => void;
     }) => ReactNode;
@@ -156,6 +170,10 @@ export function BranchesSection({
                     ...(onRenameBranch ? { onRename: () => { onRenameBranch(branch); } } : {}),
                     onDelete: () => { onDelete(branch); },
                     ...(onMergeBranch ? { onMerge: () => { onMergeBranch(branch); } } : {}),
+                    ...(onBringInBranch ? { onBringIn: () => { onBringInBranch(branch); } } : {}),
+                    ...(onCreateWorktreeFromBranch
+                        ? { onCreateWorktree: () => { onCreateWorktreeFromBranch(branch); } }
+                        : {}),
                     onPinToggle: () => { onPinToggle(branch, pinned); },
                 });
             })}

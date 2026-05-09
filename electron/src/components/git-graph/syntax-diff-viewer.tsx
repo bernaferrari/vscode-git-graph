@@ -42,14 +42,14 @@ function highlightSyntax(content: string, filename?: string): string {
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		// Strings
-		.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="text-green-600">$&</span>')
+		.replace(/(["'`])(?:(?!\1|\\).|\\.)*\1/g, '<span class="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">$&</span>')
 		// Numbers
-		.replace(/\b(\d+\.?\d*)\b/g, '<span class="text-amber-600">$1</span>')
+		.replace(/\b(\d+\.?\d*)\b/g, '<span class="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">$1</span>')
 		// Comments
 		.replace(/(\/\/.*$)/gm, '<span class="text-gray-500 italic">$1</span>')
 		.replace(/(#.*$)/gm, '<span class="text-gray-500 italic">$1</span>')
 		// Keywords
-		.replace(new RegExp(`\\b(${langKeywords.join('|')})\\b`, 'g'), '<span class="text-purple-600 font-medium">$1</span>');
+		.replace(new RegExp(`\\b(${langKeywords.join('|')})\\b`, 'g'), '<span class="text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] font-medium">$1</span>');
 
 	return result;
 }
@@ -96,9 +96,9 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 								<tr
 									key={index}
 									className={cn(
-										line.type === 'added' && 'bg-green-50 dark:bg-green-950/30',
-										line.type === 'removed' && 'bg-red-50 dark:bg-red-950/30',
-										line.type === 'modified' && 'bg-amber-50 dark:bg-amber-950/30',
+										line.type === 'added' && 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]',
+										line.type === 'removed' && 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--destructive)_30%,transparent)]',
+										line.type === 'modified' && 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]',
 									)}
 								>
 									{/* Old line number */}
@@ -111,9 +111,9 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 									</td>
 									{/* Diff indicator */}
 									<td className="px-1 py-0.5 text-center text-xs select-none">
-										{line.type === 'added' && <span className="text-green-600">+</span>}
-										{line.type === 'removed' && <span className="text-red-600">-</span>}
-										{line.type === 'modified' && <span className="text-amber-600">~</span>}
+										{line.type === 'added' && <span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">+</span>}
+										{line.type === 'removed' && <span className="text-destructive">-</span>}
+										{line.type === 'modified' && <span className="text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]">~</span>}
 									</td>
 									{/* Content */}
 									<td className="px-2 py-0.5 whitespace-pre">
@@ -128,7 +128,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 											/>
 										) : line.type === 'removed' ? (
 											wordDiff && line.left?.chars ? (
-												<span className="text-red-700 dark:text-red-300">
+												<span className="text-destructive dark:text-destructive">
 													<DiffCharRenderer chars={line.left.chars} baseClass="removed" />
 												</span>
 											) : (
@@ -143,7 +143,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 											)
 										) : line.type === 'added' ? (
 											wordDiff && line.right?.chars ? (
-												<span className="text-green-700 dark:text-green-300">
+												<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 													<DiffCharRenderer chars={line.right.chars} baseClass="added" />
 												</span>
 											) : (
@@ -161,7 +161,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 											<>
 												{line.left && (
 													<div className={wordDiff ? '' : 'hidden'}>
-														<span className="text-red-700 dark:text-red-300">
+														<span className="text-destructive dark:text-destructive">
 															{/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
 															{wordDiff && line.left.chars ? (
 																<DiffCharRenderer chars={line.left.chars} baseClass="removed" />
@@ -173,7 +173,7 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 												)}
 												{line.right && (
 													<div className={wordDiff ? '' : ''}>
-														<span className="text-green-700 dark:text-green-300">
+														<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">
 															{/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
 															{wordDiff && line.right.chars ? (
 																<DiffCharRenderer chars={line.right.chars} baseClass="added" />
@@ -197,8 +197,8 @@ export function SyntaxDiffViewer({ diff, filename, className, showWordDiff = tru
 			<div className="flex items-center justify-between px-2 py-1 border-t bg-muted/30 text-xs text-muted-foreground">
 				<span>{lines.length} lines</span>
 				<div className="flex items-center gap-3">
-					<span className="text-red-600">-{stats.removed}</span>
-					<span className="text-green-600">+{stats.added + stats.modified}</span>
+					<span className="text-destructive">-{stats.removed}</span>
+					<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">+{stats.added + stats.modified}</span>
 				</div>
 			</div>
 		</div>

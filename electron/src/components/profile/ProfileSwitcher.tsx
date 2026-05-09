@@ -37,12 +37,18 @@ const PROFILE_ICONS: Record<string, React.ElementType> = {
 };
 
 const PROFILE_COLORS: Record<string, string> = {
-	blue: 'border-blue-500/30 bg-blue-500/10 text-blue-500',
-	green: 'border-green-500/30 bg-green-500/10 text-green-500',
-	purple: 'border-purple-500/30 bg-purple-500/10 text-purple-500',
-	orange: 'border-orange-500/30 bg-orange-500/10 text-orange-500',
-	red: 'border-red-500/30 bg-red-500/10 text-red-500',
-	cyan: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-500',
+	blue:
+		'border-[color-mix(in_oklch,var(--info)_35%,transparent)] bg-[color-mix(in_oklch,var(--info)_10%,transparent)] text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]',
+	green:
+		'border-[color-mix(in_oklch,var(--success)_35%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]',
+	purple:
+		'border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_10%,transparent)] text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]',
+	orange:
+		'border-[color-mix(in_oklch,var(--warning)_38%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]',
+	red:
+		'border-[color-mix(in_oklch,var(--destructive)_35%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] text-[color-mix(in_oklch,var(--destructive)_72%,var(--foreground))]',
+	cyan:
+		'border-[color-mix(in_oklch,var(--chart-7)_35%,transparent)] bg-[color-mix(in_oklch,var(--chart-7)_10%,transparent)] text-[color-mix(in_oklch,var(--chart-7)_75%,var(--foreground))]',
 };
 
 interface ProfileSwitcherProps {
@@ -79,22 +85,21 @@ export function ProfileSwitcher({ className }: ProfileSwitcherProps) {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button
-					variant="outline"
-					size="sm"
+					variant='outline'
+					size='sm'
 					className={cn(
-						'h-8 gap-1.5 border-dashed',
+						'h-8 gap-1.5',
 						activeProfile && PROFILE_COLORS[activeProfile.color],
 						className
-					)}
-				>
-					<ActiveIcon className="h-4 w-4" />
-					<span>{activeProfile?.name || 'Select Profile'}</span>
-					<ChevronDown className="h-3 w-3 opacity-50" />
+					)}>
+					<ActiveIcon className='h-4 w-4' />
+					<span className='font-medium'>{activeProfile?.name || 'Select profile'}</span>
+					<ChevronDown className='h-3 w-3 opacity-60' />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-56">
-				<div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
-					Git Profiles
+			<DropdownMenuContent align='start' className='w-64'>
+				<div className='px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/85'>
+					Git profiles
 				</div>
 				<DropdownMenuSeparator />
 				{profiles.map((profile) => {
@@ -104,34 +109,28 @@ export function ProfileSwitcher({ className }: ProfileSwitcherProps) {
 						<DropdownMenuItem
 							key={profile.id}
 							onClick={() => { setActiveProfile(profile.id); }}
-							className={cn('flex items-center gap-2 cursor-pointer', isActive && 'bg-accent')}
-						>
-							<Icon
-								className={cn(
-									'h-4 w-4',
-									isActive ? 'opacity-100' : 'opacity-50'
-								)}
-							/>
-							<div className="flex flex-col flex-1">
-								<span className="font-medium">{profile.name}</span>
+							className={cn('flex cursor-pointer items-start gap-2 px-2 py-1.5', isActive && 'bg-accent/70')}>
+							<Icon className={cn('mt-0.5 h-4 w-4', isActive ? 'opacity-100' : 'opacity-60')} />
+							<div className='flex min-w-0 flex-1 flex-col leading-snug'>
+								<span className='truncate text-[0.8125rem] font-medium'>{profile.name}</span>
 								{profile.userEmail && (
-									<span className="text-xs text-muted-foreground truncate">
+									<span className='truncate font-mono text-[11px] text-muted-foreground/85'>
 										{profile.userEmail}
 									</span>
 								)}
 							</div>
-							{isActive && <Check className="h-4 w-4 ml-auto" />}
+							{isActive && <Check className='ml-auto mt-0.5 h-3.5 w-3.5 text-primary' />}
 						</DropdownMenuItem>
 					);
 				})}
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={handleAddProfile} className="cursor-pointer">
-					<Plus className="h-4 w-4 mr-2" />
-					Add Profile
+				<DropdownMenuItem onClick={handleAddProfile} className='cursor-pointer'>
+					<Plus className='mr-2 h-3.5 w-3.5' />
+					Add profile
 				</DropdownMenuItem>
-				<DropdownMenuItem className="cursor-pointer">
-					<Settings className="h-4 w-4 mr-2" />
-					Manage Profiles
+				<DropdownMenuItem className='cursor-pointer'>
+					<Settings className='mr-2 h-3.5 w-3.5' />
+					Manage profiles
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>

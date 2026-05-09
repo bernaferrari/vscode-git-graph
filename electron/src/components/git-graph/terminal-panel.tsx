@@ -205,7 +205,7 @@ Any other command is executed by your system shell in the active repository.`,
 								className={item.type === 'input'
 										? 'text-foreground'
 										: item.type === 'error'
-											? 'text-red-500'
+											? 'text-destructive'
 											: 'text-muted-foreground'}
 							>
 								{item.text}

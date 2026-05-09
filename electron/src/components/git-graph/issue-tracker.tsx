@@ -79,20 +79,20 @@ interface IssueTrackerConfig {
 // eslint-disable-next-line react-refresh/only-export-components
 export const PROVIDER_CONFIG: Record<IssueProvider, { name: string; icon: React.ReactNode; color: string }> = {
 	github: { name: 'GitHub', icon: <GitPullRequest className="h-4 w-4" />, color: 'text-gray-700 dark:text-gray-300' },
-	jira: { name: 'Jira', icon: <ListTodo className="h-4 w-4" />, color: 'text-blue-600' },
-	linear: { name: 'Linear', icon: <Package className="h-4 w-4" />, color: 'text-indigo-600' },
-	asana: { name: 'Asana', icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-orange-600' },
-	trello: { name: 'Trello', icon: <LayoutGrid className="h-4 w-4" />, color: 'text-blue-500' },
-	clickup: { name: 'ClickUp', icon: <ListTodo className="h-4 w-4" />, color: 'text-pink-600' },
+	jira: { name: 'Jira', icon: <ListTodo className="h-4 w-4" />, color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' },
+	linear: { name: 'Linear', icon: <Package className="h-4 w-4" />, color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]' },
+	asana: { name: 'Asana', icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]' },
+	trello: { name: 'Trello', icon: <LayoutGrid className="h-4 w-4" />, color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]' },
+	clickup: { name: 'ClickUp', icon: <ListTodo className="h-4 w-4" />, color: 'text-[color-mix(in_oklch,var(--chart-4)_75%,var(--foreground))]' },
 	notion: { name: 'Notion', icon: <Globe className="h-4 w-4" />, color: 'text-gray-800' },
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const STATUS_CONFIG: Record<Issue['status'], { color: string; icon: React.ReactNode }> = {
-	open: { color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30', icon: <AlertCircle className="h-3 w-3" /> },
-	in_progress: { color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30', icon: <Clock className="h-3 w-3" /> },
-	closed: { color: 'text-green-600 bg-green-100 dark:bg-green-900/30', icon: <CheckCircle2 className="h-3 w-3" /> },
-	done: { color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30', icon: <CheckCircle2 className="h-3 w-3" /> },
+	open: { color: 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--warning)_30%,transparent)]', icon: <AlertCircle className="h-3 w-3" /> },
+	in_progress: { color: 'text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_30%,transparent)]', icon: <Clock className="h-3 w-3" /> },
+	closed: { color: 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))] bg-[color-mix(in_oklch,var(--success)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--success)_30%,transparent)]', icon: <CheckCircle2 className="h-3 w-3" /> },
+	done: { color: 'text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))] bg-[color-mix(in_oklch,var(--primary)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--primary)_30%,transparent)]', icon: <CheckCircle2 className="h-3 w-3" /> },
 };
 const DEFAULT_ISSUE_TRACKER_CONFIG: IssueTrackerConfig = {
     providers: {
@@ -291,7 +291,7 @@ export function IssueTrackerPanel({
 					{searchErrors.length > 0 && (
 						<div className='space-y-1'>
 							{searchErrors.map((error) => (
-								<p key={error.provider} className='text-xs text-amber-600 dark:text-amber-300'>
+								<p key={error.provider} className='text-xs text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] dark:text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
 									{PROVIDER_CONFIG[error.provider].name}: {error.message}
 								</p>
 							))}
@@ -325,7 +325,7 @@ export function IssueTrackerPanel({
 
 			{/* Detected issues */}
 			{detectedKeys.length > 0 && (
-				<div className="px-3 py-2 border-b bg-blue-50 dark:bg-blue-900/20">
+				<div className="px-3 py-2 border-b bg-[color-mix(in_oklch,var(--info)_15%,transparent)] dark:bg-[color-mix(in_oklch,var(--info)_20%,transparent)]">
 					<p className="text-xs text-muted-foreground mb-1">Detected in commit message:</p>
 					<div className="flex flex-wrap gap-1">
 						{detectedKeys.map(key => (
@@ -374,7 +374,7 @@ export function IssueTrackerPanel({
 									<Button
 										variant="ghost"
 										size="sm"
-										className="h-6 w-6 p-0 text-red-600"
+										className="h-6 w-6 p-0 text-destructive"
 										onClick={() => { void handleUnlinkIssue(link); }}
 									>
 										<Unlink className="h-3 w-3" />

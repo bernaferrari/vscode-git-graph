@@ -212,7 +212,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 								<div key={stash.index} className="border rounded-lg overflow-hidden">
 									<div className="p-3 hover:bg-accent/30">
 										<div className="flex items-start gap-3">
-											<div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 shrink-0 text-sm font-medium">
+											<div className="flex items-center justify-center w-8 h-8 rounded-full bg-[color-mix(in_oklch,var(--warning)_15%,transparent)] text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))] shrink-0 text-sm font-medium">
 												{stash.index}
 											</div>
 											<div className="flex-1 min-w-0">
@@ -279,7 +279,7 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 												<Button
 													variant="ghost"
 													size="sm"
-													className="text-red-600"
+													className="text-destructive"
 													onClick={() => { handleDropStash(stash.index); }}
 													disabled={dropMutation.isPending}
 												>
@@ -338,10 +338,10 @@ export function StashManagement({ open, onOpenChange }: StashManagementProps) {
 															<span className="truncate">{file.path}</span>
 															<div className="flex items-center gap-2 text-muted-foreground">
 																{file.additions > 0 && (
-																	<span className="text-green-600">+{file.additions}</span>
+																	<span className="text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]">+{file.additions}</span>
 																)}
 																{file.deletions > 0 && (
-																	<span className="text-red-600">-{file.deletions}</span>
+																	<span className="text-destructive">-{file.deletions}</span>
 																)}
 															</div>
 														</div>

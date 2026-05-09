@@ -33,12 +33,12 @@ interface RebaseCommit {
 }
 
 const ACTION_CONFIG: Record<RebaseAction, { label: string; color: string; description: string }> = {
-	pick: { label: 'Pick', color: 'bg-blue-500', description: 'Use this commit' },
-	reword: { label: 'Reword', color: 'bg-yellow-500', description: 'Edit commit message' },
-	edit: { label: 'Edit', color: 'bg-orange-500', description: 'Stop to amend' },
-	squash: { label: 'Squash', color: 'bg-purple-500', description: 'Merge with previous, edit message' },
-	fixup: { label: 'Fixup', color: 'bg-pink-500', description: 'Merge with previous, discard message' },
-	drop: { label: 'Drop', color: 'bg-red-500', description: 'Remove this commit' },
+	pick: { label: 'Pick', color: 'bg-[color-mix(in_oklch,var(--info)_15%,transparent)]', description: 'Use this commit' },
+	reword: { label: 'Reword', color: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]', description: 'Edit commit message' },
+	edit: { label: 'Edit', color: 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]', description: 'Stop to amend' },
+	squash: { label: 'Squash', color: 'bg-[color-mix(in_oklch,var(--primary)_15%,transparent)]', description: 'Merge with previous, edit message' },
+	fixup: { label: 'Fixup', color: 'bg-[color-mix(in_oklch,var(--chart-4)_15%,transparent)]', description: 'Merge with previous, discard message' },
+	drop: { label: 'Drop', color: 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]', description: 'Remove this commit' },
 };
 
 interface DragDropRebaseProps {
@@ -178,9 +178,9 @@ const rebaseMutation = trpc.git.rebase.useMutation({
 						<Badge variant="outline" className="font-mono">{onto}</Badge>
 					</div>
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
-						{stats.drop > 0 && <span className="text-red-600">{stats.drop} dropped</span>}
+						{stats.drop > 0 && <span className="text-destructive">{stats.drop} dropped</span>}
 						{stats.squash + stats.fixup > 0 && (
-							<span className="text-purple-600">{stats.squash + stats.fixup} squashed</span>
+							<span className="text-[color-mix(in_oklch,var(--primary)_75%,var(--foreground))]">{stats.squash + stats.fixup} squashed</span>
 						)}
 					</div>
 				</CardTitle>

@@ -75,41 +75,52 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
 
     if (!activeRepo) {
         return (
-            <div className={cn('ui-status-bar text-muted-foreground flex h-6 items-center px-3 text-xs', className)}>
+            <div className={cn('ui-status-bar flex h-6 items-center px-3 text-xs text-muted-foreground/85', className)}>
                 <span>No repository open</span>
             </div>
         );
     }
+
+    const detached = !currentBranch;
+    const isClean = stagedCount === 0 && unstagedCount === 0 && untrackedCount === 0 && conflictedCount === 0;
 
     return (
         <div className={cn('ui-status-bar flex h-6 items-center justify-between px-3 text-xs', className)}>
             {/* Left side - Branch and status */}
             <div className='flex items-center gap-3'>
                 {/* Branch */}
-                <div className='flex items-center gap-1.5'>
-                    <GitBranch className='text-muted-foreground h-3 w-3' />
-                    <span className='font-medium'>{currentBranch || 'detached'}</span>
+                <div
+                    className='flex items-center gap-1.5'
+                    title={detached ? 'HEAD is detached — not on a branch' : `On branch ${currentBranch ?? ''}`}>
+                    <GitBranch className={cn('h-3 w-3', detached ? 'text-warning' : 'text-muted-foreground')} />
+                    <span className={cn('font-medium tabular-nums', detached && 'italic text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]')}>
+                        {currentBranch ?? 'detached HEAD'}
+                    </span>
                 </div>
 
                 {/* Sync status */}
                 {statusLoading ? (
-                    <Loader2 className='text-muted-foreground h-3 w-3 animate-spin' />
+                    <Loader2 className='h-3 w-3 animate-spin text-muted-foreground' />
                 ) : (
-                    <div className='flex items-center gap-2'>
+                    <div className='flex items-center gap-2 tabular-nums'>
                         {ahead > 0 && (
-                            <span className='flex items-center gap-1 text-green-600'>
+                            <span
+                                title={`${String(ahead)} commit${ahead === 1 ? '' : 's'} to push`}
+                                className='flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
                                 <Upload className='h-3 w-3' />
                                 {ahead}
                             </span>
                         )}
                         {behind > 0 && (
-                            <span className='flex items-center gap-1 text-blue-600'>
+                            <span
+                                title={`${String(behind)} commit${behind === 1 ? '' : 's'} to pull`}
+                                className='flex items-center gap-1 text-[color-mix(in_oklch,var(--info)_72%,var(--foreground))]'>
                                 <Download className='h-3 w-3' />
                                 {behind}
                             </span>
                         )}
                         {ahead === 0 && behind === 0 && (
-                            <span className='text-muted-foreground flex items-center gap-1'>
+                            <span className='flex items-center gap-1 text-muted-foreground'>
                                 <Check className='h-3 w-3' />
                                 Synced
                             </span>
@@ -118,22 +129,43 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
                 )}
 
                 {/* File status */}
-                {(stagedCount > 0 || unstagedCount > 0 || untrackedCount > 0 || conflictedCount > 0) && (
-                    <div className='flex items-center gap-2'>
+                {!isClean && (
+                    <div className='flex items-center gap-2 tabular-nums'>
                         {conflictedCount > 0 && (
-                            <span className='flex items-center gap-1 text-red-600'>
+                            <span
+                                title={`${String(conflictedCount)} conflicted file${conflictedCount === 1 ? '' : 's'} — resolve in the diff editor`}
+                                className='flex items-center gap-1 text-destructive'>
                                 <AlertCircle className='h-3 w-3' />
-                                {conflictedCount} conflict{conflictedCount !== 1 ? 's' : ''}
+                                {conflictedCount} conflict{conflictedCount === 1 ? '' : 's'}
                             </span>
                         )}
-                        {stagedCount > 0 && <span className='text-green-600'>+{stagedCount} staged</span>}
-                        {unstagedCount > 0 && <span className='text-amber-600'>~{unstagedCount} modified</span>}
+                        {stagedCount > 0 && (
+                            <span
+                                title={`${String(stagedCount)} staged change${stagedCount === 1 ? '' : 's'}`}
+                                className='flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'>
+                                <span aria-hidden className='inline-block h-1.5 w-1.5 rounded-full bg-current' />
+                                {stagedCount} staged
+                            </span>
+                        )}
+                        {unstagedCount > 0 && (
+                            <span
+                                title={`${String(unstagedCount)} modified file${unstagedCount === 1 ? '' : 's'} not yet staged`}
+                                className='flex items-center gap-1 text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'>
+                                <span aria-hidden className='inline-block h-1.5 w-1.5 rounded-full bg-current' />
+                                {unstagedCount} modified
+                            </span>
+                        )}
                         {untrackedCount > 0 && (
-                            <span className='text-muted-foreground'>?{untrackedCount} untracked</span>
+                            <span
+                                title={`${String(untrackedCount)} untracked file${untrackedCount === 1 ? '' : 's'}`}
+                                className='flex items-center gap-1 text-muted-foreground'>
+                                <span aria-hidden className='inline-block h-1.5 w-1.5 rounded-full bg-current opacity-65' />
+                                {untrackedCount} untracked
+                            </span>
                         )}
                     </div>
                 )}
-                <span className='text-muted-foreground hidden lg:inline'>{stateMessage}</span>
+                <span className='hidden text-muted-foreground/85 lg:inline'>{stateMessage}</span>
             </div>
 
             {/* Right side - Quick actions and info */}
@@ -141,24 +173,26 @@ export function StatusBar({ className, onFetch, onPush, onPull }: StatusBarProps
                 {/* Quick sync buttons */}
                 <div className='flex items-center gap-1'>
                     {behind > 0 && (
-                        <Button variant='ghost' size='sm' className='h-5 px-1.5 text-xs' onClick={onPull}>
+                        <Button variant='ghost' size='sm' className='h-5 px-1.5 text-xs' onClick={onPull} title={`Pull ${String(behind)} commit${behind === 1 ? '' : 's'}`}>
                             <Download className='mr-1 h-3 w-3' />
                             Pull
                         </Button>
                     )}
                     {ahead > 0 && (
-                        <Button variant='ghost' size='sm' className='h-5 px-1.5 text-xs' onClick={onPush}>
+                        <Button variant='ghost' size='sm' className='h-5 px-1.5 text-xs' onClick={onPush} title={`Push ${String(ahead)} commit${ahead === 1 ? '' : 's'}`}>
                             <Upload className='mr-1 h-3 w-3' />
                             Push
                         </Button>
                     )}
-                    <Button variant='ghost' size='sm' className='h-5 px-1.5 text-xs' onClick={onFetch}>
+                    <Button variant='ghost' size='sm' className='h-5 w-5 p-0 text-xs' onClick={onFetch} title='Fetch from remote' aria-label='Fetch'>
                         <RefreshCw className='h-3 w-3' />
                     </Button>
                 </div>
 
                 {/* Repository name */}
-                <span className='text-muted-foreground max-w-[200px] truncate'>{activeRepo.split('/').pop()}</span>
+                <span className='max-w-[200px] truncate text-muted-foreground' title={activeRepo}>
+                    {activeRepo.split('/').pop()}
+                </span>
             </div>
         </div>
     );
