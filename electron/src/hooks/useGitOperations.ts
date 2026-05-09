@@ -86,6 +86,10 @@ interface CherryPickVariables {
     noCommit?: boolean | undefined;
 }
 
+interface CommitBatchVariables {
+    commitHashes: string[];
+}
+
 interface RevertVariables {
     commitHash: string;
     noCommit?: boolean | undefined;
@@ -632,6 +636,54 @@ export function useGitOperations() {
         },
     });
 
+    const squashCommits = trpc.git.squashCommits.useMutation({
+        onSuccess: (result: MutationResultShape, variables: CommitBatchVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Squash failed', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'rebase',
+                description: `Squashed ${String(variables.commitHashes.length)} commits`,
+                details: variables.commitHashes.join(', '),
+                gitCommands: ['git rebase -i'],
+                affectedBranches: currentBranch ? [currentBranch] : [],
+                affectedCommits: variables.commitHashes,
+                status: 'success',
+            });
+            toast.success('Commits squashed');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Squash failed', error.message);
+        },
+    });
+
+    const dropCommits = trpc.git.dropCommits.useMutation({
+        onSuccess: (result: MutationResultShape, variables: CommitBatchVariables) => {
+            const error = getMutationError(result);
+            if (error) {
+                notifyOperationError('Drop failed', error);
+                return;
+            }
+            void safeInvalidateRepositoryData();
+            logOperation({
+                type: 'rebase',
+                description: `Dropped ${String(variables.commitHashes.length)} commits`,
+                details: variables.commitHashes.join(', '),
+                gitCommands: ['git rebase -i'],
+                affectedBranches: currentBranch ? [currentBranch] : [],
+                affectedCommits: variables.commitHashes,
+                status: 'success',
+            });
+            toast.success('Commits dropped');
+        },
+        onError: (error: MutationErrorShape) => {
+            notifyOperationError('Drop failed', error.message);
+        },
+    });
+
     const revert = trpc.git.revert.useMutation({
         onSuccess: (result: MutationResultShape, variables: RevertVariables) => {
             const error = getMutationError(result);
@@ -1163,6 +1215,32 @@ export function useGitOperations() {
         [activeRepo, cherryPick, runTrackedOperation]
     );
 
+    const handleSquashCommits = useCallback(
+        async (commitHashes: string[]) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Squashing ${String(commitHashes.length)} commits`, () =>
+                squashCommits.mutateAsync({
+                    repo: activeRepo,
+                    commitHashes,
+                })
+            );
+        },
+        [activeRepo, runTrackedOperation, squashCommits]
+    );
+
+    const handleDropCommits = useCallback(
+        async (commitHashes: string[]) => {
+            if (!activeRepo) return { error: 'No active repository' };
+            return runTrackedOperation(`Dropping ${String(commitHashes.length)} commits`, () =>
+                dropCommits.mutateAsync({
+                    repo: activeRepo,
+                    commitHashes,
+                })
+            );
+        },
+        [activeRepo, dropCommits, runTrackedOperation]
+    );
+
     const handleRevert = useCallback(
         async (commitHash: string, noCommit?: boolean) => {
             if (!activeRepo) return { error: 'No active repository' };
@@ -1546,6 +1624,8 @@ export function useGitOperations() {
             merge.isPending ||
             rebase.isPending ||
             cherryPick.isPending ||
+            squashCommits.isPending ||
+            dropCommits.isPending ||
             revert.isPending ||
             commit.isPending ||
             stage.isPending ||
@@ -1587,6 +1667,8 @@ export function useGitOperations() {
         merge: handleMerge,
         rebase: handleRebase,
         cherryPick: handleCherryPick,
+        squashCommits: handleSquashCommits,
+        dropCommits: handleDropCommits,
         revert: handleRevert,
         commit: handleCommit,
         stage: handleStage,

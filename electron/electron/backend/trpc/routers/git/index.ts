@@ -147,6 +147,69 @@ async function runRebaseCommandWithOptionalTodos(args: string[], repo: string, t
     return gitService.runGitCommand(args, repo);
 }
 
+async function commitHasParent(repo: string, commitHash: string): Promise<boolean> {
+    const error = await getGitService().runGitCommand(['cat-file', '-e', `${commitHash}^`], repo);
+    return !error;
+}
+
+async function getCommitSubject(repo: string, commitHash: string): Promise<string> {
+    const output = await getGitService().runGitCommandWithOutput(['show', '-s', '--format=%s', commitHash], repo);
+    return (output ?? '').trim().replace(/\s+/g, ' ');
+}
+
+async function buildSelectedCommitRebaseTodo(
+    repo: string,
+    commitHashes: string[],
+    selectedAction: 'drop' | 'fixup'
+): Promise<{ args: string[]; todos: string; error: string | null }> {
+    const selected = new Set(commitHashes.map((hash) => hash.trim()).filter(Boolean));
+    if (selected.size === 0) {
+        return { args: [], todos: '', error: 'Select at least one commit.' };
+    }
+
+    const revListOutput = await getGitService().runGitCommandWithOutput(['rev-list', '--reverse', 'HEAD'], repo);
+    const headCommits = (revListOutput ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
+    const selectedIndices = headCommits
+        .map((hash, index) => (selected.has(hash) ? index : -1))
+        .filter((index) => index >= 0);
+
+    if (selectedIndices.length !== selected.size) {
+        return { args: [], todos: '', error: 'All selected commits must be reachable from HEAD.' };
+    }
+
+    const firstSelectedIndex = selectedIndices[0] ?? -1;
+    const selectedCommitsAreContiguous =
+        selectedIndices.every((index, offset) => index === firstSelectedIndex + offset);
+
+    if (selectedAction === 'fixup' && !selectedCommitsAreContiguous) {
+        return { args: [], todos: '', error: 'Select contiguous commits to squash them together.' };
+    }
+
+    const oldestSelected = headCommits[firstSelectedIndex];
+    if (!oldestSelected) {
+        return { args: [], todos: '', error: 'Unable to resolve selected commits.' };
+    }
+
+    const todoCommits = headCommits.slice(firstSelectedIndex);
+    const todoLines = await Promise.all(
+        todoCommits.map(async (hash) => {
+            const subject = await getCommitSubject(repo, hash);
+            if (selected.has(hash)) {
+                if (selectedAction === 'drop') {
+                    return `drop ${hash} ${subject}`;
+                }
+                return hash === oldestSelected ? `pick ${hash} ${subject}` : `fixup ${hash} ${subject}`;
+            }
+            return `pick ${hash} ${subject}`;
+        })
+    );
+
+    const hasParent = await commitHasParent(repo, oldestSelected);
+    const args = hasParent ? ['rebase', '-i', `${oldestSelected}^`] : ['rebase', '-i', '--root'];
+
+    return { args, todos: todoLines.join('\n'), error: null };
+}
+
 async function getGitDir(repo: string): Promise<string | null> {
     const output = await getGitService().runGitCommandWithOutput(['rev-parse', '--git-dir'], repo);
     const gitDir = output?.trim();
@@ -2656,6 +2719,48 @@ export const gitRouter = router({
         }),
 
     /**
+     * Squash selected contiguous commits on the current branch.
+     */
+    squashCommits: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                commitHashes: z.array(z.string()).min(1),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            const plan = await buildSelectedCommitRebaseTodo(input.repo, input.commitHashes, 'fixup');
+            if (plan.error) return { error: plan.error };
+
+            const error = await runRebaseCommandWithOptionalTodos(plan.args, input.repo, plan.todos);
+            return { error };
+        }),
+
+    /**
+     * Drop selected commits from the current branch history.
+     */
+    dropCommits: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                commitHashes: z.array(z.string()).min(1),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { error: initError };
+
+            const plan = await buildSelectedCommitRebaseTodo(input.repo, input.commitHashes, 'drop');
+            if (plan.error) return { error: plan.error };
+
+            const error = await runRebaseCommandWithOptionalTodos(plan.args, input.repo, plan.todos);
+            return { error };
+        }),
+
+    /**
      * Revert a commit.
      */
     revert: publicProcedure
@@ -4064,11 +4169,15 @@ export const gitRouter = router({
                             branch: branchName ?? '',
                             commit: record.headSha ?? '',
                             isMain,
+                            isCurrent: path.resolve(record.path) === path.resolve(input.repo),
+                            isLocked: record.locked,
+                            isPrunable: record.prunable,
                             locked: record.locked,
                             lockReason: record.lockReason,
                             detached: record.detached || !branchName,
                             prunable: record.prunable,
                             bare: record.bare,
+                            head: branchName ?? record.headSha ?? null,
                             headRef: branchName,
                             headSha: record.headSha,
                             branchUpstream: upstream,
