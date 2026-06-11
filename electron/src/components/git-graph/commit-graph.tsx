@@ -31,7 +31,6 @@ interface CommitGraphProps {
     showAvatars?: boolean;
     visibleStartIndex?: number;
     visibleEndIndex?: number;
-    scrollOffset?: number;
 }
 
 export function CommitGraph({
@@ -46,7 +45,6 @@ export function CommitGraph({
     showAvatars = false,
     visibleStartIndex,
     visibleEndIndex,
-    scrollOffset = 0,
 }: CommitGraphProps) {
     const VIEW_BUFFER_ROWS = 160;
 
@@ -67,6 +65,7 @@ export function CommitGraph({
 
         const minVisibleIndex = Math.max(0, (visibleStartIndex ?? 0) - VIEW_BUFFER_ROWS);
         const maxVisibleIndex = (visibleEndIndex ?? layout.vertices.length) + VIEW_BUFFER_ROWS;
+        const windowOffset = (visibleStartIndex ?? 0) * rowHeight;
 
         for (const line of layout.lines) {
             const maxIndex = Math.max(line.p1.y, line.p2.y);
@@ -76,9 +75,9 @@ export function CommitGraph({
             }
 
             const x1 = line.p1.x * config.grid.x + config.grid.offsetX;
-            const y1 = line.p1.y * config.grid.y + centerY - scrollOffset;
+            const y1 = line.p1.y * config.grid.y + centerY - windowOffset;
             const x2 = line.p2.x * config.grid.x + config.grid.offsetX;
-            const y2 = line.p2.y * config.grid.y + centerY - scrollOffset;
+            const y2 = line.p2.y * config.grid.y + centerY - windowOffset;
 
             // Adjust for expanded commit
             const adjustedY1 = expandedIndex > -1 && line.p1.y > expandedIndex ? y1 + config.grid.expandY : y1;
@@ -114,7 +113,7 @@ export function CommitGraph({
                     v.id * config.grid.y +
                     centerY +
                     (expandedIndex > -1 && v.id > expandedIndex ? config.grid.expandY : 0) -
-                    scrollOffset,
+                    windowOffset,
                 colour: config.colours[v.colour % config.colours.length] ?? '#808080',
                 isCommitted: v.isCommitted,
                 isCurrent: v.isCurrent,
@@ -122,7 +121,7 @@ export function CommitGraph({
             }));
 
         return { paths, vertices };
-    }, [layout, config, expandedIndex, selectedIndex, scrollOffset, visibleStartIndex, visibleEndIndex]);
+    }, [layout, config, expandedIndex, selectedIndex, visibleStartIndex, visibleEndIndex]);
 
     if (!layout) return null;
 
@@ -189,8 +188,12 @@ export function CommitGraph({
                                         }
                                         onVertexClick(v.id);
                                     }}
-                                    onMouseEnter={() => { onVertexHover(v.id); }}
-                                    onMouseLeave={() => { onVertexHover(null); }}>
+                                    onMouseEnter={() => {
+                                        onVertexHover(v.id);
+                                    }}
+                                    onMouseLeave={() => {
+                                        onVertexHover(null);
+                                    }}>
                                     {/* Small colored circle underneath */}
                                     <circle cx={v.cx} cy={v.cy} r={avatarRadius + 1} fill={v.colour} />
                                     {/* White background for avatar */}
@@ -250,8 +253,12 @@ export function CommitGraph({
                                                 }
                                                 onVertexClick(v.id);
                                             }}
-                                            onMouseEnter={() => { onVertexHover(v.id); }}
-                                            onMouseLeave={() => { onVertexHover(null); }}
+                                            onMouseEnter={() => {
+                                                onVertexHover(v.id);
+                                            }}
+                                            onMouseLeave={() => {
+                                                onVertexHover(null);
+                                            }}
                                         />
                                     ) : (
                                         <circle
@@ -270,8 +277,12 @@ export function CommitGraph({
                                                 }
                                                 onVertexClick(v.id);
                                             }}
-                                            onMouseEnter={() => { onVertexHover(v.id); }}
-                                            onMouseLeave={() => { onVertexHover(null); }}
+                                            onMouseEnter={() => {
+                                                onVertexHover(v.id);
+                                            }}
+                                            onMouseLeave={() => {
+                                                onVertexHover(null);
+                                            }}
                                         />
                                     )}
                                     {v.isStash && !v.isCurrent && (

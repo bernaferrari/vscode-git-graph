@@ -3,29 +3,20 @@
  * GitKraken-style Git visualization
  */
 
-import {
-    Loader2,
-    GitBranch,
-    Tag,
-    GitCommit,
-    X,
-    ArrowUp,
-    ArrowDown,
-    Activity,
-    Copy,
-} from 'lucide-react';
+import { Loader2, GitBranch, Tag, GitCommit, X, ArrowUp, ArrowDown, Activity, Copy } from 'lucide-react';
 import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef, startTransition } from 'react';
 import { toast } from 'sonner';
 
 import { BranchDropdown } from './branch-dropdown';
 import { CommitContextMenuOverlay } from './commit-context-menu-overlay';
+import { CommitDotQuickActions } from './commit-dot-quick-actions';
 import { CommitFiltersDialog } from './commit-filters-dialog';
 import { CommitGraph } from './commit-graph';
 import { CommitGraphLegend } from './commit-graph-legend';
+import { CommitMultiSelectBar } from './commit-multi-select-bar';
 import { DragCommitHandler } from './drag-commit-to-branch';
 import { DragDropCherryPick } from './drag-drop-cherry-pick';
 import { CommitListSkeleton, GraphSkeleton, ErrorState } from './empty-states';
-import { ToolsMenu } from './tools-menu';
 import { GitGraphCommitActionDialogs } from './git-graph-commit-action-dialogs';
 import { GitGraphFeatureDialogs } from './git-graph-feature-dialogs';
 import { GitGraphShellOverlays } from './git-graph-shell-overlays';
@@ -39,11 +30,9 @@ import { QuickActionsToolbar } from './quick-actions-toolbar';
 import { QuickLookPanel, useQuickLookKeyboard } from './quick-look';
 import { RepoBranchSwitcher } from './repo-branch-switcher';
 import { SidePanel } from './side-panel';
-import { CommitDotQuickActions } from './commit-dot-quick-actions';
-import { CommitMultiSelectBar } from './commit-multi-select-bar';
+import { ToolsMenu } from './tools-menu';
 import { UndoStackProvider } from './undo-stack-provider';
 import { UndoToastHost } from './undo-toast-host';
-import { OutcomePickerProvider, useOutcomePicker } from '@/components/outcome-preview/useOutcomePicker';
 import { useCollaborationPresence } from './use-collaboration-presence';
 import { useCollaborationRealtime } from './use-collaboration-realtime';
 import { useCommandPaletteActions } from './use-command-palette-actions';
@@ -57,6 +46,7 @@ import { VirtualizedCommitList } from './virtualized-commit-list';
 import { useActionPreview, type ActionPreview } from '@/components/action-preview';
 import { LensSwitcher, useLensMode } from '@/components/lens';
 import { useLensOnboarding } from '@/components/lens/LensOnboarding';
+import { OutcomePickerProvider, useOutcomePicker } from '@/components/outcome-preview/useOutcomePicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -332,9 +322,9 @@ export function GitGraph() {
     const [branchSearch, setBranchSearch] = useState('');
     const [visibleStartIndex, setVisibleStartIndex] = useState(0);
     const [visibleEndIndex, setVisibleEndIndex] = useState(120);
-    const [commitListScrollOffset, setCommitListScrollOffset] = useState(0);
     const visibleRangeRef = useRef({ start: 0, end: 120 });
     const scrollOffsetRef = useRef(0);
+    const graphViewportRef = useRef<HTMLDivElement>(null);
 
     // New feature states
     const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
@@ -436,7 +426,9 @@ export function GitGraph() {
     // Settings hook
     const { settings } = useSettings();
     const showPerfDebug = settings.telemetryEnabled;
-    const onboardingStateQuery = trpc.config.onboardingState.useQuery(undefined, { staleTime: 10_000 });
+    const onboardingStateQuery = trpc.config.onboardingState.useQuery(undefined, {
+        staleTime: 10_000,
+    });
     const repoList = trpc.repo.list.useQuery(undefined, { staleTime: 10_000 }).data as
         | { repos?: HomeStartRepoEntry[] }
         | undefined;
@@ -503,7 +495,7 @@ export function GitGraph() {
             | undefined;
         return {
             ...DEFAULT_RELEASE_FEATURE_FLAGS,
-            ...(ui?.featureFlags ?? {}),
+            ...ui?.featureFlags,
         };
     }, [configAllQuery.data?.ui]);
 
@@ -665,7 +657,7 @@ export function GitGraph() {
                                         gitUtils.git.commits.invalidate(),
                                         gitUtils.git.repoInfo.invalidate(),
                                         gitUtils.git.workingDirectoryStatus.invalidate({ repo: activeRepo }),
-                                    // eslint-disable-next-line @typescript-eslint/use-unknown-in-catch-callback-variable
+                                        // eslint-disable-next-line @typescript-eslint/use-unknown-in-catch-callback-variable
                                     ]).catch((error) => {
                                         console.error('[git-graph] Failed to invalidate conflict state:', error);
                                     });
@@ -742,7 +734,10 @@ export function GitGraph() {
         author: string;
         email?: string;
     } | null>(null);
-    const [commitDotQuickPosition, setCommitDotQuickPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [commitDotQuickPosition, setCommitDotQuickPosition] = useState<{ x: number; y: number }>({
+        x: 0,
+        y: 0,
+    });
     useCollaborationPresence(activeRepo, repoInfo?.head ?? null);
     useCollaborationRealtime();
     const { data: workingTreeStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -768,7 +763,11 @@ export function GitGraph() {
             hideRemotes: [],
             includePerf: showPerfDebug,
         },
-        { enabled: !!activeRepo && !!commitsData?.refsDeferred, staleTime: 5000, refetchOnWindowFocus: false }
+        {
+            enabled: !!activeRepo && !!commitsData?.refsDeferred,
+            staleTime: 5000,
+            refetchOnWindowFocus: false,
+        }
     );
     const { mutateAsync: revealInFinder } = trpc.system.revealInFinder.useMutation();
     const { mutateAsync: openTerminalInRepo } = trpc.system.openTerminal.useMutation();
@@ -887,9 +886,7 @@ export function GitGraph() {
         commitsPerfTrend.level === 'regressed' ||
         refsPerfTrend.level === 'regressed';
     const hasPerfWatch =
-        repoInfoPerfTrend.level === 'watch' ||
-        commitsPerfTrend.level === 'watch' ||
-        refsPerfTrend.level === 'watch';
+        repoInfoPerfTrend.level === 'watch' || commitsPerfTrend.level === 'watch' || refsPerfTrend.level === 'watch';
 
     const formatPerfMs = useCallback((value: number | null | undefined) => {
         if (value === null || value === undefined || Number.isNaN(value)) {
@@ -1015,9 +1012,15 @@ export function GitGraph() {
         }
 
         const refs = refsData as RefTips;
-        refs.heads.forEach((head) => { append(headsByHash, head.hash, head.name); });
-        refs.tags.forEach((tag) => { append(tagsByHash, tag.hash, tag.name); });
-        refs.remotes.forEach((remote) => { append(remotesByHash, remote.hash, remote.name); });
+        refs.heads.forEach((head) => {
+            append(headsByHash, head.hash, head.name);
+        });
+        refs.tags.forEach((tag) => {
+            append(tagsByHash, tag.hash, tag.name);
+        });
+        refs.remotes.forEach((remote) => {
+            append(remotesByHash, remote.hash, remote.name);
+        });
 
         return {
             headsByHash,
@@ -1167,7 +1170,7 @@ export function GitGraph() {
                         // Seed the set with the currently-selected commit so the
                         // user's first cmd-click extends to two, not collapses to one.
                         if (next.size === 0 && selectedCommitIndex !== null) {
-                            const anchor = commitsData?.commits[selectedCommitIndex];
+                            const anchor = commitsData.commits[selectedCommitIndex];
                             if (anchor && anchor.hash !== commit.hash) {
                                 next.add(anchor.hash);
                             }
@@ -1183,7 +1186,7 @@ export function GitGraph() {
             }
 
             // Shift-click: extend a contiguous range from the anchor.
-            if (modifiers?.shift && lastSelectionAnchor !== null && commitsData?.commits) {
+            if (modifiers?.shift && lastSelectionAnchor !== null) {
                 const a = Math.min(lastSelectionAnchor, index);
                 const b = Math.max(lastSelectionAnchor, index);
                 const range = commitsData.commits.slice(a, b + 1);
@@ -1236,9 +1239,13 @@ export function GitGraph() {
                 orderedSelection.push({ hash: c.hash, message: c.message });
             }
         });
+        const firstIndex = indices[0];
+        const lastIndex = indices[indices.length - 1];
         const contiguous =
             indices.length > 1 &&
-            indices[indices.length - 1]! - indices[0]! === indices.length - 1;
+            firstIndex !== undefined &&
+            lastIndex !== undefined &&
+            lastIndex - firstIndex === indices.length - 1;
         return { commits: orderedSelection, contiguous };
     }, [multiSelectedHashes, commitsData]);
 
@@ -1384,7 +1391,9 @@ export function GitGraph() {
             lastHandledLink = link;
             const resolved = await gitUtils.app.deeplink.resolve.fetch({ link });
             if (!resolved.valid || !resolved.target) {
-                toast.error('Invalid deep link', { description: resolved.error ?? 'Unable to parse deep link.' });
+                toast.error('Invalid deep link', {
+                    description: resolved.error ?? 'Unable to parse deep link.',
+                });
                 return;
             }
 
@@ -1467,9 +1476,12 @@ export function GitGraph() {
         [baselineInitialMaxCommits]
     );
 
-    const handleCreateBranchFromHash = useCallback((hash: string) => {
-        commitActionController.openCreateBranch(hash);
-    }, [commitActionController]);
+    const handleCreateBranchFromHash = useCallback(
+        (hash: string) => {
+            commitActionController.openCreateBranch(hash);
+        },
+        [commitActionController]
+    );
 
     const handleOpenInFinder = useCallback(() => {
         if (!activeRepo) {
@@ -1736,7 +1748,9 @@ export function GitGraph() {
         };
 
         window.addEventListener('keydown', handleKeyDown);
-        return () => { window.removeEventListener('keydown', handleKeyDown); };
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
     }, [
         handleRefreshAll,
         commitsData?.commits.length,
@@ -1763,40 +1777,56 @@ export function GitGraph() {
         await openRepositoryDialog('Open Repository');
     };
 
-    const handleVisibleRangeChange = useCallback((start: number, end: number) => {
-        const prev = visibleRangeRef.current;
-        if (prev.start === start && prev.end === end) {
-            return;
-        }
-        visibleRangeRef.current = { start, end };
-        setVisibleStartIndex(start);
-        setVisibleEndIndex(end);
+    const syncGraphScrollTransform = useCallback(() => {
+        const graphViewport = graphViewportRef.current;
+        if (!graphViewport) return;
+
+        const coarseOffset = visibleRangeRef.current.start * GRAPH_CONFIG.grid.y;
+        const residualOffset = scrollOffsetRef.current - coarseOffset;
+        graphViewport.style.transform = `translate3d(0, ${String(-residualOffset)}px, 0)`;
     }, []);
 
-    const handleCommitListScrollOffsetChange = useCallback((offset: number) => {
-        if (Math.abs(scrollOffsetRef.current - offset) < 1) {
-            return;
-        }
-        scrollOffsetRef.current = offset;
-        setCommitListScrollOffset(offset);
-    }, []);
+    const handleVisibleRangeChange = useCallback(
+        (start: number, end: number) => {
+            const prev = visibleRangeRef.current;
+            if (prev.start === start && prev.end === end) {
+                return;
+            }
+            visibleRangeRef.current = { start, end };
+            syncGraphScrollTransform();
+            setVisibleStartIndex(start);
+            setVisibleEndIndex(end);
+        },
+        [syncGraphScrollTransform]
+    );
+
+    const handleCommitListScrollOffsetChange = useCallback(
+        (offset: number) => {
+            if (Math.abs(scrollOffsetRef.current - offset) < 1) {
+                return;
+            }
+            scrollOffsetRef.current = offset;
+            syncGraphScrollTransform();
+        },
+        [syncGraphScrollTransform]
+    );
 
     useEffect(() => {
         visibleRangeRef.current = { start: 0, end: 120 };
         scrollOffsetRef.current = 0;
+        syncGraphScrollTransform();
         startTransition(() => {
             setSelectedBranches(['__all__']);
-        setCommitFilters({});
-        setMaxCommits(baselineInitialMaxCommits);
-        setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-        setExpandedCommit(null);
-        setSelectedCommitIndex(null);
-        commitActionController.setTargetCommit('');
-        setVisibleStartIndex(0);
-        setVisibleEndIndex(120);
-        setCommitListScrollOffset(0);
-    });
-    }, [activeRepo, baselineInitialMaxCommits, commitActionController]);
+            setCommitFilters({});
+            setMaxCommits(baselineInitialMaxCommits);
+            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+            setExpandedCommit(null);
+            setSelectedCommitIndex(null);
+            commitActionController.setTargetCommit('');
+            setVisibleStartIndex(0);
+            setVisibleEndIndex(120);
+        });
+    }, [activeRepo, baselineInitialMaxCommits, commitActionController, syncGraphScrollTransform]);
 
     useEffect(() => {
         if (!activeRepo) {
@@ -1837,18 +1867,22 @@ export function GitGraph() {
         return (
             <div className='flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8'>
                 <div className='mx-auto flex w-full justify-center'>
-                        <HomeStartSurface
-                            mode='hero'
+                    <HomeStartSurface
+                        mode='hero'
                         title='Open a repository.'
                         description='Pick a folder. Git Graph will open on the commit graph with your changes, branches, and sync state ready.'
                         primaryActionLabel='Open Repository'
                         primaryActionBusyLabel='Opening…'
                         isPrimaryActionBusy={isRepoLoading}
-                        onPrimaryAction={() => { void handleOpenRepo(); }}
+                        onPrimaryAction={() => {
+                            void handleOpenRepo();
+                        }}
                         secondaryActionLabel='Clone Repository'
                         secondaryActionBusyLabel='Opening clone flow…'
                         isSecondaryActionBusy={isRepoBusy && cloneDialogOpen}
-                        onSecondaryAction={() => { setCloneDialogOpen(true); }}
+                        onSecondaryAction={() => {
+                            setCloneDialogOpen(true);
+                        }}
                         recentRepos={recentRepoEntries}
                         openedRepos={openedRepoEntries}
                         activeRepoPath={activeRepo}
@@ -2014,8 +2048,7 @@ export function GitGraph() {
         <UndoStackProvider>
             <OutcomePickerProvider
                 handlers={{
-                    merge: async (branch, options) =>
-                        gitOps.merge(branch, options),
+                    merge: async (branch, options) => gitOps.merge(branch, options),
                     rebase: async (onto, interactive) => {
                         await gitOps.rebase(onto, interactive);
                     },
@@ -2032,937 +2065,1052 @@ export function GitGraph() {
                         await gitOps.dropCommits(commitHashes);
                     },
                 }}>
-            <OutcomePickerBridge
-                currentHead={currentHead}
-                onReady={(handler) => {
-                    bringInBranchHandlerRef.current = handler;
-                }}
-            />
-            <UndoToastHost />
-            <TooltipProvider>
-                <div className='flex h-full flex-1 flex-col overflow-hidden'>
-                    {/* Top Toolbar */}
-                    <GitGraphToolbar
-                        isGuided={isGuided}
-                        hasFilters={Boolean(
-                            commitFilters.author ||
+                <OutcomePickerBridge
+                    currentHead={currentHead}
+                    onReady={(handler) => {
+                        bringInBranchHandlerRef.current = handler;
+                    }}
+                />
+                <UndoToastHost />
+                <TooltipProvider>
+                    <div className='flex h-full flex-1 flex-col overflow-hidden'>
+                        {/* Top Toolbar */}
+                        <GitGraphToolbar
+                            isGuided={isGuided}
+                            hasFilters={Boolean(
+                                commitFilters.author ||
                                 commitFilters.search ||
                                 commitFilters.dateFrom ||
                                 commitFilters.dateTo ||
                                 commitFilters.filePath
-                        )}
-                        pinnedCommitCount={pinnedCommits.length}
-                        leftSlots={
-                            <RepoBranchSwitcher
-                                repoLabel={activeRepo.split('/').pop() ?? activeRepo}
-                                currentHead={currentHead}
-                                branchMenuOpen={branchMenuOpen}
-                                onBranchMenuOpenChange={setBranchMenuOpen}
-                                branchSearch={branchSearch}
-                                onBranchSearchChange={setBranchSearch}
-                                onBranchSearchSubmit={() => {
-                                    const firstResult = branchResults[0];
-                                    if (firstResult) {
-                                        handleCheckoutBranch(firstResult);
-                                    }
-                                }}
-                                filteredLocalBranches={filteredLocalBranches}
-                                filteredRemoteBranches={filteredRemoteBranches}
-                                branchResultsEmpty={branchResults.length === 0}
-                                onCheckoutBranch={handleCheckoutBranch}
-                            />
-                        }
-                        branchFilter={
-                            <BranchDropdown
-                                branches={branchOptions}
-                                selectedBranches={selectedBranches}
-                                multiple
-                                onChange={handleSelectedBranchesChange}
-                            />
-                        }
-                        lensSwitcher={<LensSwitcher variant='toolbar' showLabel={false} />}
-                        profileSwitcher={
-                            <Suspense fallback={<div className='h-8 w-8' />}>
-                                <ProfileSwitcher />
-                            </Suspense>
-                        }
-                        operationTimeline={
-                            <Suspense fallback={<div className='h-8 w-8' />}>
-                                <OperationTimeline />
-                            </Suspense>
-                        }
-                        stackedBranches={
-                            <Suspense fallback={<div className='h-8 w-8' />}>
-                                <StackedBranchesPanel enableGraphiteInterop={featureFlags.graphiteInterop} />
-                            </Suspense>
-                        }
-                        overflowMenu={
-                            <OverflowMenu
-                                featureFlags={featureFlags}
-                                inlineBlameEnabled={inlineBlameEnabled}
-                                onOpenInTerminal={handleOpenInTerminal}
-                                onOpenInFinder={handleOpenInFinder}
-                                onClone={() => { setCloneDialogOpen(true); }}
-                                onQuickSwitch={() => { setFuzzyFinderOpen(true); }}
-                                onFilterCommits={() => { setShowFiltersDialog(true); }}
-                                onLineStaging={() => { commandPaletteActions.onLineStaging?.(); }}
-                                onToggleTerminal={() => { setTerminalOpen(!terminalOpen); }}
-                                onStatistics={() => { setStatisticsOpen(true); }}
-                                onManageRemotes={() => { setRemoteManageOpen(true); }}
-                                onCompareBranches={() => { setBranchCompareOpen(true); }}
-                                onHooks={() => { setHooksManageOpen(true); }}
-                                onCommitSigning={() => { setCommitSigningOpen(true); }}
-                                onReflog={() => { setReflogOpen(true); }}
-                                onTemplates={() => { setTemplatesOpen(true); }}
-                                onGitignore={() => { setGitignoreOpen(true); }}
-                                onCustomCommands={() => { setCustomCommandsOpen(true); }}
-                                onSearchCommits={() => { setSearchCommitsOpen(true); }}
-                                onLfs={() => { setLfsOpen(true); }}
-                                onToggleInlineBlame={() => { setInlineBlameEnabled(!inlineBlameEnabled); }}
-                                onPullRequests={() => { setPrIntegrationOpen(true); }}
-                                onWorktrees={() => { setWorktreeOpen(true); }}
-                                onWorkflows={() => { setWorkflowOpen(true); }}
-                                onSubmodules={() => { setSubmoduleOpen(true); }}
-                                onRecentRepos={() => { setRecentReposOpen(true); }}
-                                onWorkspaces={() => { setWorkspacesOpen(true); }}
-                                onKeyboardHelp={() => { setKeyboardHelpOpen(true); }}
-                                onRestartOnboarding={restartOnboarding}
-                                onStashes={() => { setStashManageOpen(true); }}
-                                onGraphLegend={() => { setGraphLegendOpen(true); }}
-                                onGitFlow={() => { setGitFlowOpen(true); }}
-                                onHealthCheck={() => { setHealthCheckOpen(true); }}
-                                onBisect={() => { setBisectOpen(true); }}
-                                onUndoStack={() => { setUndoStackOpen(true); }}
-                                onConfigEditor={() => { setConfigEditorOpen(true); }}
-                                onExternalDiff={() => { setExternalDiffOpen(true); }}
-                                onIssueTracker={() => { setIssueTrackerOpen(true); }}
-                                onBulkOps={() => { setBulkOpsOpen(true); }}
-                                onFileAnnotations={() => { setFileAnnotationsOpen(true); }}
-                                onActivityHeatmap={() => { setActivityHeatmapOpen(true); }}
-                                onSettings={() => { openSettingsAt('general'); }}
-                                onDiagnostics={() => { openSettingsAt('integrations', 'diagnostics'); }}
-                                onCommandPalette={() => { setCommandPaletteOpen(true); }}
-                                onUndoLastCommit={() => { void gitOps.undoLastCommit(); }}
-                            />
-                        }
-                        notifications={
-                            <>
-                                <ToolsMenu
-                                    worktreeCount={featureHubData.worktreeCount}
-                                    worktreeAttentionCount={featureHubData.worktreeAttentionCount}
-                                    workflowCount={featureHubData.workflowCount}
-                                    workflowFailureCount={featureHubData.workflowFailureCount}
-                                    auditCount={featureHubData.auditCount}
-                                    protocolRegistered={featureHubData.protocolRegistered}
-                                    collaborationSummary={featureHubData.collaborationSummary}
-                                    prSummary={featureHubData.prSummary}
-                                    repoPolicy={featureHubData.repoPolicy}
-                                    onOpenWorktrees={() => {
-                                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                        if (featureFlags.worktreePro) {
-                                            setWorktreeOpen(true);
-                                            return;
+                            )}
+                            pinnedCommitCount={pinnedCommits.length}
+                            leftSlots={
+                                <RepoBranchSwitcher
+                                    repoLabel={activeRepo.split('/').pop() ?? activeRepo}
+                                    currentHead={currentHead}
+                                    branchMenuOpen={branchMenuOpen}
+                                    onBranchMenuOpenChange={setBranchMenuOpen}
+                                    branchSearch={branchSearch}
+                                    onBranchSearchChange={setBranchSearch}
+                                    onBranchSearchSubmit={() => {
+                                        const firstResult = branchResults[0];
+                                        if (firstResult) {
+                                            handleCheckoutBranch(firstResult);
                                         }
-                                        openSettingsAt('integrations');
                                     }}
-                                    onOpenWorkflows={() => {
-                                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                        if (featureFlags.workflowEngine) {
-                                            setWorkflowOpen(true);
-                                            return;
-                                        }
-                                        openSettingsAt('integrations');
+                                    filteredLocalBranches={filteredLocalBranches}
+                                    filteredRemoteBranches={filteredRemoteBranches}
+                                    branchResultsEmpty={branchResults.length === 0}
+                                    onCheckoutBranch={handleCheckoutBranch}
+                                />
+                            }
+                            branchFilter={
+                                <BranchDropdown
+                                    branches={branchOptions}
+                                    selectedBranches={selectedBranches}
+                                    multiple
+                                    onChange={handleSelectedBranchesChange}
+                                />
+                            }
+                            lensSwitcher={<LensSwitcher variant='toolbar' showLabel={false} />}
+                            profileSwitcher={
+                                <Suspense fallback={<div className='h-8 w-8' />}>
+                                    <ProfileSwitcher />
+                                </Suspense>
+                            }
+                            operationTimeline={
+                                <Suspense fallback={<div className='h-8 w-8' />}>
+                                    <OperationTimeline />
+                                </Suspense>
+                            }
+                            stackedBranches={
+                                <Suspense fallback={<div className='h-8 w-8' />}>
+                                    <StackedBranchesPanel enableGraphiteInterop={featureFlags.graphiteInterop} />
+                                </Suspense>
+                            }
+                            overflowMenu={
+                                <OverflowMenu
+                                    featureFlags={featureFlags}
+                                    inlineBlameEnabled={inlineBlameEnabled}
+                                    onOpenInTerminal={handleOpenInTerminal}
+                                    onOpenInFinder={handleOpenInFinder}
+                                    onClone={() => {
+                                        setCloneDialogOpen(true);
                                     }}
-                                    onOpenPullRequests={() => {
+                                    onQuickSwitch={() => {
+                                        setFuzzyFinderOpen(true);
+                                    }}
+                                    onFilterCommits={() => {
+                                        setShowFiltersDialog(true);
+                                    }}
+                                    onLineStaging={() => {
+                                        commandPaletteActions.onLineStaging?.();
+                                    }}
+                                    onToggleTerminal={() => {
+                                        setTerminalOpen(!terminalOpen);
+                                    }}
+                                    onStatistics={() => {
+                                        setStatisticsOpen(true);
+                                    }}
+                                    onManageRemotes={() => {
+                                        setRemoteManageOpen(true);
+                                    }}
+                                    onCompareBranches={() => {
+                                        setBranchCompareOpen(true);
+                                    }}
+                                    onHooks={() => {
+                                        setHooksManageOpen(true);
+                                    }}
+                                    onCommitSigning={() => {
+                                        setCommitSigningOpen(true);
+                                    }}
+                                    onReflog={() => {
+                                        setReflogOpen(true);
+                                    }}
+                                    onTemplates={() => {
+                                        setTemplatesOpen(true);
+                                    }}
+                                    onGitignore={() => {
+                                        setGitignoreOpen(true);
+                                    }}
+                                    onCustomCommands={() => {
+                                        setCustomCommandsOpen(true);
+                                    }}
+                                    onSearchCommits={() => {
+                                        setSearchCommitsOpen(true);
+                                    }}
+                                    onLfs={() => {
+                                        setLfsOpen(true);
+                                    }}
+                                    onToggleInlineBlame={() => {
+                                        setInlineBlameEnabled(!inlineBlameEnabled);
+                                    }}
+                                    onPullRequests={() => {
                                         setPrIntegrationOpen(true);
                                     }}
-                                    onOpenCollaboration={() => {
-                                        setCollaborationOpen(true);
+                                    onWorktrees={() => {
+                                        setWorktreeOpen(true);
                                     }}
-                                    onOpenRepoPolicy={() => {
-                                        openSettingsAt('integrations', 'repo-policy');
+                                    onWorkflows={() => {
+                                        setWorkflowOpen(true);
                                     }}
-                                    onOpenDiagnostics={() => {
+                                    onSubmodules={() => {
+                                        setSubmoduleOpen(true);
+                                    }}
+                                    onRecentRepos={() => {
+                                        setRecentReposOpen(true);
+                                    }}
+                                    onWorkspaces={() => {
+                                        setWorkspacesOpen(true);
+                                    }}
+                                    onKeyboardHelp={() => {
+                                        setKeyboardHelpOpen(true);
+                                    }}
+                                    onRestartOnboarding={restartOnboarding}
+                                    onStashes={() => {
+                                        setStashManageOpen(true);
+                                    }}
+                                    onGraphLegend={() => {
+                                        setGraphLegendOpen(true);
+                                    }}
+                                    onGitFlow={() => {
+                                        setGitFlowOpen(true);
+                                    }}
+                                    onHealthCheck={() => {
+                                        setHealthCheckOpen(true);
+                                    }}
+                                    onBisect={() => {
+                                        setBisectOpen(true);
+                                    }}
+                                    onUndoStack={() => {
+                                        setUndoStackOpen(true);
+                                    }}
+                                    onConfigEditor={() => {
+                                        setConfigEditorOpen(true);
+                                    }}
+                                    onExternalDiff={() => {
+                                        setExternalDiffOpen(true);
+                                    }}
+                                    onIssueTracker={() => {
+                                        setIssueTrackerOpen(true);
+                                    }}
+                                    onBulkOps={() => {
+                                        setBulkOpsOpen(true);
+                                    }}
+                                    onFileAnnotations={() => {
+                                        setFileAnnotationsOpen(true);
+                                    }}
+                                    onActivityHeatmap={() => {
+                                        setActivityHeatmapOpen(true);
+                                    }}
+                                    onSettings={() => {
+                                        openSettingsAt('general');
+                                    }}
+                                    onDiagnostics={() => {
                                         openSettingsAt('integrations', 'diagnostics');
                                     }}
+                                    onCommandPalette={() => {
+                                        setCommandPaletteOpen(true);
+                                    }}
+                                    onUndoLastCommit={() => {
+                                        void gitOps.undoLastCommit();
+                                    }}
                                 />
-                                <NotificationCenter />
-                            </>
-                        }
-                        onSync={async () => {
-                            await gitOps.fetch();
-                            await gitOps.pull(currentHead, 'origin', false, false);
-                        }}
-                        onFetch={() => {
-                            void gitOps.fetch();
-                        }}
-                        onPush={() => {
-                            handlePreviewedPush(false);
-                        }}
-                        onForcePush={() => {
-                            handlePreviewedPush(true);
-                        }}
-                        onPull={() => {
-                            void gitOps.pull(currentHead, 'origin', false, false);
-                        }}
-                        onPullFfOnly={() => {
-                            void gitOps.pull(currentHead, 'origin', false, true);
-                        }}
-                        onCreateBranch={() => {
-                            commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
-                        }}
-                        onCreateTag={() => {
-                            commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
-                        }}
-                        onStash={() => {
-                            setStashManageOpen(true);
-                        }}
-                        onOpenWorkspaces={() => {
-                            setWorkspacesOpen(true);
-                        }}
-                        onClearFilters={() => {
-                            setCommitFilters({});
-                            setMaxCommits(baselineInitialMaxCommits);
-                            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-                        }}
-                        onFind={() => {
-                            setFindWidgetOpen(true);
-                        }}
-                        onRefresh={handleRefreshAll}
-                        onToggleSidePanel={() => {
-                            setShowSidePanel(!showSidePanel);
-                        }}
-                        onOpenPinnedCommits={() => {
-                            setPinnedCommitsOpen(true);
-                        }}
-                    />
-                    <QuickActionsToolbar className='border-border/60 border-t' />
+                            }
+                            notifications={
+                                <>
+                                    <ToolsMenu
+                                        worktreeCount={featureHubData.worktreeCount}
+                                        worktreeAttentionCount={featureHubData.worktreeAttentionCount}
+                                        workflowCount={featureHubData.workflowCount}
+                                        workflowFailureCount={featureHubData.workflowFailureCount}
+                                        auditCount={featureHubData.auditCount}
+                                        protocolRegistered={featureHubData.protocolRegistered}
+                                        collaborationSummary={featureHubData.collaborationSummary}
+                                        prSummary={featureHubData.prSummary}
+                                        repoPolicy={featureHubData.repoPolicy}
+                                        onOpenWorktrees={() => {
+                                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                            if (featureFlags.worktreePro) {
+                                                setWorktreeOpen(true);
+                                                return;
+                                            }
+                                            openSettingsAt('integrations');
+                                        }}
+                                        onOpenWorkflows={() => {
+                                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                            if (featureFlags.workflowEngine) {
+                                                setWorkflowOpen(true);
+                                                return;
+                                            }
+                                            openSettingsAt('integrations');
+                                        }}
+                                        onOpenPullRequests={() => {
+                                            setPrIntegrationOpen(true);
+                                        }}
+                                        onOpenCollaboration={() => {
+                                            setCollaborationOpen(true);
+                                        }}
+                                        onOpenRepoPolicy={() => {
+                                            openSettingsAt('integrations', 'repo-policy');
+                                        }}
+                                        onOpenDiagnostics={() => {
+                                            openSettingsAt('integrations', 'diagnostics');
+                                        }}
+                                    />
+                                    <NotificationCenter />
+                                </>
+                            }
+                            onSync={async () => {
+                                await gitOps.fetch();
+                                await gitOps.pull(currentHead, 'origin', false, false);
+                            }}
+                            onFetch={() => {
+                                void gitOps.fetch();
+                            }}
+                            onPush={() => {
+                                handlePreviewedPush(false);
+                            }}
+                            onForcePush={() => {
+                                handlePreviewedPush(true);
+                            }}
+                            onPull={() => {
+                                void gitOps.pull(currentHead, 'origin', false, false);
+                            }}
+                            onPullFfOnly={() => {
+                                void gitOps.pull(currentHead, 'origin', false, true);
+                            }}
+                            onCreateBranch={() => {
+                                commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
+                            }}
+                            onCreateTag={() => {
+                                commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
+                            }}
+                            onStash={() => {
+                                setStashManageOpen(true);
+                            }}
+                            onOpenWorkspaces={() => {
+                                setWorkspacesOpen(true);
+                            }}
+                            onClearFilters={() => {
+                                setCommitFilters({});
+                                setMaxCommits(baselineInitialMaxCommits);
+                                setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+                            }}
+                            onFind={() => {
+                                setFindWidgetOpen(true);
+                            }}
+                            onRefresh={handleRefreshAll}
+                            onToggleSidePanel={() => {
+                                setShowSidePanel(!showSidePanel);
+                            }}
+                            onOpenPinnedCommits={() => {
+                                setPinnedCommitsOpen(true);
+                            }}
+                        />
+                        <QuickActionsToolbar className='border-border/60 border-t' />
 
-                    {/* Find Widget */}
-                    {findWidgetOpen && (
-                        <Suspense fallback={<DialogLoadingFallback />}>
-                            <FindWidget
-                                open={findWidgetOpen}
-                                onClose={() => { setFindWidgetOpen(false); }}
-                                onFind={handleFind}
-                                onFindNext={handleFindNext}
-                                onFindPrevious={handleFindPrevious}
-                                currentIndex={findCurrentIndex}
-                                totalMatches={findMatches.length}
-                            />
-                        </Suspense>
-                    )}
-
-                    {/* Main Content */}
-                    <div className='flex min-w-0 flex-1 overflow-hidden'>
-                        {/* Side Panel - Branches/Tags/Stashes */}
-                        {showSidePanel && layoutMode === 'panel' && (
-                            <SidePanel
-                                onBranchSelect={handleBranchFilter}
-                                onCreateBranch={() => {
-                                    commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
-                                }}
-                                onCreateTag={() => {
-                                    commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
-                                }}
-                                onMergeBranch={(branch) => {
-                                    commitActionController.openMerge(branch);
-                                }}
-                                onBringInBranch={(branch) => {
-                                    bringInBranchHandlerRef.current?.(branch);
-                                }}
-                                onCreateWorktreeFromBranch={(branch) => {
-                                    setWorktreePrefillBranch(branch);
-                                    setWorktreeOpen(true);
-                                }}
-                                enableBranchPinning={featureFlags.branchPinning}
-                                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                {...(featureFlags.worktreePro
-                                    ? {
-                                          onOpenWorktrees: () => {
-                                              setWorktreeOpen(true);
-                                          },
-                                      }
-                                    : {})}
-                            />
+                        {/* Find Widget */}
+                        {findWidgetOpen && (
+                            <Suspense fallback={<DialogLoadingFallback />}>
+                                <FindWidget
+                                    open={findWidgetOpen}
+                                    onClose={() => {
+                                        setFindWidgetOpen(false);
+                                    }}
+                                    onFind={handleFind}
+                                    onFindNext={handleFindNext}
+                                    onFindPrevious={handleFindPrevious}
+                                    currentIndex={findCurrentIndex}
+                                    totalMatches={findMatches.length}
+                                />
+                            </Suspense>
                         )}
 
-                        {/* Graph and Commit List */}
-                        <div className='flex flex-1 flex-col overflow-hidden'>
-                            <div className='flex flex-1 overflow-hidden'>
-                                {commitsLoading && !hasCommitResponse ? (
-                                    // Loading skeleton
-                                    <div className='flex w-full'>
-                                        <div className='ui-commit-col w-28 shrink-0'>
-                                            {Array.from({ length: 15 }).map((_, i) => (
-                                                <div key={i} className='h-8 animate-pulse px-2'>
-                                                    <div className='bg-muted h-4 w-16 rounded' />
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className='shrink-0' style={{ width: 210 }}>
-                                            <GraphSkeleton />
-                                        </div>
-                                        <div className='flex-1'>
-                                            <CommitListSkeleton count={15} />
-                                        </div>
-                                    </div>
-                                ) : commitsData?.error ? (
-                                    // Error state
-                                    <ErrorState
-                                        title='Failed to load commits'
-                                        message={commitsData.error}
-                                        onRetry={handleRefreshAll}
-                                    />
-                                ) : (
-                                    <div className='relative h-full w-full overflow-hidden'>
-                                        {commitsFetching && hasCommitResponse && (
-                                            <div className='pointer-events-none absolute top-2 right-3 z-10'>
-                                                <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
-                                                    <Loader2 className='h-3 w-3 animate-spin' />
-                                                    <span>Refreshing graph…</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {hasPendingLayoutExpansion && (
-                                            <div className='pointer-events-none absolute top-10 right-3 z-10'>
-                                                <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
-                                                    {graphLayoutCalculating ? (
-                                                        <Loader2 className='h-3 w-3 animate-spin' />
-                                                    ) : (
-                                                        <Activity className='h-3 w-3' />
-                                                    )}
-                                                    <span>
-                                                        Refining graph… {layoutCommits.length}/{totalLoadedCommits}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {isDecoratingRefs && (
-                                            <div className='pointer-events-none absolute top-[4.5rem] right-3 z-10'>
-                                                <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
-                                                    <Loader2 className='h-3 w-3 animate-spin' />
-                                                    <span>Loading branch labels…</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className='flex h-full min-w-max'>
-                                            {/* Graph */}
-                                            <div
-                                                className='bg-background relative shrink-0 overflow-hidden'
-                                                style={{ width: (graphLayout?.width ?? 200) + 10 }}>
-                                                {graphLayout && (
-                                                    <CommitGraph
-                                                        layout={graphLayout}
-                                                        config={GRAPH_CONFIG}
-                                                        expandedIndex={expandedCommit ?? -1}
-                                                        selectedIndex={selectedCommitIndex}
-                                                        onVertexClick={handleSelectCommit}
-                                                        onVertexQuickActions={(index, pos) => {
-                                                            const full = layoutCommits[index] as
-                                                                | { hash: string; author: string; email?: string; message?: string; parents?: string[] }
-                                                                | undefined;
-                                                            if (!full) return;
-                                                            handleSelectCommit(index);
-                                                            setCommitDotQuickTarget({
-                                                                hash: full.hash,
-                                                                message: full.message ?? '',
-                                                                author: full.author,
-                                                                ...(full.email !== undefined ? { email: full.email } : {}),
-                                                            });
-                                                            setCommitDotQuickPosition(pos);
-                                                            setCommitDotQuickOpen(true);
-                                                        }}
-                                                        onVertexHover={() => {}}
-                                                        commits={commitGraphCommits}
-		                                                        showAvatars={commitGraphCommits.length < 2500}
-                                                        visibleStartIndex={visibleStartIndex}
-                                                        visibleEndIndex={visibleEndIndex}
-                                                        scrollOffset={commitListScrollOffset}
-                                                    />
-                                                )}
-                                                {!graphLayout && graphLayoutCalculating && (
-                                                    <div className='flex h-full min-h-[240px] items-center justify-center px-3'>
-                                                        <div className='text-muted-foreground flex items-center gap-2 text-xs'>
-                                                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                                                            <span>Computing graph in background...</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
+                        {/* Main Content */}
+                        <div className='flex min-w-0 flex-1 overflow-hidden'>
+                            {/* Side Panel - Branches/Tags/Stashes */}
+                            {showSidePanel && layoutMode === 'panel' && (
+                                <SidePanel
+                                    onBranchSelect={handleBranchFilter}
+                                    onCreateBranch={() => {
+                                        commitActionController.openCreateBranch(selectedCommit ?? 'HEAD');
+                                    }}
+                                    onCreateTag={() => {
+                                        commitActionController.openCreateTag(selectedCommit ?? 'HEAD');
+                                    }}
+                                    onMergeBranch={(branch) => {
+                                        commitActionController.openMerge(branch);
+                                    }}
+                                    onBringInBranch={(branch) => {
+                                        bringInBranchHandlerRef.current?.(branch);
+                                    }}
+                                    onCreateWorktreeFromBranch={(branch) => {
+                                        setWorktreePrefillBranch(branch);
+                                        setWorktreeOpen(true);
+                                    }}
+                                    enableBranchPinning={featureFlags.branchPinning}
+                                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                    {...(featureFlags.worktreePro
+                                        ? {
+                                              onOpenWorktrees: () => {
+                                                  setWorktreeOpen(true);
+                                              },
+                                          }
+                                        : {})}
+                                />
+                            )}
 
-                                            {/* Commit list */}
-                                            <div className='min-w-[400px] flex-1'>
-                                                {commitsData?.commits && commitsData.commits.length > 0 ? (
-                                                    <VirtualizedCommitList
-                                                        commits={commitsData.commits}
-                                                        layout={graphLayout}
-                                                        refLookup={refsLookup}
-                                                        repo={activeRepo}
-                                                        selectedIndex={selectedCommitIndex}
-                                                        multiSelectedHashes={multiSelectedHashes}
-                                                        expandedIndex={expandedCommit}
-                                                        onSelect={handleSelectCommit}
-                                                        onExpand={handleExpandCommit}
-                                                        onContextMenu={handleContextMenu}
-                                                        onVisibleRangeChange={handleVisibleRangeChange}
-                                                        onScrollOffsetChange={handleCommitListScrollOffsetChange}
-	                                                        showAvatars={totalLoadedCommits < 2500}
-                                                        hideRefs={false}
-                                                    />
-                                                ) : (
-                                                    <div className='text-muted-foreground flex h-64 items-center justify-center'>
-                                                        <p>No commits found</p>
+                            {/* Graph and Commit List */}
+                            <div className='flex flex-1 flex-col overflow-hidden'>
+                                <div className='flex flex-1 overflow-hidden'>
+                                    {commitsLoading && !hasCommitResponse ? (
+                                        // Loading skeleton
+                                        <div className='flex w-full'>
+                                            <div className='ui-commit-col w-28 shrink-0'>
+                                                {Array.from({ length: 15 }).map((_, i) => (
+                                                    <div key={i} className='h-8 animate-pulse px-2'>
+                                                        <div className='bg-muted h-4 w-16 rounded' />
                                                     </div>
-                                                )}
+                                                ))}
+                                            </div>
+                                            <div className='shrink-0' style={{ width: 210 }}>
+                                                <GraphSkeleton />
+                                            </div>
+                                            <div className='flex-1'>
+                                                <CommitListSkeleton count={15} />
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : commitsData?.error ? (
+                                        // Error state
+                                        <ErrorState
+                                            title='Failed to load commits'
+                                            message={commitsData.error}
+                                            onRetry={handleRefreshAll}
+                                        />
+                                    ) : (
+                                        <div className='relative h-full w-full overflow-hidden'>
+                                            {commitsFetching && hasCommitResponse && (
+                                                <div className='pointer-events-none absolute top-2 right-3 z-10'>
+                                                    <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
+                                                        <Loader2 className='h-3 w-3 animate-spin' />
+                                                        <span>Refreshing graph…</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {hasPendingLayoutExpansion && (
+                                                <div className='pointer-events-none absolute top-10 right-3 z-10'>
+                                                    <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
+                                                        {graphLayoutCalculating ? (
+                                                            <Loader2 className='h-3 w-3 animate-spin' />
+                                                        ) : (
+                                                            <Activity className='h-3 w-3' />
+                                                        )}
+                                                        <span>
+                                                            Refining graph… {layoutCommits.length}/{totalLoadedCommits}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {isDecoratingRefs && (
+                                                <div className='pointer-events-none absolute top-[4.5rem] right-3 z-10'>
+                                                    <div className='bg-background/90 text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] shadow-sm backdrop-blur'>
+                                                        <Loader2 className='h-3 w-3 animate-spin' />
+                                                        <span>Loading branch labels…</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className='flex h-full min-w-max'>
+                                                {/* Graph */}
+                                                <div
+                                                    className='bg-background relative shrink-0 overflow-hidden'
+                                                    style={{ width: (graphLayout?.width ?? 200) + 10 }}>
+                                                    {graphLayout && (
+                                                        <div
+                                                            ref={graphViewportRef}
+                                                            className='will-change-transform'
+                                                            style={{ transform: 'translate3d(0, 0, 0)' }}>
+                                                            <CommitGraph
+                                                                layout={graphLayout}
+                                                                config={GRAPH_CONFIG}
+                                                                expandedIndex={expandedCommit ?? -1}
+                                                                selectedIndex={selectedCommitIndex}
+                                                                onVertexClick={handleSelectCommit}
+                                                                onVertexQuickActions={(index, pos) => {
+                                                                    const full = layoutCommits[index] as
+                                                                        | {
+                                                                              hash: string;
+                                                                              author: string;
+                                                                              email?: string;
+                                                                              message?: string;
+                                                                              parents?: string[];
+                                                                          }
+                                                                        | undefined;
+                                                                    if (!full) return;
+                                                                    handleSelectCommit(index);
+                                                                    setCommitDotQuickTarget({
+                                                                        hash: full.hash,
+                                                                        message: full.message ?? '',
+                                                                        author: full.author,
+                                                                        ...(full.email !== undefined
+                                                                            ? { email: full.email }
+                                                                            : {}),
+                                                                    });
+                                                                    setCommitDotQuickPosition(pos);
+                                                                    setCommitDotQuickOpen(true);
+                                                                }}
+                                                                onVertexHover={() => {}}
+                                                                commits={commitGraphCommits}
+                                                                showAvatars={commitGraphCommits.length < 2500}
+                                                                visibleStartIndex={visibleStartIndex}
+                                                                visibleEndIndex={visibleEndIndex}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {!graphLayout && graphLayoutCalculating && (
+                                                        <div className='flex h-full min-h-[240px] items-center justify-center px-3'>
+                                                            <div className='text-muted-foreground flex items-center gap-2 text-xs'>
+                                                                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                                                                <span>Computing graph in background...</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Commit list */}
+                                                <div className='min-w-[400px] flex-1'>
+                                                    {commitsData?.commits && commitsData.commits.length > 0 ? (
+                                                        <VirtualizedCommitList
+                                                            commits={commitsData.commits}
+                                                            layout={graphLayout}
+                                                            refLookup={refsLookup}
+                                                            repo={activeRepo}
+                                                            selectedIndex={selectedCommitIndex}
+                                                            multiSelectedHashes={multiSelectedHashes}
+                                                            expandedIndex={expandedCommit}
+                                                            onSelect={handleSelectCommit}
+                                                            onExpand={handleExpandCommit}
+                                                            onContextMenu={handleContextMenu}
+                                                            onVisibleRangeChange={handleVisibleRangeChange}
+                                                            onScrollOffsetChange={handleCommitListScrollOffsetChange}
+                                                            showAvatars={totalLoadedCommits < 2500}
+                                                            hideRefs={false}
+                                                        />
+                                                    ) : (
+                                                        <div className='text-muted-foreground flex h-64 items-center justify-center'>
+                                                            <p>No commits found</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Commit Details Panel */}
+                            {commitDetailsOpen && selectedCommit && (
+                                <div className='border-border/65 w-80 shrink-0 border-l'>
+                                    <Suspense
+                                        fallback={
+                                            <div className='flex h-full items-center justify-center'>
+                                                <Loader2 className='text-muted-foreground h-5 w-5 animate-spin' />
+                                            </div>
+                                        }>
+                                        <CommitDetailsPanel
+                                            commitHash={selectedCommit}
+                                            onClose={() => {
+                                                setCommitDetailsOpen(false);
+                                            }}
+                                            onNavigateToCommit={handleNavigateToCommit}
+                                            onFilterByAuthor={handleAuthorFilter}
+                                            onCreateBranch={handleCreateBranchFromHash}
+                                            onCreateTag={(hash) => {
+                                                commitActionController.openCreateTag(hash);
+                                            }}
+                                            onReset={(hash) => {
+                                                commitActionController.openReset(hash);
+                                            }}
+                                            onFileHistoryNavigate={handleNavigateToCommit}
+                                        />
+                                    </Suspense>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Status bar — branch identity + sync state + counts + attention */}
+                        <div className='ui-status-bar flex items-center gap-3 px-3 text-[11px] leading-none'>
+                            {/* Left — current branch */}
+                            <div className='flex items-center gap-2'>
+                                {repoInfo?.head && (
+                                    <span className='text-foreground inline-flex items-center gap-1 font-medium'>
+                                        <GitBranch className='text-primary h-3 w-3' />
+                                        <span className='max-w-[16rem] truncate'>{repoInfo.head}</span>
+                                    </span>
+                                )}
+                                <span className='text-muted-foreground/70'>
+                                    <span className='text-foreground/85 font-medium tabular-nums'>
+                                        {commitsData?.commits.length ?? 0}
+                                    </span>{' '}
+                                    commits
+                                </span>
+                                {commitsData?.moreCommitsAvailable && maxCommits < maxCommitsLimit && (
+                                    <button
+                                        className='text-primary font-medium hover:underline'
+                                        onClick={handleLoadMore}>
+                                        Load more
+                                    </button>
+                                )}
+                                {commitsData?.moreCommitsAvailable && maxCommits >= maxCommitsLimit && (
+                                    <span className='text-muted-foreground/70'>
+                                        Limit reached ({maxCommitsLimit.toLocaleString()})
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className='flex-1' />
+
+                            {/* Center - sync state */}
+                            <div className='flex items-center gap-3'>
+                                {(aheadBehindData?.ahead ?? 0) > 0 && (
+                                    <span className='inline-flex items-center gap-1 text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))] tabular-nums'>
+                                        <ArrowUp className='h-3 w-3' />
+                                        {aheadBehindData?.ahead}
+                                    </span>
+                                )}
+                                {(aheadBehindData?.behind ?? 0) > 0 && (
+                                    <span className='inline-flex items-center gap-1 text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))] tabular-nums'>
+                                        <ArrowDown className='h-3 w-3' />
+                                        {aheadBehindData?.behind}
+                                    </span>
+                                )}
+                                {(workingTreeStatus?.unstaged.length ?? 0) > 0 && (
+                                    <span className='text-muted-foreground inline-flex items-center gap-1 tabular-nums'>
+                                        <GitCommit className='h-3 w-3' />
+                                        {workingTreeStatus?.unstaged.length ?? 0}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className='flex-1' />
+
+                            {/* Right - counts + perf */}
+                            <div className='text-muted-foreground/85 flex items-center gap-3'>
+                                <span className='inline-flex items-center gap-1 tabular-nums'>
+                                    <GitBranch className='h-3 w-3' />
+                                    {repoInfo?.branches.length ?? 0}
+                                </span>
+                                <span className='inline-flex items-center gap-1 tabular-nums'>
+                                    <Tag className='h-3 w-3' />
+                                    {repoInfo?.tags.length ?? 0}
+                                </span>
+                                {showPerfDebug && (
+                                    <button
+                                        className='hover:bg-accent/60 text-muted-foreground hover:text-foreground inline-flex h-6 items-center gap-1 rounded border border-transparent px-1.5 transition-colors'
+                                        onClick={() => {
+                                            setPerfPanelOpen(true);
+                                        }}
+                                        title={
+                                            hasPerfRegression
+                                                ? 'Startup query regression detected'
+                                                : hasPerfWatch
+                                                  ? 'Startup query latency drift detected'
+                                                  : 'Open startup query telemetry'
+                                        }>
+                                        <Activity
+                                            className={`h-3 w-3 ${
+                                                hasPerfRegression
+                                                    ? 'text-destructive'
+                                                    : hasPerfWatch
+                                                      ? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
+                                                      : 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
+                                            }`}
+                                        />
+                                        <span className='text-[11px]'>Perf</span>
+                                        <span
+                                            aria-hidden='true'
+                                            className={`h-1.5 w-1.5 rounded-full ${
+                                                hasPerfRegression
+                                                    ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]'
+                                                    : hasPerfWatch
+                                                      ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]'
+                                                      : 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]'
+                                            }`}
+                                        />
+                                    </button>
                                 )}
                             </div>
                         </div>
 
-                        {/* Commit Details Panel */}
-                        {commitDetailsOpen && selectedCommit && (
-                            <div className='border-border/65 w-80 shrink-0 border-l'>
-                                <Suspense
-                                    fallback={
-                                        <div className='flex h-full items-center justify-center'>
-                                            <Loader2 className='text-muted-foreground h-5 w-5 animate-spin' />
+                        {showPerfDebug && (
+                            <Dialog open={perfPanelOpen} onOpenChange={setPerfPanelOpen}>
+                                <DialogContent className='ui-surface sm:max-w-xl'>
+                                    <DialogHeader>
+                                        <div className='flex items-center justify-between gap-3'>
+                                            <DialogTitle className='flex items-center gap-2'>
+                                                <Activity className='h-4 w-4' />
+                                                Startup Query Telemetry
+                                            </DialogTitle>
+                                            <Button
+                                                type='button'
+                                                variant='outline'
+                                                size='sm'
+                                                className='h-7 gap-1 px-2 text-[11px]'
+                                                onClick={() => {
+                                                    void copyPerfDiagnostics();
+                                                }}
+                                                disabled={copyingPerfDiagnostics}>
+                                                {copyingPerfDiagnostics ? (
+                                                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                                                ) : (
+                                                    <Copy className='h-3.5 w-3.5' />
+                                                )}
+                                                Copy diagnostics
+                                            </Button>
                                         </div>
-                                    }>
-                                    <CommitDetailsPanel
-                                        commitHash={selectedCommit}
-                                        onClose={() => { setCommitDetailsOpen(false); }}
-                                        onNavigateToCommit={handleNavigateToCommit}
-                                        onFilterByAuthor={handleAuthorFilter}
-                                        onCreateBranch={handleCreateBranchFromHash}
-                                        onCreateTag={(hash) => {
-                                            commitActionController.openCreateTag(hash);
-                                        }}
-                                        onReset={(hash) => {
-                                            commitActionController.openReset(hash);
-                                        }}
-                                        onFileHistoryNavigate={handleNavigateToCommit}
-                                    />
-                                </Suspense>
-                            </div>
+                                    </DialogHeader>
+                                    <div className='space-y-2 text-xs'>
+                                        <p className='text-muted-foreground px-2 text-[11px]'>
+                                            Repository-scoped rolling window (last {MAX_PERF_HISTORY_SAMPLES}{' '}
+                                            samples/query).
+                                        </p>
+                                        <div className='text-muted-foreground grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] gap-2 px-2 text-[11px] tabular-nums'>
+                                            <span>Query</span>
+                                            <span>Latest</span>
+                                            <span>p50</span>
+                                            <span>p95</span>
+                                            <span>Payload</span>
+                                            <span>Samples</span>
+                                            <span>Errors</span>
+                                        </div>
+
+                                        <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
+                                            <span className='flex items-center gap-2'>
+                                                <span className='w-[64px]'>repoInfo</span>
+                                                <Badge
+                                                    variant='outline'
+                                                    title={repoInfoPerfTrend.title}
+                                                    className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(repoInfoPerfTrend.level)}`}>
+                                                    {repoInfoPerfTrend.label}
+                                                </Badge>
+                                            </span>
+                                            <span>{formatPerfMs(repoInfoPerfStats.latestDurationMs)}</span>
+                                            <span>{formatPerfMs(repoInfoPerfStats.p50DurationMs)}</span>
+                                            <span>{formatPerfMs(repoInfoPerfStats.p95DurationMs)}</span>
+                                            <span>{formatPerfBytes(repoInfoPerfStats.latestPayloadBytes)}</span>
+                                            <span>{repoInfoPerfStats.sampleCount}</span>
+                                            <span>{repoInfoPerfStats.errorCount}</span>
+                                        </div>
+
+                                        <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
+                                            <span className='flex items-center gap-2'>
+                                                <span className='w-[64px]'>commits</span>
+                                                <Badge
+                                                    variant='outline'
+                                                    title={commitsPerfTrend.title}
+                                                    className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(commitsPerfTrend.level)}`}>
+                                                    {commitsPerfTrend.label}
+                                                </Badge>
+                                            </span>
+                                            <span>{formatPerfMs(commitsPerfStats.latestDurationMs)}</span>
+                                            <span>{formatPerfMs(commitsPerfStats.p50DurationMs)}</span>
+                                            <span>{formatPerfMs(commitsPerfStats.p95DurationMs)}</span>
+                                            <span>{formatPerfBytes(commitsPerfStats.latestPayloadBytes)}</span>
+                                            <span>{commitsPerfStats.sampleCount}</span>
+                                            <span>{commitsPerfStats.errorCount}</span>
+                                        </div>
+
+                                        <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
+                                            <span className='flex items-center gap-2'>
+                                                <span className='w-[64px]'>refs</span>
+                                                <Badge
+                                                    variant='outline'
+                                                    title={refsPerfTrend.title}
+                                                    className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(refsPerfTrend.level)}`}>
+                                                    {refsPerfTrend.label}
+                                                </Badge>
+                                            </span>
+                                            <span>{formatPerfMs(refsPerfStats.latestDurationMs)}</span>
+                                            <span>{formatPerfMs(refsPerfStats.p50DurationMs)}</span>
+                                            <span>{formatPerfMs(refsPerfStats.p95DurationMs)}</span>
+                                            <span>{formatPerfBytes(refsPerfStats.latestPayloadBytes)}</span>
+                                            <span>{refsPerfStats.sampleCount}</span>
+                                            <span>{refsPerfStats.errorCount}</span>
+                                        </div>
+
+                                        <div className='text-muted-foreground border-border/60 mt-3 space-y-1 rounded-md border p-2 text-[11px]'>
+                                            <p>
+                                                Active fetches: repoInfo {repoLoading ? 'yes' : 'no'}, commits{' '}
+                                                {commitsFetching || commitsLoading ? 'yes' : 'no'}, refs{' '}
+                                                {refsFetching ? 'yes' : 'no'}
+                                            </p>
+                                            <p>
+                                                Counts: branches {repoInfo?.branches.length ?? 0}, tags{' '}
+                                                {repoInfo?.tags.length ?? 0}, commits {commitsData?.commits.length ?? 0}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         )}
-                    </div>
 
-                    {/* Status bar — branch identity + sync state + counts + attention */}
-                    <div className='ui-status-bar flex items-center gap-3 px-3 text-[11px] leading-none'>
-                        {/* Left — current branch */}
-                        <div className='flex items-center gap-2'>
-                            {repoInfo?.head && (
-                                <span className='text-foreground inline-flex items-center gap-1 font-medium'>
-                                    <GitBranch className='h-3 w-3 text-primary' />
-                                    <span className='truncate max-w-[16rem]'>{repoInfo.head}</span>
-                                </span>
-                            )}
-                            <span className='text-muted-foreground/70'>
-                                <span className='text-foreground/85 font-medium tabular-nums'>{commitsData?.commits.length ?? 0}</span>{' '}
-                                commits
-                            </span>
-                            {commitsData?.moreCommitsAvailable && maxCommits < maxCommitsLimit && (
-                                <button className='text-primary font-medium hover:underline' onClick={handleLoadMore}>
-                                    Load more
-                                </button>
-                            )}
-                            {commitsData?.moreCommitsAvailable && maxCommits >= maxCommitsLimit && (
-                                <span className='text-muted-foreground/70'>
-                                    Limit reached ({maxCommitsLimit.toLocaleString()})
-                                </span>
-                            )}
-                        </div>
-
-                        <div className='flex-1' />
-
-                        {/* Center - sync state */}
-                        <div className='flex items-center gap-3'>
-                            {(aheadBehindData?.ahead ?? 0) > 0 && (
-                                <span className='inline-flex items-center gap-1 tabular-nums text-[color-mix(in_oklch,var(--success)_70%,var(--foreground))]'>
-                                    <ArrowUp className='h-3 w-3' />
-                                    {aheadBehindData?.ahead}
-                                </span>
-                            )}
-                            {(aheadBehindData?.behind ?? 0) > 0 && (
-                                <span className='inline-flex items-center gap-1 tabular-nums text-[color-mix(in_oklch,var(--warning)_60%,var(--foreground))]'>
-                                    <ArrowDown className='h-3 w-3' />
-                                    {aheadBehindData?.behind}
-                                </span>
-                            )}
-                            {(workingTreeStatus?.unstaged.length ?? 0) > 0 && (
-                                <span className='text-muted-foreground inline-flex items-center gap-1 tabular-nums'>
-                                    <GitCommit className='h-3 w-3' />
-                                    {workingTreeStatus?.unstaged.length ?? 0}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className='flex-1' />
-
-                        {/* Right - counts + perf */}
-                        <div className='text-muted-foreground/85 flex items-center gap-3'>
-                            <span className='inline-flex items-center gap-1 tabular-nums'>
-                                <GitBranch className='h-3 w-3' />
-                                {repoInfo?.branches.length ?? 0}
-                            </span>
-                            <span className='inline-flex items-center gap-1 tabular-nums'>
-                                <Tag className='h-3 w-3' />
-                                {repoInfo?.tags.length ?? 0}
-                            </span>
-                            {showPerfDebug && (
-                                <button
-                                    className='hover:bg-accent/60 text-muted-foreground hover:text-foreground inline-flex h-6 items-center gap-1 rounded border border-transparent px-1.5 transition-colors'
-                                    onClick={() => { setPerfPanelOpen(true); }}
-                                    title={
-                                        hasPerfRegression
-                                            ? 'Startup query regression detected'
-                                            : hasPerfWatch
-                                              ? 'Startup query latency drift detected'
-                                              : 'Open startup query telemetry'
-                                    }>
-                                    <Activity
-                                        className={`h-3 w-3 ${
-                                            hasPerfRegression
-                                                ? 'text-destructive'
-                                                : hasPerfWatch
-                                                  ? 'text-[color-mix(in_oklch,var(--warning)_72%,var(--foreground))]'
-                                                  : 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]'
-                                        }`}
-                                    />
-                                    <span className='text-[11px]'>Perf</span>
-                                    <span
-                                        aria-hidden='true'
-                                        className={`h-1.5 w-1.5 rounded-full ${
-                                            hasPerfRegression
-                                                ? 'bg-[color-mix(in_oklch,var(--destructive)_15%,transparent)]'
-                                                : hasPerfWatch
-                                                  ? 'bg-[color-mix(in_oklch,var(--warning)_15%,transparent)]'
-                                                  : 'bg-[color-mix(in_oklch,var(--success)_15%,transparent)]'
-                                        }`}
-                                    />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {showPerfDebug && (
-                        <Dialog open={perfPanelOpen} onOpenChange={setPerfPanelOpen}>
-                            <DialogContent className='ui-surface sm:max-w-xl'>
-                                <DialogHeader>
-                                    <div className='flex items-center justify-between gap-3'>
-                                        <DialogTitle className='flex items-center gap-2'>
-                                            <Activity className='h-4 w-4' />
-                                            Startup Query Telemetry
-                                        </DialogTitle>
-                                        <Button
-                                            type='button'
-                                            variant='outline'
-                                            size='sm'
-                                            className='h-7 gap-1 px-2 text-[11px]'
-                                            onClick={() => { void copyPerfDiagnostics(); }}
-                                            disabled={copyingPerfDiagnostics}>
-                                            {copyingPerfDiagnostics ? (
-                                                <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                                            ) : (
-                                                <Copy className='h-3.5 w-3.5' />
-                                            )}
-                                            Copy diagnostics
-                                        </Button>
-                                    </div>
-                                </DialogHeader>
-                                <div className='space-y-2 text-xs'>
-                                    <p className='text-muted-foreground px-2 text-[11px]'>
-                                        Repository-scoped rolling window (last {MAX_PERF_HISTORY_SAMPLES}{' '}
-                                        samples/query).
-                                    </p>
-                                    <div className='text-muted-foreground grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] gap-2 px-2 text-[11px] tabular-nums'>
-                                        <span>Query</span>
-                                        <span>Latest</span>
-                                        <span>p50</span>
-                                        <span>p95</span>
-                                        <span>Payload</span>
-                                        <span>Samples</span>
-                                        <span>Errors</span>
-                                    </div>
-
-                                    <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
-                                        <span className='flex items-center gap-2'>
-                                            <span className='w-[64px]'>repoInfo</span>
-                                            <Badge
-                                                variant='outline'
-                                                title={repoInfoPerfTrend.title}
-                                                className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(repoInfoPerfTrend.level)}`}>
-                                                {repoInfoPerfTrend.label}
-                                            </Badge>
-                                        </span>
-                                        <span>{formatPerfMs(repoInfoPerfStats.latestDurationMs)}</span>
-                                        <span>{formatPerfMs(repoInfoPerfStats.p50DurationMs)}</span>
-                                        <span>{formatPerfMs(repoInfoPerfStats.p95DurationMs)}</span>
-                                        <span>{formatPerfBytes(repoInfoPerfStats.latestPayloadBytes)}</span>
-                                        <span>{repoInfoPerfStats.sampleCount}</span>
-                                        <span>{repoInfoPerfStats.errorCount}</span>
-                                    </div>
-
-                                    <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
-                                        <span className='flex items-center gap-2'>
-                                            <span className='w-[64px]'>commits</span>
-                                            <Badge
-                                                variant='outline'
-                                                title={commitsPerfTrend.title}
-                                                className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(commitsPerfTrend.level)}`}>
-                                                {commitsPerfTrend.label}
-                                            </Badge>
-                                        </span>
-                                        <span>{formatPerfMs(commitsPerfStats.latestDurationMs)}</span>
-                                        <span>{formatPerfMs(commitsPerfStats.p50DurationMs)}</span>
-                                        <span>{formatPerfMs(commitsPerfStats.p95DurationMs)}</span>
-                                        <span>{formatPerfBytes(commitsPerfStats.latestPayloadBytes)}</span>
-                                        <span>{commitsPerfStats.sampleCount}</span>
-                                        <span>{commitsPerfStats.errorCount}</span>
-                                    </div>
-
-                                    <div className='bg-muted/35 grid grid-cols-[176px_1fr_1fr_1fr_1fr_64px_64px] items-center gap-2 rounded-md px-2 py-2 font-mono tabular-nums'>
-                                        <span className='flex items-center gap-2'>
-                                            <span className='w-[64px]'>refs</span>
-                                            <Badge
-                                                variant='outline'
-                                                title={refsPerfTrend.title}
-                                                className={`min-w-[74px] justify-center px-1.5 text-[10px] ${perfTrendBadgeClass(refsPerfTrend.level)}`}>
-                                                {refsPerfTrend.label}
-                                            </Badge>
-                                        </span>
-                                        <span>{formatPerfMs(refsPerfStats.latestDurationMs)}</span>
-                                        <span>{formatPerfMs(refsPerfStats.p50DurationMs)}</span>
-                                        <span>{formatPerfMs(refsPerfStats.p95DurationMs)}</span>
-                                        <span>{formatPerfBytes(refsPerfStats.latestPayloadBytes)}</span>
-                                        <span>{refsPerfStats.sampleCount}</span>
-                                        <span>{refsPerfStats.errorCount}</span>
-                                    </div>
-
-                                    <div className='text-muted-foreground border-border/60 mt-3 space-y-1 rounded-md border p-2 text-[11px]'>
-                                        <p>
-                                            Active fetches: repoInfo {repoLoading ? 'yes' : 'no'}, commits{' '}
-                                            {commitsFetching || commitsLoading ? 'yes' : 'no'}, refs{' '}
-                                            {refsFetching ? 'yes' : 'no'}
-                                        </p>
-                                        <p>
-                                            Counts: branches {repoInfo?.branches.length ?? 0}, tags{' '}
-                                            {repoInfo?.tags.length ?? 0}, commits {commitsData?.commits.length ?? 0}
-                                        </p>
-                                    </div>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    )}
-
-                    <GitGraphCommitActionDialogs
-                        createBranchOpen={commitActionController.createBranchOpen}
-                        onCreateBranchOpenChange={commitActionController.setCreateBranchOpen}
-                        onCreateBranch={(name, checkout) => {
-                            void gitOps.createBranch(commitActionController.targetCommit, name, checkout);
-                            commitActionController.setCreateBranchOpen(false);
-                        }}
-                        addTagOpen={commitActionController.addTagOpen}
-                        onAddTagOpenChange={commitActionController.setAddTagOpen}
-                        onAddTag={(name, type) => {
-                            void gitOps.createTag(
-                                commitActionController.targetCommit,
-                                name,
-                                type === 'annotated' ? name : undefined
-                            );
-                            commitActionController.setAddTagOpen(false);
-                        }}
-                        resetOpen={commitActionController.resetOpen}
-                        onResetOpenChange={commitActionController.setResetOpen}
-                        onReset={(mode) => {
-                            void commitActionController.handlePreviewedReset(mode);
-                        }}
-                        mergeOpen={commitActionController.mergeOpen}
-                        onMergeOpenChange={commitActionController.setMergeOpen}
-                        onMerge={(options) => {
-                            void commitActionController.handlePreviewedMerge(options);
-                        }}
-                        rebaseOpen={commitActionController.rebaseOpen}
-                        onRebaseOpenChange={commitActionController.setRebaseOpen}
-                        onRebase={(interactive) => {
-                            void commitActionController.handlePreviewedRebase(interactive);
-                        }}
-                        cherryPickOpen={commitActionController.cherryPickOpen}
-                        onCherryPickOpenChange={commitActionController.setCherryPickOpen}
-                        onCherryPick={(noCommit) => {
-                            commitActionController.handlePreviewedCherryPick(noCommit);
-                        }}
-                        revertOpen={commitActionController.revertOpen}
-                        onRevertOpenChange={commitActionController.setRevertOpen}
-                        onRevert={(noCommit) => {
-                            commitActionController.handlePreviewedRevert(noCommit);
-                        }}
-                        interactiveRebaseOpen={commitActionController.interactiveRebaseOpen}
-                        onInteractiveRebaseOpenChange={commitActionController.setInteractiveRebaseOpen}
-                        targetCommit={commitActionController.targetCommit}
-                        targetBranch={commitActionController.targetBranch}
-                        interactiveRebaseCommits={commitActionController.interactiveRebaseCommits}
-                        onInteractiveRebaseComplete={commitActionController.handleInteractiveRebaseComplete}
-                        actionPreviewDialog={commitActionController.actionPreviewDialog}
-                    />
-
-                    <GitGraphShellOverlays
-                        fuzzyFinder={{ open: fuzzyFinderOpen, onOpenChange: setFuzzyFinderOpen }}
-                        statistics={{ open: statisticsOpen, onClose: () => { setStatisticsOpen(false); } }}
-                        remoteManage={{ open: remoteManageOpen, onOpenChange: setRemoteManageOpen }}
-                        branchCompare={{
-                            open: branchCompareOpen,
-                            onOpenChange: setBranchCompareOpen,
-                            branches: repoInfo?.branches ?? [],
-                            initialFrom: repoInfo?.head ?? '',
-                        }}
-                        hooksManage={{ open: hooksManageOpen, onOpenChange: setHooksManageOpen }}
-                        mergeConflict={{
-                            open: mergeConflictOpen,
-                            onOpenChange: handleCloseConflictEditor,
-                            conflict: conflictFile,
-                            onResolve: handleResolveConflictFile,
-                        }}
-                        terminal={{ open: terminalOpen, onOpenChange: setTerminalOpen, cwd: activeRepo }}
-                        commitSigning={{ open: commitSigningOpen, onOpenChange: setCommitSigningOpen }}
-                        rebaseTodo={{ open: rebaseTodoOpen, onOpenChange: setRebaseTodoOpen }}
-                    />
-
-                    {/* Pinned Commits Dialog */}
-                    <PinnedCommitsDialog
-                        open={pinnedCommitsOpen}
-                        onOpenChange={setPinnedCommitsOpen}
-                        pinnedCommits={pinnedCommits}
-                        onPin={(commit) => { pinCommit(commit as Omit<PinnedCommit, 'pinnedAt'>); }}
-                        onUnpin={unpinCommit}
-                        onUpdateNote={updateNote}
-                        onJumpToCommit={(hash) => {
-                            const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
-                            if (index !== undefined && index >= 0) {
-                                handleSelectCommit(index);
-                                setPinnedCommitsOpen(false);
-                            }
-                        }}
-                    />
-
-                    {/* Graph Legend */}
-                    <CommitGraphLegend open={graphLegendOpen} onOpenChange={setGraphLegendOpen} />
-
-                    {/* Cherry-Pick Dialog */}
-                    <DragDropCherryPick
-                        open={cherryPickDialogOpen}
-                        onOpenChange={setCherryPickDialogOpen}
-                        sourceCommit={cherryPickCommit}
-                    />
-
-                    <CommitContextMenuOverlay
-                        open={contextMenuOpen}
-                        position={contextMenuPosition}
-                        currentBranch={currentHead}
-                        selectedCommit={
-                            commitActionController.selectedCommitData
-                                ? {
-                                      hash: commitActionController.selectedCommitData.hash,
-                                      message: commitActionController.selectedCommitData.message,
-                                      author: commitActionController.selectedCommitData.author,
-                                  }
-                                : null
-                        }
-                        onClose={() => { setContextMenuOpen(false); }}
-                        onCreateBranch={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openCreateBranch(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                        onCreateTag={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openCreateTag(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                        onMerge={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openMerge(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                        onRebase={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openRebase(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                        onCherryPick={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openCherryPick(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                        onRevert={() => {
-                            if (!commitActionController.selectedCommitData) return;
-                            commitActionController.openRevert(commitActionController.selectedCommitData.hash);
-                            setContextMenuOpen(false);
-                        }}
-                    />
-
-                    <CommitFiltersDialog
-                        open={showFiltersDialog}
-                        onOpenChange={setShowFiltersDialog}
-                        filters={commitFilters}
-                        onChange={(filters) => {
-                            setCommitFilters(filters);
-                            setMaxCommits(baselineInitialMaxCommits);
-                            setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
-                            if (Object.keys(filters).length === 0) {
-                                setShowFiltersDialog(false);
-                            }
-                        }}
-                    />
-
-                    <GitGraphFeatureDialogs
-                        featureFlags={featureFlags}
-                        reflog={{ open: reflogOpen, onOpenChange: setReflogOpen }}
-                        onCreateBranchFromHash={handleCreateBranchFromHash}
-                        templates={{ open: templatesOpen, onOpenChange: setTemplatesOpen }}
-                        templateValues={templates}
-                        onTemplatesChange={setTemplates}
-                        gitignore={{ open: gitignoreOpen, onOpenChange: setGitignoreOpen }}
-                        customCommands={{ open: customCommandsOpen, onOpenChange: setCustomCommandsOpen }}
-                        searchCommits={{ open: searchCommitsOpen, onOpenChange: setSearchCommitsOpen }}
-                        onSelectCommit={(hash) => {
-                            const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
-                            if (index !== undefined && index >= 0) {
-                                handleSelectCommit(index);
-                            }
-                        }}
-                        lfs={{ open: lfsOpen, onOpenChange: setLfsOpen }}
-                        pullRequests={{ open: prIntegrationOpen, onOpenChange: setPrIntegrationOpen }}
-                        worktree={{
-                            open: worktreeOpen,
-                            onOpenChange: (next) => {
-                                if (typeof next === 'function') {
-                                    setWorktreeOpen(next);
-                                } else {
-                                    setWorktreeOpen(next);
-                                    if (!next) setWorktreePrefillBranch(null);
-                                }
-                            },
-                            initialBranch: worktreePrefillBranch,
-                        }}
-                        workflow={{ open: workflowOpen, onOpenChange: setWorkflowOpen }}
-                        submodule={{ open: submoduleOpen, onOpenChange: setSubmoduleOpen }}
-                        keyboardHelp={{ open: keyboardHelpOpen, onOpenChange: setKeyboardHelpOpen }}
-                        keyboardEditor={{ open: keyboardEditorOpen, onOpenChange: setKeyboardEditorOpen }}
-                        onboarding={{ open: onboardingOpen, onOpenChange: setOnboardingOpen }}
-                        recentRepos={{ open: recentReposOpen, onOpenChange: setRecentReposOpen }}
-                        workspaces={{ open: workspacesOpen, onOpenChange: setWorkspacesOpen }}
-                        collaboration={{ open: collaborationOpen, onOpenChange: setCollaborationOpen }}
-                        cloneRepository={{ open: cloneDialogOpen, onOpenChange: setCloneDialogOpen }}
-                        onCloned={async (repoPath) => {
-                            await activateRepoPath(repoPath, {
-                                ensureRegistered: true,
-                                errorTitle: 'Failed to open cloned repository',
-                            });
-                        }}
-                        stashManagement={{ open: stashManageOpen, onOpenChange: setStashManageOpen }}
-                        settings={{
-                            open: settingsOpen,
-                            onOpenChange: setSettingsOpen,
-                            initialTab: settingsInitialTab,
-                            initialSection: settingsInitialSection,
-                        }}
-                        lineStaging={{ open: lineStagingOpen, onOpenChange: setLineStagingOpen }}
-                        stagingFile={stagingFile}
-                        onLineStagingChange={(nextOpen) => {
-                            setLineStagingOpen(nextOpen);
-                            if (!nextOpen) {
-                                setStagingFile(null);
-                            }
-                        }}
-                        onLineStaged={() => {
-                            void gitUtils.git.workingTreeStatus
-                                .invalidate({ repo: activeRepo })
-                                .catch((error: unknown) => {
-                                    console.error('[git-graph] Failed to refresh working tree status:', error);
-                                });
-                        }}
-                        commandPalette={{ open: commandPaletteOpen, onOpenChange: setCommandPaletteOpen }}
-                        commandPaletteActions={commandPaletteActions}
-                        gitFlow={{ open: gitFlowOpen, onOpenChange: setGitFlowOpen }}
-                        healthCheck={{ open: healthCheckOpen, onOpenChange: setHealthCheckOpen }}
-                        bisect={{ open: bisectOpen, onOpenChange: setBisectOpen }}
-                        selectedCommit={selectedCommit}
-                        undoStack={{ open: undoStackOpen, onOpenChange: setUndoStackOpen }}
-                        configEditor={{ open: configEditorOpen, onOpenChange: setConfigEditorOpen }}
-                        externalDiff={{ open: externalDiffOpen, onOpenChange: setExternalDiffOpen }}
-                        issueTracker={{ open: issueTrackerOpen, onOpenChange: setIssueTrackerOpen }}
-                        bulkOps={{ open: bulkOpsOpen, onOpenChange: setBulkOpsOpen }}
-                        bulkOpCommits={(commitsData?.commits ?? []).map((c: ClientCommit) => ({
-                            hash: c.hash,
-                            message: c.message,
-                            author: c.author,
-                            date: c.date,
-                            parents: c.parents,
-                        }))}
-                        onBulkOpsComplete={handleRefreshAll}
-                        fileAnnotations={{ open: fileAnnotationsOpen, onOpenChange: setFileAnnotationsOpen }}
-                        annotationsFile={annotationsFile}
-                        activityHeatmap={{ open: activityHeatmapOpen, onOpenChange: setActivityHeatmapOpen }}
-                    />
-
-                    <LensOnboardingDialog />
-
-                    {/* Drag Cherry-Pick Handler */}
-                    {dragCommit && (
-                        <DragCommitHandler
-                            open={dragCherryPickOpen}
-                            onOpenChange={setDragCherryPickOpen}
-                            commitHash={dragCommit.hash}
-                            commitMessage={dragCommit.message}
-                            targetBranch={dragTargetBranch}
-                            onComplete={handleRefreshAll}
+                        <GitGraphCommitActionDialogs
+                            createBranchOpen={commitActionController.createBranchOpen}
+                            onCreateBranchOpenChange={commitActionController.setCreateBranchOpen}
+                            onCreateBranch={(name, checkout) => {
+                                void gitOps.createBranch(commitActionController.targetCommit, name, checkout);
+                                commitActionController.setCreateBranchOpen(false);
+                            }}
+                            addTagOpen={commitActionController.addTagOpen}
+                            onAddTagOpenChange={commitActionController.setAddTagOpen}
+                            onAddTag={(name, type) => {
+                                void gitOps.createTag(
+                                    commitActionController.targetCommit,
+                                    name,
+                                    type === 'annotated' ? name : undefined
+                                );
+                                commitActionController.setAddTagOpen(false);
+                            }}
+                            resetOpen={commitActionController.resetOpen}
+                            onResetOpenChange={commitActionController.setResetOpen}
+                            onReset={(mode) => {
+                                void commitActionController.handlePreviewedReset(mode);
+                            }}
+                            mergeOpen={commitActionController.mergeOpen}
+                            onMergeOpenChange={commitActionController.setMergeOpen}
+                            onMerge={(options) => {
+                                void commitActionController.handlePreviewedMerge(options);
+                            }}
+                            rebaseOpen={commitActionController.rebaseOpen}
+                            onRebaseOpenChange={commitActionController.setRebaseOpen}
+                            onRebase={(interactive) => {
+                                void commitActionController.handlePreviewedRebase(interactive);
+                            }}
+                            cherryPickOpen={commitActionController.cherryPickOpen}
+                            onCherryPickOpenChange={commitActionController.setCherryPickOpen}
+                            onCherryPick={(noCommit) => {
+                                commitActionController.handlePreviewedCherryPick(noCommit);
+                            }}
+                            revertOpen={commitActionController.revertOpen}
+                            onRevertOpenChange={commitActionController.setRevertOpen}
+                            onRevert={(noCommit) => {
+                                commitActionController.handlePreviewedRevert(noCommit);
+                            }}
+                            interactiveRebaseOpen={commitActionController.interactiveRebaseOpen}
+                            onInteractiveRebaseOpenChange={commitActionController.setInteractiveRebaseOpen}
+                            targetCommit={commitActionController.targetCommit}
+                            targetBranch={commitActionController.targetBranch}
+                            interactiveRebaseCommits={commitActionController.interactiveRebaseCommits}
+                            onInteractiveRebaseComplete={commitActionController.handleInteractiveRebaseComplete}
+                            actionPreviewDialog={commitActionController.actionPreviewDialog}
                         />
-                    )}
 
-                    {/* Quick Look Panel */}
-                    <QuickLookPanel />
+                        <GitGraphShellOverlays
+                            fuzzyFinder={{ open: fuzzyFinderOpen, onOpenChange: setFuzzyFinderOpen }}
+                            statistics={{
+                                open: statisticsOpen,
+                                onClose: () => {
+                                    setStatisticsOpen(false);
+                                },
+                            }}
+                            remoteManage={{ open: remoteManageOpen, onOpenChange: setRemoteManageOpen }}
+                            branchCompare={{
+                                open: branchCompareOpen,
+                                onOpenChange: setBranchCompareOpen,
+                                branches: repoInfo?.branches ?? [],
+                                initialFrom: repoInfo?.head ?? '',
+                            }}
+                            hooksManage={{ open: hooksManageOpen, onOpenChange: setHooksManageOpen }}
+                            mergeConflict={{
+                                open: mergeConflictOpen,
+                                onOpenChange: handleCloseConflictEditor,
+                                conflict: conflictFile,
+                                onResolve: handleResolveConflictFile,
+                            }}
+                            terminal={{ open: terminalOpen, onOpenChange: setTerminalOpen, cwd: activeRepo }}
+                            commitSigning={{ open: commitSigningOpen, onOpenChange: setCommitSigningOpen }}
+                            rebaseTodo={{ open: rebaseTodoOpen, onOpenChange: setRebaseTodoOpen }}
+                        />
 
-                    <CommitMultiSelectBar
-                        selectedCommits={multiSelectionPayload.commits}
-                        currentBranch={currentHead}
-                        contiguous={multiSelectionPayload.contiguous}
-                        onCurrentBranch={true}
-                        onClear={clearMultiSelection}
-                    />
-
-                    <CommitDotQuickActions
-                        open={commitDotQuickOpen}
-                        position={commitDotQuickPosition}
-                        commit={commitDotQuickTarget}
-                        currentBranch={currentHead}
-                        onClose={() => { setCommitDotQuickOpen(false); }}
-                        onOpenFullDetails={(hash) => {
-                            const idx = (layoutCommits ?? []).findIndex(
-                                (c: { hash: string }) => c.hash === hash
-                            );
-                            if (idx >= 0) handleSelectCommit(idx);
-                        }}
-                    />
-
-                    {activeRepo && (
-                        <OperationStatusBar
-                            repo={activeRepo}
-                            onOpenRebaseTodo={() => { setRebaseTodoOpen(true); }}
-                            onOpenConflictFile={handleOpenConflictFile}
-                            onRevealConflictFile={handleRevealConflictFile}
-                            onOperationStateChange={(operationState) => {
-                                if (operationState && !operationState.rebasing) {
-                                    setRebaseTodoOpen(false);
+                        {/* Pinned Commits Dialog */}
+                        <PinnedCommitsDialog
+                            open={pinnedCommitsOpen}
+                            onOpenChange={setPinnedCommitsOpen}
+                            pinnedCommits={pinnedCommits}
+                            onPin={(commit) => {
+                                pinCommit(commit as Omit<PinnedCommit, 'pinnedAt'>);
+                            }}
+                            onUnpin={unpinCommit}
+                            onUpdateNote={updateNote}
+                            onJumpToCommit={(hash) => {
+                                const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
+                                if (index !== undefined && index >= 0) {
+                                    handleSelectCommit(index);
+                                    setPinnedCommitsOpen(false);
                                 }
                             }}
                         />
-                    )}
-                </div>
-            </TooltipProvider>
+
+                        {/* Graph Legend */}
+                        <CommitGraphLegend open={graphLegendOpen} onOpenChange={setGraphLegendOpen} />
+
+                        {/* Cherry-Pick Dialog */}
+                        <DragDropCherryPick
+                            open={cherryPickDialogOpen}
+                            onOpenChange={setCherryPickDialogOpen}
+                            sourceCommit={cherryPickCommit}
+                        />
+
+                        <CommitContextMenuOverlay
+                            open={contextMenuOpen}
+                            position={contextMenuPosition}
+                            currentBranch={currentHead}
+                            selectedCommit={
+                                commitActionController.selectedCommitData
+                                    ? {
+                                          hash: commitActionController.selectedCommitData.hash,
+                                          message: commitActionController.selectedCommitData.message,
+                                          author: commitActionController.selectedCommitData.author,
+                                      }
+                                    : null
+                            }
+                            onClose={() => {
+                                setContextMenuOpen(false);
+                            }}
+                            onCreateBranch={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openCreateBranch(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                            onCreateTag={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openCreateTag(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                            onMerge={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openMerge(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                            onRebase={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openRebase(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                            onCherryPick={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openCherryPick(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                            onRevert={() => {
+                                if (!commitActionController.selectedCommitData) return;
+                                commitActionController.openRevert(commitActionController.selectedCommitData.hash);
+                                setContextMenuOpen(false);
+                            }}
+                        />
+
+                        <CommitFiltersDialog
+                            open={showFiltersDialog}
+                            onOpenChange={setShowFiltersDialog}
+                            filters={commitFilters}
+                            onChange={(filters) => {
+                                setCommitFilters(filters);
+                                setMaxCommits(baselineInitialMaxCommits);
+                                setLayoutCommitLimit(INITIAL_LAYOUT_COMMIT_WINDOW);
+                                if (Object.keys(filters).length === 0) {
+                                    setShowFiltersDialog(false);
+                                }
+                            }}
+                        />
+
+                        <GitGraphFeatureDialogs
+                            featureFlags={featureFlags}
+                            reflog={{ open: reflogOpen, onOpenChange: setReflogOpen }}
+                            onCreateBranchFromHash={handleCreateBranchFromHash}
+                            templates={{ open: templatesOpen, onOpenChange: setTemplatesOpen }}
+                            templateValues={templates}
+                            onTemplatesChange={setTemplates}
+                            gitignore={{ open: gitignoreOpen, onOpenChange: setGitignoreOpen }}
+                            customCommands={{ open: customCommandsOpen, onOpenChange: setCustomCommandsOpen }}
+                            searchCommits={{ open: searchCommitsOpen, onOpenChange: setSearchCommitsOpen }}
+                            onSelectCommit={(hash) => {
+                                const index = commitsData?.commits.findIndex((c: ClientCommit) => c.hash === hash);
+                                if (index !== undefined && index >= 0) {
+                                    handleSelectCommit(index);
+                                }
+                            }}
+                            lfs={{ open: lfsOpen, onOpenChange: setLfsOpen }}
+                            pullRequests={{ open: prIntegrationOpen, onOpenChange: setPrIntegrationOpen }}
+                            worktree={{
+                                open: worktreeOpen,
+                                onOpenChange: (next) => {
+                                    if (typeof next === 'function') {
+                                        setWorktreeOpen(next);
+                                    } else {
+                                        setWorktreeOpen(next);
+                                        if (!next) setWorktreePrefillBranch(null);
+                                    }
+                                },
+                                initialBranch: worktreePrefillBranch,
+                            }}
+                            workflow={{ open: workflowOpen, onOpenChange: setWorkflowOpen }}
+                            submodule={{ open: submoduleOpen, onOpenChange: setSubmoduleOpen }}
+                            keyboardHelp={{ open: keyboardHelpOpen, onOpenChange: setKeyboardHelpOpen }}
+                            keyboardEditor={{ open: keyboardEditorOpen, onOpenChange: setKeyboardEditorOpen }}
+                            onboarding={{ open: onboardingOpen, onOpenChange: setOnboardingOpen }}
+                            recentRepos={{ open: recentReposOpen, onOpenChange: setRecentReposOpen }}
+                            workspaces={{ open: workspacesOpen, onOpenChange: setWorkspacesOpen }}
+                            collaboration={{ open: collaborationOpen, onOpenChange: setCollaborationOpen }}
+                            cloneRepository={{ open: cloneDialogOpen, onOpenChange: setCloneDialogOpen }}
+                            onCloned={async (repoPath) => {
+                                await activateRepoPath(repoPath, {
+                                    ensureRegistered: true,
+                                    errorTitle: 'Failed to open cloned repository',
+                                });
+                            }}
+                            stashManagement={{ open: stashManageOpen, onOpenChange: setStashManageOpen }}
+                            settings={{
+                                open: settingsOpen,
+                                onOpenChange: setSettingsOpen,
+                                initialTab: settingsInitialTab,
+                                initialSection: settingsInitialSection,
+                            }}
+                            lineStaging={{ open: lineStagingOpen, onOpenChange: setLineStagingOpen }}
+                            stagingFile={stagingFile}
+                            onLineStagingChange={(nextOpen) => {
+                                setLineStagingOpen(nextOpen);
+                                if (!nextOpen) {
+                                    setStagingFile(null);
+                                }
+                            }}
+                            onLineStaged={() => {
+                                void gitUtils.git.workingTreeStatus
+                                    .invalidate({ repo: activeRepo })
+                                    .catch((error: unknown) => {
+                                        console.error('[git-graph] Failed to refresh working tree status:', error);
+                                    });
+                            }}
+                            commandPalette={{ open: commandPaletteOpen, onOpenChange: setCommandPaletteOpen }}
+                            commandPaletteActions={commandPaletteActions}
+                            gitFlow={{ open: gitFlowOpen, onOpenChange: setGitFlowOpen }}
+                            healthCheck={{ open: healthCheckOpen, onOpenChange: setHealthCheckOpen }}
+                            bisect={{ open: bisectOpen, onOpenChange: setBisectOpen }}
+                            selectedCommit={selectedCommit}
+                            undoStack={{ open: undoStackOpen, onOpenChange: setUndoStackOpen }}
+                            configEditor={{ open: configEditorOpen, onOpenChange: setConfigEditorOpen }}
+                            externalDiff={{ open: externalDiffOpen, onOpenChange: setExternalDiffOpen }}
+                            issueTracker={{ open: issueTrackerOpen, onOpenChange: setIssueTrackerOpen }}
+                            bulkOps={{ open: bulkOpsOpen, onOpenChange: setBulkOpsOpen }}
+                            bulkOpCommits={(commitsData?.commits ?? []).map((c: ClientCommit) => ({
+                                hash: c.hash,
+                                message: c.message,
+                                author: c.author,
+                                date: c.date,
+                                parents: c.parents,
+                            }))}
+                            onBulkOpsComplete={handleRefreshAll}
+                            fileAnnotations={{ open: fileAnnotationsOpen, onOpenChange: setFileAnnotationsOpen }}
+                            annotationsFile={annotationsFile}
+                            activityHeatmap={{ open: activityHeatmapOpen, onOpenChange: setActivityHeatmapOpen }}
+                        />
+
+                        <LensOnboardingDialog />
+
+                        {/* Drag Cherry-Pick Handler */}
+                        {dragCommit && (
+                            <DragCommitHandler
+                                open={dragCherryPickOpen}
+                                onOpenChange={setDragCherryPickOpen}
+                                commitHash={dragCommit.hash}
+                                commitMessage={dragCommit.message}
+                                targetBranch={dragTargetBranch}
+                                onComplete={handleRefreshAll}
+                            />
+                        )}
+
+                        {/* Quick Look Panel */}
+                        <QuickLookPanel />
+
+                        <CommitMultiSelectBar
+                            selectedCommits={multiSelectionPayload.commits}
+                            currentBranch={currentHead}
+                            contiguous={multiSelectionPayload.contiguous}
+                            onCurrentBranch={true}
+                            onClear={clearMultiSelection}
+                        />
+
+                        <CommitDotQuickActions
+                            open={commitDotQuickOpen}
+                            position={commitDotQuickPosition}
+                            commit={commitDotQuickTarget}
+                            currentBranch={currentHead}
+                            onClose={() => {
+                                setCommitDotQuickOpen(false);
+                            }}
+                            onOpenFullDetails={(hash) => {
+                                const idx = layoutCommits.findIndex((c: { hash: string }) => c.hash === hash);
+                                if (idx >= 0) handleSelectCommit(idx);
+                            }}
+                        />
+
+                        {activeRepo && (
+                            <OperationStatusBar
+                                repo={activeRepo}
+                                onOpenRebaseTodo={() => {
+                                    setRebaseTodoOpen(true);
+                                }}
+                                onOpenConflictFile={handleOpenConflictFile}
+                                onRevealConflictFile={handleRevealConflictFile}
+                                onOperationStateChange={(operationState) => {
+                                    if (operationState && !operationState.rebasing) {
+                                        setRebaseTodoOpen(false);
+                                    }
+                                }}
+                            />
+                        )}
+                    </div>
+                </TooltipProvider>
             </OutcomePickerProvider>
         </UndoStackProvider>
     );

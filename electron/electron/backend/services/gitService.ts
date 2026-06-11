@@ -60,6 +60,13 @@ export interface DiffNumStatRecord {
     deletions: number;
 }
 
+export interface GitCommandResult {
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    error: string | null;
+}
+
 // ==================== GPG Status Parsing ====================
 
 // Reserved for future GPG signature parsing
@@ -202,14 +209,14 @@ export class GitService {
     /**
      * Spawn a Git command and return the result.
      */
-	async spawnGit<T>(args: string[], cwd: string, parser: (stdout: string) => T): Promise<T> {
-	        const gitExecutable = this.gitExecutable;
-	        if (!gitExecutable) {
-	            throw new Error('Git executable not available');
-	        }
+    async spawnGit<T>(args: string[], cwd: string, parser: (stdout: string) => T): Promise<T> {
+        const gitExecutable = this.gitExecutable;
+        if (!gitExecutable) {
+            throw new Error('Git executable not available');
+        }
 
-	        return new Promise((resolve, reject) => {
-	            const cmd = cp.spawn(gitExecutable.path, args, { cwd });
+        return new Promise((resolve, reject) => {
+            const cmd = cp.spawn(gitExecutable.path, args, { cwd });
 
             const stdoutChunks: Buffer[] = [];
             let stdoutBytes = 0;
@@ -225,43 +232,43 @@ export class GitService {
                 stderr += Buffer.isBuffer(data) ? data.toString('utf8') : data;
             });
 
-	            cmd.on('error', (error) => {
-	                reject(error);
-	            });
+            cmd.on('error', (error) => {
+                reject(error);
+            });
 
             cmd.on('close', (code) => {
                 if (code === 0) {
                     try {
                         const encoding = encodingExists(this.config.fileEncoding) ? this.config.fileEncoding : 'utf8';
-	                        const outputBuffer =
-	                            stdoutChunks.length === 0
-	                                ? Buffer.alloc(0)
-	                                : stdoutChunks.length === 1
-	                                  ? (stdoutChunks[0] ?? Buffer.alloc(0))
-	                                  : Buffer.concat(stdoutChunks, stdoutBytes);
-	                        const output = decode(outputBuffer, encoding);
-	                        resolve(parser(output));
-	                    } catch (error) {
-	                        reject(error instanceof Error ? error : new Error('Parse error'));
-	                    }
-	                } else {
-	                    reject(new Error(stderr.trim() || `Git exited with code ${String(code)}`));
-	                }
-	            });
-	        });
-	    }
+                        const outputBuffer =
+                            stdoutChunks.length === 0
+                                ? Buffer.alloc(0)
+                                : stdoutChunks.length === 1
+                                  ? (stdoutChunks[0] ?? Buffer.alloc(0))
+                                  : Buffer.concat(stdoutChunks, stdoutBytes);
+                        const output = decode(outputBuffer, encoding);
+                        resolve(parser(output));
+                    } catch (error) {
+                        reject(error instanceof Error ? error : new Error('Parse error'));
+                    }
+                } else {
+                    reject(new Error(stderr.trim() || `Git exited with code ${String(code)}`));
+                }
+            });
+        });
+    }
 
     /**
      * Run a Git command and return error info (null = success).
      */
-	async runGitCommand(args: string[], cwd: string, options?: { env?: NodeJS.ProcessEnv }): Promise<string | null> {
-	        const gitExecutable = this.gitExecutable;
-	        if (!gitExecutable) {
-	            return 'Git executable not available';
-	        }
+    async runGitCommand(args: string[], cwd: string, options?: { env?: NodeJS.ProcessEnv }): Promise<string | null> {
+        const gitExecutable = this.gitExecutable;
+        if (!gitExecutable) {
+            return 'Git executable not available';
+        }
 
-	        return new Promise((resolve) => {
-	            const cmd = cp.spawn(gitExecutable.path, args, {
+        return new Promise((resolve) => {
+            const cmd = cp.spawn(gitExecutable.path, args, {
                 cwd,
                 env: options?.env ? { ...process.env, ...options.env } : process.env,
             });
@@ -276,26 +283,26 @@ export class GitService {
                 resolve(error.message);
             });
 
-	            cmd.on('close', (code) => {
-	                if (code === 0) {
-	                    resolve(null);
-	                } else {
-	                    resolve(stderr.trim() || `Git exited with code ${String(code)}`);
-	                }
-	            });
-	        });
-	    }
+            cmd.on('close', (code) => {
+                if (code === 0) {
+                    resolve(null);
+                } else {
+                    resolve(stderr.trim() || `Git exited with code ${String(code)}`);
+                }
+            });
+        });
+    }
 
     /**
      * Run a Git command with custom interactive rebase todo content.
      */
-	async runGitCommandWithInteractiveTodo(args: string[], cwd: string, todos: string): Promise<string | null> {
-	        const trimmedTodos = todos.trim();
-	        const tmpTodoPath = path.join(os.tmpdir(), `git-graph-rebase-todo-${String(Date.now())}.txt`);
-	        const tmpEditorPath = path.join(
-	            os.tmpdir(),
-	            `git-graph-rebase-sequence-editor-${String(Date.now())}${process.platform === 'win32' ? '.cmd' : '.sh'}`
-	        );
+    async runGitCommandWithInteractiveTodo(args: string[], cwd: string, todos: string): Promise<string | null> {
+        const trimmedTodos = todos.trim();
+        const tmpTodoPath = path.join(os.tmpdir(), `git-graph-rebase-todo-${String(Date.now())}.txt`);
+        const tmpEditorPath = path.join(
+            os.tmpdir(),
+            `git-graph-rebase-sequence-editor-${String(Date.now())}${process.platform === 'win32' ? '.cmd' : '.sh'}`
+        );
         const normalizedTodos = trimmedTodos === '' ? '# no changes\\n' : `${trimmedTodos}\\n`;
         const isWindows = process.platform === 'win32';
 
@@ -331,14 +338,14 @@ export class GitService {
     /**
      * Run a git command and return the stdout output.
      */
-	async runGitCommandWithOutput(args: string[], cwd: string): Promise<string | null> {
-	        const gitExecutable = this.gitExecutable;
-	        if (!gitExecutable) {
-	            return null;
-	        }
+    async runGitCommandWithOutput(args: string[], cwd: string): Promise<string | null> {
+        const gitExecutable = this.gitExecutable;
+        if (!gitExecutable) {
+            return null;
+        }
 
-	        return new Promise((resolve) => {
-	            const cmd = cp.spawn(gitExecutable.path, args, { cwd });
+        return new Promise((resolve) => {
+            const cmd = cp.spawn(gitExecutable.path, args, { cwd });
 
             const stdoutChunks: Buffer[] = [];
             const stderrChunks: Buffer[] = [];
@@ -368,6 +375,59 @@ export class GitService {
         });
     }
 
+    /**
+     * Run a Git command and return stdout, stderr, and the exit code.
+     *
+     * Some read-only Git commands, notably `merge-tree --write-tree`, exit with
+     * code 1 to report conflicts while still printing useful preview data.
+     */
+    async runGitCommandWithResult(args: string[], cwd: string): Promise<GitCommandResult> {
+        const gitExecutable = this.gitExecutable;
+        if (!gitExecutable) {
+            return {
+                stdout: '',
+                stderr: '',
+                exitCode: null,
+                error: 'Git executable not available',
+            };
+        }
+
+        return new Promise((resolve) => {
+            const cmd = cp.spawn(gitExecutable.path, args, { cwd });
+
+            const stdoutChunks: Buffer[] = [];
+            const stderrChunks: Buffer[] = [];
+
+            cmd.stdout.on('data', (data: Buffer | string) => {
+                stdoutChunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
+            });
+
+            cmd.stderr.on('data', (data: Buffer | string) => {
+                stderrChunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
+            });
+
+            cmd.on('error', (error) => {
+                resolve({
+                    stdout: '',
+                    stderr: '',
+                    exitCode: null,
+                    error: error.message,
+                });
+            });
+
+            cmd.on('close', (code) => {
+                const stdout = Buffer.concat(stdoutChunks).toString('utf8');
+                const stderr = Buffer.concat(stderrChunks).toString('utf8');
+                resolve({
+                    stdout,
+                    stderr,
+                    exitCode: code,
+                    error: code === 0 || code === 1 ? null : stderr.trim() || `Git exited with code ${String(code)}`,
+                });
+            });
+        });
+    }
+
     // ==================== Repository Information ====================
 
     /**
@@ -391,16 +451,16 @@ export class GitService {
 
         const hideRemotePatterns = hideRemotes.map((remote) => `remotes/${remote}/`);
 
-	        return this.spawnGit(args, repo, (stdout) => {
-	            const data: GitBranchData = { branches: [], head: null };
-	            const lines = stdout.split(EOL_REGEX);
+        return this.spawnGit(args, repo, (stdout) => {
+            const data: GitBranchData = { branches: [], head: null };
+            const lines = stdout.split(EOL_REGEX);
 
-	            for (let i = 0; i < lines.length - 1; i++) {
-	                const branchLine = lines[i];
-	                if (!branchLine || branchLine.length < 2) {
-	                    continue;
-	                }
-	                const name = branchLine.substring(2).split(' -> ')[0] ?? '';
+            for (let i = 0; i < lines.length - 1; i++) {
+                const branchLine = lines[i];
+                if (!branchLine || branchLine.length < 2) {
+                    continue;
+                }
+                const name = branchLine.substring(2).split(' -> ')[0] ?? '';
 
                 if (
                     INVALID_BRANCH_REGEXP.test(name) ||
@@ -410,10 +470,10 @@ export class GitService {
                     continue;
                 }
 
-	                if (branchLine.charAt(0) === '*') {
-	                    data.head = name;
-	                    data.branches.unshift(name);
-	                } else {
+                if (branchLine.charAt(0) === '*') {
+                    data.head = name;
+                    data.branches.unshift(name);
+                } else {
                     data.branches.push(name);
                 }
             }
@@ -460,25 +520,25 @@ export class GitService {
             }> = [];
 
             const lines = stdout.split(EOL_REGEX);
-	            for (const line of lines) {
-	                if (!line) continue;
+            for (const line of lines) {
+                if (!line) continue;
 
-	                const parts = line.split(GIT_LOG_SEPARATOR);
-	                if (parts.length < 7) continue;
+                const parts = line.split(GIT_LOG_SEPARATOR);
+                if (parts.length < 7) continue;
 
-	                const parentTokens = (parts[1] ?? '').split(' ');
-	                const selector = parts[2] ?? '';
-	                stashes.push({
-	                    hash: parts[0] ?? '',
-	                    baseHash: parentTokens[0] ?? '',
-	                    untrackedFilesHash: parentTokens[1] ?? null,
-	                    selector,
-	                    author: parts[3] ?? '',
-	                    email: parts[4] ?? '',
-	                    date: parseInt(parts[5] ?? '0', 10),
-	                    message: parts[6] ?? '',
-	                });
-	            }
+                const parentTokens = (parts[1] ?? '').split(' ');
+                const selector = parts[2] ?? '';
+                stashes.push({
+                    hash: parts[0] ?? '',
+                    baseHash: parentTokens[0] ?? '',
+                    untrackedFilesHash: parentTokens[1] ?? null,
+                    selector,
+                    author: parts[3] ?? '',
+                    email: parts[4] ?? '',
+                    date: parseInt(parts[5] ?? '0', 10),
+                    message: parts[6] ?? '',
+                });
+            }
 
             return stashes;
         });
@@ -620,14 +680,14 @@ export class GitService {
             message: string;
         }>
     > {
-	        const args = [
-	            '-c',
-	            'log.showSignature=false',
-	            'log',
-	            `--max-count=${String(maxCommits)}`,
-	            `--format=${this.gitFormatLog}`,
-	            `--${order}-order`,
-	        ];
+        const args = [
+            '-c',
+            'log.showSignature=false',
+            'log',
+            `--max-count=${String(maxCommits)}`,
+            `--format=${this.gitFormatLog}`,
+            `--${order}-order`,
+        ];
 
         if (onlyFollowFirstParent) {
             args.push('--first-parent');
@@ -675,21 +735,21 @@ export class GitService {
             }> = [];
 
             const lines = stdout.split(EOL_REGEX);
-	            for (const line of lines) {
-	                if (!line) continue;
+            for (const line of lines) {
+                if (!line) continue;
 
-	                const parts = line.split(GIT_LOG_SEPARATOR);
-	                if (parts.length < 6) continue;
+                const parts = line.split(GIT_LOG_SEPARATOR);
+                if (parts.length < 6) continue;
 
-	                commits.push({
-	                    hash: parts[0] ?? '',
-	                    parents: parts[1] ? parts[1].split(' ') : [],
-	                    author: parts[2] ?? '',
-	                    email: parts[3] ?? '',
-	                    date: parseInt(parts[4] ?? '0', 10),
-	                    message: parts[5] ?? '',
-	                });
-	            }
+                commits.push({
+                    hash: parts[0] ?? '',
+                    parents: parts[1] ? parts[1].split(' ') : [],
+                    author: parts[2] ?? '',
+                    email: parts[3] ?? '',
+                    date: parseInt(parts[4] ?? '0', 10),
+                    message: parts[5] ?? '',
+                });
+            }
 
             return commits;
         });
@@ -712,11 +772,16 @@ export class GitService {
             message: string;
         }>
     > {
-	        if (!startHash.trim() || maxCommits <= 0) {
-	            return [];
-	        }
+        if (!startHash.trim() || maxCommits <= 0) {
+            return [];
+        }
 
-	        const args = ['log', `--max-count=${String(maxCommits)}`, `--format=${this.gitFormatLog}`, `${startHash}..HEAD`];
+        const args = [
+            'log',
+            `--max-count=${String(maxCommits)}`,
+            `--format=${this.gitFormatLog}`,
+            `${startHash}..HEAD`,
+        ];
 
         return this.spawnGit(args, repo, (stdout) => {
             const commits: Array<{
@@ -729,21 +794,21 @@ export class GitService {
             }> = [];
 
             const lines = stdout.split(EOL_REGEX);
-	            for (const line of lines) {
-	                if (!line) continue;
+            for (const line of lines) {
+                if (!line) continue;
 
-	                const parts = line.split(GIT_LOG_SEPARATOR);
-	                if (parts.length < 6) continue;
+                const parts = line.split(GIT_LOG_SEPARATOR);
+                if (parts.length < 6) continue;
 
-	                commits.push({
-	                    hash: parts[0] ?? '',
-	                    parents: parts[1] ? parts[1].split(' ') : [],
-	                    author: parts[2] ?? '',
-	                    email: parts[3] ?? '',
-	                    date: parseInt(parts[4] ?? '0', 10),
-	                    message: parts[5] ?? '',
-	                });
-	            }
+                commits.push({
+                    hash: parts[0] ?? '',
+                    parents: parts[1] ? parts[1].split(' ') : [],
+                    author: parts[2] ?? '',
+                    email: parts[3] ?? '',
+                    date: parseInt(parts[4] ?? '0', 10),
+                    message: parts[5] ?? '',
+                });
+            }
 
             return commits;
         });
@@ -770,20 +835,20 @@ export class GitService {
         return this.spawnGit(
             ['-c', 'log.showSignature=false', 'show', '--quiet', commitHash, '--format=' + this.gitFormatCommitDetails],
             repo,
-	            (stdout) => {
-	                const parts = stdout.split(GIT_LOG_SEPARATOR);
-	                return {
-	                    hash: parts[0] ?? '',
-	                    parents: parts[1] ? parts[1].split(' ') : [],
-	                    author: parts[2] ?? '',
-	                    authorEmail: parts[3] ?? '',
-	                    authorDate: parseInt(parts[4] ?? '0', 10),
-	                    committer: parts[5] ?? '',
-	                    committerEmail: parts[6] ?? '',
-	                    committerDate: parseInt(parts[7] ?? '0', 10),
-	                    signature:
-	                        parts[8] && ['G', 'U', 'X', 'Y', 'R', 'E', 'B'].includes(parts[8])
-	                            ? { key: parts[10]?.trim() ?? '', signer: parts[9]?.trim() ?? '', status: parts[8] }
+            (stdout) => {
+                const parts = stdout.split(GIT_LOG_SEPARATOR);
+                return {
+                    hash: parts[0] ?? '',
+                    parents: parts[1] ? parts[1].split(' ') : [],
+                    author: parts[2] ?? '',
+                    authorEmail: parts[3] ?? '',
+                    authorDate: parseInt(parts[4] ?? '0', 10),
+                    committer: parts[5] ?? '',
+                    committerEmail: parts[6] ?? '',
+                    committerDate: parseInt(parts[7] ?? '0', 10),
+                    signature:
+                        parts[8] && ['G', 'U', 'X', 'Y', 'R', 'E', 'B'].includes(parts[8])
+                            ? { key: parts[10]?.trim() ?? '', signer: parts[9]?.trim() ?? '', status: parts[8] }
                             : null,
                     body: parts.slice(11).join(GIT_LOG_SEPARATOR).trim(),
                 };
@@ -810,7 +875,9 @@ export class GitService {
         }
 
         return new Promise((resolve, reject) => {
-            const cmd = cp.spawn(gitExecutable.path, ['show', `${commitHash}:${filePath}`], { cwd: repo });
+            const cmd = cp.spawn(gitExecutable.path, ['show', `${commitHash}:${filePath}`], {
+                cwd: repo,
+            });
             const stdoutChunks: Buffer[] = [];
             let stdoutBytes = 0;
             let stderr = '';
@@ -867,19 +934,19 @@ export class GitService {
                 const parts = line.split('\t');
                 const type = parts[0]?.[0];
 
-	                if (type === 'A' || type === 'D' || type === 'M') {
-	                    records.push({
-	                        type,
-	                        oldFilePath: parts[1] ?? '',
-	                        newFilePath: parts[1] ?? '',
-	                    });
-	                } else if (type === 'R') {
-	                    records.push({
-	                        type,
-	                        oldFilePath: parts[1] ?? '',
-	                        newFilePath: parts[2] ?? '',
-	                    });
-	                }
+                if (type === 'A' || type === 'D' || type === 'M') {
+                    records.push({
+                        type,
+                        oldFilePath: parts[1] ?? '',
+                        newFilePath: parts[1] ?? '',
+                    });
+                } else if (type === 'R') {
+                    records.push({
+                        type,
+                        oldFilePath: parts[1] ?? '',
+                        newFilePath: parts[2] ?? '',
+                    });
+                }
             }
 
             return records;
@@ -905,13 +972,13 @@ export class GitService {
                 if (!line) continue;
 
                 const parts = line.split('\t');
-	                if (parts.length >= 3) {
-	                    records.push({
-	                        filePath: parts[2] ?? '',
-	                        additions: parts[0] === '-' ? 0 : parseInt(parts[0] ?? '0', 10),
-	                        deletions: parts[1] === '-' ? 0 : parseInt(parts[1] ?? '0', 10),
-	                    });
-	                }
+                if (parts.length >= 3) {
+                    records.push({
+                        filePath: parts[2] ?? '',
+                        additions: parts[0] === '-' ? 0 : parseInt(parts[0] ?? '0', 10),
+                        deletions: parts[1] === '-' ? 0 : parseInt(parts[1] ?? '0', 10),
+                    });
+                }
             }
 
             return records;

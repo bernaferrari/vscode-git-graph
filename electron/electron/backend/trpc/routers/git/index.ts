@@ -14,7 +14,12 @@ import { readSecretValue, setSecretValue } from '@/app/backend/store/secret';
 
 import { parseWorktreePorcelainRecords } from './worktree';
 import { findGit } from '../../../services/gitExecutable';
-import { GitService, type DiffNameStatusRecord, type DiffNumStatRecord } from '../../../services/gitService';
+import {
+    GitService,
+    type DiffNameStatusRecord,
+    type DiffNumStatRecord,
+    type GitCommandResult,
+} from '../../../services/gitService';
 import {
     addPullRequestComment as addRemotePullRequestComment,
     addPullRequestInlineComment as addRemotePullRequestInlineComment,
@@ -168,7 +173,10 @@ async function buildSelectedCommitRebaseTodo(
     }
 
     const revListOutput = await getGitService().runGitCommandWithOutput(['rev-list', '--reverse', 'HEAD'], repo);
-    const headCommits = (revListOutput ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
+    const headCommits = (revListOutput ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
     const selectedIndices = headCommits
         .map((hash, index) => (selected.has(hash) ? index : -1))
         .filter((index) => index >= 0);
@@ -178,8 +186,9 @@ async function buildSelectedCommitRebaseTodo(
     }
 
     const firstSelectedIndex = selectedIndices[0] ?? -1;
-    const selectedCommitsAreContiguous =
-        selectedIndices.every((index, offset) => index === firstSelectedIndex + offset);
+    const selectedCommitsAreContiguous = selectedIndices.every(
+        (index, offset) => index === firstSelectedIndex + offset
+    );
 
     if (selectedAction === 'fixup' && !selectedCommitsAreContiguous) {
         return { args: [], todos: '', error: 'Select contiguous commits to squash them together.' };
@@ -491,25 +500,378 @@ async function applySigningConfig(update: SigningConfigUpdate): Promise<string |
     );
 }
 
-function parseConflictedFilesFromStatusOutput(statusOutput: string | null): string[] {
-    if (!statusOutput) {
-        return [];
+function parseUpstreamTrack(track: string): { ahead: number; behind: number } {
+    const aheadMatch = track.match(/ahead (\d+)/i);
+    const behindMatch = track.match(/behind (\d+)/i);
+    return {
+        ahead: aheadMatch ? parseInt(aheadMatch[1] ?? '0', 10) || 0 : 0,
+        behind: behindMatch ? parseInt(behindMatch[1] ?? '0', 10) || 0 : 0,
+    };
+}
+
+type IntegrationPreviewStrategy = 'merge' | 'rebase' | 'squash';
+type PreviewRiskLevel = 'low' | 'medium' | 'high';
+
+interface MergeTreePreviewResult {
+    canApplyCleanly: boolean;
+    treeHash: string | null;
+    conflictFiles: string[];
+    error: string | null;
+}
+
+interface IntegrationPreviewOption {
+    strategy: IntegrationPreviewStrategy;
+    conflicts: number;
+    conflictFiles: string[];
+    willRewriteHistory: boolean;
+    willForcePush: boolean;
+    commitsAfter: number;
+    commitsAffected: number;
+    filesChanged: number;
+    gitCommands: string[];
+    riskLevel: PreviewRiskLevel;
+    riskReasons: string[];
+    warnings: string[];
+    recommended: boolean;
+}
+
+const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+function uniqueStrings(values: string[]): string[] {
+    return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+
+function parseMergeTreeNameOnlyOutput(result: GitCommandResult): {
+    treeHash: string | null;
+    conflictFiles: string[];
+} {
+    const parts = result.stdout.split('\0').filter(Boolean);
+    const treeHash = parts[0]?.match(/^[0-9a-f]{40}$/i) ? parts[0] : null;
+    return {
+        treeHash,
+        conflictFiles: uniqueStrings(treeHash ? parts.slice(1) : parts),
+    };
+}
+
+async function runMergeTreePreview(
+    repo: string,
+    ours: string,
+    theirs: string,
+    mergeBase?: string
+): Promise<MergeTreePreviewResult> {
+    const args = ['merge-tree', '--write-tree', '--name-only', '-z', '--no-messages'];
+    if (mergeBase) {
+        args.push('--merge-base', mergeBase);
+    }
+    args.push(ours, theirs);
+
+    const result = await getGitService().runGitCommandWithResult(args, repo);
+    const parsed = parseMergeTreeNameOnlyOutput(result);
+    const stderr = result.stderr.trim();
+
+    if (result.error) {
+        return {
+            canApplyCleanly: false,
+            treeHash: parsed.treeHash,
+            conflictFiles: parsed.conflictFiles,
+            error: result.error,
+        };
     }
 
-    const conflicted: string[] = [];
-    for (const line of statusOutput.split('\n').filter(Boolean)) {
-        const index = line[0];
-        const workTree = line[1];
-        if (
-            index === 'U' ||
-            workTree === 'U' ||
-            (index === 'A' && workTree === 'A') ||
-            (index === 'D' && workTree === 'D')
-        ) {
-            conflicted.push(line.slice(3));
+    if (!parsed.treeHash) {
+        return {
+            canApplyCleanly: false,
+            treeHash: null,
+            conflictFiles: parsed.conflictFiles,
+            error: stderr || 'Git merge-tree did not return a preview tree.',
+        };
+    }
+
+    return {
+        canApplyCleanly: result.exitCode === 0 && parsed.conflictFiles.length === 0,
+        treeHash: parsed.treeHash,
+        conflictFiles: parsed.conflictFiles,
+        error: null,
+    };
+}
+
+async function countCommits(repo: string, range: string): Promise<number> {
+    const output = await getGitService().runGitCommandWithOutput(['rev-list', '--count', range], repo);
+    return Math.max(0, parseInt((output ?? '').trim(), 10) || 0);
+}
+
+async function listPreviewCommits(
+    repo: string,
+    range: string,
+    maxCount = 200
+): Promise<Array<{ hash: string; message: string }>> {
+    const output = await getGitService().runGitCommandWithOutput(
+        ['log', `--max-count=${String(maxCount)}`, '--format=%H%x1f%s', range],
+        repo
+    );
+    return (output ?? '')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+            const [hash, message = ''] = line.split('\x1f');
+            return { hash: hash ?? '', message };
+        })
+        .filter((commit) => commit.hash.length > 0);
+}
+
+function toPreviewFileStatus(type: string): 'added' | 'modified' | 'deleted' | 'renamed' {
+    if (type === 'A') return 'added';
+    if (type === 'D') return 'deleted';
+    if (type === 'R') return 'renamed';
+    return 'modified';
+}
+
+async function getPreviewFiles(
+    repo: string,
+    range: string
+): Promise<
+    Array<{
+        path: string;
+        status: 'added' | 'modified' | 'deleted' | 'renamed';
+        additions: number;
+        deletions: number;
+        changes: number;
+    }>
+> {
+    const gitService = getGitService();
+    const [nameStatus, numStat] = await Promise.all([
+        gitService.getDiffNameStatus(repo, range, ''),
+        gitService.getDiffNumStat(repo, range, ''),
+    ]);
+
+    return nameStatus.map((record) => {
+        const filePath = record.newFilePath || record.oldFilePath;
+        const stats = numStat.find((entry) => entry.filePath === filePath);
+        const additions = stats?.additions ?? 0;
+        const deletions = stats?.deletions ?? 0;
+        return {
+            path: filePath,
+            status: toPreviewFileStatus(record.type),
+            additions,
+            deletions,
+            changes: additions + deletions,
+        };
+    });
+}
+
+async function getUpstreamForRef(repo: string, ref: string): Promise<string | null> {
+    const output = await getGitService().runGitCommandWithOutput(
+        ['rev-parse', '--abbrev-ref', `${ref}@{upstream}`],
+        repo
+    );
+    const upstream = output?.trim();
+    return upstream && upstream !== `${ref}@{upstream}` ? upstream : null;
+}
+
+async function getRebaseCommitHashes(repo: string, source: string, target: string): Promise<string[]> {
+    const output = await getGitService().runGitCommandWithOutput(
+        ['rev-list', '--reverse', '--no-merges', `${source}..${target}`],
+        repo
+    );
+    return (output ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+async function getFirstParentOrEmptyTree(repo: string, commitHash: string): Promise<string> {
+    const output = await getGitService().runGitCommandWithOutput(
+        ['rev-list', '--parents', '-n', '1', commitHash],
+        repo
+    );
+    const [, firstParent] = (output ?? '').trim().split(/\s+/);
+    return firstParent || EMPTY_TREE_HASH;
+}
+
+async function previewRebaseReplay(
+    repo: string,
+    source: string,
+    target: string
+): Promise<{
+    conflictFiles: string[];
+    commitsAffected: number;
+    warnings: string[];
+    error: string | null;
+}> {
+    const commitHashes = await getRebaseCommitHashes(repo, source, target);
+    const warnings: string[] = [];
+    let currentTree = source;
+    const conflictFiles: string[] = [];
+
+    for (const commitHash of commitHashes) {
+        const parent = await getFirstParentOrEmptyTree(repo, commitHash);
+        const preview = await runMergeTreePreview(repo, currentTree, commitHash, parent);
+
+        conflictFiles.push(...preview.conflictFiles);
+        if (preview.error) {
+            return {
+                conflictFiles: uniqueStrings(conflictFiles),
+                commitsAffected: commitHashes.length,
+                warnings,
+                error: preview.error,
+            };
+        }
+
+        if (preview.treeHash) {
+            currentTree = preview.treeHash;
+        }
+
+        if (!preview.canApplyCleanly) {
+            warnings.push(`Rebase preview found conflicts while replaying ${commitHash.slice(0, 7)}.`);
         }
     }
-    return conflicted;
+
+    return {
+        conflictFiles: uniqueStrings(conflictFiles),
+        commitsAffected: commitHashes.length,
+        warnings: uniqueStrings(warnings),
+        error: null,
+    };
+}
+
+function analyzePreviewRisk(input: {
+    conflicts: number;
+    willRewriteHistory: boolean;
+    willForcePush: boolean;
+    remoteBranchesAffected: string[];
+}): { level: PreviewRiskLevel; reasons: string[] } {
+    const reasons: string[] = [];
+    let level: PreviewRiskLevel = 'low';
+
+    if (input.conflicts > 0) {
+        reasons.push(`${String(input.conflicts)} conflict file${input.conflicts === 1 ? '' : 's'} detected`);
+        level = input.conflicts > 10 ? 'high' : 'medium';
+    }
+
+    if (input.willRewriteHistory) {
+        reasons.push('This rewrites local commit hashes');
+        if (level === 'low') level = 'medium';
+    }
+
+    if (input.willForcePush) {
+        reasons.push('Updating the tracked remote branch may require a force push');
+        level = 'high';
+    }
+
+    if (input.remoteBranchesAffected.length > 0) {
+        reasons.push(`Tracked branch affected: ${input.remoteBranchesAffected.join(', ')}`);
+    }
+
+    return { level, reasons };
+}
+
+async function buildIntegrationPreviewOptions(
+    repo: string,
+    source: string,
+    target: string
+): Promise<{ options: IntegrationPreviewOption[]; error: string | null }> {
+    const [mergeTree, rebaseReplay, sourceCommits, targetCommits, mergeFiles, rebaseFiles, upstream] =
+        await Promise.all([
+            runMergeTreePreview(repo, target, source),
+            previewRebaseReplay(repo, source, target),
+            countCommits(repo, `${target}..${source}`),
+            countCommits(repo, `${source}..${target}`),
+            getPreviewFiles(repo, `${target}...${source}`),
+            getPreviewFiles(repo, `${source}...${target}`),
+            getUpstreamForRef(repo, target),
+        ]);
+
+    const buildOption = (input: {
+        strategy: IntegrationPreviewStrategy;
+        conflictFiles: string[];
+        willRewriteHistory: boolean;
+        willForcePush: boolean;
+        commitsAfter: number;
+        commitsAffected: number;
+        filesChanged: number;
+        gitCommands: string[];
+        warnings: string[];
+    }): IntegrationPreviewOption => {
+        const remoteBranchesAffected = input.willForcePush && upstream ? [upstream] : [];
+        const risk = analyzePreviewRisk({
+            conflicts: input.conflictFiles.length,
+            willRewriteHistory: input.willRewriteHistory,
+            willForcePush: input.willForcePush,
+            remoteBranchesAffected,
+        });
+
+        return {
+            strategy: input.strategy,
+            conflicts: input.conflictFiles.length,
+            conflictFiles: input.conflictFiles,
+            willRewriteHistory: input.willRewriteHistory,
+            willForcePush: input.willForcePush,
+            commitsAfter: input.commitsAfter,
+            commitsAffected: input.commitsAffected,
+            filesChanged: input.filesChanged,
+            gitCommands: input.gitCommands,
+            riskLevel: risk.level,
+            riskReasons: risk.reasons,
+            warnings: input.warnings,
+            recommended: false,
+        };
+    };
+
+    const mergeWarnings = mergeTree.error ? [mergeTree.error] : [];
+    const rebaseWarnings = rebaseReplay.error ? [...rebaseReplay.warnings, rebaseReplay.error] : rebaseReplay.warnings;
+    const rebaseWillForcePush = Boolean(upstream && targetCommits > 0);
+    const mergeConflictFiles = uniqueStrings(mergeTree.conflictFiles);
+    const rebaseConflictFiles = uniqueStrings(rebaseReplay.conflictFiles);
+
+    const options = [
+        buildOption({
+            strategy: 'merge',
+            conflictFiles: mergeConflictFiles,
+            willRewriteHistory: false,
+            willForcePush: false,
+            commitsAfter: sourceCommits > 0 ? 1 : 0,
+            commitsAffected: sourceCommits,
+            filesChanged: mergeFiles.length,
+            gitCommands: [`git merge --no-ff ${source}`],
+            warnings: mergeWarnings,
+        }),
+        buildOption({
+            strategy: 'rebase',
+            conflictFiles: rebaseConflictFiles,
+            willRewriteHistory: true,
+            willForcePush: rebaseWillForcePush,
+            commitsAfter: targetCommits,
+            commitsAffected: targetCommits,
+            filesChanged: rebaseFiles.length,
+            gitCommands: [`git rebase ${source}`],
+            warnings: rebaseWarnings,
+        }),
+        buildOption({
+            strategy: 'squash',
+            conflictFiles: mergeConflictFiles,
+            willRewriteHistory: false,
+            willForcePush: false,
+            commitsAfter: sourceCommits > 0 ? 1 : 0,
+            commitsAffected: sourceCommits,
+            filesChanged: mergeFiles.length,
+            gitCommands: [`git merge --squash ${source}`],
+            warnings: mergeWarnings,
+        }),
+    ];
+
+    const recommended =
+        options.find((option) => option.strategy === 'merge' && option.conflicts === 0) ??
+        options.find((option) => option.strategy === 'rebase' && option.conflicts === 0) ??
+        options.find((option) => option.strategy === 'squash' && option.conflicts === 0) ??
+        options[0];
+
+    return {
+        options: options.map((option) => ({
+            ...option,
+            recommended: option.strategy === recommended?.strategy,
+        })),
+        error: mergeTree.error && rebaseReplay.error ? `${mergeTree.error}\n${rebaseReplay.error}` : null,
+    };
 }
 
 function parseLfsTrackPatterns(trackOutput: string | null): string[] {
@@ -618,9 +980,7 @@ function parseLfsTrackedFiles(lsFilesOutput: string | null): Array<{
         const sizeToken = sizeMatch?.[1]?.trim() ?? null;
         const sizeBytes = sizeToken ? parseByteSizeToken(sizeToken) : null;
 
-        const pathWithPrefix = line
-            .replace(/^([0-9a-f]{6,64})\s+[*-]\s+/i, '')
-            .replace(/\s+\([^)]+\)\s*$/, '');
+        const pathWithPrefix = line.replace(/^([0-9a-f]{6,64})\s+[*-]\s+/i, '').replace(/\s+\([^)]+\)\s*$/, '');
         const filePath = pathWithPrefix.trim();
 
         if (!filePath) continue;
@@ -649,7 +1009,9 @@ function resolveGlobalGitConfigPath(): string {
     return path.join(os.homedir(), '.gitconfig');
 }
 
-function mapCiStatusFromGitHub(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+function mapCiStatusFromGitHub(
+    state: string | null | undefined
+): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
     switch ((state ?? '').toLowerCase()) {
         case 'success':
             return 'success';
@@ -663,7 +1025,9 @@ function mapCiStatusFromGitHub(state: string | null | undefined): 'success' | 'f
     }
 }
 
-function mapCiStatusFromGitLab(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+function mapCiStatusFromGitLab(
+    state: string | null | undefined
+): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
     switch ((state ?? '').toLowerCase()) {
         case 'success':
             return 'success';
@@ -683,7 +1047,9 @@ function mapCiStatusFromGitLab(state: string | null | undefined): 'success' | 'f
     }
 }
 
-function mapCiStatusFromBitbucket(state: string | null | undefined): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
+function mapCiStatusFromBitbucket(
+    state: string | null | undefined
+): 'success' | 'failure' | 'pending' | 'running' | 'cancelled' | 'unknown' {
     switch ((state ?? '').toLowerCase()) {
         case 'successful':
         case 'success':
@@ -851,26 +1217,38 @@ async function buildRepoHealthDiagnostics(repo: string): Promise<{
     const statusCounts = parsePorcelainStatus(statusOutput);
     const remoteOutput = await git.runGitCommandWithOutput(['remote', '-v'], repo);
     const head = (await git.runGitCommandWithOutput(['branch', '--show-current'], repo))?.trim() || null;
-    const upstream = (await git.runGitCommandWithOutput(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], repo))?.trim() || null;
+    const upstream =
+        (
+            await git.runGitCommandWithOutput(
+                ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+                repo
+            )
+        )?.trim() || null;
     const aheadBehind = upstream
-        ? parseAheadBehind(await git.runGitCommandWithOutput(['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], repo))
+        ? parseAheadBehind(
+              await git.runGitCommandWithOutput(['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], repo)
+          )
         : null;
     const largeFiles = parseLargeTrackedFiles(await git.runGitCommandWithOutput(['ls-tree', '-r', '-l', 'HEAD'], repo));
     const largeFileThreshold = 5 * 1024 * 1024;
     const oversizedFiles = largeFiles.filter((file) => file.sizeBytes >= largeFileThreshold).slice(0, 5);
     const staleThresholdSeconds = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
     const branchDates = parseBranchDates(
-        await git.runGitCommandWithOutput(['for-each-ref', '--format=%(refname:short)|%(committerdate:unix)', 'refs/heads'], repo)
+        await git.runGitCommandWithOutput(
+            ['for-each-ref', '--format=%(refname:short)|%(committerdate:unix)', 'refs/heads'],
+            repo
+        )
     );
     const staleBranches = branchDates
         .filter((branch) => branch.name !== head && branch.timestamp < staleThresholdSeconds)
         .sort((left, right) => left.timestamp - right.timestamp)
         .slice(0, 5);
-    const mergedBranches = (await git.runGitCommandWithOutput(['branch', '--merged', 'HEAD', '--format=%(refname:short)'], repo))
-        ?.split('\n')
-        .map((branch) => branch.trim())
-        .filter((branch) => branch && branch !== head && !['main', 'master', 'develop'].includes(branch))
-        .slice(0, 8) ?? [];
+    const mergedBranches =
+        (await git.runGitCommandWithOutput(['branch', '--merged', 'HEAD', '--format=%(refname:short)'], repo))
+            ?.split('\n')
+            .map((branch) => branch.trim())
+            .filter((branch) => branch && branch !== head && !['main', 'master', 'develop'].includes(branch))
+            .slice(0, 8) ?? [];
     const lfsFiles = parseLfsTrackedFiles(await git.runGitCommandWithOutput(['lfs', 'ls-files', '--size'], repo));
     const submoduleOutput = await git.runGitCommandWithOutput(['submodule', 'status', '--recursive'], repo);
     const submoduleLines = submoduleOutput?.split('\n').filter((line) => line.trim().length > 0) ?? [];
@@ -881,9 +1259,18 @@ async function buildRepoHealthDiagnostics(repo: string): Promise<{
             id: 'working-tree',
             label: 'Working Directory',
             description: 'Detect staged, unstaged, untracked, and conflicted files.',
-            status: statusCounts.conflictedCount > 0 ? 'fail' : statusCounts.stagedCount + statusCounts.unstagedCount + statusCounts.untrackedCount > 0 ? 'warn' : 'pass',
+            status:
+                statusCounts.conflictedCount > 0
+                    ? 'fail'
+                    : statusCounts.stagedCount + statusCounts.unstagedCount + statusCounts.untrackedCount > 0
+                      ? 'warn'
+                      : 'pass',
             detail:
-                statusCounts.stagedCount + statusCounts.unstagedCount + statusCounts.untrackedCount + statusCounts.conflictedCount > 0
+                statusCounts.stagedCount +
+                    statusCounts.unstagedCount +
+                    statusCounts.untrackedCount +
+                    statusCounts.conflictedCount >
+                0
                     ? `${String(statusCounts.stagedCount)} staged, ${String(statusCounts.unstagedCount)} unstaged, ${String(statusCounts.untrackedCount)} untracked, ${String(statusCounts.conflictedCount)} conflicted`
                     : 'Clean working directory',
             metrics: statusCounts,
@@ -925,7 +1312,9 @@ async function buildRepoHealthDiagnostics(repo: string): Promise<{
             status: oversizedFiles.length > 0 ? 'warn' : 'pass',
             detail:
                 oversizedFiles.length > 0
-	                    ? oversizedFiles.map((file) => `${file.path} (${formatByteSize(file.sizeBytes) ?? 'unknown size'})`).join(', ')
+                    ? oversizedFiles
+                          .map((file) => `${file.path} (${formatByteSize(file.sizeBytes) ?? 'unknown size'})`)
+                          .join(', ')
                     : 'No tracked files over 5 MB in HEAD',
             metrics: {
                 thresholdBytes: largeFileThreshold,
@@ -1086,9 +1475,11 @@ function parseRebaseTodoLine(line: string): RebaseTodoItem | null {
     return null;
 }
 
-async function readRebaseTodo(
-    gitDir: string
-): Promise<{ source: 'rebase-merge' | 'rebase-apply'; rawTodo: string; todos: RebaseTodoItem[] } | null> {
+async function readRebaseTodo(gitDir: string): Promise<{
+    source: 'rebase-merge' | 'rebase-apply';
+    rawTodo: string;
+    todos: RebaseTodoItem[];
+} | null> {
     const rebaseTodoCandidates: Array<{ source: 'rebase-merge' | 'rebase-apply'; path: string }> = [
         { source: 'rebase-merge', path: path.join(gitDir, 'rebase-merge', 'git-rebase-todo') },
         { source: 'rebase-apply', path: path.join(gitDir, 'rebase-apply', 'git-rebase-todo') },
@@ -1305,7 +1696,12 @@ function addWorkflowRun(run: {
     startedAt: number;
     finishedAt: number | null;
     status: 'running' | 'success' | 'failed';
-    steps: Array<{ id: string; type: string; status: 'pending' | 'running' | 'success' | 'failed' | 'skipped'; message?: string }>;
+    steps: Array<{
+        id: string;
+        type: string;
+        status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+        message?: string;
+    }>;
     error?: string;
 }): void {
     const existing = instanceStore.get('workflowRuns');
@@ -2010,9 +2406,7 @@ export const gitRouter = router({
 
             try {
                 const service = getGitService();
-                const args = input.staged
-                    ? ['diff', '--cached', '--', input.filePath]
-                    : ['diff', '--', input.filePath];
+                const args = input.staged ? ['diff', '--cached', '--', input.filePath] : ['diff', '--', input.filePath];
                 const diff = await service.runGitCommandWithOutput(args, input.repo);
                 return { diff: diff ?? '', error: null };
             } catch (error) {
@@ -2415,66 +2809,64 @@ export const gitRouter = router({
             if (initError) return { error: initError };
 
             try {
-                // Check if merge is possible (dry run)
-                await getGitService().runGitCommandWithOutput(
-                    ['merge', '--no-commit', '--no-ff', input.source],
-                    input.repo
-                );
-
-                // Get conflicts if any
-                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
-                const conflicts = parseConflictedFilesFromStatusOutput(statusOutput);
-
-                // Abort the dry-run merge
-                await getGitService().runGitCommand(['merge', '--abort'], input.repo);
-
-                // Get commits that would be merged
-                const logResult = await getGitService().runGitCommandWithOutput(
-                    ['log', `${input.target}..${input.source}`, '--oneline'],
-                    input.repo
-                );
-                const aheadCommits = (logResult ?? '')
-                    .split('\n')
-                    .filter(Boolean)
-                    .map((line) => {
-                        const [hash, ...msgParts] = line.split(' ');
-                        return { hash: hash ?? '', message: msgParts.join(' ') };
-                    });
-
-                // Get files that would change
-                const diffResult = await getGitService().runGitCommandWithOutput(
-                    ['diff', '--stat', `${input.target}...${input.source}`],
-                    input.repo
-                );
-                const files = (diffResult ?? '')
-                    .split('\n')
-                    .filter(Boolean)
-                    .map((line) => {
-                        const match = line.match(/^(.+?)\s*\|\s*(\d+)/);
-                        if (match) {
-                            return { path: match[1]?.trim() ?? '', changes: parseInt(match[2] ?? '0', 10) || 0 };
-                        }
-                        return { path: line.trim(), changes: 0 };
-                    });
+                const [mergeTree, aheadCommits, files] = await Promise.all([
+                    runMergeTreePreview(input.repo, input.target, input.source),
+                    listPreviewCommits(input.repo, `${input.target}..${input.source}`),
+                    getPreviewFiles(input.repo, `${input.target}...${input.source}`),
+                ]);
+                const conflicts = mergeTree.conflictFiles;
 
                 return {
-                    canMerge: conflicts.length === 0,
+                    canMerge: mergeTree.canApplyCleanly,
                     conflicts,
                     aheadCommits,
                     files,
-                    warnings: [],
+                    warnings: [
+                        ...(conflicts.length > 0 ? ['Merge conflicts detected'] : []),
+                        ...(mergeTree.error ? [mergeTree.error] : []),
+                    ],
                 };
-            } catch {
-                // Merge would have conflicts
-                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
-                await getGitService().runGitCommand(['merge', '--abort'], input.repo);
-
+            } catch (error) {
                 return {
                     canMerge: false,
-                    conflicts: parseConflictedFilesFromStatusOutput(statusOutput),
+                    conflicts: [],
                     aheadCommits: [],
                     files: [],
-                    warnings: ['Merge conflicts detected'],
+                    warnings: ['Could not preview merge'],
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        }),
+
+    /**
+     * Preview all branch-integration strategies without touching the worktree.
+     */
+    integrationPreview: publicProcedure
+        .input(
+            z.object({
+                repo: z.string(),
+                source: z.string(),
+                target: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            const initError = await ensureGitInitialized();
+            if (initError) return { options: [], error: initError };
+
+            try {
+                const preview = await buildIntegrationPreviewOptions(input.repo, input.source, input.target);
+                return {
+                    sourceRef: input.source,
+                    targetRef: input.target,
+                    options: preview.options,
+                    error: preview.error,
+                };
+            } catch (error) {
+                return {
+                    sourceRef: input.source,
+                    targetRef: input.target,
+                    options: [],
+                    error: error instanceof Error ? error.message : 'Unknown error',
                 };
             }
         }),
@@ -3065,8 +3457,14 @@ export const gitRouter = router({
                 try {
                     const gitService = getGitService();
                     const [fetchOutput, pushOutput] = await Promise.all([
-                        gitService.runGitCommandWithOutput(['config', '--get-all', `remote.${input.name}.fetch`], input.repo),
-                        gitService.runGitCommandWithOutput(['config', '--get-all', `remote.${input.name}.push`], input.repo),
+                        gitService.runGitCommandWithOutput(
+                            ['config', '--get-all', `remote.${input.name}.fetch`],
+                            input.repo
+                        ),
+                        gitService.runGitCommandWithOutput(
+                            ['config', '--get-all', `remote.${input.name}.push`],
+                            input.repo
+                        ),
                     ]);
 
                     const fetch = (fetchOutput ?? '')
@@ -3080,7 +3478,11 @@ export const gitRouter = router({
 
                     return { fetch, push, error: null };
                 } catch (error) {
-                    return { fetch: [], push: [], error: error instanceof Error ? error.message : 'Unknown error' };
+                    return {
+                        fetch: [],
+                        push: [],
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                    };
                 }
             }),
 
@@ -3301,7 +3703,11 @@ export const gitRouter = router({
 
             return { staged, unstaged, error: null };
         } catch (error) {
-            return { staged: [], unstaged: [], error: error instanceof Error ? error.message : 'Unknown error' };
+            return {
+                staged: [],
+                unstaged: [],
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
         }
     }),
 
@@ -3859,7 +4265,10 @@ export const gitRouter = router({
                     const result = await dialog.showSaveDialog({
                         defaultPath: `${input.ref}.${input.format}`,
                         filters: [
-                            { name: 'Archive', extensions: [input.format === 'tar.gz' ? 'tar.gz' : input.format] },
+                            {
+                                name: 'Archive',
+                                extensions: [input.format === 'tar.gz' ? 'tar.gz' : input.format],
+                            },
                         ],
                     });
 
@@ -5052,36 +5461,28 @@ export const gitRouter = router({
         try {
             const gitService = getGitService();
             const output = await gitService.runGitCommandWithOutput(
-                ['for-each-ref', '--format=%(refname:short) %(upstream:short)', 'refs/heads/'],
+                ['for-each-ref', '--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)', 'refs/heads/'],
                 input.repo
             );
 
-            const branches: Array<{ branch: string; ahead: number; behind: number; upstream: string | null }> = [];
+            const branches: Array<{
+                branch: string;
+                ahead: number;
+                behind: number;
+                upstream: string | null;
+            }> = [];
             const lines = (output ?? '').split('\n').filter(Boolean);
 
             for (const line of lines) {
-                const [branch, upstream] = line.split(' ');
+                const [branch, upstream = '', track = ''] = line.split('\0');
                 if (!branch) continue;
-
-                if (upstream) {
-                    try {
-                        const countOutput = await gitService.runGitCommandWithOutput(
-                            ['rev-list', '--left-right', '--count', `${branch}...${upstream}`],
-                            input.repo
-                        );
-                        const match = countOutput?.match(/^(\d+)\s+(\d+)/);
-                        branches.push({
-                            branch,
-                            ahead: match ? parseInt(match[1] ?? '0', 10) : 0,
-                            behind: match ? parseInt(match[2] ?? '0', 10) : 0,
-                            upstream,
-                        });
-                    } catch {
-                        branches.push({ branch, ahead: 0, behind: 0, upstream });
-                    }
-                } else {
-                    branches.push({ branch, ahead: 0, behind: 0, upstream: null });
-                }
+                const parsed = parseUpstreamTrack(track);
+                branches.push({
+                    branch,
+                    ahead: parsed.ahead,
+                    behind: parsed.behind,
+                    upstream: upstream || null,
+                });
             }
 
             return { branches, error: null };
@@ -5643,7 +6044,12 @@ export const gitRouter = router({
                 return {
                     summary: null,
                     activity: [] as Array<{ date: string; commits: number }>,
-                    hotspots: [] as Array<{ path: string; touches: number; additions: number; deletions: number }>,
+                    hotspots: [] as Array<{
+                        path: string;
+                        touches: number;
+                        additions: number;
+                        deletions: number;
+                    }>,
                     error: initError,
                 };
             }
@@ -5658,7 +6064,10 @@ export const gitRouter = router({
                 const lines = (output ?? '').split('\n');
                 const dailyCommits = new Map<string, number>();
                 const authorCommits = new Map<string, number>();
-                const hotspots = new Map<string, { path: string; touches: number; additions: number; deletions: number }>();
+                const hotspots = new Map<
+                    string,
+                    { path: string; touches: number; additions: number; deletions: number }
+                >();
                 let totalCommits = 0;
                 let mergeCommits = 0;
                 let revertCommits = 0;
@@ -5719,10 +6128,10 @@ export const gitRouter = router({
                 const authorCounts = Array.from(authorCommits.values()).sort((left, right) => right - left);
                 const topAuthorCommits = authorCounts[0] ?? 0;
                 const activeDays = activity.filter((day) => day.commits > 0).length;
-                const busiestDay = activity.reduce(
-                    (best, day) => (day.commits > best.commits ? day : best),
-                    { date: '', commits: 0 }
-                );
+                const busiestDay = activity.reduce((best, day) => (day.commits > best.commits ? day : best), {
+                    date: '',
+                    commits: 0,
+                });
                 const midpoint = Math.max(1, Math.floor(activity.length / 2));
                 const previousWindow = activity.slice(0, midpoint).reduce((sum, day) => sum + day.commits, 0);
                 const currentWindow = activity.slice(midpoint).reduce((sum, day) => sum + day.commits, 0);
@@ -5739,8 +6148,7 @@ export const gitRouter = router({
                         totalDeletions,
                         hotspotCount: hotspotList.length,
                         topAuthorSharePct: totalCommits > 0 ? Math.round((topAuthorCommits / totalCommits) * 100) : 0,
-                        avgCommitsPerActiveDay:
-                            activeDays > 0 ? Number((totalCommits / activeDays).toFixed(1)) : 0,
+                        avgCommitsPerActiveDay: activeDays > 0 ? Number((totalCommits / activeDays).toFixed(1)) : 0,
                         busiestDay,
                         velocityDeltaPct,
                     },
@@ -5752,7 +6160,12 @@ export const gitRouter = router({
                 return {
                     summary: null,
                     activity: [] as Array<{ date: string; commits: number }>,
-                    hotspots: [] as Array<{ path: string; touches: number; additions: number; deletions: number }>,
+                    hotspots: [] as Array<{
+                        path: string;
+                        touches: number;
+                        additions: number;
+                        deletions: number;
+                    }>,
                     error: error instanceof Error ? error.message : 'Unknown error',
                 };
             }
@@ -5868,7 +6281,12 @@ export const gitRouter = router({
                 const entries = await fs.readdir(hooksDir, { withFileTypes: true });
                 const discovered = new Map<
                     string,
-                    { enabled: boolean; executable: boolean; source: 'hook' | 'sample' | 'generated'; path: string }
+                    {
+                        enabled: boolean;
+                        executable: boolean;
+                        source: 'hook' | 'sample' | 'generated';
+                        path: string;
+                    }
                 >();
 
                 for (const entry of entries) {
@@ -6112,7 +6530,10 @@ export const gitRouter = router({
                 }
 
                 const warnings: string[] = [];
-                const statusOutput = await getGitService().runGitCommandWithOutput(['status', '--porcelain'], input.repo);
+                const statusOutput = await getGitService().runGitCommandWithOutput(
+                    ['status', '--porcelain'],
+                    input.repo
+                );
                 const currentBranch =
                     (await getGitService().runGitCommandWithOutput(['branch', '--show-current'], input.repo))?.trim() ??
                     '';
@@ -6148,12 +6569,10 @@ export const gitRouter = router({
                         label: `${String(index + 1)}. ${step.type}`,
                         params: step.params,
                     })),
-                    edges: workflow.steps
-                        .slice(0, -1)
-                        .map((step, index) => ({
-                            from: step.id,
-                            to: workflow.steps[index + 1]?.id ?? step.id,
-                        })),
+                    edges: workflow.steps.slice(0, -1).map((step, index) => ({
+                        from: step.id,
+                        to: workflow.steps[index + 1]?.id ?? step.id,
+                    })),
                 };
 
                 return {
@@ -6241,7 +6660,7 @@ export const gitRouter = router({
                         const asString = (key: string, fallback: string = ''): string =>
                             typeof params[key] === 'string' ? resolveTemplate(params[key]) : fallback;
                         const asBool = (key: string, fallback: boolean = false): boolean =>
-                            typeof params[key] === 'boolean' ? (params[key]) : fallback;
+                            typeof params[key] === 'boolean' ? params[key] : fallback;
 
                         let stepError: string | null = null;
 
@@ -6254,7 +6673,8 @@ export const gitRouter = router({
                             }
                         } else if (step.type === 'fetch') {
                             const remote = asString('remote', '--all');
-                            const args = remote === '--all' ? ['fetch', '--all', '--prune'] : ['fetch', remote, '--prune'];
+                            const args =
+                                remote === '--all' ? ['fetch', '--all', '--prune'] : ['fetch', remote, '--prune'];
                             stepError = await getGitService().runGitCommand(args, input.repo);
                         } else if (step.type === 'createBranch') {
                             const name = asString('name');
@@ -6262,7 +6682,10 @@ export const gitRouter = router({
                             if (!name) {
                                 stepError = 'createBranch step requires params.name';
                             } else {
-                                stepError = await getGitService().runGitCommand(['checkout', '-b', name, from], input.repo);
+                                stepError = await getGitService().runGitCommand(
+                                    ['checkout', '-b', name, from],
+                                    input.repo
+                                );
                             }
                         } else if (step.type === 'merge') {
                             const branch = asString('branch');
@@ -6317,7 +6740,10 @@ export const gitRouter = router({
                             if (!command) {
                                 stepError = 'runHook step requires params.command';
                             } else {
-                                const output = await getGitService().runGitCommandWithOutput(command.split(' '), input.repo);
+                                const output = await getGitService().runGitCommandWithOutput(
+                                    command.split(' '),
+                                    input.repo
+                                );
                                 if (output === null) {
                                     stepError = 'Hook command failed.';
                                 }
@@ -6341,15 +6767,21 @@ export const gitRouter = router({
                                 ];
 
                                 for (const rollbackStep of rollbackSteps) {
-                                    const rollbackError = await getGitService().runGitCommand(rollbackStep.args, input.repo);
+                                    const rollbackError = await getGitService().runGitCommand(
+                                        rollbackStep.args,
+                                        input.repo
+                                    );
                                     rollbackAttempts.push({ name: rollbackStep.name, error: rollbackError });
                                 }
 
-                                const successful = rollbackAttempts.filter((entry) => !entry.error).map((entry) => entry.name);
+                                const successful = rollbackAttempts
+                                    .filter((entry) => !entry.error)
+                                    .map((entry) => entry.name);
                                 const failed = rollbackAttempts.filter((entry) => entry.error);
-                                const rollbackSummary = successful.length > 0
-                                    ? `Rollback attempted: ${successful.join(', ')}`
-                                    : 'Rollback attempt did not complete any recovery step';
+                                const rollbackSummary =
+                                    successful.length > 0
+                                        ? `Rollback attempted: ${successful.join(', ')}`
+                                        : 'Rollback attempt did not complete any recovery step';
                                 const rollbackFailures =
                                     failed.length > 0
                                         ? ` | rollback warnings: ${failed.map((entry) => `${entry.name}: ${entry.error ?? ''}`).join(' ; ')}`
@@ -6443,7 +6875,11 @@ export const gitRouter = router({
             .query(async ({ input }) => {
                 const available = await commandExists('gt');
                 if (!available) {
-                    return { stack: [] as Array<{ branch: string; parent: string | null }>, error: null, fallbackMode: 'local' };
+                    return {
+                        stack: [] as Array<{ branch: string; parent: string | null }>,
+                        error: null,
+                        fallbackMode: 'local',
+                    };
                 }
 
                 const run = await runExecutable('gt', ['log', '--short'], input.repo);
@@ -6483,7 +6919,10 @@ export const gitRouter = router({
                 // We currently verify branch presence and return success to keep interoperability explicit.
                 const missingBranches: string[] = [];
                 for (const item of input.stack) {
-                    const exists = await getGitService().runGitCommand(['show-ref', '--verify', `refs/heads/${item.branch}`], input.repo);
+                    const exists = await getGitService().runGitCommand(
+                        ['show-ref', '--verify', `refs/heads/${item.branch}`],
+                        input.repo
+                    );
                     if (exists) {
                         missingBranches.push(item.branch);
                     }
@@ -6494,9 +6933,7 @@ export const gitRouter = router({
                     fallbackMode: 'graphite',
                     missingBranches,
                     error:
-                        missingBranches.length === 0
-                            ? null
-                            : `Missing local branches: ${missingBranches.join(', ')}`,
+                        missingBranches.length === 0 ? null : `Missing local branches: ${missingBranches.join(', ')}`,
                 };
             }),
 
@@ -6768,7 +7205,11 @@ export const gitRouter = router({
             )
             .query(async ({ input }) => {
                 const initError = await ensureGitInitialized();
-                if (initError) return { branches: [] as Array<{ name: string; score: number; pinned: boolean }>, error: initError };
+                if (initError)
+                    return {
+                        branches: [] as Array<{ name: string; score: number; pinned: boolean }>,
+                        error: initError,
+                    };
 
                 const gitService = getGitService();
                 const currentBranch =
@@ -6799,7 +7240,10 @@ export const gitRouter = router({
                             const [name = '', commitDate = '0'] = line.split('|');
                             const upstream = upstreamByBranch.get(name) ?? null;
                             const aheadBehind = await getWorktreeAheadBehind(name, upstream, input.repo);
-                            const recentBoost = Math.max(0, 120 - Math.floor((Date.now() / 1000 - Number.parseInt(commitDate, 10)) / 3600));
+                            const recentBoost = Math.max(
+                                0,
+                                120 - Math.floor((Date.now() / 1000 - Number.parseInt(commitDate, 10)) / 3600)
+                            );
                             const score =
                                 (name === currentBranch ? 10_000 : 0) +
                                 (pinned.includes(name) ? 3_000 : 0) +
@@ -6829,7 +7273,10 @@ export const gitRouter = router({
             .input(
                 z.object({
                     repo: z.string(),
-                    map: z.record(z.string(), z.object({ label: z.string(), severity: z.enum(['info', 'warn', 'error']) })),
+                    map: z.record(
+                        z.string(),
+                        z.object({ label: z.string(), severity: z.enum(['info', 'warn', 'error']) })
+                    ),
                 })
             )
             .mutation(({ input }) => {
@@ -6895,7 +7342,9 @@ export const gitRouter = router({
                         if (code === 0) {
                             resolve({ error: null });
                         } else {
-                            resolve({ error: stderr || `Git apply failed with code ${String(code ?? 'unknown')}` });
+                            resolve({
+                                error: stderr || `Git apply failed with code ${String(code ?? 'unknown')}`,
+                            });
                         }
                     });
 
@@ -6985,7 +7434,12 @@ export const gitRouter = router({
                         }
                         return null;
                     })
-                    .filter(Boolean) as Array<{ hash: string; message: string; author: string; date: number }>;
+                    .filter(Boolean) as Array<{
+                    hash: string;
+                    message: string;
+                    author: string;
+                    date: number;
+                }>;
 
                 // For file search, we need to get more details
                 if (input.type === 'file') {
@@ -7001,11 +7455,19 @@ export const gitRouter = router({
                     const fileOutput = await gitService.runGitCommandWithOutput(fileArgs, input.repo);
 
                     if (fileOutput) {
-                        const matchingCommits: Array<{ hash: string; message: string; author: string; date: number }> =
-                            [];
+                        const matchingCommits: Array<{
+                            hash: string;
+                            message: string;
+                            author: string;
+                            date: number;
+                        }> = [];
                         const lines = fileOutput.split('\n');
-                        let currentCommit: { hash: string; message: string; author: string; date: number } | null =
-                            null;
+                        let currentCommit: {
+                            hash: string;
+                            message: string;
+                            author: string;
+                            date: number;
+                        } | null = null;
 
                         for (const line of lines) {
                             if (line.includes('|')) {
@@ -7090,8 +7552,7 @@ export const gitRouter = router({
                 input.bitbucketUsername === undefined
                     ? current.bitbucketUsername
                     : (input.bitbucketUsername ?? '').trim();
-            const azureToken =
-                input.azureToken === undefined ? current.azureToken : (input.azureToken ?? '').trim();
+            const azureToken = input.azureToken === undefined ? current.azureToken : (input.azureToken ?? '').trim();
 
             if (githubToken !== undefined) next.githubToken = githubToken;
             if (gitlabToken !== undefined) next.gitlabToken = gitlabToken;
@@ -7111,31 +7572,33 @@ export const gitRouter = router({
             };
         }),
 
-    detectPullRequestProvider: publicProcedure
-        .input(z.object({ repo: z.string() }))
-        .query(async ({ input }) => {
-            const initError = await ensureGitInitialized();
-            if (initError) return { remoteUrl: null, provider: null, error: initError };
+    detectPullRequestProvider: publicProcedure.input(z.object({ repo: z.string() })).query(async ({ input }) => {
+        const initError = await ensureGitInitialized();
+        if (initError) return { remoteUrl: null, provider: null, error: initError };
 
-            try {
-                const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
-                if (!remoteUrl) {
-                    return { remoteUrl: null, provider: null, error: 'No remotes configured for this repository.' };
-                }
-                const parsed = parsePullRequestRemoteUrl(remoteUrl);
-                return {
-                    remoteUrl,
-                    provider: parsed?.provider ?? null,
-                    error: null,
-                };
-            } catch (error) {
+        try {
+            const remoteUrl = await getPreferredRemoteUrlForPullRequests(input.repo);
+            if (!remoteUrl) {
                 return {
                     remoteUrl: null,
                     provider: null,
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    error: 'No remotes configured for this repository.',
                 };
             }
-        }),
+            const parsed = parsePullRequestRemoteUrl(remoteUrl);
+            return {
+                remoteUrl,
+                provider: parsed?.provider ?? null,
+                error: null,
+            };
+        } catch (error) {
+            return {
+                remoteUrl: null,
+                provider: null,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }),
 
     ciStatus: publicProcedure
         .input(
@@ -7485,7 +7948,10 @@ export const gitRouter = router({
                 );
                 return { pullRequest, error: null };
             } catch (error) {
-                return { pullRequest: null, error: error instanceof Error ? error.message : 'Unknown error' };
+                return {
+                    pullRequest: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
             }
         }),
 
@@ -7515,7 +7981,10 @@ export const gitRouter = router({
                 );
                 return { pullRequest, error: null };
             } catch (error) {
-                return { pullRequest: null, error: error instanceof Error ? error.message : 'Unknown error' };
+                return {
+                    pullRequest: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
             }
         }),
 
@@ -7575,7 +8044,10 @@ export const gitRouter = router({
                 );
                 return { reviewState, error: null };
             } catch (error) {
-                return { reviewState: null, error: error instanceof Error ? error.message : 'Unknown error' };
+                return {
+                    reviewState: null,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
             }
         }),
 
@@ -7709,12 +8181,7 @@ export const gitRouter = router({
                     return { error: 'No remotes configured for this repository.' };
                 }
                 const auth = getStoredProviderAuthConfig();
-                await closeRemotePullRequest(
-                    remoteUrl,
-                    input.provider as PullRequestProvider,
-                    auth,
-                    input.number
-                );
+                await closeRemotePullRequest(remoteUrl, input.provider as PullRequestProvider, auth, input.number);
                 return { error: null };
             } catch (error) {
                 return { error: error instanceof Error ? error.message : 'Unknown error' };

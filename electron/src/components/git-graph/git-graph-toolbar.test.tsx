@@ -5,7 +5,6 @@ import { GitGraphToolbar } from './git-graph-toolbar';
 
 import type { ComponentProps } from 'react';
 
-
 function getToolbarProps(overrides: Partial<ComponentProps<typeof GitGraphToolbar>> = {}) {
     const props: ComponentProps<typeof GitGraphToolbar> = {
         isGuided: false,
@@ -102,11 +101,11 @@ describe('GitGraphToolbar', () => {
         renderToolbar({ onCreateBranch, onCreateTag, onStash });
 
         fireEvent.click(screen.getByRole('button', { name: /new/i }));
-        fireEvent.click(screen.getByText('Branch...'));
+        fireEvent.click(screen.getByText('Branch…'));
         expect(onCreateBranch).toHaveBeenCalledTimes(1);
 
         fireEvent.click(screen.getByRole('button', { name: /new/i }));
-        fireEvent.click(screen.getByText('Tag...'));
+        fireEvent.click(screen.getByText('Tag…'));
         expect(onCreateTag).toHaveBeenCalledTimes(1);
 
         fireEvent.click(screen.getByRole('button', { name: /new/i }));

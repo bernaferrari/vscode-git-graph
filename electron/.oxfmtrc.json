@@ -1,0 +1,19 @@
+{
+    "quoteProps": "as-needed",
+    "arrowParens": "always",
+    "bracketSameLine": true,
+    "bracketSpacing": true,
+    "htmlWhitespaceSensitivity": "ignore",
+    "jsxSingleQuote": true,
+    "printWidth": 120,
+    "proseWrap": "preserve",
+    "semi": true,
+    "singleAttributePerLine": false,
+    "singleQuote": true,
+    "tabWidth": 4,
+    "trailingComma": "es5",
+    "useTabs": false,
+    "sortTailwindcss": {},
+    "sortPackageJson": false,
+    "ignorePatterns": []
+}

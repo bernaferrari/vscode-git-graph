@@ -73,9 +73,10 @@ describe('NotificationCenter', () => {
     it('renders unread notifications and supports mark all read', async () => {
         render(<NotificationCenter />);
 
+        const trigger = screen.getByRole('button', { name: /notifications/i });
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        expect(screen.getByTitle('Notifications')).toHaveTextContent('1');
-        fireEvent.click(screen.getByTitle('Notifications'));
+        expect(trigger).toHaveTextContent('1');
+        fireEvent.click(trigger);
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         expect(screen.getByText('Fetch failed')).toBeInTheDocument();
