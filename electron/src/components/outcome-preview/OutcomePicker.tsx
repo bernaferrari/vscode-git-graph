@@ -26,6 +26,37 @@ export type IntegrationStrategy = 'merge' | 'rebase' | 'squash';
 export type BatchStrategy = 'cherry-pick' | 'squash-batch' | 'drop';
 export type AnyStrategy = IntegrationStrategy | BatchStrategy;
 
+export type PreviewGraphCommitKind = 'base' | 'source' | 'target' | 'rewritten' | 'merge-result' | 'squash-result';
+
+export interface PreviewGraphCommit {
+    id: string;
+    hash: string | null;
+    label: string;
+    message: string;
+    lane: number;
+    row: number;
+    kind: PreviewGraphCommitKind;
+    parentIds: string[];
+}
+
+export interface PreviewGraphBranch {
+    name: string;
+    commitId: string;
+    kind: 'source' | 'target' | 'result';
+}
+
+export interface PreviewGraphState {
+    commits: PreviewGraphCommit[];
+    branches: PreviewGraphBranch[];
+}
+
+export interface IntegrationPreviewGraph {
+    before: PreviewGraphState;
+    after: PreviewGraphState;
+    summary: string;
+    truncated: boolean;
+}
+
 export interface IntegrationOption {
     strategy: IntegrationStrategy;
     conflicts: number | null;
@@ -37,6 +68,7 @@ export interface IntegrationOption {
     riskReasons?: string[] | undefined;
     warnings?: string[] | undefined;
     recommended?: boolean | undefined;
+    previewGraph?: IntegrationPreviewGraph | undefined;
 }
 
 export interface BatchOption {
@@ -225,6 +257,7 @@ function SinglePicker({
                             willRewriteHistory={option.willRewriteHistory}
                             recommended={option.recommended}
                             selected={selected === option.strategy}
+                            previewGraph={option.previewGraph}
                             glyph={<MiniGraph variant={option.strategy} />}
                             onSelect={() => {
                                 setSelected(option.strategy);
@@ -584,6 +617,7 @@ interface OutcomeCardProps {
     selected: boolean;
     disabled?: boolean | undefined;
     disabledReason?: string | undefined;
+    previewGraph?: IntegrationPreviewGraph | undefined;
     glyph: React.ReactNode;
     onSelect: () => void;
 }
@@ -601,6 +635,7 @@ function OutcomeCard({
     selected,
     disabled,
     disabledReason,
+    previewGraph,
     glyph,
     onSelect,
 }: OutcomeCardProps) {
@@ -648,7 +683,7 @@ function OutcomeCard({
 
             <div className='border-border/60 -mx-3.5 my-3 border-t' />
 
-            {glyph}
+            {previewGraph ? <HistoryPreviewGraph graph={previewGraph} /> : glyph}
 
             <p className='text-muted-foreground mt-3 text-[11px] leading-relaxed'>{copy.explainer}</p>
 
@@ -741,6 +776,124 @@ function Detail({
                 {Icon ? <Icon className='h-3 w-3' /> : null}
                 <span>{value}</span>
             </dd>
+        </div>
+    );
+}
+
+const PREVIEW_GRAPH_LANE_X = [24, 72, 120, 168];
+
+function getPreviewGraphTone(kind: PreviewGraphCommitKind): {
+    fill: string;
+    stroke?: string;
+    dashed?: boolean;
+    opacity?: number;
+} {
+    if (kind === 'source') return { fill: 'var(--chart-3)' };
+    if (kind === 'rewritten') return { fill: 'var(--warning)', dashed: true };
+    if (kind === 'merge-result' || kind === 'squash-result') {
+        return { fill: 'var(--primary)', stroke: 'var(--primary)', dashed: true };
+    }
+    if (kind === 'base') return { fill: 'var(--muted-foreground)', opacity: 0.72 };
+    return { fill: 'var(--chart-1)' };
+}
+
+function getPreviewGraphPosition(commit: PreviewGraphCommit): { x: number; y: number } {
+    return {
+        x: PREVIEW_GRAPH_LANE_X[commit.lane] ?? PREVIEW_GRAPH_LANE_X[0] ?? 24,
+        y: 16 + commit.row * 18,
+    };
+}
+
+function HistoryPreviewGraph({ graph }: { graph: IntegrationPreviewGraph }) {
+    return (
+        <div className='border-border/60 bg-muted/20 rounded-lg border p-2.5'>
+            <div className='grid grid-cols-2 gap-2'>
+                <PreviewGraphStateView label='Before' state={graph.before} />
+                <PreviewGraphStateView label='After' state={graph.after} />
+            </div>
+            <p className='text-muted-foreground/85 mt-2 line-clamp-2 text-[10px] leading-snug'>
+                {graph.summary}
+                {graph.truncated ? ' Showing nearest commits only.' : ''}
+            </p>
+        </div>
+    );
+}
+
+function PreviewGraphStateView({ label, state }: { label: string; state: PreviewGraphState }) {
+    const commitById = useMemo(() => new Map(state.commits.map((commit) => [commit.id, commit])), [state.commits]);
+    const maxRow = state.commits.reduce((max, commit) => Math.max(max, commit.row), 0);
+    const height = Math.max(68, 28 + maxRow * 18);
+
+    return (
+        <div className='min-w-0'>
+            <div className='mb-1 flex items-center justify-between gap-1'>
+                <span className='text-muted-foreground text-[10px] font-semibold tracking-[0.06em] uppercase'>
+                    {label}
+                </span>
+                <span className='text-muted-foreground/70 text-[10px] tabular-nums'>{state.commits.length}</span>
+            </div>
+            <svg
+                viewBox={`0 0 192 ${String(height)}`}
+                role='img'
+                aria-label={`${label} history`}
+                className='h-[86px] w-full'>
+                {state.commits.flatMap((commit) => {
+                    const to = getPreviewGraphPosition(commit);
+                    return commit.parentIds.map((parentId) => {
+                        const parent = commitById.get(parentId);
+                        if (!parent) return null;
+                        const from = getPreviewGraphPosition(parent);
+                        return (
+                            <path
+                                key={`${parentId}-${commit.id}`}
+                                d={`M${String(from.x)} ${String(from.y)} L${String(to.x)} ${String(to.y)}`}
+                                stroke='var(--border)'
+                                strokeWidth='1.5'
+                                fill='none'
+                            />
+                        );
+                    });
+                })}
+                {state.commits.map((commit) => {
+                    const tone = getPreviewGraphTone(commit.kind);
+                    const { x, y } = getPreviewGraphPosition(commit);
+                    return (
+                        <g key={commit.id}>
+                            {(commit.kind === 'merge-result' ||
+                                commit.kind === 'squash-result' ||
+                                commit.kind === 'rewritten') && (
+                                <circle cx={x} cy={y} r='8' fill={tone.fill} opacity='0.15' />
+                            )}
+                            <circle
+                                cx={x}
+                                cy={y}
+                                r='4.5'
+                                fill={tone.fill}
+                                opacity={tone.opacity ?? 1}
+                                stroke={tone.stroke ?? 'var(--card)'}
+                                strokeWidth='1.5'
+                                strokeDasharray={tone.dashed ? '2 2' : undefined}>
+                                <title>{`${commit.label} ${commit.message}`}</title>
+                            </circle>
+                        </g>
+                    );
+                })}
+            </svg>
+            <div className='mt-1 flex flex-wrap gap-1'>
+                {state.branches.slice(0, 3).map((branch) => (
+                    <span
+                        key={`${branch.kind}-${branch.name}-${branch.commitId}`}
+                        className={cn(
+                            'max-w-full truncate rounded-sm border px-1 py-0.5 text-[9px] leading-none',
+                            branch.kind === 'result'
+                                ? 'border-primary/25 bg-primary/10 text-primary'
+                                : 'border-border/70 bg-background/70 text-muted-foreground'
+                        )}
+                        title={branch.name}>
+                        {branch.name}
+                    </span>
+                ))}
+            </div>
         </div>
     );
 }

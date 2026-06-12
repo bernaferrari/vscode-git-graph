@@ -511,12 +511,47 @@ function parseUpstreamTrack(track: string): { ahead: number; behind: number } {
 
 type IntegrationPreviewStrategy = 'merge' | 'rebase' | 'squash';
 type PreviewRiskLevel = 'low' | 'medium' | 'high';
+type PreviewGraphCommitKind = 'base' | 'source' | 'target' | 'rewritten' | 'merge-result' | 'squash-result';
 
 interface MergeTreePreviewResult {
     canApplyCleanly: boolean;
     treeHash: string | null;
     conflictFiles: string[];
     error: string | null;
+}
+
+interface PreviewCommitSummary {
+    hash: string;
+    message: string;
+}
+
+interface PreviewGraphCommit {
+    id: string;
+    hash: string | null;
+    label: string;
+    message: string;
+    lane: number;
+    row: number;
+    kind: PreviewGraphCommitKind;
+    parentIds: string[];
+}
+
+interface PreviewGraphBranch {
+    name: string;
+    commitId: string;
+    kind: 'source' | 'target' | 'result';
+}
+
+interface PreviewGraphState {
+    commits: PreviewGraphCommit[];
+    branches: PreviewGraphBranch[];
+}
+
+interface IntegrationPreviewGraph {
+    before: PreviewGraphState;
+    after: PreviewGraphState;
+    summary: string;
+    truncated: boolean;
 }
 
 interface IntegrationPreviewOption {
@@ -533,9 +568,11 @@ interface IntegrationPreviewOption {
     riskReasons: string[];
     warnings: string[];
     recommended: boolean;
+    previewGraph: IntegrationPreviewGraph;
 }
 
 const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+const PREVIEW_GRAPH_RANGE_LIMIT = 4;
 
 function uniqueStrings(values: string[]): string[] {
     return [...new Set(values.filter((value) => value.trim().length > 0))];
@@ -617,6 +654,283 @@ async function listPreviewCommits(
             return { hash: hash ?? '', message };
         })
         .filter((commit) => commit.hash.length > 0);
+}
+
+async function getPreviewCommit(repo: string, ref: string): Promise<PreviewCommitSummary | null> {
+    const output = await getGitService().runGitCommandWithOutput(
+        ['log', '--max-count=1', '--format=%H%x1f%s', ref],
+        repo
+    );
+    const line = (output ?? '').split('\n')[0]?.trim();
+    if (!line) return null;
+
+    const [hash, message = ''] = line.split('\x1f');
+    return hash ? { hash, message } : null;
+}
+
+async function getMergeBaseCommit(repo: string, source: string, target: string): Promise<PreviewCommitSummary | null> {
+    const result = await getGitService().runGitCommandWithResult(['merge-base', source, target], repo);
+    const mergeBaseHash = result.stdout.trim();
+    if (result.exitCode !== 0 || !mergeBaseHash) {
+        return null;
+    }
+    return getPreviewCommit(repo, mergeBaseHash);
+}
+
+function shortRefName(ref: string): string {
+    return ref.replace(/^refs\/heads\//, '').replace(/^refs\/remotes\//, '');
+}
+
+function commitLabel(commit: PreviewCommitSummary | null, fallback: string): string {
+    return commit?.hash ? commit.hash.slice(0, 7) : fallback;
+}
+
+function chronologicalPreviewCommits(commits: PreviewCommitSummary[]): PreviewCommitSummary[] {
+    return commits.slice().reverse();
+}
+
+function firstPreviewCommit(
+    commits: PreviewCommitSummary[],
+    fallback: PreviewCommitSummary | null
+): PreviewCommitSummary[] {
+    if (commits.length > 0) {
+        return chronologicalPreviewCommits(commits);
+    }
+    return fallback ? [fallback] : [];
+}
+
+function createGraphCommit(input: {
+    commit: PreviewCommitSummary | null;
+    id: string;
+    label?: string;
+    message: string;
+    lane: number;
+    row: number;
+    kind: PreviewGraphCommitKind;
+    parentIds?: string[];
+}): PreviewGraphCommit {
+    return {
+        id: input.id,
+        hash: input.commit?.hash ?? null,
+        label: input.label ?? commitLabel(input.commit, input.id),
+        message: input.commit?.message || input.message,
+        lane: input.lane,
+        row: input.row,
+        kind: input.kind,
+        parentIds: input.parentIds ?? [],
+    };
+}
+
+function appendCommitLine(input: {
+    commits: PreviewGraphCommit[];
+    line: PreviewCommitSummary[];
+    lane: number;
+    startRow: number;
+    kind: PreviewGraphCommitKind;
+    parentId: string | null;
+}): string | null {
+    let parentId = input.parentId;
+
+    input.line.forEach((commit, index) => {
+        const id = commit.hash;
+        input.commits.push(
+            createGraphCommit({
+                commit,
+                id,
+                message: commit.message,
+                lane: input.lane,
+                row: input.startRow + index,
+                kind: input.kind,
+                parentIds: parentId ? [parentId] : [],
+            })
+        );
+        parentId = id;
+    });
+
+    return parentId;
+}
+
+function buildIntegrationPreviewGraph(input: {
+    strategy: IntegrationPreviewStrategy;
+    source: string;
+    target: string;
+    sourceTip: PreviewCommitSummary | null;
+    targetTip: PreviewCommitSummary | null;
+    mergeBase: PreviewCommitSummary | null;
+    sourceOnlyCommits: PreviewCommitSummary[];
+    targetOnlyCommits: PreviewCommitSummary[];
+    sourceCommitCount: number;
+    targetCommitCount: number;
+}): IntegrationPreviewGraph {
+    const sourceName = shortRefName(input.source);
+    const targetName = shortRefName(input.target);
+    const baseId = input.mergeBase?.hash ?? null;
+    const sourceLine = firstPreviewCommit(input.sourceOnlyCommits, input.sourceTip).filter(
+        (commit) => commit.hash !== baseId
+    );
+    const targetLine = firstPreviewCommit(input.targetOnlyCommits, input.targetTip).filter(
+        (commit) => commit.hash !== baseId
+    );
+    const beforeCommits: PreviewGraphCommit[] = [];
+
+    if (input.mergeBase) {
+        beforeCommits.push(
+            createGraphCommit({
+                commit: input.mergeBase,
+                id: input.mergeBase.hash,
+                message: input.mergeBase.message,
+                lane: 0,
+                row: 0,
+                kind: 'base',
+            })
+        );
+    }
+
+    const targetTipId = appendCommitLine({
+        commits: beforeCommits,
+        line: targetLine,
+        lane: 0,
+        startRow: input.mergeBase ? 1 : 0,
+        kind: 'target',
+        parentId: baseId,
+    });
+    const sourceTipId = appendCommitLine({
+        commits: beforeCommits,
+        line: sourceLine,
+        lane: 1,
+        startRow: input.mergeBase ? 1 : 0,
+        kind: 'source',
+        parentId: baseId,
+    });
+
+    const beforeTargetTipId = targetTipId ?? baseId;
+    const beforeSourceTipId = sourceTipId ?? baseId;
+    const before: PreviewGraphState = {
+        commits: beforeCommits,
+        branches: [
+            ...(beforeTargetTipId ? [{ name: targetName, commitId: beforeTargetTipId, kind: 'target' as const }] : []),
+            ...(beforeSourceTipId ? [{ name: sourceName, commitId: beforeSourceTipId, kind: 'source' as const }] : []),
+        ],
+    };
+
+    const afterCommits: PreviewGraphCommit[] = [];
+    const afterBranches: PreviewGraphBranch[] = [];
+    let summary = '';
+
+    if (input.strategy === 'merge') {
+        const afterTargetTipId = appendCommitLine({
+            commits: afterCommits,
+            line: targetLine,
+            lane: 0,
+            startRow: 0,
+            kind: 'target',
+            parentId: null,
+        });
+        const afterSourceTipId = appendCommitLine({
+            commits: afterCommits,
+            line: sourceLine,
+            lane: 1,
+            startRow: 0,
+            kind: 'source',
+            parentId: null,
+        });
+        const mergeId = `preview-merge-${targetName}-${sourceName}`;
+        afterCommits.push(
+            createGraphCommit({
+                commit: null,
+                id: mergeId,
+                label: 'merge',
+                message: `Merge ${sourceName} into ${targetName}`,
+                lane: 0,
+                row: Math.max(targetLine.length, sourceLine.length),
+                kind: 'merge-result',
+                parentIds: [afterTargetTipId, afterSourceTipId].filter((id): id is string => Boolean(id)),
+            })
+        );
+        afterBranches.push({ name: targetName, commitId: mergeId, kind: 'result' });
+        if (afterSourceTipId) afterBranches.push({ name: sourceName, commitId: afterSourceTipId, kind: 'source' });
+        summary = `${targetName} gains one merge commit with ${sourceName} as the second parent.`;
+    } else if (input.strategy === 'rebase') {
+        const afterSourceTipId = appendCommitLine({
+            commits: afterCommits,
+            line: sourceLine,
+            lane: 0,
+            startRow: 0,
+            kind: 'source',
+            parentId: null,
+        });
+        let rewrittenParentId = afterSourceTipId;
+        const rewrittenLine = targetLine.length > 0 ? targetLine : input.targetTip ? [input.targetTip] : [];
+        rewrittenLine.forEach((commit, index) => {
+            const rewrittenId = `preview-rebase-${commit.hash}`;
+            afterCommits.push(
+                createGraphCommit({
+                    commit,
+                    id: rewrittenId,
+                    label: `new ${commit.hash.slice(0, 7)}`,
+                    message: commit.message,
+                    lane: 0,
+                    row: sourceLine.length + index,
+                    kind: 'rewritten',
+                    parentIds: rewrittenParentId ? [rewrittenParentId] : [],
+                })
+            );
+            rewrittenParentId = rewrittenId;
+        });
+        if (afterSourceTipId) afterBranches.push({ name: sourceName, commitId: afterSourceTipId, kind: 'source' });
+        if (rewrittenParentId) afterBranches.push({ name: targetName, commitId: rewrittenParentId, kind: 'result' });
+        summary =
+            input.targetCommitCount > 0
+                ? `${targetName} is replayed on top of ${sourceName}; ${String(input.targetCommitCount)} commit hash${input.targetCommitCount === 1 ? '' : 'es'} change.`
+                : `${targetName} already sits on ${sourceName}; no target commits need replay.`;
+    } else {
+        const afterTargetTipId = appendCommitLine({
+            commits: afterCommits,
+            line: targetLine,
+            lane: 0,
+            startRow: 0,
+            kind: 'target',
+            parentId: null,
+        });
+        const afterSourceTipId = appendCommitLine({
+            commits: afterCommits,
+            line: sourceLine,
+            lane: 1,
+            startRow: 0,
+            kind: 'source',
+            parentId: null,
+        });
+        const squashId = `preview-squash-${targetName}-${sourceName}`;
+        afterCommits.push(
+            createGraphCommit({
+                commit: null,
+                id: squashId,
+                label: 'squash',
+                message: `Squash ${sourceName} into ${targetName}`,
+                lane: 0,
+                row: Math.max(targetLine.length, 1),
+                kind: 'squash-result',
+                parentIds: afterTargetTipId ? [afterTargetTipId] : [],
+            })
+        );
+        afterBranches.push({ name: targetName, commitId: squashId, kind: 'result' });
+        if (afterSourceTipId) afterBranches.push({ name: sourceName, commitId: afterSourceTipId, kind: 'source' });
+        summary =
+            input.sourceCommitCount > 0
+                ? `${String(input.sourceCommitCount)} source commit${input.sourceCommitCount === 1 ? '' : 's'} become one new commit on ${targetName}.`
+                : `${targetName} receives one squash commit if there are staged merge changes.`;
+    }
+
+    return {
+        before,
+        after: {
+            commits: afterCommits,
+            branches: afterBranches,
+        },
+        summary,
+        truncated:
+            input.sourceCommitCount > PREVIEW_GRAPH_RANGE_LIMIT || input.targetCommitCount > PREVIEW_GRAPH_RANGE_LIMIT,
+    };
 }
 
 function toPreviewFileStatus(type: string): 'added' | 'modified' | 'deleted' | 'renamed' {
@@ -770,16 +1084,33 @@ async function buildIntegrationPreviewOptions(
     source: string,
     target: string
 ): Promise<{ options: IntegrationPreviewOption[]; error: string | null }> {
-    const [mergeTree, rebaseReplay, sourceCommits, targetCommits, mergeFiles, rebaseFiles, upstream] =
-        await Promise.all([
-            runMergeTreePreview(repo, target, source),
-            previewRebaseReplay(repo, source, target),
-            countCommits(repo, `${target}..${source}`),
-            countCommits(repo, `${source}..${target}`),
-            getPreviewFiles(repo, `${target}...${source}`),
-            getPreviewFiles(repo, `${source}...${target}`),
-            getUpstreamForRef(repo, target),
-        ]);
+    const [
+        mergeTree,
+        rebaseReplay,
+        sourceCommits,
+        targetCommits,
+        mergeFiles,
+        rebaseFiles,
+        upstream,
+        sourceOnlyCommits,
+        targetOnlyCommits,
+        sourceTip,
+        targetTip,
+        mergeBase,
+    ] = await Promise.all([
+        runMergeTreePreview(repo, target, source),
+        previewRebaseReplay(repo, source, target),
+        countCommits(repo, `${target}..${source}`),
+        countCommits(repo, `${source}..${target}`),
+        getPreviewFiles(repo, `${target}...${source}`),
+        getPreviewFiles(repo, `${source}...${target}`),
+        getUpstreamForRef(repo, target),
+        listPreviewCommits(repo, `${target}..${source}`, PREVIEW_GRAPH_RANGE_LIMIT),
+        listPreviewCommits(repo, `${source}..${target}`, PREVIEW_GRAPH_RANGE_LIMIT),
+        getPreviewCommit(repo, source),
+        getPreviewCommit(repo, target),
+        getMergeBaseCommit(repo, source, target),
+    ]);
 
     const buildOption = (input: {
         strategy: IntegrationPreviewStrategy;
@@ -814,6 +1145,18 @@ async function buildIntegrationPreviewOptions(
             riskReasons: risk.reasons,
             warnings: input.warnings,
             recommended: false,
+            previewGraph: buildIntegrationPreviewGraph({
+                strategy: input.strategy,
+                source,
+                target,
+                sourceTip,
+                targetTip,
+                mergeBase,
+                sourceOnlyCommits,
+                targetOnlyCommits,
+                sourceCommitCount: sourceCommits,
+                targetCommitCount: targetCommits,
+            }),
         };
     };
 
@@ -1983,6 +2326,7 @@ export const gitRouter = router({
                 filePath: z.string().optional(),
                 dateFrom: z.string().optional(),
                 dateTo: z.string().optional(),
+                cursor: z.string().optional(),
             })
         )
         .query(async ({ input }) => {
@@ -1995,6 +2339,7 @@ export const gitRouter = router({
                     tags: [],
                     moreCommitsAvailable: false,
                     refsDeferred: false,
+                    cursor: input.cursor ?? null,
                     error: initError,
                     ...(input.includePerf
                         ? {
@@ -2024,6 +2369,7 @@ export const gitRouter = router({
                         ...(input.filePath ? { filePath: input.filePath } : {}),
                         ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
                         ...(input.dateTo ? { dateTo: input.dateTo } : {}),
+                        ...(input.cursor ? { cursor: input.cursor } : {}),
                     }
                 );
 
@@ -2058,6 +2404,7 @@ export const gitRouter = router({
                         tags: [],
                         moreCommitsAvailable,
                         refsDeferred: true,
+                        cursor: input.cursor ?? null,
                         error: null,
                         ...(input.includePerf
                             ? {
@@ -2111,6 +2458,7 @@ export const gitRouter = router({
                     tags: refs.tags.map((t: { name: string }) => t.name),
                     moreCommitsAvailable,
                     refsDeferred: false,
+                    cursor: input.cursor ?? null,
                     error: null,
                     ...(input.includePerf
                         ? {
@@ -2143,6 +2491,7 @@ export const gitRouter = router({
                     tags: [],
                     moreCommitsAvailable: false,
                     refsDeferred: false,
+                    cursor: input.cursor ?? null,
                     error: error instanceof Error ? error.message : 'Unknown error',
                     ...(input.includePerf
                         ? {

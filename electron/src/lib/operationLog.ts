@@ -37,7 +37,9 @@ export interface OperationReceipt {
     undoAction?: {
         type: string;
         command: string;
+        label?: string;
     };
+    undoUnavailableReason?: string;
     // Affected refs
     affectedBranches: string[];
     affectedCommits: string[];

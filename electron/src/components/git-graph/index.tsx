@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 
 import { BranchDropdown } from './branch-dropdown';
 import { CommitContextMenuOverlay } from './commit-context-menu-overlay';
-import { CommitDotQuickActions } from './commit-dot-quick-actions';
 import { CommitFiltersDialog } from './commit-filters-dialog';
 import { CommitGraph } from './commit-graph';
 import { CommitGraphLegend } from './commit-graph-legend';
@@ -77,6 +76,17 @@ interface RefTips {
     heads: Array<{ hash: string; name: string }>;
     tags: Array<{ hash: string; name: string }>;
     remotes: Array<{ hash: string; name: string }>;
+}
+
+interface CommitQueryResult {
+    commits: ClientCommit[];
+    head: string | null;
+    tags: string[];
+    moreCommitsAvailable: boolean;
+    refsDeferred: boolean;
+    cursor: string | null;
+    error: string | null;
+    perf?: QueryPerfSummary;
 }
 
 interface QueryPerfSummary {
@@ -509,6 +519,9 @@ export function GitGraph() {
 
     // Commit and layout limit state
     const [maxCommits, setMaxCommits] = useState(INITIAL_MAX_COMMITS);
+    const [commitCursor, setCommitCursor] = useState<string | null>(null);
+    const [mergedCommitsData, setMergedCommitsData] = useState<CommitQueryResult | null>(null);
+    const [skipNextInitialCommitMerge, setSkipNextInitialCommitMerge] = useState(false);
     const [layoutCommitLimit, setLayoutCommitLimit] = useState(INITIAL_LAYOUT_COMMIT_WINDOW);
 
     const conflictFileContent = trpc.git.readFile.useQuery(
@@ -685,12 +698,24 @@ export function GitGraph() {
         setMaxCommits((previous) => Math.min(previous, maxCommitsLimit));
     }, [maxCommitsLimit]);
 
+    const commitQueryBranches = useMemo(
+        () => (selectedBranches.includes('__all__') ? null : selectedBranches),
+        [selectedBranches]
+    );
+    const commitQueryPageSize = useMemo(() => {
+        if (!commitCursor) {
+            return maxCommits;
+        }
+        const loadedCount = mergedCommitsData?.commits.length ?? 0;
+        return Math.max(1, Math.min(LOAD_MORE_STEP, maxCommitsLimit - loadedCount));
+    }, [commitCursor, maxCommits, maxCommitsLimit, mergedCommitsData?.commits.length]);
+
     // tRPC queries
     const commitQueryInput = useMemo(
         () => ({
             repo: activeRepo ?? '',
-            branches: selectedBranches.includes('__all__') ? null : selectedBranches,
-            maxCommits,
+            branches: commitQueryBranches,
+            maxCommits: commitQueryPageSize,
             order: 'date' as const,
             onlyFollowFirstParent: false,
             showTags: true,
@@ -698,13 +723,14 @@ export function GitGraph() {
             hideRemotes: [],
             decorateRefs: false,
             includePerf: showPerfDebug,
+            cursor: commitCursor ?? undefined,
             author: commitFilters.author,
             search: commitFilters.search,
             filePath: commitFilters.filePath,
             dateFrom: commitFilters.dateFrom ? commitFilters.dateFrom.toISOString() : undefined,
             dateTo: commitFilters.dateTo ? commitFilters.dateTo.toISOString() : undefined,
         }),
-        [activeRepo, selectedBranches, maxCommits, commitFilters, showPerfDebug]
+        [activeRepo, commitQueryBranches, commitQueryPageSize, showPerfDebug, commitCursor, commitFilters]
     );
 
     const { data: repoInfo, isLoading: repoLoading } = trpc.git.repoInfo.useQuery(
@@ -727,17 +753,6 @@ export function GitGraph() {
     const currentHead = repoInfo?.head ?? 'main';
     const bringInBranchHandlerRef = useRef<((branch: string) => void) | null>(null);
     const [worktreePrefillBranch, setWorktreePrefillBranch] = useState<string | null>(null);
-    const [commitDotQuickOpen, setCommitDotQuickOpen] = useState(false);
-    const [commitDotQuickTarget, setCommitDotQuickTarget] = useState<{
-        hash: string;
-        message: string;
-        author: string;
-        email?: string;
-    } | null>(null);
-    const [commitDotQuickPosition, setCommitDotQuickPosition] = useState<{ x: number; y: number }>({
-        x: 0,
-        y: 0,
-    });
     useCollaborationPresence(activeRepo, repoInfo?.head ?? null);
     useCollaborationRealtime();
     const { data: workingTreeStatus } = trpc.git.workingTreeStatus.useQuery(
@@ -746,7 +761,7 @@ export function GitGraph() {
     );
 
     const {
-        data: commitsData,
+        data: rawCommitsQueryData,
         isLoading: commitsLoading,
         isFetching: commitsFetching,
     } = trpc.git.commits.useQuery(commitQueryInput, {
@@ -755,6 +770,63 @@ export function GitGraph() {
         refetchOnWindowFocus: false,
         placeholderData: (previous) => previous,
     });
+    const rawCommitsData = rawCommitsQueryData as CommitQueryResult | undefined;
+    const commitsData = mergedCommitsData ?? rawCommitsData;
+    const commitQueryScopeKey = useMemo(
+        () =>
+            [
+                activeRepo ?? '',
+                commitQueryBranches?.join('\0') ?? '__all__',
+                commitFilters.author ?? '',
+                commitFilters.search ?? '',
+                commitFilters.filePath ?? '',
+                commitFilters.dateFrom?.toISOString() ?? '',
+                commitFilters.dateTo?.toISOString() ?? '',
+            ].join('\x1f'),
+        [activeRepo, commitQueryBranches, commitFilters]
+    );
+
+    useEffect(() => {
+        setCommitCursor(null);
+        setMergedCommitsData(null);
+        setSkipNextInitialCommitMerge(false);
+    }, [commitQueryScopeKey]);
+
+    useEffect(() => {
+        if (!rawCommitsData) {
+            return;
+        }
+
+        if ((rawCommitsData.cursor ?? null) !== (commitCursor ?? null)) {
+            return;
+        }
+
+        if (!commitCursor && skipNextInitialCommitMerge) {
+            setSkipNextInitialCommitMerge(false);
+            return;
+        }
+
+        setMergedCommitsData((current) => {
+            if (!commitCursor || !current) {
+                return rawCommitsData;
+            }
+
+            const seenHashes = new Set(current.commits.map((commit) => commit.hash));
+            const appendedCommits = rawCommitsData.commits.filter((commit) => !seenHashes.has(commit.hash));
+            return {
+                ...rawCommitsData,
+                commits: [...current.commits, ...appendedCommits],
+                head: current.head ?? rawCommitsData.head,
+                tags: current.tags.length > 0 ? current.tags : rawCommitsData.tags,
+                refsDeferred: current.refsDeferred || rawCommitsData.refsDeferred,
+            };
+        });
+
+        if (commitCursor) {
+            setSkipNextInitialCommitMerge(true);
+            setCommitCursor(null);
+        }
+    }, [commitCursor, rawCommitsData, skipNextInitialCommitMerge]);
     const { data: refsData, isFetching: refsFetching } = trpc.git.refs.useQuery(
         {
             repo: activeRepo ?? '',
@@ -814,14 +886,27 @@ export function GitGraph() {
 
     // Load more commits handler
     const handleLoadMore = useCallback(() => {
-        if (maxCommits >= maxCommitsLimit) {
+        const loadedCount = commitsData?.commits.length ?? 0;
+        if (loadedCount >= maxCommitsLimit) {
             toast.info(`Commit load limit reached (${String(maxCommitsLimit)}).`, {
                 description: 'Increase it in Settings > Performance if needed.',
             });
             return;
         }
-        setMaxCommits((prev) => Math.min(prev + LOAD_MORE_STEP, maxCommitsLimit));
-    }, [maxCommits, maxCommitsLimit]);
+
+        const cursor = commitsData?.commits.at(-1)?.hash;
+        if (!cursor) {
+            toast.info('No older commit cursor is available yet.');
+            return;
+        }
+
+        if (commitsFetching) {
+            return;
+        }
+
+        setCommitCursor(cursor);
+        setMaxCommits(Math.min(loadedCount + LOAD_MORE_STEP, maxCommitsLimit));
+    }, [commitsData?.commits, commitsFetching, maxCommitsLimit]);
 
     // Git status check
     const { data: gitStatus } = trpc.git.status.useQuery();
@@ -2260,45 +2345,47 @@ export function GitGraph() {
                             }
                             notifications={
                                 <>
-                                    <ToolsMenu
-                                        worktreeCount={featureHubData.worktreeCount}
-                                        worktreeAttentionCount={featureHubData.worktreeAttentionCount}
-                                        workflowCount={featureHubData.workflowCount}
-                                        workflowFailureCount={featureHubData.workflowFailureCount}
-                                        auditCount={featureHubData.auditCount}
-                                        protocolRegistered={featureHubData.protocolRegistered}
-                                        collaborationSummary={featureHubData.collaborationSummary}
-                                        prSummary={featureHubData.prSummary}
-                                        repoPolicy={featureHubData.repoPolicy}
-                                        onOpenWorktrees={() => {
-                                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                            if (featureFlags.worktreePro) {
-                                                setWorktreeOpen(true);
-                                                return;
-                                            }
-                                            openSettingsAt('integrations');
-                                        }}
-                                        onOpenWorkflows={() => {
-                                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                            if (featureFlags.workflowEngine) {
-                                                setWorkflowOpen(true);
-                                                return;
-                                            }
-                                            openSettingsAt('integrations');
-                                        }}
-                                        onOpenPullRequests={() => {
-                                            setPrIntegrationOpen(true);
-                                        }}
-                                        onOpenCollaboration={() => {
-                                            setCollaborationOpen(true);
-                                        }}
-                                        onOpenRepoPolicy={() => {
-                                            openSettingsAt('integrations', 'repo-policy');
-                                        }}
-                                        onOpenDiagnostics={() => {
-                                            openSettingsAt('integrations', 'diagnostics');
-                                        }}
-                                    />
+                                    {!isGuided && (
+                                        <ToolsMenu
+                                            worktreeCount={featureHubData.worktreeCount}
+                                            worktreeAttentionCount={featureHubData.worktreeAttentionCount}
+                                            workflowCount={featureHubData.workflowCount}
+                                            workflowFailureCount={featureHubData.workflowFailureCount}
+                                            auditCount={featureHubData.auditCount}
+                                            protocolRegistered={featureHubData.protocolRegistered}
+                                            collaborationSummary={featureHubData.collaborationSummary}
+                                            prSummary={featureHubData.prSummary}
+                                            repoPolicy={featureHubData.repoPolicy}
+                                            onOpenWorktrees={() => {
+                                                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                                if (featureFlags.worktreePro) {
+                                                    setWorktreeOpen(true);
+                                                    return;
+                                                }
+                                                openSettingsAt('integrations');
+                                            }}
+                                            onOpenWorkflows={() => {
+                                                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                                                if (featureFlags.workflowEngine) {
+                                                    setWorkflowOpen(true);
+                                                    return;
+                                                }
+                                                openSettingsAt('integrations');
+                                            }}
+                                            onOpenPullRequests={() => {
+                                                setPrIntegrationOpen(true);
+                                            }}
+                                            onOpenCollaboration={() => {
+                                                setCollaborationOpen(true);
+                                            }}
+                                            onOpenRepoPolicy={() => {
+                                                openSettingsAt('integrations', 'repo-policy');
+                                            }}
+                                            onOpenDiagnostics={() => {
+                                                openSettingsAt('integrations', 'diagnostics');
+                                            }}
+                                        />
+                                    )}
                                     <NotificationCenter />
                                 </>
                             }
@@ -2477,29 +2564,6 @@ export function GitGraph() {
                                                                 expandedIndex={expandedCommit ?? -1}
                                                                 selectedIndex={selectedCommitIndex}
                                                                 onVertexClick={handleSelectCommit}
-                                                                onVertexQuickActions={(index, pos) => {
-                                                                    const full = layoutCommits[index] as
-                                                                        | {
-                                                                              hash: string;
-                                                                              author: string;
-                                                                              email?: string;
-                                                                              message?: string;
-                                                                              parents?: string[];
-                                                                          }
-                                                                        | undefined;
-                                                                    if (!full) return;
-                                                                    handleSelectCommit(index);
-                                                                    setCommitDotQuickTarget({
-                                                                        hash: full.hash,
-                                                                        message: full.message ?? '',
-                                                                        author: full.author,
-                                                                        ...(full.email !== undefined
-                                                                            ? { email: full.email }
-                                                                            : {}),
-                                                                    });
-                                                                    setCommitDotQuickPosition(pos);
-                                                                    setCommitDotQuickOpen(true);
-                                                                }}
                                                                 onVertexHover={() => {}}
                                                                 commits={commitGraphCommits}
                                                                 showAvatars={commitGraphCommits.length < 2500}
@@ -2595,18 +2659,20 @@ export function GitGraph() {
                                     </span>{' '}
                                     commits
                                 </span>
-                                {commitsData?.moreCommitsAvailable && maxCommits < maxCommitsLimit && (
-                                    <button
-                                        className='text-primary font-medium hover:underline'
-                                        onClick={handleLoadMore}>
-                                        Load more
-                                    </button>
-                                )}
-                                {commitsData?.moreCommitsAvailable && maxCommits >= maxCommitsLimit && (
-                                    <span className='text-muted-foreground/70'>
-                                        Limit reached ({maxCommitsLimit.toLocaleString()})
-                                    </span>
-                                )}
+                                {commitsData?.moreCommitsAvailable &&
+                                    (commitsData?.commits.length ?? 0) < maxCommitsLimit && (
+                                        <button
+                                            className='text-primary font-medium hover:underline'
+                                            onClick={handleLoadMore}>
+                                            {commitsFetching ? 'Loading...' : 'Load more'}
+                                        </button>
+                                    )}
+                                {commitsData?.moreCommitsAvailable &&
+                                    (commitsData?.commits.length ?? 0) >= maxCommitsLimit && (
+                                        <span className='text-muted-foreground/70'>
+                                            Limit reached ({maxCommitsLimit.toLocaleString()})
+                                        </span>
+                                    )}
                             </div>
 
                             <div className='flex-1' />
@@ -3078,20 +3144,6 @@ export function GitGraph() {
                             contiguous={multiSelectionPayload.contiguous}
                             onCurrentBranch={true}
                             onClear={clearMultiSelection}
-                        />
-
-                        <CommitDotQuickActions
-                            open={commitDotQuickOpen}
-                            position={commitDotQuickPosition}
-                            commit={commitDotQuickTarget}
-                            currentBranch={currentHead}
-                            onClose={() => {
-                                setCommitDotQuickOpen(false);
-                            }}
-                            onOpenFullDetails={(hash) => {
-                                const idx = layoutCommits.findIndex((c: { hash: string }) => c.hash === hash);
-                                if (idx >= 0) handleSelectCommit(idx);
-                            }}
                         />
 
                         {activeRepo && (

@@ -21,11 +21,6 @@ interface CommitGraphProps {
     expandedIndex: number;
     selectedIndex?: number | null;
     onVertexClick: (index: number) => void;
-    /**
-     * Fires when a user shift- or alt-clicks a commit dot. The host renders an
-     * inline quick-actions popover at (clientX, clientY) — see CommitDotQuickActions.
-     */
-    onVertexQuickActions?: (index: number, position: { x: number; y: number }) => void;
     onVertexHover: (index: number | null) => void;
     commits?: CommitInfo[];
     showAvatars?: boolean;
@@ -39,7 +34,6 @@ export function CommitGraph({
     expandedIndex,
     selectedIndex = null,
     onVertexClick,
-    onVertexQuickActions,
     onVertexHover,
     commits = [],
     showAvatars = false,
@@ -179,13 +173,7 @@ export function CommitGraph({
                                 <g
                                     className='cursor-pointer'
                                     onClick={(e) => {
-                                        // Plain click on the dot opens the quick-actions card.
-                                        // Cmd/Ctrl-click falls back to selection (row-style behaviour).
-                                        if (onVertexQuickActions && !e.metaKey && !e.ctrlKey) {
-                                            e.stopPropagation();
-                                            onVertexQuickActions(v.id, { x: e.clientX, y: e.clientY });
-                                            return;
-                                        }
+                                        e.stopPropagation();
                                         onVertexClick(v.id);
                                     }}
                                     onMouseEnter={() => {
@@ -246,11 +234,7 @@ export function CommitGraph({
                                             strokeWidth={2.5}
                                             className='cursor-pointer'
                                             onClick={(e) => {
-                                                if (onVertexQuickActions && !e.metaKey && !e.ctrlKey) {
-                                                    e.stopPropagation();
-                                                    onVertexQuickActions(v.id, { x: e.clientX, y: e.clientY });
-                                                    return;
-                                                }
+                                                e.stopPropagation();
                                                 onVertexClick(v.id);
                                             }}
                                             onMouseEnter={() => {
@@ -270,11 +254,7 @@ export function CommitGraph({
                                             strokeWidth={1.5}
                                             className='cursor-pointer'
                                             onClick={(e) => {
-                                                if (onVertexQuickActions && !e.metaKey && !e.ctrlKey) {
-                                                    e.stopPropagation();
-                                                    onVertexQuickActions(v.id, { x: e.clientX, y: e.clientY });
-                                                    return;
-                                                }
+                                                e.stopPropagation();
                                                 onVertexClick(v.id);
                                             }}
                                             onMouseEnter={() => {

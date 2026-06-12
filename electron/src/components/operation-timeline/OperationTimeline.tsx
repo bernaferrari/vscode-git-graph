@@ -37,7 +37,6 @@ import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { trpc } from '@/trpc/client';
 
-
 const OPERATION_ICONS: Record<string, React.ElementType> = {
     commit: GitCommit,
     rebase: GitBranch,
@@ -59,7 +58,7 @@ const OPERATION_ICONS: Record<string, React.ElementType> = {
     amend: GitCommit,
 };
 
-const SAFE_UNDO_ACTION_TYPES = new Set(['undo-last-commit', 'checkout', 'delete-branch']);
+const SAFE_UNDO_ACTION_TYPES = new Set(['undo-last-commit', 'checkout', 'delete-branch', 'reset-mixed']);
 
 interface OperationTimelineProps {
     children?: ReactElement;
@@ -75,6 +74,7 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
     const undoLastCommit = trpc.git.undoLastCommit.useMutation();
     const checkout = trpc.git.checkout.useMutation();
     const deleteBranch = trpc.git.deleteBranch.useMutation();
+    const reset = trpc.git.reset.useMutation();
 
     const handleUndo = useCallback(
         async (operation: OperationReceipt) => {
@@ -105,6 +105,15 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                         if (result.error) throw new Error(result.error);
                         break;
                     }
+                    case 'reset-mixed': {
+                        const result = await reset.mutateAsync({
+                            repo: activeRepo,
+                            commitHash: operation.undoAction.command,
+                            mode: 'mixed',
+                        });
+                        if (result.error) throw new Error(result.error);
+                        break;
+                    }
                     default:
                         toast.info('Undo is not implemented for this operation yet.');
                         return;
@@ -120,7 +129,9 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                     utils.git.aheadBehindAll.invalidate(),
                     utils.git.operationState.invalidate(),
                 ]);
-                toast.success('Operation undone');
+                toast.success('Operation undone', {
+                    description: operation.undoAction.label ?? operation.undoAction.command,
+                });
             } catch (error) {
                 toast.error('Failed to undo operation', {
                     description: error instanceof Error ? error.message : 'Unknown error',
@@ -135,6 +146,7 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
             deleteBranch,
             markAsUndone,
             undoLastCommit,
+            reset,
             utils.git.aheadBehind,
             utils.git.aheadBehindAll,
             utils.git.commits,
@@ -197,7 +209,9 @@ export function OperationTimeline({ children }: OperationTimelineProps) {
                                             variant='ghost'
                                             size='sm'
                                             className='h-7 w-7 p-0'
-                                            onClick={() => { cancelQueuedOperation(entry.id); }}
+                                            onClick={() => {
+                                                cancelQueuedOperation(entry.id);
+                                            }}
                                             aria-label={`Cancel ${entry.label}`}>
                                             <X className='h-3.5 w-3.5' />
                                         </Button>
@@ -270,7 +284,8 @@ function OperationItem({ operation, onUndo, isUndoing = false }: OperationItemPr
                         <StatusIcon
                             className={cn(
                                 'h-3.5 w-3.5',
-                                operation.status === 'success' && 'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
+                                operation.status === 'success' &&
+                                    'text-[color-mix(in_oklch,var(--success)_72%,var(--foreground))]',
                                 operation.status === 'failed' && 'text-destructive',
                                 operation.status === 'undone' && 'text-muted-foreground'
                             )}
@@ -280,7 +295,7 @@ function OperationItem({ operation, onUndo, isUndoing = false }: OperationItemPr
                         {formatDistanceToNow(operation.timestamp, { addSuffix: true })}
                     </p>
                     {operation.error && (
-                        <p className='mt-1 flex items-center gap-1 text-xs text-destructive'>
+                        <p className='text-destructive mt-1 flex items-center gap-1 text-xs'>
                             <AlertCircle className='h-3 w-3' />
                             {operation.error}
                         </p>
@@ -307,6 +322,11 @@ function OperationItem({ operation, onUndo, isUndoing = false }: OperationItemPr
                     </Button>
                 )}
             </div>
+            {!onUndo && operation.status === 'success' && operation.undoUnavailableReason ? (
+                <p className='text-muted-foreground/85 mt-2 text-xs'>
+                    Undo unavailable: {operation.undoUnavailableReason}
+                </p>
+            ) : null}
         </div>
     );
 }

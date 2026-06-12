@@ -654,6 +654,12 @@ export class GitService {
 
     // ==================== Commit Operations ====================
 
+    private async getParentRevisions(repo: string, commitHash: string): Promise<string[]> {
+        const output = await this.runGitCommandWithOutput(['rev-list', '--parents', '-n', '1', commitHash], repo);
+        const [, ...parents] = (output ?? '').trim().split(/\s+/).filter(Boolean);
+        return parents;
+    }
+
     /**
      * Get commit log.
      */
@@ -669,6 +675,7 @@ export class GitService {
             filePath?: string;
             dateFrom?: string;
             dateTo?: string;
+            cursor?: string;
         }
     ): Promise<
         Array<{
@@ -680,6 +687,12 @@ export class GitService {
             message: string;
         }>
     > {
+        const cursor = filters?.cursor?.trim();
+        const cursorParentRevisions = cursor ? await this.getParentRevisions(repo, cursor) : null;
+        if (cursor && cursorParentRevisions?.length === 0) {
+            return [];
+        }
+
         const args = [
             '-c',
             'log.showSignature=false',
@@ -713,7 +726,9 @@ export class GitService {
             args.push(`--until=${filteredDateTo}`);
         }
 
-        if (branches !== null && branches.length > 0) {
+        if (cursorParentRevisions) {
+            args.push(...cursorParentRevisions);
+        } else if (branches !== null && branches.length > 0) {
             args.push(...branches);
         } else {
             args.push('--branches', '--tags');

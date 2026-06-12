@@ -3,7 +3,7 @@
  * Provides convenient access to Git tRPC mutations
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
 import { useOperationLog, type OperationReceipt } from '@/lib/operationLog';
@@ -204,6 +204,54 @@ export function useGitOperations() {
         { enabled: !!activeRepo }
     );
     const currentBranch = repoInfo?.head ?? null;
+    const pendingUndoHeadRef = useRef<string | null>(null);
+
+    const captureCurrentHeadForUndo = useCallback(async () => {
+        if (!activeRepo) {
+            pendingUndoHeadRef.current = null;
+            return;
+        }
+
+        const result = await utils.git.commitDetails.fetch({
+            repo: activeRepo,
+            commitHash: 'HEAD',
+        });
+        pendingUndoHeadRef.current = result.details?.hash ?? null;
+    }, [activeRepo, utils.git.commitDetails]);
+
+    const consumeResetUndoReceipt = useCallback(
+        (operationLabel: string): Pick<LoggedOperation, 'undoAction' | 'undoUnavailableReason'> => {
+            const previousHead = pendingUndoHeadRef.current;
+            pendingUndoHeadRef.current = null;
+
+            if (!previousHead) {
+                return {
+                    undoUnavailableReason: `Previous HEAD could not be captured before ${operationLabel}.`,
+                };
+            }
+
+            const shortHead = previousHead.slice(0, 7);
+            return {
+                undoAction: {
+                    type: 'reset-mixed',
+                    command: previousHead,
+                    label: `Restore ${currentBranch ?? 'current branch'} to ${shortHead}`,
+                },
+            };
+        },
+        [currentBranch]
+    );
+
+    const consumeNoCommitUndoReason = useCallback(
+        (operationLabel: string): Pick<LoggedOperation, 'undoUnavailableReason'> => {
+            pendingUndoHeadRef.current = null;
+            return {
+                undoUnavailableReason: `${operationLabel} left changes in the working tree instead of moving the branch. Use the working-tree changes list to discard or stage them.`,
+            };
+        },
+        []
+    );
+
     const safeInvalidateRepositoryData = useCallback(async () => {
         await Promise.allSettled([
             utils.git.repoInfo.invalidate(),
@@ -233,9 +281,49 @@ export function useGitOperations() {
         ]);
     }, [utils.git.operationState, utils.git.repoInfo, utils.git.workingDirectoryStatus, utils.git.workingTreeStatus]);
 
+    const safeInvalidateHistoryData = useCallback(async () => {
+        await Promise.allSettled([
+            utils.git.repoInfo.invalidate(),
+            utils.git.refs.invalidate(),
+            utils.git.commits.invalidate(),
+            utils.git.aheadBehind.invalidate(),
+            utils.git.aheadBehindAll.invalidate(),
+            utils.git.operationState.invalidate(),
+        ]);
+    }, [
+        utils.git.aheadBehind,
+        utils.git.aheadBehindAll,
+        utils.git.commits,
+        utils.git.operationState,
+        utils.git.refs,
+        utils.git.repoInfo,
+    ]);
+
+    const safeInvalidateRefsData = useCallback(async () => {
+        await Promise.allSettled([
+            utils.git.repoInfo.invalidate(),
+            utils.git.refs.invalidate(),
+            utils.git.commits.invalidate(),
+        ]);
+    }, [utils.git.commits, utils.git.refs, utils.git.repoInfo]);
+
+    const safeInvalidateSyncStateData = useCallback(async () => {
+        await Promise.allSettled([
+            utils.git.repoInfo.invalidate(),
+            utils.git.aheadBehind.invalidate(),
+            utils.git.aheadBehindAll.invalidate(),
+        ]);
+    }, [utils.git.aheadBehind, utils.git.aheadBehindAll, utils.git.repoInfo]);
+
     const safeInvalidateRepoAndRemotesData = useCallback(async () => {
-        await Promise.allSettled([utils.git.remotes.invalidate(), safeInvalidateRepositoryData()]);
-    }, [safeInvalidateRepositoryData, utils.git.remotes]);
+        await Promise.allSettled([
+            utils.git.remotes.invalidate(),
+            utils.git.repoInfo.invalidate(),
+            utils.git.refs.invalidate(),
+            utils.git.aheadBehind.invalidate(),
+            utils.git.aheadBehindAll.invalidate(),
+        ]);
+    }, [utils.git.aheadBehind, utils.git.aheadBehindAll, utils.git.refs, utils.git.remotes, utils.git.repoInfo]);
 
     const formatErrorWithGuidance = useCallback((message: string): string => {
         const trimmed = message.trim();
@@ -328,7 +416,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to create branch', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateRefsData();
             logOperation({
                 type: 'branch-create',
                 description: `Created branch ${variables.branchName}`,
@@ -337,6 +425,7 @@ export function useGitOperations() {
                 undoAction: {
                     type: 'delete-branch',
                     command: variables.branchName,
+                    label: `Delete branch ${variables.branchName}`,
                 },
                 affectedBranches: [variables.branchName],
                 affectedCommits: [variables.commitHash],
@@ -356,7 +445,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to delete branch', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateRefsData();
             logOperation({
                 type: 'branch-delete',
                 description: `Deleted branch ${variables.branchName}`,
@@ -380,7 +469,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to rename branch', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateRefsData();
             logOperation({
                 type: 'branch-rename',
                 description: `Renamed branch ${variables.oldName} to ${variables.newName}`,
@@ -415,6 +504,7 @@ export function useGitOperations() {
                           undoAction: {
                               type: 'checkout',
                               command: currentBranch,
+                              label: `Checkout ${currentBranch}`,
                           },
                       }
                     : {}),
@@ -442,6 +532,7 @@ export function useGitOperations() {
                 description: `Reset ${variables.mode} to ${variables.commitHash.slice(0, 7)}`,
                 details: `${variables.mode}:${variables.commitHash}`,
                 gitCommands: [`git reset --${variables.mode} ${variables.commitHash}`],
+                ...consumeResetUndoReceipt('reset'),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [variables.commitHash],
                 status: 'success',
@@ -460,7 +551,7 @@ export function useGitOperations() {
                 notifyOperationError('Fetch failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateHistoryData();
             logOperation({
                 type: 'fetch',
                 description: `Fetched ${variables.remote ?? 'all remotes'}`,
@@ -494,6 +585,7 @@ export function useGitOperations() {
                 gitCommands: [
                     `git pull${variables.fastForwardOnly ? ' --ff-only' : variables.noFastForward ? ' --no-ff' : ''} ${variables.remote} ${variables.branchName}`,
                 ],
+                ...consumeResetUndoReceipt('pull'),
                 affectedBranches: [variables.branchName],
                 affectedCommits: [],
                 status: 'success',
@@ -513,7 +605,7 @@ export function useGitOperations() {
                 return;
             }
             const pushMode = variables.mode ?? 'normal';
-            void safeInvalidateRepositoryData();
+            void safeInvalidateSyncStateData();
             logOperation({
                 type: pushMode === 'normal' ? 'push' : 'force-push',
                 description: `${pushMode === 'normal' ? 'Pushed' : pushMode === 'force-with-lease' ? 'Force-with-lease pushed' : 'Force pushed'} ${variables.remote}/${variables.branchName}`,
@@ -539,7 +631,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to create tag', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateRefsData();
             toast.success('Tag created');
         },
         onError: (error: MutationErrorShape) => {
@@ -554,7 +646,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to delete tag', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateRefsData();
             toast.success('Tag deleted');
         },
         onError: (error: MutationErrorShape) => {
@@ -577,6 +669,9 @@ export function useGitOperations() {
                 gitCommands: [
                     `git merge${variables.noFastForward ? ' --no-ff' : ''}${variables.squash ? ' --squash' : ''}${variables.noCommit ? ' --no-commit' : ''} ${variables.branch}`,
                 ],
+                ...(variables.noCommit || variables.squash
+                    ? consumeNoCommitUndoReason('Merge')
+                    : consumeResetUndoReceipt('merge')),
                 affectedBranches: [variables.branch, ...(currentBranch ? [currentBranch] : [])],
                 affectedCommits: [],
                 status: 'success',
@@ -595,12 +690,13 @@ export function useGitOperations() {
                 notifyOperationError('Rebase failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateHistoryData();
             logOperation({
                 type: 'rebase',
                 description: `Rebased ${currentBranch ?? 'current branch'} onto ${variables.onto}`,
                 details: variables.onto,
                 gitCommands: [`git rebase${variables.interactive ? ' -i' : ''} ${variables.onto}`],
+                ...consumeResetUndoReceipt('rebase'),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [],
                 status: 'success',
@@ -619,12 +715,15 @@ export function useGitOperations() {
                 notifyOperationError('Cherry-pick failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateSyncStateData();
             logOperation({
                 type: 'cherry-pick',
                 description: `Cherry-picked ${variables.commitHash.slice(0, 7)}`,
                 details: variables.commitHash,
                 gitCommands: [`git cherry-pick${variables.noCommit ? ' --no-commit' : ''} ${variables.commitHash}`],
+                ...(variables.noCommit
+                    ? consumeNoCommitUndoReason('Cherry-pick')
+                    : consumeResetUndoReceipt('cherry-pick')),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [variables.commitHash],
                 status: 'success',
@@ -643,12 +742,13 @@ export function useGitOperations() {
                 notifyOperationError('Squash failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateHistoryData();
             logOperation({
                 type: 'rebase',
                 description: `Squashed ${String(variables.commitHashes.length)} commits`,
                 details: variables.commitHashes.join(', '),
                 gitCommands: ['git rebase -i'],
+                ...consumeResetUndoReceipt('squash'),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: variables.commitHashes,
                 status: 'success',
@@ -667,12 +767,13 @@ export function useGitOperations() {
                 notifyOperationError('Drop failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateSyncStateData();
             logOperation({
                 type: 'rebase',
                 description: `Dropped ${String(variables.commitHashes.length)} commits`,
                 details: variables.commitHashes.join(', '),
                 gitCommands: ['git rebase -i'],
+                ...consumeResetUndoReceipt('drop'),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: variables.commitHashes,
                 status: 'success',
@@ -691,12 +792,13 @@ export function useGitOperations() {
                 notifyOperationError('Revert failed', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateHistoryData();
             logOperation({
                 type: 'revert',
                 description: `Reverted ${variables.commitHash.slice(0, 7)}`,
                 details: variables.commitHash,
                 gitCommands: [`git revert${variables.noCommit ? ' --no-commit' : ''} ${variables.commitHash}`],
+                ...(variables.noCommit ? consumeNoCommitUndoReason('Revert') : consumeResetUndoReceipt('revert')),
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [variables.commitHash],
                 status: 'success',
@@ -726,6 +828,7 @@ export function useGitOperations() {
                 undoAction: {
                     type: 'undo-last-commit',
                     command: variables.amend ? 'soft' : 'soft',
+                    label: `Move ${currentBranch ?? 'current branch'} back one commit`,
                 },
                 affectedBranches: currentBranch ? [currentBranch] : [],
                 affectedCommits: [],
@@ -951,7 +1054,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to set upstream', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateSyncStateData();
             logOperation({
                 type: 'push',
                 description: `Set upstream for ${variables.branchName} to ${variables.upstream}`,
@@ -975,7 +1078,7 @@ export function useGitOperations() {
                 notifyOperationError('Failed to delete remote branch', error);
                 return;
             }
-            void safeInvalidateRepositoryData();
+            void safeInvalidateHistoryData();
             logOperation({
                 type: 'branch-delete',
                 description: `Deleted remote branch ${variables.remote}/${variables.branchName}`,
@@ -1067,15 +1170,16 @@ export function useGitOperations() {
     const handleReset = useCallback(
         async (commitHash: string, mode: 'soft' | 'mixed' | 'hard') => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Resetting (${mode})`, () =>
-                reset.mutateAsync({
+            return runTrackedOperation(`Resetting (${mode})`, async () => {
+                await captureCurrentHeadForUndo();
+                return reset.mutateAsync({
                     repo: activeRepo,
                     commitHash,
                     mode,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, reset, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, reset, runTrackedOperation]
     );
 
     const handleFetch = useCallback(
@@ -1106,17 +1210,21 @@ export function useGitOperations() {
                 return { error: 'Cannot combine no-fast-forward and fast-forward-only pull options' };
             }
 
-            return runTrackedOperation(`Pulling ${remote}/${resolvedBranch}${fastForwardOnly ? ' (ff-only)' : ''}`, () =>
-                pull.mutateAsync({
-                    repo: activeRepo,
-                    branchName: resolvedBranch,
-                    remote,
-                    noFastForward,
-                    fastForwardOnly,
-                })
+            return runTrackedOperation(
+                `Pulling ${remote}/${resolvedBranch}${fastForwardOnly ? ' (ff-only)' : ''}`,
+                async () => {
+                    await captureCurrentHeadForUndo();
+                    return pull.mutateAsync({
+                        repo: activeRepo,
+                        branchName: resolvedBranch,
+                        remote,
+                        noFastForward,
+                        fastForwardOnly,
+                    });
+                }
             );
         },
-        [currentBranch, activeRepo, pull, runTrackedOperation]
+        [currentBranch, activeRepo, captureCurrentHeadForUndo, pull, runTrackedOperation]
     );
 
     const handlePush = useCallback(
@@ -1173,86 +1281,92 @@ export function useGitOperations() {
     const handleMerge = useCallback(
         async (branch: string, options?: { noFastForward?: boolean; squash?: boolean; noCommit?: boolean }) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Merging ${branch}`, () =>
-                merge.mutateAsync({
+            return runTrackedOperation(`Merging ${branch}`, async () => {
+                await captureCurrentHeadForUndo();
+                return merge.mutateAsync({
                     repo: activeRepo,
                     branch,
                     noFastForward: options?.noFastForward ?? true,
                     squash: options?.squash ?? false,
                     noCommit: options?.noCommit ?? false,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, merge, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, merge, runTrackedOperation]
     );
 
     const handleRebase = useCallback(
         async (onto: string, interactive?: boolean, todos?: string) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Rebasing onto ${onto}`, () =>
-                rebase.mutateAsync({
+            return runTrackedOperation(`Rebasing onto ${onto}`, async () => {
+                await captureCurrentHeadForUndo();
+                return rebase.mutateAsync({
                     repo: activeRepo,
                     onto,
                     interactive: interactive ?? false,
                     todos: todos,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, rebase, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, rebase, runTrackedOperation]
     );
 
     const handleCherryPick = useCallback(
         async (commitHash: string, noCommit?: boolean) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Cherry-picking ${commitHash.slice(0, 7)}`, () =>
-                cherryPick.mutateAsync({
+            return runTrackedOperation(`Cherry-picking ${commitHash.slice(0, 7)}`, async () => {
+                await captureCurrentHeadForUndo();
+                return cherryPick.mutateAsync({
                     repo: activeRepo,
                     commitHash,
                     noCommit: noCommit ?? false,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, cherryPick, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, cherryPick, runTrackedOperation]
     );
 
     const handleSquashCommits = useCallback(
         async (commitHashes: string[]) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Squashing ${String(commitHashes.length)} commits`, () =>
-                squashCommits.mutateAsync({
+            return runTrackedOperation(`Squashing ${String(commitHashes.length)} commits`, async () => {
+                await captureCurrentHeadForUndo();
+                return squashCommits.mutateAsync({
                     repo: activeRepo,
                     commitHashes,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, runTrackedOperation, squashCommits]
+        [activeRepo, captureCurrentHeadForUndo, runTrackedOperation, squashCommits]
     );
 
     const handleDropCommits = useCallback(
         async (commitHashes: string[]) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Dropping ${String(commitHashes.length)} commits`, () =>
-                dropCommits.mutateAsync({
+            return runTrackedOperation(`Dropping ${String(commitHashes.length)} commits`, async () => {
+                await captureCurrentHeadForUndo();
+                return dropCommits.mutateAsync({
                     repo: activeRepo,
                     commitHashes,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, dropCommits, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, dropCommits, runTrackedOperation]
     );
 
     const handleRevert = useCallback(
         async (commitHash: string, noCommit?: boolean) => {
             if (!activeRepo) return { error: 'No active repository' };
-            return runTrackedOperation(`Reverting ${commitHash.slice(0, 7)}`, () =>
-                revert.mutateAsync({
+            return runTrackedOperation(`Reverting ${commitHash.slice(0, 7)}`, async () => {
+                await captureCurrentHeadForUndo();
+                return revert.mutateAsync({
                     repo: activeRepo,
                     commitHash,
                     noCommit: noCommit ?? false,
-                })
-            );
+                });
+            });
         },
-        [activeRepo, revert, runTrackedOperation]
+        [activeRepo, captureCurrentHeadForUndo, revert, runTrackedOperation]
     );
 
     const handleCommit = useCallback(

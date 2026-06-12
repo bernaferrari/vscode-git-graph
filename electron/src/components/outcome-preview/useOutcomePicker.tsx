@@ -178,6 +178,7 @@ export function OutcomePickerProvider({ handlers, children }: OutcomePickerProvi
                             riskReasons: analyzed.riskReasons,
                             warnings: analyzed.warnings,
                             recommended: analyzed.recommended,
+                            previewGraph: analyzed.previewGraph,
                         };
                     });
                     setState((current) => {
